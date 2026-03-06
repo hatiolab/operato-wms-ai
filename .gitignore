@@ -1,0 +1,46 @@
+# Gradle
+.gradle
+bin/
+build/
+
+# IDE — Eclipse
+.classpath
+.project
+.settings/
+
+# IDE — IntelliJ
+.idea/
+*.iml
+*.iws
+
+# IDE — VSCode
+.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temp
+*.tmp
+*.swp
+*.bak
+
+# 프론트엔드
+node_modules/
+client/dist/
+client/.vite/
+
+# 환경 파일
+.env
+.env.local
+*.key
+*.pem
+
+# 빌드 결과물
+*.jar
+*.war
+!gradle/wrapper/gradle-wrapper.jar

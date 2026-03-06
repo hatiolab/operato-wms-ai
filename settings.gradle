@@ -1,0 +1,4 @@
+rootProject.name = 'operato-wms-ai'
+
+include ':otarepo-core'
+project(':otarepo-core').projectDir = new File('../otarepo-core')

@@ -1,0 +1,123 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.2.4'
+	id 'io.spring.dependency-management' version '1.1.4'
+}
+
+ext {
+	baseUrl = "http://repo.hatiolab.com/nexus/content"
+}
+
+group = 'operato.wms'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	sourceCompatibility = '17'
+}
+
+springBoot {
+	mainClass = 'operato.wms.OperatoWmsApplication'
+}
+
+jar {
+	manifest {
+		attributes 'Implementation-Title': 'operato-wms-ai',
+					'Implementation-Version': version,
+					'Main-Class': 'operato.wms.OperatoWmsApplication'
+	}
+	archiveBaseName = "${project.name}"
+	version = ""
+}
+
+processResources {
+	from ('src/main/java') {
+		include '/**/*.sql'
+	}
+	from ('src/main/java') {
+		include '/**/*.ttf'
+	}
+}
+
+repositories {
+	maven {
+		url baseUrl + '/groups/elidom-repository/'
+		allowInsecureProtocol true
+	}
+	mavenCentral()
+}
+
+dependencies {
+	// --- Project modules ---
+	implementation project(':otarepo-core')
+
+	// --- Spring Boot Starters ---
+	implementation 'org.springframework.boot:spring-boot-starter-amqp'
+	implementation 'org.springframework.boot:spring-boot-starter-cache'
+	implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	implementation 'org.springframework.boot:spring-boot-starter-data-rest'
+	implementation 'org.springframework.boot:spring-boot-starter-graphql'
+	implementation 'org.springframework.boot:spring-boot-starter-groovy-templates'
+	implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
+	implementation 'org.springframework.boot:spring-boot-starter-quartz'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-web-services'
+
+	// --- Spring Session ---
+	implementation 'org.springframework.session:spring-session-data-redis'
+	implementation 'org.springframework.session:spring-session-jdbc'
+
+	// --- Database drivers ---
+	implementation 'com.mysql:mysql-connector-j'
+	implementation 'com.oracle.database.jdbc:ojdbc11'
+	implementation 'org.postgresql:postgresql'
+
+	// --- HTTP & JSON ---
+	implementation 'org.apache.httpcomponents.client5:httpclient5'
+	implementation 'com.google.code.gson:gson'
+	implementation 'com.googlecode.json-simple:json-simple:1.1.1'
+
+	// --- Framework & Legacy support ---
+	implementation 'javax.annotation:javax.annotation-api:1.3.2'
+	implementation 'commons-collections:commons-collections:3.2.2'
+	implementation 'commons-dbcp:commons-dbcp:1.4'
+	implementation 'org.apache.velocity:velocity:1.7'
+	implementation 'org.javassist:javassist:3.30.2-GA'
+	implementation 'org.aspectj:aspectjweaver'
+	implementation 'net.sf.common-util:common-util:1.0.17'
+
+	// --- Security ---
+	implementation 'com.github.ulisesbocchio:jasypt-spring-boot-starter:3.0.5'
+	implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
+	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.3'
+	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
+
+	// --- Scripting engines ---
+	implementation 'org.apache.groovy:groovy-jsr223:4.0.24'
+	implementation 'com.sun.script.jruby:jruby-engine:1.1.7'
+
+	// --- Excel & Document processing ---
+	implementation 'org.jxls:jxls:2.14.0'
+	implementation 'org.jxls:jxls-poi:2.14.0'
+	implementation 'org.jxls:jxls-jexcel:1.0.9'
+	implementation 'org.apache.poi:poi:5.2.5'
+	implementation 'org.apache.poi:poi-ooxml:5.2.5'
+	implementation 'org.apache.pdfbox:pdfbox:2.0.30'
+	implementation 'com.github.librepdf:openpdf:1.3.35'
+
+	// --- Barcode, QR & Reporting ---
+	implementation 'net.sf.barcode4j:barcode4j:2.1'
+	implementation 'com.google.zxing:core:3.4.1'
+	implementation 'com.google.zxing:javase:3.4.1'
+	implementation 'net.sf.jasperreports:jasperreports:6.21.0'
+
+	// --- SVG (Batik) ---
+	implementation 'org.apache.xmlgraphics:batik-dom:1.17'
+	implementation 'org.apache.xmlgraphics:batik-svggen:1.17'
+	implementation 'org.apache.xmlgraphics:batik-bridge:1.17'
+
+	// --- Test ---
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
