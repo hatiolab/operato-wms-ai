@@ -8,8 +8,8 @@
 			"name": "otarepo-core"
 		},
 		{
-			"path": "../operato-wms-ai",
-			"name": "operato-wms-ai"
+			"name": "operato-wms-app (frontend)",
+			"path": "../operato-wms-app"
 		}
 	],
 	"settings": {

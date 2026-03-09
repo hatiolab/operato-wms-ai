@@ -40,9 +40,11 @@ client/.vite/
 .env.local
 *.key
 *.pem
+src/main/resources/application-dev.properties
 
 # 빌드 결과물
 *.jar
 *.war
 !gradle/wrapper/gradle-wrapper.jar
 .vscode/launch.json
+/.vscode

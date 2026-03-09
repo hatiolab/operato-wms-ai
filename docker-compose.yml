@@ -1,0 +1,85 @@
+services:
+
+  # -------------------------------------------------------------------
+  # 백엔드 API 서버
+  # -------------------------------------------------------------------
+  operato-wms-ai:
+    build:
+      context: ..                              # otarepo-core 접근을 위해 상위 디렉터리
+      dockerfile: operato-wms-ai/Dockerfile
+    image: hatiolab/operato-wms-ai:latest
+    container_name: operato-wms-ai
+    restart: unless-stopped
+    ports:
+      - "9501:9501"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      JAVA_OPTS: "-Xmx512m -Djava.security.egd=file:/dev/./urandom"
+      JASYPT_ENCRYPTOR_PASSWORD: ${JASYPT_ENCRYPTOR_PASSWORD}
+    volumes:
+      - wms-logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - wms-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9501/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # -------------------------------------------------------------------
+  # PostgreSQL
+  # -------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: operato-postgres
+    restart: unless-stopped
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_DB: operatowms
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - wms-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d operatowms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -------------------------------------------------------------------
+  # Redis
+  # -------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: operato-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis-data:/data
+    networks:
+      - wms-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
+  redis-data:
+  wms-logs:
+
+networks:
+  wms-network:
+    driver: bridge

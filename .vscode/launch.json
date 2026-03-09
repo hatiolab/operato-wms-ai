@@ -3,14 +3,15 @@
   "configurations": [
     {
       "type": "java",
-      "name": "operato-wms-ai (debug)",
+      "name": "operato-wms-ai (debug-dev)",
       "request": "launch",
       "mainClass": "operato.wms.OperatoWmsApplication",
       "projectName": "operato-wms-ai",
       "args": "--spring.profiles.active=dev",
       "vmArgs": "-Xmx512m",
       "env": {
-        "JAVA_HOME": "/Library/Java/JavaVirtualMachines/zulu-18.jdk/Contents/Home"
+        "JAVA_HOME": "/Library/Java/JavaVirtualMachines/zulu-18.jdk/Contents/Home",
+        "JASYPT_ENCRYPTOR_PASSWORD": "operato-wms-secret"
       }
     },
     {
@@ -19,6 +20,19 @@
       "request": "attach",
       "hostName": "localhost",
       "port": 5004
+    },
+    {
+      "type": "java",
+      "name": "operato-wms-ai (debug-prod)",
+      "request": "launch",
+      "mainClass": "operato.wms.OperatoWmsApplication",
+      "projectName": "operato-wms-ai",
+      "args": "--spring.profiles.active=prod",
+      "vmArgs": "-Xmx512m",
+      "env": {
+        "JAVA_HOME": "/Library/Java/JavaVirtualMachines/zulu-18.jdk/Contents/Home",
+        "JASYPT_ENCRYPTOR_PASSWORD": "operato-wms-secret"
+      }
     }
   ]
 }

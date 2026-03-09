@@ -1,0 +1,42 @@
+# Gradle 캐시 및 빌드 결과물
+.gradle/
+build/
+bin/
+
+# IDE 설정
+.idea/
+.vscode/
+*.iml
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 로그
+*.log
+logs/
+
+# 문서 및 참조 파일 (빌드 불필요)
+docs/
+ref/
+.ai/
+.claude/
+*.md
+
+# 환경 파일 (이미지에 포함 금지)
+.env
+.env.*
+*.key
+*.pem
+src/main/resources/application-dev.properties
+
+# Git
+.git/
+.gitignore
+.gitmodules
+
+# Temp
+*.tmp
+*.swp
+*.bak

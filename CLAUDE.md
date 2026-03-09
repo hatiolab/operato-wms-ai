@@ -11,9 +11,19 @@
 - DAS/DPS 등 WCS 설비 연계 지원
 - 3D 재고 모니터링 현황판 제공
 
+### 저장소 구성
+
+| 저장소 | 경로 | 역할 |
+|--------|------|------|
+| `operato-wms-ai` | `./` (현재) | 백엔드 — Spring Boot REST API 서버 |
+| `operato-wms-app` | `../operato-wms-app` | 프론트엔드 — Things Factory 기반 Web/PWA UI |
+| `otarepo-core` | `../otarepo-core` | 공유 코어 라이브러리 (백엔드 서브모듈) |
+
 ---
 
 ## 기술 스택
+
+### 백엔드 (operato-wms-ai)
 
 | 항목 | 내용 |
 |------|------|
@@ -32,27 +42,59 @@
 | SVG | Apache Batik |
 | 서브모듈 | `otarepo-core` (../otarepo-core) |
 
+### 프론트엔드 (operato-wms-app)
+
+| 항목 | 내용 |
+|------|------|
+| 프레임워크 | Things Factory (하티오랩 자체 프레임워크) |
+| 모노레포 | Lerna + Yarn Workspaces |
+| 언어 | TypeScript, JavaScript |
+| 번들러 | Webpack (`@things-factory/builder`) |
+| 패키지 매니저 | Yarn |
+| 테스트 | Jest + Babel |
+| 주요 패키지 | `@things-factory/operato-wms-ui` (메인 WMS UI) |
+| UI 컴포넌트 | `@operato/*` 시리즈 (data-grist, layout, popup, graphql 등) |
+| API 통신 | GraphQL (`@operato/graphql`) |
+| 서버 사이드 | Node.js (Koa 기반, TypeORM, DB 마이그레이션 포함) |
+
 ---
 
 ## 빌드 및 실행
 
-### 빌드
+### 백엔드 빌드
 ```bash
 JAVA_HOME=$(/usr/libexec/java_home -v 18) ./gradlew build
 ```
 
-### 디버그 실행 (VSCode)
+### 백엔드 디버그 실행 (VSCode)
 - `실행 및 디버그` (Cmd+Shift+D) → **operato-wms-ai (debug)** 선택
 - 또는 원격 attach: **operato-wms-ai (attach)** (포트 5004)
 
-### 환경 설정
+### 백엔드 환경 설정
 - `src/main/resources/application.properties` — 공통 설정
-- `src/main/resources/application-dev.properties` — 개발 환경 설정
+- `src/main/resources/application-dev.properties` — 개발 환경 설정 (git 미추적)
 - `spring.profiles.active=dev` 로 실행
+
+### 프론트엔드 빌드 및 실행
+```bash
+cd ../operato-wms-app
+
+# 의존성 설치
+yarn install
+
+# 전체 빌드
+yarn build
+
+# 개발 서버 실행 (operato-wms-ui)
+yarn wms:dev       # 빌드 후 개발 서버 (포트 3000/3001)
+yarn wms           # 프로덕션 모드 실행
+```
 
 ---
 
 ## 프로젝트 구조
+
+### 백엔드 (operato-wms-ai)
 
 ```
 src/main/java/operato/wms/
@@ -72,6 +114,33 @@ src/main/java/operato/wms/
 └── stock/                           # 재고 관리 모듈
     ├── entity/                      # Inventory, InventoryHist, Stocktake 등
     └── rest/                        # InventoryController 등
+```
+
+### 프론트엔드 (operato-wms-app)
+
+```
+packages/
+├── operato-wms-ui/                  # 메인 WMS UI 패키지
+│   ├── client/                      # 브라우저 클라이언트 코드
+│   │   ├── pages/                   # 화면 페이지
+│   │   │   ├── inbound/             # 입고 화면
+│   │   │   ├── outbound/            # 출고 화면
+│   │   │   ├── inventory/           # 재고 화면
+│   │   │   ├── master/              # 기준 정보 화면
+│   │   │   ├── settlement/          # 정산 화면
+│   │   │   ├── work/                # 작업 화면
+│   │   │   └── config/              # 설정 화면
+│   │   ├── actions/                 # Redux 액션
+│   │   ├── reducers/                # Redux 리듀서
+│   │   └── themes/                  # UI 테마
+│   └── server/                      # Node.js 서버 사이드 (BFF)
+│       ├── controllers/             # 서버 컨트롤러
+│       ├── middlewares/             # Koa 미들웨어
+│       ├── migrations/              # TypeORM DB 마이그레이션
+│       └── routes.ts                # 라우트 등록
+├── operato-logis-system-ui/         # 물류 시스템 공통 UI
+├── metapage/                        # 메타페이지 컴포넌트
+└── operatofill/                     # 자동입력 유틸
 ```
 
 ---
@@ -120,6 +189,7 @@ src/main/java/operato/wms/
 
 ## 코딩 컨벤션
 
+### 백엔드 (operato-wms-ai)
 - 패키지: `operato.wms.{모듈}.{레이어}` (예: `operato.wms.inbound.rest`)
 - Entity: JPA 엔티티, 각 모듈의 `entity/` 하위
 - Controller: REST, `{도메인}Controller.java` 네이밍
@@ -127,6 +197,15 @@ src/main/java/operato/wms/
 - QueryStore: 복잡한 조회 쿼리, `query/store/` 하위
 - Initializer: 모듈 초기화, `web/initializer/` 하위
 - 모듈별 상수: `Wms{Module}Constants.java`, `Wms{Module}ConfigConstants.java`
+
+### 프론트엔드 (operato-wms-app)
+- 패키지명: `@things-factory/{패키지명}` 스코프
+- 화면 파일: `client/pages/{모듈}/{도메인}-{액션}.js` (예: `inbound/receive-list.js`)
+- Things Factory 라우트: `client/route.js`에 페이지 경로 등록
+- 서버 라우트: `server/routes.ts`에 Koa 라우터로 등록 (`bootstrap-module-*-route` 이벤트)
+- DB 마이그레이션: `server/migrations/`에 TypeORM 마이그레이션 파일 추가
+- API 통신: GraphQL 우선, 백엔드 REST API는 `/rest/` 경로로 직접 호출
+- 상태관리: Redux (actions/reducers 패턴)
 
 ---
 
