@@ -9,7 +9,7 @@
 # ---------------------------------------------------------------------
 # Stage 1: Build
 # ---------------------------------------------------------------------
-FROM eclipse-temurin:18-jdk-alpine AS builder
+FROM --platform=linux/amd64 eclipse-temurin:18-jdk-alpine AS builder
 
 WORKDIR /workspace
 
@@ -33,7 +33,7 @@ RUN chmod +x gradlew && \
 # ---------------------------------------------------------------------
 # Stage 2: Runtime
 # ---------------------------------------------------------------------
-FROM eclipse-temurin:18-jre-alpine AS runtime
+FROM --platform=linux/amd64 eclipse-temurin:18-jre-alpine AS runtime
 
 # 보안: root가 아닌 전용 사용자로 실행
 RUN addgroup -S wms && adduser -S wms -G wms

@@ -7,6 +7,8 @@ services:
     build:
       context: ..                              # otarepo-core 접근을 위해 상위 디렉터리
       dockerfile: operato-wms-ai/Dockerfile
+      platforms:
+        - linux/amd64
     image: hatiolab/operato-wms-ai:latest
     container_name: operato-wms-ai
     restart: unless-stopped
