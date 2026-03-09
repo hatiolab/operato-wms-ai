@@ -45,3 +45,4 @@ client/.vite/
 *.jar
 *.war
 !gradle/wrapper/gradle-wrapper.jar
+.vscode/launch.json
