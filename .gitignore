@@ -14,7 +14,8 @@ build/
 *.iws
 
 # IDE — VSCode
-.vscode/settings.json
+.vscode/
+!.vscode/*.code-workspace
 
 # OS
 .DS_Store
@@ -30,10 +31,18 @@ logs/
 *.swp
 *.bak
 
-# 프론트엔드
-node_modules/
-client/dist/
-client/.vite/
+# 프론트엔드 (통합된 operato-wms-app)
+frontend/node_modules/
+frontend/dist/
+frontend/packages/*/dist*/
+frontend/packages/*/node_modules/
+frontend/.yarn/
+frontend/.pnp.*
+frontend/yarn.lock
+
+# Spring Boot static 리소스 (빌드 산출물)
+src/main/resources/static/
+!src/main/resources/static/.gitkeep
 
 # 환경 파일
 .env
@@ -46,5 +55,3 @@ src/main/resources/application-dev.properties
 *.jar
 *.war
 !gradle/wrapper/gradle-wrapper.jar
-.vscode/launch.json
-/.vscode

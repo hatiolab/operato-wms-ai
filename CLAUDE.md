@@ -6,16 +6,42 @@
 
 **Operato WMS** — 자가 물류 및 3PL을 위한 클라우드 기반 WMS. 하티오랩(HatioLab) 개발.
 
-- 저장소: `./` (백엔드 Spring Boot) | `../operato-wms-app` (프론트엔드 Things Factory) | `../otarepo-core` (공유 코어)
+- 저장소: `./` (통합 레포) | `./frontend/` (프론트엔드 operato-wms-app) | 별도 레포: `otarepo-core` (공유 코어)
 - 백엔드: Java 18 / Spring Boot 3.2.4 / Gradle 8.5 / PostgreSQL+Redis / Jasypt
 - 프론트엔드: Things Factory / Lerna+Yarn / TypeScript / GraphQL / Node.js(Koa)
+- **통합 구조**: 프론트엔드가 `frontend/` 디렉토리에 통합됨. 배포 시 단일 JAR 파일 생성
 
 
 ## 빌드 및 실행
 
-- 백엔드: `/build` skill 사용 (JAVA_HOME 자동 설정) | 환경설정: `application-dev.properties` (git 미추적)
-- 프론트엔드: `cd ../operato-wms-app && yarn wms:dev` (포트 3000/3001)
+### 개발 모드 (권장)
+```bash
+# 통합 실행 (백엔드 + 프론트엔드)
+./scripts/dev.sh
+
+# 또는 개별 실행
+# 터미널 1: 백엔드 (포트 9191)
+./gradlew bootRunDev
+
+# 터미널 2: 프론트엔드 (포트 3000)
+cd frontend && yarn wms:dev
+```
+
+### 배포용 빌드
+```bash
+# 전체 빌드 (프론트엔드 + 백엔드 통합)
+./scripts/build.sh
+# 또는
+./gradlew buildAll
+
+# 결과: build/libs/operato-wms-ai.jar (단일 파일)
+```
+
+### 기타
+- 환경설정: `application-dev.properties` (git 미추적, 템플릿 제공)
 - VSCode 디버그: Cmd+Shift+D → **operato-wms-ai (debug-dev)** | 원격 attach: 포트 5004
+- 프론트엔드 개발 서버: http://localhost:3000
+- 백엔드 API: http://localhost:9191/rest
 
 
 ## 업무 도메인
@@ -36,14 +62,16 @@
 - Initializer: 모듈 초기화, `web/initializer/` 하위
 - 모듈별 상수: `Wms{Module}Constants.java`, `Wms{Module}ConfigConstants.java`
 
-### 프론트엔드 (operato-wms-app)
-- 패키지명: `@things-factory/{패키지명}` 스코프
+### 프론트엔드 (frontend/ - operato-wms-app 통합)
+- 위치: `frontend/packages/`
+- 패키지명: `@operato-app/{패키지명}` 스코프 (메인 앱: `@operato-app/operato-wes`)
 - 화면 파일: `client/pages/{모듈}/{도메인}-{액션}.js` (예: `inbound/receive-list.js`)
 - Things Factory 라우트: `client/route.js`에 페이지 경로 등록
 - 서버 라우트: `server/routes.ts`에 Koa 라우터로 등록 (`bootstrap-module-*-route` 이벤트)
 - DB 마이그레이션: `server/migrations/`에 TypeORM 마이그레이션 파일 추가
 - API 통신: GraphQL 우선, 백엔드 REST API는 `/rest/` 경로로 직접 호출
 - 상태관리: Redux (actions/reducers 패턴)
+- 빌드 산출물: `frontend/packages/operato-wes/dist-app/` → `src/main/resources/static/` (자동 복사)
 
 
 ## Claude Skills (`.claude/commands/`)

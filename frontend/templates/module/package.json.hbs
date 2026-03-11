@@ -1,0 +1,34 @@
+{
+  "name": "@smart-village/{{ name }}",
+  "version": "{{ version }}",
+  "main": "dist-server/index.js",
+  "browser": "dist-client/index.js",
+  "things-factory": true,
+  "license": "MIT",
+  "author": "heartyoh <heartyoh@hatiolab.com>",
+  "description": "{{ description }}",
+  "publishConfig": {
+    "access": "public",
+    "@smart-village:registry": "https://registry.npmjs.org"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hatiolab/smart-village-m.git",
+    "directory": "packages/{{ name }}"
+  },
+  "scripts": {
+    "build": "npm run build:server && npm run build:client",
+    "build:client": "npx tsc --p ./client/tsconfig.json",
+    "build:server": "npx tsc --p ./server/tsconfig.json",
+    "clean:client": "npx rimraf dist-client",
+    "clean:server": "npx rimraf dist-server",
+    "clean": "npm run clean:server && npm run clean:client",
+    "migration:create": "node ../../node_modules/typeorm/cli.js migration:create -d ./server/migrations"
+  },
+  "dependencies": {
+    "@things-factory/shell": "^7.0.1-alpha",
+    "@things-factory/auth-base": "^7.0.1-alpha",
+    "@operato/graphql": "^2.0.0-alpha",
+    "@operato/shell": "^2.0.0-alpha"
+  }
+}

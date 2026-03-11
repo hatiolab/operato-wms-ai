@@ -2,6 +2,7 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.2.4'
 	id 'io.spring.dependency-management' version '1.1.4'
+	id 'com.github.node-gradle.node' version '7.0.2'
 }
 
 ext {
@@ -120,4 +121,125 @@ dependencies {
 
 	// --- Test ---
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+// ========================================
+// 프론트엔드 빌드 설정 (operato-wms-app 통합)
+// ========================================
+
+node {
+	version = '20.11.0'
+	yarnVersion = '1.22.19'
+	download = true
+	workDir = file("${project.buildDir}/nodejs")
+	yarnWorkDir = file("${project.buildDir}/yarn")
+	nodeProjectDir = file("${project.projectDir}/frontend")
+}
+
+// Yarn 설치 태스크 (Lerna 모노레포용 - 기존 node_modules 활용)
+task yarnInstall(type: com.github.gradle.node.yarn.task.YarnTask) {
+	description = '프론트엔드 의존성 설치 (이미 설치된 경우 스킵)'
+	args = ['install', '--frozen-lockfile']
+
+	inputs.file('frontend/package.json')
+	inputs.file('frontend/yarn.lock')
+	outputs.dir('frontend/node_modules')
+
+	onlyIf {
+		file('frontend/package.json').exists() &&
+		!file('frontend/node_modules').exists()
+	}
+}
+
+// Lerna 전체 빌드 (로컬 패키지 의존성 해결)
+task lernaBootstrap(type: com.github.gradle.node.yarn.task.YarnTask) {
+	description = 'Lerna 모노레포 전체 빌드 (로컬 의존성 해결)'
+	dependsOn yarnInstall
+
+	args = ['run', 'build']
+
+	inputs.dir('frontend/packages')
+	inputs.file('frontend/lerna.json')
+	outputs.dir('frontend/packages/operato-wes/dist-server')
+
+	onlyIf {
+		file('frontend/package.json').exists()
+	}
+}
+
+// 프론트엔드 최종 빌드 (dist-app 생성)
+task buildFrontend(type: com.github.gradle.node.yarn.task.YarnTask) {
+	description = '프론트엔드 배포용 빌드 (dist-app)'
+	dependsOn lernaBootstrap
+
+	// dist-app 빌드 (배포용 통합 빌드)
+	args = ['workspace', '@operato-app/operato-wes', 'run', 'build:app']
+
+	inputs.dir('frontend/packages/operato-wes/dist-server')
+	outputs.dir('frontend/packages/operato-wes/dist-app')
+
+	onlyIf {
+		file('frontend/packages/operato-wes/dist-server').exists()
+	}
+}
+
+// 프론트엔드 빌드 결과물을 Spring Boot static 디렉토리로 복사
+task copyFrontendDist(type: Copy) {
+	description = '프론트엔드 빌드 산출물을 static 디렉토리로 복사'
+	dependsOn buildFrontend
+
+	from 'frontend/packages/operato-wes/dist-app'
+	into 'src/main/resources/static'
+
+	onlyIf {
+		file('frontend/packages/operato-wes/dist-app').exists()
+	}
+}
+
+// processResources와 bootJar 전에 프론트엔드 빌드 실행
+processResources {
+	dependsOn copyFrontendDist
+}
+
+bootJar {
+	dependsOn copyFrontendDist
+}
+
+// clean 시 프론트엔드 관련 산출물도 삭제
+clean {
+	delete 'src/main/resources/static'
+	delete 'frontend/node_modules'
+	delete 'frontend/packages/*/dist-app'
+	delete 'frontend/packages/*/dist-client'
+	delete 'frontend/packages/*/dist-server'
+	delete 'frontend/packages/*/node_modules'
+}
+
+// 개발 모드: 프론트엔드 빌드 스킵하고 백엔드만 실행
+task bootRunDev {
+	description = '개발 모드로 백엔드만 실행 (프론트엔드는 별도 실행)'
+	group = 'application'
+	dependsOn 'bootRun'
+
+	doFirst {
+		println '==================================='
+		println '개발 모드: 백엔드만 실행 (포트 9191)'
+		println '프론트엔드는 별도로 실행하세요:'
+		println '  cd frontend && yarn wms:dev'
+		println '==================================='
+	}
+}
+
+// 전체 빌드 (프론트엔드 포함)
+task buildAll {
+	description = '프론트엔드 + 백엔드 전체 빌드'
+	group = 'build'
+	dependsOn 'build'
+
+	doLast {
+		println '========================================='
+		println '전체 빌드 완료!'
+		println '배포 파일: build/libs/operato-wms-ai.jar'
+		println '========================================='
+	}
 }

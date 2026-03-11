@@ -103,17 +103,17 @@ curl http://localhost:9501/actuator/health
 cd ../operato-wms-app
 
 # 방법 1: npm script 사용 (빌드 + 이미지 생성 + 태깅)
-yarn workspace @things-factory/operato-wms-ui run docker
+yarn workspace @operato-app/operato-wes run docker
 
 # 방법 2: 이미지만 생성 (빌드 생략)
-yarn workspace @things-factory/operato-wms-ui run docker:only
+yarn workspace @operato-app/operato-wes run docker:only
 
 # 이미지 실행 확인 (로컬 테스트)
-yarn workspace @things-factory/operato-wms-ui run docker:run
+yarn workspace @operato-app/operato-wes run docker:run
 # → http://localhost:4000
 
 # Docker Hub 푸시
-yarn workspace @things-factory/operato-wms-ui run docker:push
+yarn workspace @operato-app/operato-wes run docker:push
 ```
 
 #### 생성되는 이미지
@@ -142,7 +142,7 @@ yarn install
 yarn wms:dev
 
 # 개발 서버 종료
-yarn workspace @things-factory/operato-wms-ui run stop:dev
+yarn workspace @operato-app/operato-wes run stop:dev
 ```
 
 ---
@@ -239,7 +239,7 @@ yarn workspace @things-factory/operato-wms-ui run stop:dev
       cd ../operato-wms-app && git pull origin main
 
 □ 2. Docker 이미지 빌드 및 태깅
-      yarn workspace @things-factory/operato-wms-ui run docker
+      yarn workspace @operato-app/operato-wes run docker
 
 □ 3. 이미지 확인
       docker images | grep wms-client
@@ -253,7 +253,7 @@ yarn workspace @things-factory/operato-wms-ui run stop:dev
       docker logs -f operato-wms-app
 
 □ 6. Docker Hub 푸시 (선택)
-      yarn workspace @things-factory/operato-wms-ui run docker:push
+      yarn workspace @operato-app/operato-wes run docker:push
 ```
 
 ---
@@ -324,10 +324,10 @@ elidom.initial.admin.passwd=admin
 cd ../operato-wms-app
 
 # 마이그레이션 실행
-yarn workspace @things-factory/operato-wms-ui run migration
+yarn workspace @operato-app/operato-wes run migration
 
 # 마이그레이션 롤백
-yarn workspace @things-factory/operato-wms-ui run migration:revert
+yarn workspace @operato-app/operato-wes run migration:revert
 ```
 
 ---

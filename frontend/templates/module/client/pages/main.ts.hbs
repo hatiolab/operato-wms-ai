@@ -1,0 +1,25 @@
+import { html } from 'lit'
+import { customElement, property } from 'lit/decorators.js'
+import { connect } from 'pwa-helpers/connect-mixin.js'
+import { store, PageView } from '@operato/shell'
+
+const logo = new URL('/assets/images/hatiolab-logo.png', import.meta.url).href
+
+@customElement('{{ name }}-main')
+class {{pascalCase name}}Main extends connect(store)(PageView) {
+  @property({ type: String }) {{camelCase name}}?: string
+
+  render() {
+    return html`
+      <section>
+        <h2>{{pascalCase name}}</h2>
+        <img src=${logo}>
+      </section>
+    `
+  }
+
+  stateChanged(state) {
+    this.{{camelCase name}} = state.{{camelCase name}}.state_main
+  }
+}
+

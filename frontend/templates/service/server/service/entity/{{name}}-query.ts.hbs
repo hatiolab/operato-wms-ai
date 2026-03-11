@@ -1,0 +1,62 @@
+import { Resolver, Query, FieldResolver, Root, Args, Arg, Ctx, Directive } from 'type-graphql'
+import { Attachment } from '@things-factory/attachment-base'
+import { Domain, getQueryBuilderFromListParams, getRepository, ListParam } from '@things-factory/shell'
+import { User } from '@things-factory/auth-base'
+import { {{pascalCase name}} } from './{{name}}'
+import { {{pascalCase name}}List } from './{{name}}-type'
+
+@Resolver({{pascalCase name}})
+export class {{pascalCase name}}Query {
+  @Query(returns => {{pascalCase name}}!, { nullable: true, description: 'To fetch a {{pascalCase name}}' })
+  async {{camelCase name}}(@Arg('id') id: string, @Ctx() context: ResolverContext): Promise<{{pascalCase name}}> {
+    const { domain } = context.state
+
+    return await getRepository({{pascalCase name}}).findOne({
+      where: { domain: { id: domain.id }, id }
+    })
+  }
+
+  @Query(returns => {{pascalCase name}}List, { description: 'To fetch multiple {{pluralPascalCase name}}' })
+  async {{pluralCamelCase name}}(@Args() params: ListParam, @Ctx() context: ResolverContext): Promise<{{pascalCase name}}List> {
+    const { domain } = context.state
+
+    const queryBuilder = getQueryBuilderFromListParams({
+      domain,
+      params,
+      repository: await getRepository({{pascalCase name}}),
+      searchables: ['name', 'description']
+    })
+
+    const [items, total] = await queryBuilder.getManyAndCount()
+
+    return { items, total }
+  }
+
+  @FieldResolver(type => String)
+  async thumbnail(@Root() {{camelCase name}}: {{pascalCase name}}): Promise<string | undefined> {
+    const attachment: Attachment = await getRepository(Attachment).findOne({
+      where: {
+        domain: { id: {{camelCase name}}.domainId },
+        refType: {{pascalCase name}}.name,
+        refBy: {{camelCase name}}.id
+      }
+    })
+
+    return attachment?.fullpath
+  }
+
+  @FieldResolver(type => Domain)
+  async domain(@Root() {{camelCase name}}: {{pascalCase name}}): Promise<Domain> {
+    return await getRepository(Domain).findOneBy({ id: {{camelCase name}}.domainId })
+  }
+
+  @FieldResolver(type => User)
+  async updater(@Root() {{camelCase name}}: {{pascalCase name}}): Promise<User> {
+    return await getRepository(User).findOneBy({ id: {{camelCase name}}.updaterId })
+  }
+
+  @FieldResolver(type => User)
+  async creator(@Root() {{camelCase name}}: {{pascalCase name}}): Promise<User> {
+    return await getRepository(User).findOneBy({ id: {{camelCase name}}.creatorId })
+  }
+}

@@ -40,3 +40,11 @@ src/main/resources/application-dev.properties
 *.tmp
 *.swp
 *.bak
+
+# 프론트엔드 (Gradle이 빌드하므로 Docker 빌드 컨텍스트에서 제외)
+frontend/node_modules/
+frontend/packages/*/node_modules/
+frontend/packages/*/dist*/
+frontend/.yarn/
+frontend/.pnp.*
+frontend/yarn.lock

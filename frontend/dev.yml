@@ -1,0 +1,14 @@
+name: operato-app
+type: node
+up:
+  - node:
+      version: v12.14.0
+      yarn: 1.22.5
+commands:
+  __default__: start
+  build: yarnpkg build
+  check: yarnpkg check
+  lint: yarnpkg lint
+  start: echo "Running operato-app is not really a concept that makes sense."
+  test: yarnpkg test
+  generate: yarnpkg generate

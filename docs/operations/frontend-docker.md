@@ -10,7 +10,7 @@
 | 파일 | 위치 | 설명 |
 |------|------|------|
 | `Dockerfile` | `operato-wms-app/` | 단일 스테이지 빌드 정의 |
-| `packages/operato-wms-ui/package.json` | `operato-wms-app/` | Docker 빌드/실행 스크립트 |
+| `packages/operato-wes/package.json` | `operato-wms-app/` | Docker 빌드/실행 스크립트 |
 
 ---
 
@@ -33,10 +33,10 @@ Stage 1: 단일 스테이지 (hatiolab/operato-env:latest)
   ├── yarn install                                       ← 의존성 설치
   ├── yarn clean                                         ← 이전 빌드 결과 정리
   ├── yarn build                                         ← 서버 사이드 TypeScript 빌드
-  ├── yarn workspace @things-factory/operato-wms-app     ← 클라이언트 번들 빌드
+  ├── yarn workspace @operato-app/operato-wes     ← 클라이언트 번들 빌드
   │     run build:client
   └── EXPOSE 5907
-      CMD: yarn workspace @things-factory/operato-wms-app run serve
+      CMD: yarn workspace @operato-app/operato-wes run serve
 ```
 
 **베이스 이미지**: `hatiolab/operato-env:latest` — Node.js, Yarn, Things Factory CLI 등 빌드 환경이 사전 설치된 이미지
@@ -47,10 +47,10 @@ Stage 1: 단일 스테이지 (hatiolab/operato-env:latest)
 
 ### 3-1. 스크립트를 이용한 빌드 (권장)
 
-`packages/operato-wms-ui/package.json`에 정의된 Docker 스크립트를 사용합니다.
+`packages/operato-wes/package.json`에 정의된 Docker 스크립트를 사용합니다.
 
 ```bash
-cd operato-wms-app/packages/operato-wms-ui
+cd operato-wms-app/packages/operato-wes
 
 # 클라이언트 빌드 + Docker 이미지 빌드
 yarn docker
@@ -111,7 +111,7 @@ docker run -d \
 ### 4-2. 로컬 테스트 실행 (스크립트)
 
 ```bash
-cd operato-wms-app/packages/operato-wms-ui
+cd operato-wms-app/packages/operato-wes
 
 # 포트 4000:3000 매핑으로 실행
 yarn docker:run
@@ -175,7 +175,7 @@ docker rmi hatiolab/wms-client:latest
 ## 7. Docker Hub 푸시
 
 ```bash
-cd operato-wms-app/packages/operato-wms-ui
+cd operato-wms-app/packages/operato-wes
 
 # latest + 버전 태그 동시 푸시
 yarn docker:push
@@ -228,7 +228,7 @@ cd operato-wms-app
 yarn install
 
 # 개발 서버 실행 (포트 3000 + 3001)
-cd packages/operato-wms-ui
+cd packages/operato-wes
 yarn serve:dev
 
 # 개발 서버 종료

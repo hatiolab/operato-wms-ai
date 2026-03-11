@@ -1,0 +1,12 @@
+{
+    "error.license token not valid": "[ms] Your license token data is not valid!",
+    "error.page count over license limit": "[ms] Your page count over license limit!",
+    "error.count over license limit": "[ms] Your board or domain count over license limit!",
+    "error.your license is not valid in this host": "[ms] Your license is not valid in this host!",
+    "error.your license is expired! expired date is [x]": "[ms] Your license is expired! Expired date is [{x}]",
+    "error.license key is empty": "[ms] License Key is empty!",
+    "error.license key is not certified": "[ms] License Key is not certified!",
+    "error.invalid license key": "[ms] Invalid license key!",
+    "error.license expiration notice": "[ms] License Expiration Notice",
+    "error.your license due date is x, please renewal your license!": "[ms] Your license due date is {x}, please renewal your license!"
+}

@@ -1,0 +1,17 @@
+import { UPDATE_{{constantCase name}} } from '../actions/main'
+
+const INITIAL_STATE = {
+  {{camelCase name}}: 'ABC'
+}
+
+const {{camelCase name}} = (state = INITIAL_STATE, action) => {
+  switch (action.type) {
+    case UPDATE_{{constantCase name}}:
+      return { ...state }
+
+    default:
+      return state
+  }
+}
+
+export default {{camelCase name}}

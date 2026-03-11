@@ -1,0 +1,17 @@
+import { EventSubscriber } from 'typeorm'
+
+import { HistoryEntitySubscriber } from '@operato/typeorm-history'
+
+import { {{pascalCase name}} } from './{{ name }}'
+import { {{pascalCase name}}History } from './{{ name }}-history'
+
+@EventSubscriber()
+export class {{pascalCase name}}HistoryEntitySubscriber extends HistoryEntitySubscriber<{{pascalCase name}}, {{pascalCase name}}History> {
+  public get entity() {
+    return {{pascalCase name}}
+  }
+
+  public get historyEntity() {
+    return {{pascalCase name}}History
+  }
+}

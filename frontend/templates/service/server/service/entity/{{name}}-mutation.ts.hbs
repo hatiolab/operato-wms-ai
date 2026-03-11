@@ -1,0 +1,198 @@
+import { Resolver, Mutation, Arg, Ctx, Directive } from 'type-graphql'
+import { In } from 'typeorm'
+
+import { createAttachment, deleteAttachmentsByRef } from '@things-factory/attachment-base'
+
+import { {{pascalCase name}} } from './{{name}}'
+import { New{{pascalCase name}}, {{pascalCase name}}Patch } from './{{name}}-type'
+
+@Resolver({{pascalCase name}})
+export class {{pascalCase name}}Mutation {
+  @Directive('@transaction')
+  @Mutation(returns => {{pascalCase name}}, { description: 'To create new {{pascalCase name}}' })
+  async create{{pascalCase name}}(@Arg('{{camelCase name}}') {{camelCase name}}: New{{pascalCase name}}, @Ctx() context: ResolverContext): Promise<{{pascalCase name}}> {
+    const { domain, user, tx } = context.state
+
+    const result = await tx.getRepository({{pascalCase name}}).save({
+      ...{{camelCase name}},
+      domain,
+      creator: user,
+      updater: user
+    })
+
+    if ({{camelCase name}}.thumbnail) {
+      await createAttachment(
+        null,
+        {
+          attachment: {
+            file: {{camelCase name}}.thumbnail,
+            refType: {{pascalCase name}}.name,
+            refBy: result.id
+          }
+        },
+        context
+      )
+    }
+
+    return result
+  }
+
+  @Directive('@transaction')
+  @Mutation(returns => {{pascalCase name}}, { description: 'To modify {{pascalCase name}} information' })
+  async update{{pascalCase name}}(
+    @Arg('id') id: string,
+    @Arg('patch') patch: {{pascalCase name}}Patch,
+    @Ctx() context: ResolverContext
+  ): Promise<{{pascalCase name}}> {
+    const { domain, user, tx } = context.state
+
+    const repository = tx.getRepository({{pascalCase name}})
+    const {{camelCase name}} = await repository.findOne({
+      where: { domain: { id: domain.id }, id }
+    })
+
+    const result = await repository.save({
+      ...{{camelCase name}},
+      ...patch,
+      updater: user
+    })
+
+    if (patch.thumbnail) {
+      await deleteAttachmentsByRef(null, { refBys: [result.id] }, context)
+      await createAttachment(
+        null,
+        {
+          attachment: {
+            file: patch.thumbnail,
+            refType: {{pascalCase name}}.name,
+            refBy: result.id
+          }
+        },
+        context
+      )
+    }
+
+    return result
+  }
+
+  @Directive('@transaction')
+  @Mutation(returns => [{{pascalCase name}}], { description: "To modify multiple {{pluralPascalCase name}}' information" })
+  async updateMultiple{{pascalCase name}}(
+    @Arg('patches', type => [{{pascalCase name}}Patch]) patches: {{pascalCase name}}Patch[],
+    @Ctx() context: ResolverContext
+  ): Promise<{{pascalCase name}}[]> {
+    const { domain, user, tx } = context.state
+
+    let results = []
+    const _createRecords = patches.filter((patch: any) => patch.cuFlag.toUpperCase() === '+')
+    const _updateRecords = patches.filter((patch: any) => patch.cuFlag.toUpperCase() === 'M')
+    const {{camelCase name}}Repo = tx.getRepository({{pascalCase name}})
+
+    if (_createRecords.length > 0) {
+      for (let i = 0; i < _createRecords.length; i++) {
+        const newRecord = _createRecords[i]
+
+        const result = await {{camelCase name}}Repo.save({
+          ...newRecord,
+          domain,
+          creator: user,
+          updater: user
+        })
+
+        if (newRecord.thumbnail) {
+          await createAttachment(
+            null,
+            {
+              attachment: {
+                file: newRecord.thumbnail,
+                refType: {{pascalCase name}}.name,
+                refBy: result.id
+              }
+            },
+            context
+          )
+        }
+
+        results.push({ ...result, cuFlag: '+' })
+      }
+    }
+
+    if (_updateRecords.length > 0) {
+      for (let i = 0; i < _updateRecords.length; i++) {
+        const updateRecord = _updateRecords[i]
+        const {{camelCase name}} = await {{camelCase name}}Repo.findOneBy({ id: updateRecord.id })
+
+        const result = await {{camelCase name}}Repo.save({
+          ...{{camelCase name}},
+          ...updateRecord,
+          updater: user
+        })
+
+        if (updateRecord.thumbnail) {
+          await deleteAttachmentsByRef(null, { refBys: [result.id] }, context)
+          await createAttachment(
+            null,
+            {
+              attachment: {
+                file: updateRecord.thumbnail,
+                refType: {{pascalCase name}}.name,
+                refBy: result.id
+              }
+            },
+            context
+          )
+        }
+
+        results.push({ ...result, cuFlag: 'M' })
+      }
+    }
+
+    return results
+  }
+
+  @Directive('@transaction')
+  @Mutation(returns => Boolean, { description: 'To delete {{pascalCase name}}' })
+  async delete{{pascalCase name}}(@Arg('id') id: string, @Ctx() context: ResolverContext): Promise<boolean> {
+    const { domain, tx } = context.state
+
+    await tx.getRepository({{pascalCase name}}).delete({ domain: { id: domain.id }, id })
+    await deleteAttachmentsByRef(null, { refBys: [id] }, context)
+
+    return true
+  }
+
+  @Directive('@transaction')
+  @Mutation(returns => Boolean, { description: 'To delete multiple {{pluralPascalCase name}}' })
+  async delete{{pluralPascalCase name}}(
+    @Arg('ids', type => [String]) ids: string[],
+    @Ctx() context: ResolverContext
+  ): Promise<boolean> {
+    const { domain, tx } = context.state
+
+    await tx.getRepository({{pascalCase name}}).delete({
+      domain: { id: domain.id },
+      id: In(ids)
+    })
+
+    await deleteAttachmentsByRef(null, { refBys: ids }, context)
+
+    return true
+  }
+
+  @Directive('@transaction')
+  @Mutation(returns => Boolean, { description: 'To import multiple {{pluralPascalCase name}}' })
+  async import{{pluralPascalCase name}}(
+    @Arg('{{pluralCamelCase name}}', type => [{{pascalCase name}}Patch]) {{pluralCamelCase name}}: {{pascalCase name}}Patch[],
+    @Ctx() context: ResolverContext
+  ): Promise<boolean> {
+    const { domain, tx } = context.state
+
+    await Promise.all(
+      {{pluralCamelCase name}}.map(async ({{camelCase name}}: {{pascalCase name}}Patch) => {
+        const created{{pascalCase name}}: {{pascalCase name}} = await tx.getRepository({{pascalCase name}}).save({ domain, ...{{camelCase name}} })
+      })
+    )
+
+    return true
+  }
+}

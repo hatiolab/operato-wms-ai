@@ -1,0 +1,320 @@
+import '@material/web/icon/icon.js'
+import '@operato/data-grist'
+import '@operato/context/ox-context-page-toolbar.js'
+import '@operato/input/ox-input-select-buttons.js'
+
+import { PropertyValues, css, html } from 'lit'
+import { customElement, property, query, state } from 'lit/decorators.js'
+import { connect } from 'pwa-helpers/connect-mixin.js'
+import gql from 'graphql-tag'
+
+import { store, PageView } from '@operato/shell'
+import { client } from '@operato/graphql'
+import { DataGrist, FetchOption, GristRecord } from '@operato/data-grist'
+import { i18next, localize } from '@operato/i18n'
+import { openPopup } from '@operato/layout'
+import { CommonHeaderStyles, ScrollbarStyles } from '@operato/styles'
+import { OxPrompt } from '@operato/popup/ox-prompt.js'
+import { isMobileDevice } from '@operato/utils'
+
+@customElement('{{name}}')
+export class {{properCase name}} extends connect(store)(localize(i18next)(PageView)) {
+  static styles = [
+    ScrollbarStyles,
+    CommonHeaderStyles,
+    css`
+      :host {
+        display: flex;
+        flex-direction: column;
+
+        overflow: hidden;
+
+        --grid-header-padding: 2px 0 2px 9px;
+      }
+
+      ox-grist {
+        overflow-y: auto;
+        flex: 1;
+      }
+    `
+  ]
+
+  @state() private gristConfig: any
+  @state() private mode: 'CARD' | 'GRID' | 'LIST' = isMobileDevice() ? 'CARD' : 'GRID'
+  @state() private state?: string[]
+
+  @query('ox-grist') private grist!: DataGrist
+
+  get context() {
+    return {
+      title: i18next.t('title.{{name}}'),
+      search: {
+        handler: (search: string) => {
+          this.grist.searchText = search
+        },
+        value: this.grist?.searchText || ''
+      },
+      filter: {
+        handler: () => {
+          this.grist.toggleHeadroom()
+        }
+      },
+      help: '{{packageName}}/{{name}}',
+      actions: [
+        {
+          title: i18next.t('button.print'),
+          action: this.print.bind(this),
+          icon: 'print'
+        }
+      ],
+      exportable: {
+        name: i18next.t('title.{{name}}'),
+        data: this.exportHandler.bind(this)
+      },
+      toolbar: false
+    }
+  }
+
+  getFilterStatus() {
+    return [
+      {
+        display: i18next.t('label.state-issued'),
+        value: 'ISSUED'
+      },
+      {
+        display: i18next.t('label.state-reviewed'),
+        value: 'REVIEWED'
+      },
+      {
+        display: i18next.t('label.state-corrected'),
+        value: 'CORRECTED'
+      }
+    ]
+  }
+
+  render() {
+    const mode = this.mode || (isMobileDevice() ? 'LIST' : 'GRID')
+
+    return html`
+      <ox-grist .mode=${mode} .config=${this.gristConfig} .fetchHandler=${this.fetchHandler.bind(this)}>
+        <div slot="headroom" class="header">
+          <div class="title">
+            <md-icon>summarize</md-icon>
+            ${i18next.t('title.{{name}}')}
+          </div>
+
+          <div class="filters">
+            <ox-input-select-buttons
+              .value=${this.state}
+              .options=${this.getFilterStatus()}
+              @change=${(e: CustomEvent) => {
+                this.state = (e.currentTarget as any)?.value
+                this.grist.fetch()
+              }}
+            ></ox-input-select-buttons>
+          </div>
+
+          <ox-context-page-toolbar class="actions" .context=${this.context}></ox-context-page-toolbar>
+        </div>
+      </ox-grist>
+    `
+  }
+
+  async pageInitialized(lifecycle) {
+    this.gristConfig = {
+      list: {
+        fields: ['name', 'description'],
+        details: ['active', 'updatedAt']
+      },
+      columns: [
+        { type: 'gutter', gutterName: 'sequence' },
+        { type: 'gutter', gutterName: 'row-selector', multiple: true },
+        {
+          type: 'string',
+          name: 'name',
+          header: i18next.t('field.name'),
+          record: {
+            editable: true
+          },
+          filter: 'search',
+          sortable: true,
+          width: 150
+        },
+        {
+          type: 'string',
+          name: 'description',
+          header: i18next.t('field.description'),
+          record: {
+            editable: true
+          },
+          filter: 'search',
+          width: 200
+        },
+        {
+          type: 'select',
+          name: 'state',
+          label: true,
+          header: i18next.t('field.status'),
+          record: {
+            editable: false,
+            options: [{ display: '', value: '' }, ...this.getFilterStatus()]
+          },
+          width: 100,
+          filter: true,
+          imex: true
+        },
+        {
+          type: 'checkbox',
+          name: 'active',
+          label: true,
+          header: i18next.t('field.active'),
+          record: {
+            editable: true
+          },
+          filter: true,
+          sortable: true,
+          width: 60
+        },
+        {
+          type: 'resource-object',
+          name: 'updater',
+          header: i18next.t('field.updater'),
+          record: {
+            editable: false
+          },
+          sortable: true,
+          width: 120
+        },
+        {
+          type: 'datetime',
+          name: 'updatedAt',
+          header: i18next.t('field.updated_at'),
+          record: {
+            editable: false
+          },
+          sortable: true,
+          width: 180
+        }
+      ],
+      rows: {
+        appendable: false,
+        selectable: {
+          multiple: true
+        },
+        handlers: {
+          click: (columns, data, column, record, rowIndex) => {
+            /* TODO Implement the desired sub-view(like item-view) and use it in the popup content after importing */
+            const popup = openPopup(html` 
+                <item-view item-id=${record.id} style="background-color: white;">
+                </item-view> 
+              `, {
+              backdrop: true,
+              size: 'large',
+              title: i18next.t('title.item view')
+            })
+            popup.onclosed = () => {
+              this.grist.fetch()
+            }
+          }
+        }
+      },
+      sorters: [
+        {
+          name: 'name',
+          desc: true
+        }
+      ]
+    }
+  }
+
+  async pageUpdated(changes: any, lifecycle: any) {
+    if (this.active) {
+      // do something here when this page just became as active
+    }
+  }
+
+  async fetchHandler({ page = 1, limit = 100, sortings = [], filters = [] }: FetchOption) {
+    const response = await client.query({
+      query: gql`
+        query ($filters: [Filter!], $pagination: Pagination, $sortings: [Sorting!]) {
+          responses: {{pluralCamelCase name}}(filters: $filters, pagination: $pagination, sortings: $sortings) {
+            items {
+              id
+              name
+              description
+              active
+              state
+              updater {
+                id
+                name
+              }
+              updatedAt
+            }
+            total
+          }
+        }
+      `,
+      variables: {
+        filters,
+        pagination: { page, limit },
+        sortings
+      }
+    })
+
+    return {
+      total: response.data.responses.total || 0,
+      records: response.data.responses.items || []
+    }
+  }
+
+  exportHandler() {
+    let records = [] as GristRecord
+    if (this.grist.selected && this.grist.selected.length > 0) {
+      records = this.grist.selected
+    } else {
+      records = this.grist.data.records
+    }
+
+    var headerSetting = this.grist.compiledConfig.columns
+      .filter(column => column.type !== 'gutter' && column.record !== undefined && column.imex !== undefined)
+      .map(column => {
+        return column.imex === true
+          ? {
+              header: column.header.renderer(column),
+              key: column.name,
+              width: column.width,
+              type: column.type
+            }
+          : column.imex
+      })
+
+    var data = records.map(item => {
+      return {
+        id: item.id,
+        ...this.gristConfig.columns
+          .filter(column => column.type !== 'gutter' && column.record !== undefined && column.imex !== undefined)
+          .reduce((record, column) => {
+            const key = column.imex === true ? column.name : column.imex.key
+            record[key] = key.split('.').reduce((obj, key) => (obj && obj[key] !== 'undefined' ? obj[key] : undefined), item)
+            return record
+          }, {})
+      }
+    })
+
+    return { header: headerSetting, data: data }
+  }
+
+  print() {
+    const selected = this.grist.selected
+    const ids = selected.map(record => record.id).join('|')
+
+    /* TODO Implement the desired functionality */
+
+    OxPrompt.open({
+      type: 'success',
+      title: i18next.t('text.completed'),
+      text: i18next.t('text.printed_successfully'),
+      confirmButton: { text: i18next.t('button.confirm') }
+    })
+  }
+}

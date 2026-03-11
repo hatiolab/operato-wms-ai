@@ -51,7 +51,7 @@
 | 번들러 | Webpack (`@things-factory/builder`) |
 | 패키지 매니저 | Yarn |
 | 테스트 | Jest + Babel |
-| 주요 패키지 | `@things-factory/operato-wms-ui` (메인 WMS UI) |
+| 주요 패키지 | `@operato-app/operato-wes` (메인 WMS 앱) |
 | UI 컴포넌트 | `@operato/*` 시리즈 (data-grist, layout, popup, graphql 등) |
 | API 통신 | GraphQL (`@operato/graphql`) |
 | 서버 사이드 | Node.js (Koa 기반, TypeORM, DB 마이그레이션 포함) |

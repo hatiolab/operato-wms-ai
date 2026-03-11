@@ -1,0 +1,26 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "noEmitOnError": true,
+    "strict": false,
+    "allowSyntheticDefaultImports": true,
+    "allowJs": true,
+    "useDefineForClassFields": false,
+    "importHelpers": true,
+    "inlineSources": true,
+    "declaration": true,
+    "incremental": true,
+    "noImplicitAny": false,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "lib": ["dom", "dom.iterable", "es2017"],
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "types": ["node", "jest"],
+    "target": "es2017",
+    "module": "commonjs"
+  },
+  "typeRoots": ["../node_modules/@types"]
+}

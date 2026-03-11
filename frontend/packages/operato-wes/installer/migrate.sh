@@ -1,0 +1,1 @@
+docker exec -it operato-wes npm run migration -- --mode=production

@@ -6,10 +6,6 @@
 		{
 			"path": "../otarepo-core",
 			"name": "otarepo-core"
-		},
-		{
-			"name": "operato-wms-app (frontend)",
-			"path": "../operato-wms-app"
 		}
 	],
 	"settings": {

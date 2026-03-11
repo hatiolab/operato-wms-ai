@@ -1,0 +1,41 @@
+openapi: 3.0.0
+info:
+  description: >
+    For the latest release information please check our [release notes](https://developer.operato-wes.com/release_notes).
+    The Operato WES Manager API exposes integrations endpoint and related functions.
+  version: 'unstable'
+  title: 'Operato WES Manager'
+  termsOfService: 'https://operato-wes.com/terms/'
+  contact:
+    email: 'heartyoh@hatiolab.com'
+  license:
+    name: MIT
+    url: http://mit-license.org/
+tags:
+  - name: 'operato-wes'
+    description: 'API for read, create and update operato-wes'
+schemes:
+  - 'https'
+  - 'http'
+servers:
+  - url: '/api/unstable'
+
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+security:
+  - basicAuth: []
+  - bearerAuth: []
+responses:
+  UnauthorizedError:
+    description: Unauthorized
+
+externalDocs:
+  description: 'Find out about our release notes'
+  url: 'https://developer.operato-wes.com/release_notes'

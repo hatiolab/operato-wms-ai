@@ -1,0 +1,12 @@
+{
+    "error.license token not valid": "라이선스 토큰 데이터 검사에 실패하였습니다!",
+    "error.page count over license limit": "라이선스에서 규정한 페이지 수량을 초과 하였습니다!",
+    "error.count over license limit": "라이선스에서 규정한 보드 또는 도메인 수량을 초과 하였습니다!",
+    "error.your license is not valid in this host": "이 호스트에서 라이센스가 유효하지 않습니다!",
+    "error.your license is expired! expired date is [x]": " 라이센스가 만료되었습니다! 만료일은 [{x}]입니다!",
+    "error.license key is empty": "라이센스 정보가 없습니다!",
+    "error.license key is not certified": "라이센스가 인증되지 않았습니다!",
+    "error.invalid license key": "라이센스가 유효하지 않습니다!",
+    "error.license expiration notice": "라이선스 만료예정 알림",
+    "error.your license due date is x, please renewal your license!": "라이센스 기한은 {x}입니다. 라이센스를 갱신하십시오!"
+}

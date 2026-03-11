@@ -72,7 +72,7 @@ src/main/java/operato/wms/
 
 ```
 packages/
-├── operato-wms-ui/                  # 메인 WMS UI 패키지
+├── operato-wes/                     # 메인 WMS 앱 패키지
 │   ├── client/                      # 브라우저 클라이언트 코드
 │   │   ├── pages/                   # 화면 페이지
 │   │   │   ├── inbound/             # 입고 화면

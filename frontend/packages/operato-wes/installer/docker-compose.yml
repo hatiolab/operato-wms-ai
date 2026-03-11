@@ -1,0 +1,18 @@
+version: '3'
+services:
+  
+  app-wes:
+    build: .
+    container_name: operato-wes
+    image: hatiolab/operato-wes:latest
+    privileged: true
+    volumes:
+      - ./logs:/app/logs
+      - ./config.production.js:/app/config.production.js
+    ports:
+      - 5908:5908
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '3'

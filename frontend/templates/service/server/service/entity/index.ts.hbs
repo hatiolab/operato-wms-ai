@@ -1,0 +1,9 @@
+import { {{pascalCase name}} } from './{{name}}'
+import { {{pascalCase name}}History } from './{{name}}-history'
+import { {{pascalCase name}}Query } from './{{name}}-query'
+import { {{pascalCase name}}Mutation } from './{{name}}-mutation'
+import { {{pascalCase name}}HistoryEntitySubscriber } from './event-subscriber'
+
+export const entities = [{{pascalCase name}}, {{pascalCase name}}History]
+export const resolvers = [{{pascalCase name}}Query, {{pascalCase name}}Mutation]
+export const subscribers = [{{pascalCase name}}HistoryEntitySubscriber]

@@ -1,0 +1,110 @@
+import { Field, ID, ObjectType } from 'type-graphql'
+import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn, RelationId } from 'typeorm'
+
+import {
+  HistoryActionColumn,
+  HistoryActionType,
+  HistoryEntityInterface,
+  HistoryOriginalIdColumn
+} from '@operato/typeorm-history'
+import { Role, User } from '@things-factory/auth-base'
+import { config } from '@things-factory/env'
+import { Domain } from '@things-factory/shell'
+
+import { {{pascalCase name}}, {{pascalCase name}}Status } from './{{name}}'
+
+const ORMCONFIG = config.get('ormconfig', {})
+const DATABASE_TYPE = ORMCONFIG.type
+
+@Entity()
+@Index(
+  'ix_{{name}}_history_0',
+  ({{camelCase name}}History: {{pascalCase name}}History) => [{{camelCase name}}History.originalId, {{camelCase name}}History.version],
+  { unique: true }
+)
+@Index(
+  'ix_{{name}}_history_1',
+  ({{camelCase name}}History: {{pascalCase name}}History) => [{{camelCase name}}History.domain, {{camelCase name}}History.originalId, {{camelCase name}}History.version],
+  { unique: true }
+)
+@ObjectType({ description: 'History Entity of {{pascalCase name}}' })
+export class {{pascalCase name}}History implements HistoryEntityInterface<{{pascalCase name}}> {
+  @PrimaryGeneratedColumn('uuid')
+  @Field(type => ID)
+  readonly id: string
+
+  @Column({ nullable: true, default: 1 })
+  @Field({ nullable: true })
+  version?: number = 1
+
+  @ManyToOne(type => Domain)
+  @Field({ nullable: true })
+  domain?: Domain
+
+  @RelationId(({{camelCase name}}: {{pascalCase name}}) => {{camelCase name}}.domain)
+  domainId?: string
+
+  @Column()
+  @Field()
+  name: string
+
+  @Column({ nullable: true })
+  @Field({ nullable: true })
+  description?: string
+
+  @Column({ nullable: true })
+  @Field({ nullable: true })
+  active?: boolean
+
+  @Column({ nullable: true })
+  @Field({ nullable: true })
+  state?: {{pascalCase name}}Status
+
+  @Column({ nullable: true })
+  @Field({ nullable: true })
+  params?: string
+
+  @Column({ nullable: true })
+  @Field({ nullable: true })
+  createdAt?: Date
+
+  @Column({ nullable: true })
+  @Field({ nullable: true })
+  updatedAt?: Date
+
+  @Column({ nullable: true })
+  @Field({ nullable: true })
+  deletedAt?: Date
+
+  @ManyToOne(type => User, { nullable: true })
+  @Field({ nullable: true })
+  creator?: User
+
+  @RelationId(({{camelCase name}}: {{pascalCase name}}) => {{camelCase name}}.creator)
+  creatorId?: string
+
+  @ManyToOne(type => User, { nullable: true })
+  @Field({ nullable: true })
+  updater?: User
+
+  @RelationId(({{camelCase name}}: {{pascalCase name}}) => {{camelCase name}}.updater)
+  updaterId?: string
+
+  @Field(type => String, { nullable: true })
+  thumbnail?: string
+
+  @HistoryOriginalIdColumn()
+  public originalId!: string
+
+  @HistoryActionColumn({
+    nullable: false,
+    type:
+      DATABASE_TYPE == 'postgres' || DATABASE_TYPE == 'mysql' || DATABASE_TYPE == 'mariadb'
+        ? 'enum'
+        : DATABASE_TYPE == 'oracle'
+        ? 'varchar2'
+        : 'smallint',
+    enum: HistoryActionType
+  })
+  public action!: HistoryActionType
+}

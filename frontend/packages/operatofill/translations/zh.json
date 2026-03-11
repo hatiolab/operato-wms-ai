@@ -1,0 +1,12 @@
+{
+    "error.license token not valid": "您的数据密钥验证失败，系统许可无效！",
+    "error.page count over license limit": "[cn] Your page count over license limit!",
+    "error.count over license limit": "您的看板或子域数量超过了许可证限制！",
+    "error.your license is not valid in this host": "您的许可证在此主机中无效！",
+    "error.your license is expired! expired date is [x]": "您的许可证已过期！ 过期日为[{x}]",
+    "error.license key is empty": "许可证密钥为空！",
+    "error.license key is not certified": "许可证密钥未通过认证！",
+    "error.invalid license key": "无效的许可证密钥！",
+    "error.license expiration notice": "许可证到期提醒",
+    "error.your license due date is x, please renewal your license!": "您的许可证到期日期为{x}，请续订您的许可证！"
+}

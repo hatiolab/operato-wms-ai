@@ -1,0 +1,13 @@
+node_modules
+installer
+Dockerfile
+logs
+docker-compose.yml
+db.sqlite
+db*.sqlite
+license.json
+attachments
+config.development.js
+config.production.js
+!config/config.development.js
+!config/config.production.js

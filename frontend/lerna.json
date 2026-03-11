@@ -1,0 +1,11 @@
+{
+  "packages": ["packages/*", "outsources/*"],
+  "npmClient": "yarn",
+  "version": "7.0.50",
+  "command": {
+    "publish": {
+      "skipNpm": false,
+      "ignoreChanges": ["**/*.md", "**/tests/**", "**/test/**"]
+    }
+  }
+}

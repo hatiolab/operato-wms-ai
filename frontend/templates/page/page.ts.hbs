@@ -1,0 +1,139 @@
+import { PropertyValues, html, css } from 'lit'
+import { customElement, property, state } from 'lit/decorators.js'
+import { connect } from 'pwa-helpers/connect-mixin.js'
+
+import { store, PageView } from '@operato/shell'
+import { i18next, localize } from '@operato/i18n'
+import { CommonButtonStyles } from '@operato/styles'
+import { OxPrompt } from '@operato/popup/ox-prompt.js'
+
+const logo = new URL('/assets/images/hatiolab-logo.png', import.meta.url).href
+
+@customElement('{{name}}')
+export class {{properCase name}} extends connect(store)(PageView) {
+  static styles = [
+    css`
+      :host {
+        display: block;
+      }
+    `
+  ]
+
+  @property({ type: String }) itemId?: string
+  @property({ type: Object }) params: any
+  
+  get context() {
+    return {
+      title: i18next.t('title.{{name}}'),
+      help: '{{packageName}}/{{name}}',
+      actions: [
+        {
+          title: i18next.t('button.save'),
+          action: this.save.bind(this),
+          ...CommonButtonStyles.save
+        }
+      ]
+    }
+  }
+
+  render() {
+    return html`
+      <section>
+        <h2>{{properCase name}}</h2>
+        <img src=${logo}>
+      </section>
+    `
+  }
+
+  updated(changes: PropertyValues<this>) {
+    /* 
+     * If this page properties are changed, this callback will be invoked.
+     * This callback will be called back only when this page is activated. 
+     */
+    if(changes.has('itemId') || changes.has('params')) {
+      /* do something */
+    }
+  }
+
+  stateChanged(state: any) {
+    /* 
+     * application wide state changed 
+     * 
+     */
+  }
+
+  /*
+   * page lifecycle 
+   * 
+   * - pageInitialized(lifecycle)
+   * - pageUpdated(changes, lifecycle, changedBefore)
+   * - pageDisposed(lifecycle)
+   * 
+   * lifecycle value has
+   * - active : this page is activated
+   * - page : first path of href
+   * - resourceId : second path of href
+   * - params : search params object of href
+   * - initialized : initialized state of this page
+   * 
+   * you can update lifecycle values, or add custom values
+   * by calling this.pageUpdate({ ...values }, force)
+   * If lifecycle values changed by this.pageUpdate(...),
+   * this.pageUpdated(...) will be called back right after.
+   * If you want to invoke this.pageUpdated(...) callback,
+   * set force argument to true.
+   * 
+   * you can re-initialize this page
+   * by calling this.pageReset().
+   * this.pageInitialized(...) followed by this.pageDisposed(...) will be invoked 
+   * by calling this.pageReset().
+   * 
+   * you can invoke this.pageDisposed()
+   * by calling this.pageDispose()
+   */
+
+  pageInitialized(lifecycle: any) {
+    /* 
+     * This page is initialized.
+     * It's right time to configure of this page.
+     * 
+     * - called before when this page activated first
+     * - called when i18next resource is updated (loaded, changed, ..)
+     * - called right after this.pageReset()
+     */
+  }
+
+  pageUpdated(changes: any, lifecycle: any, before: any) {
+    if(this.active) {
+      /* 
+       * this page is activated 
+       */
+      this.itemId = lifecycle.resourceId
+      this.params = lifecycle.params
+    } else {
+      /* this page is deactivated */
+    }
+  }
+
+  pageDisposed(lifecycle: any) {
+    /* 
+     * This page is disposed.
+     * It's right time to release system resources.
+     * 
+     * - called just before (re)pageInitialized
+     * - called right after when i18next resource updated (loaded, changed, ..)
+     * - called right after this.pageReset()
+     * - called right after this.pageDispose()
+     */
+  }
+
+  save() {
+    OxPrompt.open({
+      type: 'success',
+      title: i18next.t('text.completed'),
+      text: i18next.t('text.data_saved_successfully'),
+      confirmButton: { text: i18next.t('button.confirm') }
+    })
+  }
+}
+

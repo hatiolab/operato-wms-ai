@@ -1,0 +1,5 @@
+{
+  "menu.template-file-management": "Template Files",
+  "title.notification time": "Notification Timeout",
+  "text.search-data-permit-error": "{0}:{1} You have no data access authorization. \nPlease input other conditions."
+}

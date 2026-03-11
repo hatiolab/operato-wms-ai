@@ -35,3 +35,20 @@ docs/roadmap/
 # --- 환경설정 민감 파일 ---
 src/main/resources/application-dev.properties
 src/main/resources/application-prod.properties
+
+# --- 프론트엔드 빌드 산출물 및 의존성 ---
+node_modules/
+frontend/node_modules/
+frontend/packages/*/node_modules/
+frontend/packages/*/dist-app/
+frontend/packages/*/dist-client/
+frontend/packages/*/dist-server/
+frontend/.yarn/
+frontend/.pnp.*
+frontend/yarn.lock
+src/main/resources/static/
+
+# --- 프론트엔드 템플릿 및 설정 파일 ---
+frontend/templates/
+frontend/.prettierrc
+frontend/.eslintrc*

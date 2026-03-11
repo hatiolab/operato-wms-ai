@@ -1,0 +1,7 @@
+export default function route(page: string) {
+  switch (page) {
+    case '{{ name }}-main':
+      import('./pages/main')
+      return page
+  }
+}

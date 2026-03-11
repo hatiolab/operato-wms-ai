@@ -1,0 +1,5 @@
+{
+  "menu.template-file-management": "템플릿 파일 관리",
+  "title.notification time": "알림 시간 설정",
+  "text.search-data-permit-error": "{0}:{1} 데이터 접근 권한이 없습니다. \n다른 조회 조건을 입력해주세요."
+}

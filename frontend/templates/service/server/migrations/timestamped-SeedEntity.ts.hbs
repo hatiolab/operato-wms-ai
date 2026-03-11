@@ -1,0 +1,37 @@
+import { MigrationInterface, QueryRunner } from 'typeorm'
+import { Domain, getRepository } from '@things-factory/shell'
+import { {{pascalCase name}} } from '../service/{{name}}/{{name}}'
+
+const SEED = [
+  {
+    name: 'Seed',
+    description: 'Description for Seed'
+  }
+]
+
+export class Seed{{pascalCase name}}{{timestamp}} implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<any> {
+    const repository = getRepository({{pascalCase name}})
+    const domain: Domain = await getRepository(Domain).findOneBy({
+      name: 'SYSTEM'
+    })
+
+    return await Promise.all(SEED.map(async {{camelCase name}} => {
+      await repository.save({
+        ...{{camelCase name}},
+        domain
+      })
+    }))
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<any> {
+    const repository = getRepository({{pascalCase name}})
+    const domain: Domain = await getRepository(Domain).findOneBy({
+      name: 'SYSTEM'
+    })
+
+    return await Promise.all(SEED.reverse().map(async {{camelCase name}} => {
+      await repository.delete({ name: {{camelCase name}}.name, domain: { id: domain.id } })
+    }))
+  }
+}

@@ -1,0 +1,95 @@
+import {
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+  Entity,
+  Index,
+  Column,
+  RelationId,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  VersionColumn
+} from 'typeorm'
+import { ObjectType, Field, Int, ID, registerEnumType } from 'type-graphql'
+
+import { Domain } from '@things-factory/shell'
+import { User } from '@things-factory/auth-base'
+
+export enum {{pascalCase name}}Status {
+  STATUS_A = 'STATUS_A',
+  STATUS_B = 'STATUS_B'
+}
+
+registerEnumType({{pascalCase name}}Status, {
+  name: '{{pascalCase name}}Status',
+  description: 'state enumeration of a {{camelCase name}}'
+})
+
+@Entity()
+@Index('ix_{{snakeCase name}}_0', ({{camelCase name}}: {{pascalCase name}}) => [{{camelCase name}}.domain, {{camelCase name}}.name, {{camelCase name}}.deletedAt], { unique: true })
+@ObjectType({ description: 'Entity for {{pascalCase name}}' })
+export class {{pascalCase name}} {
+  @PrimaryGeneratedColumn('uuid')
+  @Field(type => ID)
+  readonly id: string
+
+  @VersionColumn()
+  @Field({ nullable: true })
+  version?: number = 1
+
+  @ManyToOne(type => Domain)
+  @Field({ nullable: true })
+  domain?: Domain
+
+  @RelationId(({{camelCase name}}: {{pascalCase name}}) => {{camelCase name}}.domain)
+  domainId?: string
+
+  @Column()
+  @Field({ nullable: true })
+  name?: string
+
+  @Column({ nullable: true })
+  @Field({ nullable: true })
+  description?: string
+
+  @Column({ nullable: true })
+  @Field({ nullable: true })
+  active?: boolean
+
+  @Column({ nullable: true })
+  @Field({ nullable: true })
+  state?: {{pascalCase name}}Status
+
+  @Column({ nullable: true })
+  @Field({ nullable: true })
+  params?: string
+
+  @CreateDateColumn()
+  @Field({ nullable: true })
+  createdAt?: Date
+
+  @UpdateDateColumn()
+  @Field({ nullable: true })
+  updatedAt?: Date
+
+  @DeleteDateColumn()
+  @Field({ nullable: true })
+  deletedAt?: Date
+
+  @ManyToOne(type => User, { nullable: true })
+  @Field(type => User, { nullable: true })
+  creator?: User
+
+  @RelationId(({{camelCase name}}: {{pascalCase name}}) => {{camelCase name}}.creator)
+  creatorId?: string
+
+  @ManyToOne(type => User, { nullable: true })
+  @Field(type => User, { nullable: true })
+  updater?: User
+
+  @RelationId(({{camelCase name}}: {{pascalCase name}}) => {{camelCase name}}.updater)
+  updaterId?: string
+
+  @Field(type => String, { nullable: true })
+  thumbnail?: string
+}

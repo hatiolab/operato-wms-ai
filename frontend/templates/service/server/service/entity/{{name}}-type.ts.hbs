@@ -1,0 +1,61 @@
+import type { FileUpload } from 'graphql-upload/GraphQLUpload.js'
+import GraphQLUpload from 'graphql-upload/GraphQLUpload.js'
+import { ObjectType, Field, InputType, Int, ID, registerEnumType } from 'type-graphql'
+
+import { ObjectRef, ScalarObject } from '@things-factory/shell'
+
+import { {{pascalCase name}}, {{pascalCase name}}Status } from './{{name}}'
+
+@InputType()
+export class New{{pascalCase name}} {
+  @Field()
+  name: string
+
+  @Field({ nullable: true })
+  description?: string
+
+  @Field(type => {{pascalCase name}}Status, { nullable: true })
+  state?: {{pascalCase name}}Status
+
+  @Field({ nullable: true })
+  active?: boolean
+
+  @Field({ nullable: true })
+  params?: string
+
+  @Field(type => GraphQLUpload, { nullable: true })
+  thumbnail?: FileUpload
+}
+
+@InputType()
+export class {{pascalCase name}}Patch {
+  @Field(type => ID, { nullable: true })
+  id?: string
+
+  @Field({ nullable: true })
+  name?: string
+
+  @Field({ nullable: true })
+  description?: string
+
+  @Field(type => {{pascalCase name}}Status, { nullable: true })
+  state?: {{pascalCase name}}Status
+
+  @Field({ nullable: true })
+  active?: boolean
+
+  @Field(type => GraphQLUpload, { nullable: true })
+  thumbnail?: FileUpload
+
+  @Field({ nullable: true })
+  cuFlag?: string
+}
+
+@ObjectType()
+export class {{pascalCase name}}List {
+  @Field(type => [{{pascalCase name}}])
+  items: {{pascalCase name}}[]
+
+  @Field(type => Int)
+  total: number
+}
