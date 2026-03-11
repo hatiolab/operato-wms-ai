@@ -41,10 +41,10 @@ src/main/resources/application-dev.properties
 *.swp
 *.bak
 
-# 프론트엔드 (Gradle이 빌드하므로 Docker 빌드 컨텍스트에서 제외)
-frontend/node_modules/
-frontend/packages/*/node_modules/
-frontend/packages/*/dist*/
-frontend/.yarn/
-frontend/.pnp.*
-frontend/yarn.lock
+# 프론트엔드 빌드 캐시 (Docker 안에서 새로 설치)
+# Build context가 상위 디렉터리(..)이므로 operato-wms-ai/ 접두사 사용
+operato-wms-ai/frontend/node_modules/
+operato-wms-ai/frontend/packages/*/node_modules/
+operato-wms-ai/frontend/packages/*/dist*/
+operato-wms-ai/frontend/.yarn/
+operato-wms-ai/frontend/.pnp.*

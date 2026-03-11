@@ -1,7 +1,25 @@
 services:
 
   # -------------------------------------------------------------------
-  # 백엔드 API 서버
+  # Nginx (프론트엔드 + 리버스 프록시) — 외부 노출
+  # -------------------------------------------------------------------
+  nginx:
+    build:
+      context: ..
+      dockerfile: operato-wms-ai/nginx/Dockerfile
+    image: hatiolab/operato-nginx:latest
+    container_name: operato-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      operato-wms-ai:
+        condition: service_healthy
+    networks:
+      - wms-network
+
+  # -------------------------------------------------------------------
+  # 백엔드 API 서버 — 내부 전용 (Nginx에서 proxy_pass)
   # -------------------------------------------------------------------
   operato-wms-ai:
     build:
@@ -12,8 +30,8 @@ services:
     image: hatiolab/operato-wms-ai:latest
     container_name: operato-wms-ai
     restart: unless-stopped
-    ports:
-      - "9501:9501"
+    expose:
+      - "9501"                                 # 내부만 노출 (Nginx에서 proxy_pass)
     environment:
       SPRING_PROFILES_ACTIVE: prod
       JAVA_OPTS: "-Xmx512m -Djava.security.egd=file:/dev/./urandom"

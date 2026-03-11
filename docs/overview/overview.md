@@ -17,7 +17,7 @@
 | 저장소 | 경로 | 역할 |
 |--------|------|------|
 | `operato-wms-ai` | `./` | 백엔드 — Spring Boot REST API 서버 |
-| `operato-wms-app` | `../operato-wms-app` | 프론트엔드 — Things Factory 기반 Web/PWA UI |
+| `operato-wms-ai` | `./frontend` | 프론트엔드 — Things Factory 기반 Web/PWA UI |
 | `otarepo-core` | `../otarepo-core` | 공유 코어 라이브러리 (백엔드 서브모듈) |
 
 ## 기술 스택
@@ -41,7 +41,7 @@
 | SVG | Apache Batik |
 | 서브모듈 | `otarepo-core` (../otarepo-core) |
 
-### 프론트엔드 (operato-wms-app)
+### 프론트엔드 (operato-app)
 
 | 항목 | 내용 |
 |------|------|

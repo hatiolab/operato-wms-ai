@@ -1,5 +1,5 @@
 module.exports = {
-  port: 5905,
+  port: 5907,
   protocol: 'http',
   useVirtualHostBasedDomain: false,
   subdomainOffset: 2,

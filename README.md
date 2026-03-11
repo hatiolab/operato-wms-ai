@@ -69,6 +69,20 @@ cd frontend && yarn wms:dev
 
 ### 3️⃣ 배포용 빌드
 
+**Docker 배포 (권장)**
+
+```bash
+# Nginx + 백엔드 전체 스택 빌드
+docker compose build
+
+# 실행
+docker compose up -d
+
+# 접속: http://localhost
+```
+
+**로컬 통합 JAR 빌드 (선택적)**
+
 ```bash
 # 프론트엔드 + 백엔드 통합 빌드
 ./scripts/build.sh
@@ -77,9 +91,22 @@ cd frontend && yarn wms:dev
 ./gradlew clean buildAll -x test
 
 # 결과물: build/libs/operato-wms-ai.jar
+# 주의: application.properties에서 operato.wms.spa.enabled=true 필요
 ```
 
 ### 4️⃣ 운영 모드 실행
+
+**Docker 배포 (권장)**
+
+```bash
+# 전체 스택 실행
+docker compose up -d
+
+# 접속: http://localhost (Nginx :80)
+# 프론트엔드는 Nginx에서 서빙, 백엔드는 내부 포트 9501
+```
+
+**통합 JAR 실행 (선택적)**
 
 ```bash
 # 단일 JAR 실행 (프론트엔드 포함)
@@ -109,6 +136,8 @@ java -jar build/libs/operato-wms-ai.jar
 
 - [프로젝트 개요](docs/overview/overview.md)
 - [요구사항](docs/requirement/requirements.md)
+- [프론트엔드 통합 가이드](frontend/INTEGRATION.md)
+- [백엔드 Docker 가이드](docs/operations/backend-docker.md) — Nginx + 백엔드 통합 Docker 배포 (권장)
 - [개발 가이드](CLAUDE.md)
 
 ## 🔧 Gradle 태스크
@@ -132,14 +161,15 @@ java -jar build/libs/operato-wms-ai.jar
 
 ## 📝 개발 모드 vs 배포 모드
 
-| 항목 | 개발 모드 | 배포 모드 |
-|------|----------|----------|
-| **프론트엔드** | 별도 포트 (3000) | 통합 (9191) |
-| **백엔드** | 포트 9191 | 포트 9191 |
-| **핫 리로드** | ✅ 지원 | ❌ |
-| **CORS** | 허용 | 불필요 |
-| **SPA 라우팅** | 비활성화 | 활성화 |
-| **빌드 산출물** | 없음 | JAR 파일 |
+| 항목 | 개발 모드 | 운영 (Docker) | 운영 (통합 JAR) |
+|------|----------|--------------|----------------|
+| **프론트엔드** | Koa :5907 | Nginx :80 | Spring :9191 |
+| **백엔드** | :9191 | :9501 (내부만) | :9191 |
+| **핫 리로드** | ✅ 지원 | ❌ | ❌ |
+| **CORS** | 허용 (localhost:5907) | 불필요 (프록시) | 불필요 |
+| **SPA 라우팅** | 비활성화 | Nginx 처리 | SpaController |
+| **빌드 산출물** | 없음 | Docker 이미지 | JAR 파일 |
+| **프론트엔드 독립 배포** | N/A | ✅ 가능 | ❌ 불가 |
 
 ## 🤝 기여
 

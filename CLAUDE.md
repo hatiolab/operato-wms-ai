@@ -6,10 +6,11 @@
 
 **Operato WMS** — 자가 물류 및 3PL을 위한 클라우드 기반 WMS. 하티오랩(HatioLab) 개발.
 
-- 저장소: `./` (통합 레포) | `./frontend/` (프론트엔드 operato-wms-app) | 별도 레포: `otarepo-core` (공유 코어)
+- 저장소: `./` (통합 레포) | `./frontend/` (프론트엔드 operato-wes) | 별도 레포: `otarepo-core` (공유 코어)
 - 백엔드: Java 18 / Spring Boot 3.2.4 / Gradle 8.5 / PostgreSQL+Redis / Jasypt
 - 프론트엔드: Things Factory / Lerna+Yarn / TypeScript / GraphQL / Node.js(Koa)
-- **통합 구조**: 프론트엔드가 `frontend/` 디렉토리에 통합됨. 배포 시 단일 JAR 파일 생성
+- **통합 구조**: 프론트엔드가 `frontend/` 디렉토리에 통합됨
+- **배포 방식**: Docker (Nginx + 백엔드 분리, 권장) | 로컬 통합 JAR (선택적)
 
 
 ## 빌드 및 실행
@@ -27,14 +28,27 @@
 cd frontend && yarn wms:dev
 ```
 
-### 배포용 빌드
+### Docker 배포 (운영 환경 권장)
 ```bash
-# 전체 빌드 (프론트엔드 + 백엔드 통합)
+# Nginx + 백엔드 전체 스택 빌드
+docker compose build
+
+# 실행 (Nginx:80, 백엔드:9501 내부)
+docker compose up -d
+
+# 접속: http://localhost
+# 헬스체크: http://localhost/actuator/health
+```
+
+### 로컬 통합 JAR 빌드 (선택적)
+```bash
+# 프론트엔드 + 백엔드 통합 빌드
 ./scripts/build.sh
 # 또는
 ./gradlew buildAll
 
 # 결과: build/libs/operato-wms-ai.jar (단일 파일)
+# 주의: application.properties에서 operato.wms.spa.enabled=true 필요
 ```
 
 ### 기타
@@ -62,7 +76,7 @@ cd frontend && yarn wms:dev
 - Initializer: 모듈 초기화, `web/initializer/` 하위
 - 모듈별 상수: `Wms{Module}Constants.java`, `Wms{Module}ConfigConstants.java`
 
-### 프론트엔드 (frontend/ - operato-wms-app 통합)
+### 프론트엔드 (frontend/)
 - 위치: `frontend/packages/`
 - 패키지명: `@operato-app/{패키지명}` 스코프 (메인 앱: `@operato-app/operato-wes`)
 - 화면 파일: `client/pages/{모듈}/{도메인}-{액션}.js` (예: `inbound/receive-list.js`)

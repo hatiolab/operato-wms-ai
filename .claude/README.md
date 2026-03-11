@@ -75,7 +75,7 @@ Claude Code가 기본 워킹 디렉토리(`operato-wms-ai`) 외에 접근할 수
 
 | 경로 | 설명 |
 |------|------|
-| `../operato-wms-app` | 프론트엔드 (Things Factory 기반) |
+| `frontend` | 프론트엔드 (Things Factory 기반) |
 | `../otarepo-core` | 공유 코어 라이브러리 |
 
 > 이 설정이 없으면 Claude가 관련 저장소의 파일을 읽거나 수정할 때 권한 오류가 발생함.

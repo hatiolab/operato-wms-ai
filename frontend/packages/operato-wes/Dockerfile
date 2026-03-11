@@ -10,7 +10,7 @@ COPY . .
 # run node install command
 RUN yarn install
 
-# Make port 5908 available to the world outside this container
-EXPOSE 5908
+# Make port 5907 available to the world outside this container
+EXPOSE 5907
 
 CMD [ "yarn", "run", "serve" ]

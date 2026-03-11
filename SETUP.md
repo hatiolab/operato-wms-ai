@@ -45,6 +45,24 @@ cd frontend && yarn wms:dev
 
 ### 3️⃣ 운영 배포용 빌드
 
+**방법 A: Docker 배포 (권장)**
+
+```bash
+# Nginx + 백엔드 전체 스택 빌드
+docker compose build
+
+# 실행
+docker compose up -d
+
+# 접속: http://localhost
+```
+
+- Nginx가 프론트엔드 정적 파일 서빙 + 백엔드 API 리버스 프록시 담당
+- 백엔드 포트(9501)는 내부 네트워크에서만 접근 (보안 강화)
+- 프론트엔드와 백엔드 독립 배포 가능
+
+**방법 B: 로컬 통합 JAR 빌드 (선택적)**
+
 ```bash
 # 전체 빌드
 ./scripts/build.sh
@@ -55,7 +73,23 @@ cd frontend && yarn wms:dev
 # 결과: build/libs/operato-wms-ai.jar (단일 파일, 프론트엔드 포함)
 ```
 
+⚠️ **주의**: JAR 배포 시 `application.properties`에서 `operato.wms.spa.enabled=true` 설정 필요
+
 ### 4️⃣ 운영 모드 실행
+
+**Docker 배포 (권장)**
+
+```bash
+# 컨테이너 실행
+docker compose up -d
+
+# 로그 확인
+docker compose logs -f
+
+# 접속: http://localhost (Nginx :80)
+```
+
+**통합 JAR 배포 (선택적)**
 
 ```bash
 java -jar build/libs/operato-wms-ai.jar
@@ -153,15 +187,17 @@ operato-wms-ai/
 
 ## 📝 **개발 vs 배포 모드**
 
-| 항목 | 개발 모드 | 배포 모드 |
-|------|----------|----------|
-| **프론트엔드** | 별도 포트 (3000) | 통합 (9191) |
-| **백엔드** | 포트 9191 | 포트 9191 |
-| **핫 리로드** | ✅ 지원 | ❌ |
-| **CORS** | 허용 (localhost:5907) | 불필요 |
-| **SPA 라우팅** | 비활성화 | 활성화 |
-| **빌드 시간** | 빠름 (백엔드만) | 느림 (전체) |
-| **배포 파일** | 없음 | JAR 1개 |
+| 항목 | 개발 모드 | 운영 (Docker) | 운영 (통합 JAR) |
+|------|----------|--------------|----------------|
+| **프론트엔드** | Koa :5907 | Nginx :80 | Spring :9191 |
+| **백엔드** | :9191 | :9501 (내부만) | :9191 |
+| **핫 리로드** | ✅ 지원 | ❌ | ❌ |
+| **CORS** | 허용 (localhost:5907) | 불필요 (프록시) | 불필요 |
+| **SPA 라우팅** | 비활성화 | Nginx 처리 | SpaController |
+| **빌드 시간** | 빠름 (백엔드만) | 중간 (Docker) | 느림 (전체) |
+| **배포 파일** | 없음 | Docker 이미지 | JAR 1개 |
+| **프론트엔드 독립 배포** | N/A | ✅ 가능 | ❌ 불가 |
+| **보안** | 개발 전용 | ✅ 백엔드 미노출 | ⚠️ 백엔드 외부 노출 |
 
 ---
 
@@ -206,20 +242,33 @@ rm -rf build/
 - [프로젝트 개요](docs/overview/overview.md)
 - [요구사항](docs/requirement/requirements.md)
 - [프론트엔드 통합 가이드](frontend/INTEGRATION.md)
+- [백엔드 Docker 가이드](docs/operations/backend-docker.md) — Nginx + 백엔드 통합 Docker 배포 (권장)
+- [프론트엔드 Docker 가이드](docs/operations/frontend-docker.md) — 프론트엔드 standalone Docker 배포 (레거시)
 - [개발 가이드](CLAUDE.md)
 
 ---
 
 ## ✅ **체크리스트**
 
-배포 전 확인 사항:
+**Docker 배포 전 확인 사항:**
+
+- [ ] `docker compose build` 성공
+- [ ] `docker compose up -d` 실행 성공
+- [ ] http://localhost 접속하여 프론트엔드 확인
+- [ ] REST API 동작 확인 (http://localhost/rest/...)
+- [ ] 백엔드 헬스체크 (http://localhost/actuator/health)
+- [ ] 환경 변수 설정 완료 (docker-compose.yml)
+- [ ] 데이터베이스 마이그레이션 완료
+- [ ] 볼륨 마운트 확인 (PostgreSQL, Redis)
+
+**통합 JAR 배포 전 확인 사항:**
 
 - [ ] `./gradlew buildAll` 성공
+- [ ] `operato.wms.spa.enabled=true` 설정 확인
 - [ ] `java -jar build/libs/operato-wms-ai.jar` 실행 성공
 - [ ] http://localhost:9191 접속하여 프론트엔드 확인
 - [ ] REST API 동작 확인 (http://localhost:9191/rest/...)
 - [ ] 환경 변수 / 프로퍼티 설정 완료
-- [ ] 데이터베이스 마이그레이션 완료
 
 ---
 

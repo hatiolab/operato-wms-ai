@@ -1,5 +1,7 @@
 # =====================================================================
-# Operato WMS AI — Multi-stage Dockerfile
+# Operato WMS AI — 백엔드 전용 Multi-stage Dockerfile
+#
+# 프론트엔드는 Nginx 컨테이너에서 서빙합니다 (nginx/Dockerfile 참조).
 #
 # Build context: 상위 디렉터리 (..) 로 설정해야 합니다.
 #   docker build -f operato-wms-ai/Dockerfile -t operato-wms-ai ..

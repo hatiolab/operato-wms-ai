@@ -1,14 +1,25 @@
-# Operato WMS 백엔드 Docker 빌드 및 실행 가이드
+# Operato WMS Docker 빌드 및 실행 가이드
 
 ## 개요
 
-`operato-wms-ai`는 멀티 스테이지 Dockerfile과 docker-compose를 사용하여 컨테이너로 배포합니다.
+`operato-wms-ai`는 **Nginx + Spring Boot** 분리 아키텍처로 Docker 배포합니다.
+
+- **Nginx**: 프론트엔드 정적 파일 서빙 + 리버스 프록시 (외부 포트 80)
+- **Spring Boot**: REST API 전용 (내부 포트 9501, 외부 미노출)
+
+```
+Client → Nginx (:80) → /* 정적 파일 (dist-app)
+                      → /rest/* 백엔드 프록시 (operato-wms-ai:9501)
+```
 
 ### 관련 파일
 
 | 파일 | 위치 | 설명 |
 |------|------|------|
-| `Dockerfile` | `operato-wms-ai/` | 멀티 스테이지 빌드 정의 |
+| `Dockerfile` | `operato-wms-ai/` | 백엔드 멀티 스테이지 빌드 |
+| `nginx/Dockerfile` | `operato-wms-ai/nginx/` | 프론트엔드 빌드 + Nginx 서빙 |
+| `nginx/default.conf` | `operato-wms-ai/nginx/` | Nginx 사이트 설정 (리버스 프록시 + SPA) |
+| `nginx/nginx.conf` | `operato-wms-ai/nginx/` | Nginx 메인 설정 (gzip, 업로드) |
 | `.dockerignore` | `operato-wms-ai/` | 빌드 컨텍스트 제외 목록 |
 | `docker-compose.yml` | `operato-wms-ai/` | 풀스택 서비스 구성 |
 | `.env.example` | `operato-wms-ai/` | 환경변수 템플릿 |
@@ -41,22 +52,35 @@ project(':otarepo-core').projectDir = new File('../otarepo-core')
 ```
 Git/                          ← build context (..)
 ├── operato-wms-ai/           ← 프로젝트 루트 (docker-compose.yml 실행 위치)
-│   ├── Dockerfile
+│   ├── Dockerfile            ← 백엔드 빌드
+│   ├── nginx/                ← Nginx 설정 + 프론트엔드 빌드
+│   │   ├── Dockerfile
+│   │   ├── default.conf
+│   │   └── nginx.conf
 │   ├── docker-compose.yml
+│   ├── frontend/             ← 프론트엔드 소스 (Nginx Dockerfile에서 빌드)
 │   └── src/
 └── otarepo-core/             ← Gradle 서브프로젝트 (빌드 시 필요)
 ```
 
 `docker-compose.yml`은 이를 자동으로 처리합니다:
 ```yaml
+# 백엔드
 build:
-  context: ..                   # 상위 디렉터리
+  context: ..
   dockerfile: operato-wms-ai/Dockerfile
+
+# Nginx (프론트엔드)
+build:
+  context: ..
+  dockerfile: operato-wms-ai/nginx/Dockerfile
 ```
 
 ---
 
 ## 3. Dockerfile 구조
+
+### 백엔드 (Dockerfile)
 
 ```
 Stage 1: builder (eclipse-temurin:18-jdk-alpine)
@@ -73,6 +97,23 @@ Stage 2: runtime (eclipse-temurin:18-jre-alpine)
 ```
 
 **빌드 레이어 캐시 전략**: Gradle wrapper → 빌드 스크립트 → `otarepo-core` → `src` 순으로 복사하여, 소스 변경 시에만 마지막 레이어부터 재빌드합니다.
+
+### Nginx (nginx/Dockerfile)
+
+```
+Stage 1: builder (node:20-alpine)
+  ├── frontend/ 소스 복사
+  ├── yarn install
+  ├── yarn build (Lerna 전체 빌드)
+  └── yarn workspace ... build:app          ← dist-app 생성
+
+Stage 2: nginx (nginx:alpine)
+  ├── nginx.conf + default.conf 복사
+  ├── dist-app → /usr/share/nginx/html
+  └── EXPOSE 80
+```
+
+> 프론트엔드는 Nginx 이미지 안에서 빌드되므로 별도의 사전 빌드가 불필요합니다.
 
 ---
 
@@ -118,16 +159,19 @@ DB_PASSWORD=your-db-password
 ## 5. docker-compose 서비스 구성
 
 ```
-operato-wms-ai (Spring Boot :9501)
-    depends_on ──► postgres (PostgreSQL :15432)
-    depends_on ──► redis    (Redis :6379)
+nginx (:80) ──depends_on──► operato-wms-ai (:9501 내부)
+                                  depends_on ──► postgres (:15432)
+                                  depends_on ──► redis    (:6379)
 ```
 
-| 서비스 | 이미지 | 포트 | 볼륨 |
+| 서비스 | 이미지 | 포트 | 역할 |
 |--------|--------|------|------|
-| `operato-wms-ai` | 로컬 빌드 (`hatiolab/operato-wms-ai:latest`) | 9501 | `wms-logs:/app/logs` |
-| `postgres` | `postgres:16-alpine` | 15432 | `postgres-data:/var/lib/postgresql/data` |
-| `redis` | `redis:7-alpine` | 6379 | `redis-data:/data` |
+| `nginx` | 로컬 빌드 (`hatiolab/operato-nginx:latest`) | **80** (외부) | 정적 파일 + 리버스 프록시 |
+| `operato-wms-ai` | 로컬 빌드 (`hatiolab/operato-wms-ai:latest`) | 9501 (내부) | REST API |
+| `postgres` | `postgres:16-alpine` | 15432 | 데이터베이스 |
+| `redis` | `redis:7-alpine` | 6379 | 세션/캐시 |
+
+> 백엔드 포트(9501)는 `expose`로 내부 네트워크에만 노출됩니다. 외부에서는 Nginx(80)를 통해서만 접근 가능합니다.
 
 ---
 
@@ -137,26 +181,29 @@ operato-wms-ai (Spring Boot :9501)
 ```bash
 cd operato-wms-ai
 
-# 백엔드 + PostgreSQL + Redis 전체 빌드
+# Nginx + 백엔드 + PostgreSQL + Redis 전체 빌드
 docker compose build
 
-# 백엔드만 빌드
-docker compose build operato-wms-ai
+# 개별 빌드
+docker compose build nginx           # 프론트엔드 (Nginx)만
+docker compose build operato-wms-ai  # 백엔드만
 ```
 
 ### 직접 빌드 (docker-compose 없이)
 ```bash
 # operato-wms-ai/ 디렉터리에서 실행
 # build context를 반드시 상위 디렉터리(..)로 지정
-docker build \
-  -f Dockerfile \
-  -t hatiolab/operato-wms-ai:latest \
-  ..
+
+# 백엔드
+docker build -f Dockerfile -t hatiolab/operato-wms-ai:latest ..
+
+# Nginx (프론트엔드)
+docker build -f nginx/Dockerfile -t hatiolab/operato-nginx:latest ..
 ```
 
 ### 빌드 캐시 무시 (강제 전체 재빌드)
 ```bash
-docker compose build --no-cache operato-wms-ai
+docker compose build --no-cache
 ```
 
 ---
@@ -187,16 +234,25 @@ docker compose ps
 # 기동 로그 실시간 확인 (Spring Boot 기동 약 60초 소요)
 docker compose logs -f operato-wms-ai
 
-# 헬스체크
-curl http://localhost:9501/actuator/health
+# Nginx 로그 확인
+docker compose logs -f nginx
+
+# 헬스체크 (Nginx를 통해 접근)
+curl http://localhost/actuator/health
 # 정상: {"status":"UP"}
+
+# 프론트엔드 확인
+curl -s http://localhost/ | head -5
 ```
 
 ### 7-3. 개별 서비스 조작
 
 ```bash
-# 백엔드만 재시작 (PostgreSQL/Redis 유지)
+# 백엔드만 재시작 (Nginx/PostgreSQL/Redis 유지)
 docker compose restart operato-wms-ai
+
+# 프론트엔드만 재빌드 (백엔드 재시작 불필요)
+docker compose up --build -d nginx
 
 # 백엔드 이미지 재빌드 후 재시작
 docker compose up --build -d operato-wms-ai
@@ -217,7 +273,7 @@ docker compose down
 # 전체 중지 + 볼륨 삭제 ⚠️ DB 데이터 초기화
 docker compose down -v
 
-# 백엔드만 중지 (DB/Redis 유지)
+# 백엔드만 중지 (Nginx/DB/Redis 유지)
 docker compose stop operato-wms-ai
 
 # 사용하지 않는 이미지 정리
@@ -306,18 +362,35 @@ docker compose exec postgres psql -U postgres -d operatowms -c "SELECT 1;"
 ### 포트 충돌
 
 ```
-Error: Bind for 0.0.0.0:9501 failed: port is already allocated
+Error: Bind for 0.0.0.0:80 failed: port is already allocated
 ```
 
 **해결**:
 ```bash
 # 포트 점유 프로세스 확인
-lsof -i :9501
+lsof -i :80
 lsof -i :15432
 lsof -i :6379
 
 # 기존 컨테이너 확인
-docker ps | grep -E "9501|15432|6379"
+docker ps | grep -E "80|15432|6379"
+```
+
+---
+
+### Nginx 502 Bad Gateway
+
+**원인**: 백엔드(operato-wms-ai)가 아직 기동 중이거나 다운됨
+**해결**:
+```bash
+# 백엔드 상태 확인
+docker compose ps operato-wms-ai
+
+# 백엔드 로그 확인
+docker compose logs -f operato-wms-ai
+
+# 백엔드 헬스체크 (내부)
+docker compose exec operato-wms-ai wget -qO- http://localhost:9501/actuator/health
 ```
 
 ---
@@ -337,10 +410,22 @@ java -cp "/path/to/jasypt.jar:/path/to/bcprov.jar" JasyptEncrypt
 ```bash
 # 버전 태그 추가
 docker tag hatiolab/operato-wms-ai:latest hatiolab/operato-wms-ai:1.0.0
+docker tag hatiolab/operato-nginx:latest hatiolab/operato-nginx:1.0.0
 
 # Docker Hub 푸시
 docker push hatiolab/operato-wms-ai:latest
 docker push hatiolab/operato-wms-ai:1.0.0
+docker push hatiolab/operato-nginx:latest
+docker push hatiolab/operato-nginx:1.0.0
+```
+
+### 프론트엔드만 업데이트
+
+프론트엔드 변경 시 **백엔드 재빌드/재시작이 불필요**합니다:
+
+```bash
+# Nginx 이미지만 재빌드 + 재시작
+docker compose up --build -d nginx
 ```
 
 ### 로그 보존

@@ -196,13 +196,17 @@ task copyFrontendDist(type: Copy) {
 	}
 }
 
-// processResources와 bootJar 전에 프론트엔드 빌드 실행
-processResources {
-	dependsOn copyFrontendDist
-}
-
-bootJar {
-	dependsOn copyFrontendDist
+// processResources와 bootJar — 프론트엔드 연동은 로컬 개발용만
+// Docker 배포 시: frontend/ 미포함 → 자동 스킵 (Nginx가 정적 파일 서빙)
+// 로컬 통합 빌드: ./gradlew buildAll → 기존처럼 프론트엔드 포함
+// 명시적 스킵: SKIP_FRONTEND=true ./gradlew build
+if (file('frontend/package.json').exists() && !System.getenv('SKIP_FRONTEND')) {
+	processResources {
+		dependsOn copyFrontendDist
+	}
+	bootJar {
+		dependsOn copyFrontendDist
+	}
 }
 
 // clean 시 프론트엔드 관련 산출물도 삭제
