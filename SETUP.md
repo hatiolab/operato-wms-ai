@@ -35,12 +35,12 @@ vi src/main/resources/application-dev.properties
 # 터미널 1: 백엔드 (포트 9191)
 ./gradlew bootRunDev
 
-# 터미널 2: 프론트엔드 (포트 3000)
+# 터미널 2: 프론트엔드 (포트 5907)
 cd frontend && yarn wms:dev
 ```
 
 **접속:**
-- 프론트엔드 개발 서버: http://localhost:3000
+- 프론트엔드 개발 서버: http://localhost:5907 (포트는 `frontend/packages/operato-wes/config/config.development.js`에서 설정)
 - 백엔드 API: http://localhost:9191/rest
 
 ### 3️⃣ 운영 배포용 빌드
@@ -158,7 +158,7 @@ operato-wms-ai/
 | **프론트엔드** | 별도 포트 (3000) | 통합 (9191) |
 | **백엔드** | 포트 9191 | 포트 9191 |
 | **핫 리로드** | ✅ 지원 | ❌ |
-| **CORS** | 허용 (localhost:3000) | 불필요 |
+| **CORS** | 허용 (localhost:5907) | 불필요 |
 | **SPA 라우팅** | 비활성화 | 활성화 |
 | **빌드 시간** | 빠름 (백엔드만) | 느림 (전체) |
 | **배포 파일** | 없음 | JAR 1개 |
@@ -197,7 +197,7 @@ rm -rf build/
 ### 4. CORS 에러 (개발 모드)
 
 - `application-dev.properties`의 CORS 설정 확인
-- 프론트엔드가 http://localhost:3000에서 실행 중인지 확인
+- 프론트엔드가 http://localhost:5907에서 실행 중인지 확인
 
 ---
 

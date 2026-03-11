@@ -55,7 +55,7 @@ BACKEND_PID=$!
 sleep 3
 
 # 프론트엔드 시작
-echo -e "${GREEN}🎨 프론트엔드 시작 (포트 3000)...${NC}"
+echo -e "${GREEN}🎨 프론트엔드 시작 (포트 5907)...${NC}"
 cd frontend && yarn wms:dev &
 FRONTEND_PID=$!
 
@@ -65,7 +65,7 @@ echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}개발 서버가 실행되었습니다!${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo -e "백엔드:     ${YELLOW}http://localhost:9191${NC}"
-echo -e "프론트엔드: ${YELLOW}http://localhost:3000${NC}"
+echo -e "프론트엔드: ${YELLOW}http://localhost:5907${NC}"
 echo ""
 echo -e "종료하려면 ${YELLOW}Ctrl+C${NC}를 누르세요."
 echo ""

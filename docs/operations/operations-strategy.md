@@ -138,7 +138,8 @@ cd ../operato-wms-app
 # 의존성 설치
 yarn install
 
-# 개발 서버 (빌드 후 실행, 포트 3000/3001)
+# 개발 서버 (빌드 후 실행, 포트 5907)
+# 포트는 frontend/packages/operato-wes/config/config.development.js에서 설정
 yarn wms:dev
 
 # 개발 서버 종료
@@ -489,7 +490,7 @@ yarn build
 
 # 5. 개발 서버 실행
 yarn wms:dev
-# → http://localhost:3000
+# → http://localhost:5907 (config.development.js에서 설정)
 ```
 
 ---

@@ -23,7 +23,7 @@
 # 터미널 1: 백엔드 (포트 9191)
 ./gradlew bootRunDev
 
-# 터미널 2: 프론트엔드 (포트 3000)
+# 터미널 2: 프론트엔드 (포트 5907)
 cd frontend && yarn wms:dev
 ```
 
@@ -40,7 +40,7 @@ cd frontend && yarn wms:dev
 ### 기타
 - 환경설정: `application-dev.properties` (git 미추적, 템플릿 제공)
 - VSCode 디버그: Cmd+Shift+D → **operato-wms-ai (debug-dev)** | 원격 attach: 포트 5004
-- 프론트엔드 개발 서버: http://localhost:3000
+- 프론트엔드 개발 서버: http://localhost:5907 (포트는 `frontend/packages/operato-wes/config/config.development.js`에서 설정)
 - 백엔드 API: http://localhost:9191/rest
 
 

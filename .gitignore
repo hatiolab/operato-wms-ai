@@ -39,6 +39,7 @@ frontend/packages/*/node_modules/
 frontend/.yarn/
 frontend/.pnp.*
 frontend/yarn.lock
+frontend/packages/operato-wes/cache/
 
 # Spring Boot static 리소스 (빌드 산출물)
 src/main/resources/static/
@@ -50,6 +51,7 @@ src/main/resources/static/
 *.key
 *.pem
 src/main/resources/application-dev.properties
+frontend/packages/*/config/config.development.js
 
 # 빌드 결과물
 *.jar

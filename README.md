@@ -59,12 +59,12 @@ vi src/main/resources/application-dev.properties
 # 터미널 1 - 백엔드 (포트 9191)
 ./gradlew bootRunDev
 
-# 터미널 2 - 프론트엔드 (포트 3000)
+# 터미널 2 - 프론트엔드 (포트 5907)
 cd frontend && yarn wms:dev
 ```
 
 **접속 URL:**
-- 프론트엔드: http://localhost:3000
+- 프론트엔드: http://localhost:5907 (포트는 `frontend/packages/operato-wes/config/config.development.js`에서 설정)
 - 백엔드 API: http://localhost:9191/rest
 
 ### 3️⃣ 배포용 빌드
