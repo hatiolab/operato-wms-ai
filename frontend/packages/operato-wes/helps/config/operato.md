@@ -8,7 +8,7 @@ Configure the configuration related to the (Operato) Server, which is composed o
   - If requests starting with '/rest' context path are received from the client, they are forwarded to this baseUrl using the same method, and the response is sent back to the client.
 
   Example:
-  baseUrl: 'http://localhost:8080/rest'
+  baseUrl: 'http://localhost:9191/rest'
 
 ## default
 

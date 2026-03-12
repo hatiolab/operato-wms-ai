@@ -22,7 +22,7 @@
                     │  /* → static      │
                     │  /rest/* → proxy  │
                     └────────┬──────────┘
-                             │ :9501 (내부)
+                             │ :9191 (내부)
                     ┌────────▼──────────┐
                     │   Spring Boot     │
                     │  REST API only    │
@@ -129,7 +129,7 @@ spring.web.cors.allowed-origins=http://localhost:5907,http://127.0.0.1:5907
 | 항목 | 개발 모드 | 운영 (Nginx Docker) | 운영 (통합 JAR) |
 |------|----------|-------------------|----------------|
 | 프론트엔드 | 별도 포트 5907 (Koa BFF) | Nginx :80 (정적 파일) | Spring Boot :9191 (static/) |
-| 백엔드 | 포트 9191 | expose :9501 (내부만) | 포트 9191 (또는 9501) |
+| 백엔드 | 포트 9191 | expose :9191 (내부만) | 포트 9191 (또는 9191) |
 | SPA 라우팅 | 비활성화 | Nginx가 처리 | SpaController 활성화 |
 | CORS | 허용 (localhost:5907) | 불필요 (Nginx 프록시) | 불필요 (동일 오리진) |
 | HMR | 지원 (serve:dev) | 미지원 | 미지원 |

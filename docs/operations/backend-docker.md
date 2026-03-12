@@ -5,11 +5,11 @@
 `operato-wms-ai`는 **Nginx + Spring Boot** 분리 아키텍처로 Docker 배포합니다.
 
 - **Nginx**: 프론트엔드 정적 파일 서빙 + 리버스 프록시 (외부 포트 80)
-- **Spring Boot**: REST API 전용 (내부 포트 9501, 외부 미노출)
+- **Spring Boot**: REST API 전용 (내부 포트 9191, 외부 미노출)
 
 ```
 Client → Nginx (:80) → /* 정적 파일 (dist-app)
-                      → /rest/* 백엔드 프록시 (operato-wms-ai:9501)
+                      → /rest/* 백엔드 프록시 (operato-wms-ai:9191)
 ```
 
 ### 관련 파일
@@ -93,7 +93,7 @@ Stage 2: runtime (eclipse-temurin:18-jre-alpine)
   ├── 전용 사용자(wms) 생성                ← 보안: 비루트 실행
   ├── app.jar 복사 (builder → runtime)
   ├── /app/logs 디렉터리 생성
-  └── EXPOSE 9501
+  └── EXPOSE 9191
 ```
 
 **빌드 레이어 캐시 전략**: Gradle wrapper → 빌드 스크립트 → `otarepo-core` → `src` 순으로 복사하여, 소스 변경 시에만 마지막 레이어부터 재빌드합니다.
@@ -159,7 +159,7 @@ DB_PASSWORD=your-db-password
 ## 5. docker-compose 서비스 구성
 
 ```
-nginx (:80) ──depends_on──► operato-wms-ai (:9501 내부)
+nginx (:80) ──depends_on──► operato-wms-ai (:9191 내부)
                                   depends_on ──► postgres (:15432)
                                   depends_on ──► redis    (:6379)
 ```
@@ -167,11 +167,11 @@ nginx (:80) ──depends_on──► operato-wms-ai (:9501 내부)
 | 서비스 | 이미지 | 포트 | 역할 |
 |--------|--------|------|------|
 | `nginx` | 로컬 빌드 (`hatiolab/operato-nginx:latest`) | **80** (외부) | 정적 파일 + 리버스 프록시 |
-| `operato-wms-ai` | 로컬 빌드 (`hatiolab/operato-wms-ai:latest`) | 9501 (내부) | REST API |
+| `operato-wms-ai` | 로컬 빌드 (`hatiolab/operato-wms-ai:latest`) | 9191 (내부) | REST API |
 | `postgres` | `postgres:16-alpine` | 15432 | 데이터베이스 |
 | `redis` | `redis:7-alpine` | 6379 | 세션/캐시 |
 
-> 백엔드 포트(9501)는 `expose`로 내부 네트워크에만 노출됩니다. 외부에서는 Nginx(80)를 통해서만 접근 가능합니다.
+> 백엔드 포트(9191)는 `expose`로 내부 네트워크에만 노출됩니다. 외부에서는 Nginx(80)를 통해서만 접근 가능합니다.
 
 ---
 
@@ -390,7 +390,7 @@ docker compose ps operato-wms-ai
 docker compose logs -f operato-wms-ai
 
 # 백엔드 헬스체크 (내부)
-docker compose exec operato-wms-ai wget -qO- http://localhost:9501/actuator/health
+docker compose exec operato-wms-ai wget -qO- http://localhost:9191/actuator/health
 ```
 
 ---

@@ -50,7 +50,7 @@ RUN mkdir -p /app/logs && chown -R wms:wms /app
 
 USER wms
 
-EXPOSE 9501
+EXPOSE 9191
 
 # 환경변수 기본값 (운영 시 반드시 외부에서 주입)
 ENV SPRING_PROFILES_ACTIVE=prod

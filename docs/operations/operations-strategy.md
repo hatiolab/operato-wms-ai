@@ -18,7 +18,7 @@
                  │ /rest/* → backend │  (reverse proxy)
                  │ /actuator/* → ... │
                  └────────┬──────────┘
-                          │ :9501 (내부만)
+                          │ :9191 (내부만)
                           ▼
                  ┌───────────────────┐
                  │  operato-wms-ai   │ expose only
@@ -34,7 +34,7 @@
 
 - **Nginx**: 프론트엔드 정적 파일 서빙 + API 리버스 프록시
 - **외부 노출 포트**: 80 (Nginx)만 외부 노출
-- **백엔드**: 내부 네트워크에서만 접근 가능 (9501)
+- **백엔드**: 내부 네트워크에서만 접근 가능 (9191)
 - **프론트엔드**: Nginx 이미지에 빌드 산출물 포함 (멀티 스테이지 빌드)
 
 ### 로컬 개발 환경 (분리 실행)
@@ -255,7 +255,7 @@ cd frontend/packages/operato-wes && yarn stop:dev
 | 서비스 | 포트 | 비고 |
 |--------|------|------|
 | **Nginx (프론트엔드 + 프록시)** | **80** | **Docker 배포 시 외부 노출** |
-| 백엔드 API (Spring Boot) | 9501 | Docker: 내부만, 개발: 9191 |
+| 백엔드 API (Spring Boot) | 9191 | Docker: 내부만, 개발: 9191 |
 | 프론트엔드 개발 서버 | 5907 | 로컬 개발 전용 (config.development.js) |
 | PostgreSQL | 15432 | 비표준 포트 |
 | Redis | 6379 | 표준 포트 |
@@ -359,7 +359,7 @@ GET http://localhost/actuator/health
 }
 
 # 백엔드 직접 접근 (컨테이너 내부에서만)
-docker compose exec operato-wms-ai wget -qO- http://localhost:9501/actuator/health
+docker compose exec operato-wms-ai wget -qO- http://localhost:9191/actuator/health
 ```
 
 - `management.endpoint.health.show-details=when-authorized` — 인증된 사용자에게만 상세 정보 노출
@@ -472,17 +472,17 @@ yarn workspace @operato-app/operato-wes run migration:revert
 ### WAS URL 브로드캐스트 설정
 ```properties
 # 다중 WAS 환경에서 변경 필요
-redis.was.urls=localhost:9501
-# → redis.was.urls=was1:9501,was2:9501,was3:9501
+redis.was.urls=localhost:9191
+# → redis.was.urls=was1:9191,was2:9191,was3:9191
 ```
 
 ### Nginx 다중 백엔드 구성 (예시)
 ```nginx
 # nginx/default.conf
 upstream backend_cluster {
-    server operato-wms-ai-1:9501;
-    server operato-wms-ai-2:9501;
-    server operato-wms-ai-3:9501;
+    server operato-wms-ai-1:9191;
+    server operato-wms-ai-2:9191;
+    server operato-wms-ai-3:9191;
 }
 
 location /rest/ {
@@ -514,7 +514,7 @@ spring.data.redis.lettuce.pool.max-active=10
 ### 9-2. 헬스체크 URL 목록
 ```
 Nginx (외부):   http://{host}/actuator/health
-백엔드 (내부):  http://operato-wms-ai:9501/actuator/health
+백엔드 (내부):  http://operato-wms-ai:9191/actuator/health
 Spring Boot Admin: http://admin.hatiolab.com/admin
 ```
 

@@ -103,7 +103,7 @@ docker compose up -d
 docker compose up -d
 
 # 접속: http://localhost (Nginx :80)
-# 프론트엔드는 Nginx에서 서빙, 백엔드는 내부 포트 9501
+# 프론트엔드는 Nginx에서 서빙, 백엔드는 내부 포트 9191
 ```
 
 **통합 JAR 실행 (선택적)**
@@ -164,7 +164,7 @@ java -jar build/libs/operato-wms-ai.jar
 | 항목 | 개발 모드 | 운영 (Docker) | 운영 (통합 JAR) |
 |------|----------|--------------|----------------|
 | **프론트엔드** | Koa :5907 | Nginx :80 | Spring :9191 |
-| **백엔드** | :9191 | :9501 (내부만) | :9191 |
+| **백엔드** | :9191 | :9191 (내부만) | :9191 |
 | **핫 리로드** | ✅ 지원 | ❌ | ❌ |
 | **CORS** | 허용 (localhost:5907) | 불필요 (프록시) | 불필요 |
 | **SPA 라우팅** | 비활성화 | Nginx 처리 | SpaController |

@@ -147,7 +147,7 @@ docker run -d \
   --name operato-wes \
   -p 5907:5907 \
   -e NODE_ENV=production \
-  -e API_BASE_URL=http://backend-host:9501 \
+  -e API_BASE_URL=http://backend-host:9191 \
   hatiolab/operato-wes:latest
 ```
 
@@ -225,7 +225,7 @@ docker image push hatiolab/operato-wes:7.0.49
 백엔드(`operato-wms-ai`)와 프론트엔드를 함께 운영할 경우:
 
 ```
-백엔드:     http://localhost:9501  (operato-wms-ai Docker)
+백엔드:     http://localhost:9191  (operato-wms-ai Docker)
 프론트엔드: http://localhost:5907  (operato-wes Docker)
 ```
 
@@ -237,7 +237,7 @@ docker image push hatiolab/operato-wes:7.0.49
 |------|------------------|-------------------------|
 | 외부 포트 | 80 (Nginx) | 5907 (Node.js) |
 | 정적 파일 서빙 | Nginx (최적화됨) | Node.js/Koa (느림) |
-| 백엔드 노출 | 내부만 (9501) | 외부 필요 (9501) |
+| 백엔드 노출 | 내부만 (9191) | 외부 필요 (9191) |
 | 프론트엔드 독립 배포 | ✅ 가능 | ❌ 불가 |
 | 보안 | ✅ 백엔드 미노출 | ⚠️ 백엔드 외부 노출 |
 

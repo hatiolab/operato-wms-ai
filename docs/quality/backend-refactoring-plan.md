@@ -2,7 +2,7 @@
 
 > 작성일: 2026-03-08
 > 대상: `operato-wms-ai` 백엔드 소스 (100 Java 파일, ~23,000 라인)
-> 참조: `docs/quality/quality.md`
+> 참조: `docs/quality/backend-quality.md`
 
 ---
 
@@ -353,4 +353,4 @@ testImplementation 'org.mockito:mockito-core'
 
 ---
 
-*관련 문서: [코드 품질 분석](../quality/quality.md) | [API 명세](../implementation/api-list.md) | [요구사항](../requirement/requirements.md)*
+*관련 문서: [코드 품질 분석](../quality/backend-quality.md) | [API 명세](../implementation/api-list.md) | [요구사항](../requirement/requirements.md)*

@@ -8,7 +8,7 @@ Restful サービスで構成された（オペラト）サーバーに関連す
   - クライアントから '/rest' コンテキストパスで始まるリクエストが受信された場合、同じメソッドを使用してこの baseUrl に転送され、レスポンスがクライアントに送信されます。
 
   例：
-  baseUrl: 'http://localhost:8080/rest'
+  baseUrl: 'http://localhost:9191/rest'
 
 ## デフォルト
 

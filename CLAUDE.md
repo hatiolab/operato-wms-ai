@@ -33,7 +33,7 @@ cd frontend && yarn wms:dev
 # Nginx + 백엔드 전체 스택 빌드
 docker compose build
 
-# 실행 (Nginx:80, 백엔드:9501 내부)
+# 실행 (Nginx:80, 백엔드:9191 내부)
 docker compose up -d
 
 # 접속: http://localhost

@@ -8,7 +8,7 @@
   - 如果从客户端收到以 '/rest' 上下文路径开头的请求，则使用相同的方法将其转发到此 baseUrl，并将响应发送回客户端。
 
   示例：
-  baseUrl: 'http://localhost:8080/rest'
+  baseUrl: 'http://localhost:9191/rest'
 
 ## 默认值
 

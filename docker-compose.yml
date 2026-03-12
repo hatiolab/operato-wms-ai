@@ -31,7 +31,7 @@ services:
     container_name: operato-wms-ai
     restart: unless-stopped
     expose:
-      - "9501"                                 # 내부만 노출 (Nginx에서 proxy_pass)
+      - "9191"                                 # 내부만 노출 (Nginx에서 proxy_pass)
     environment:
       SPRING_PROFILES_ACTIVE: prod
       JAVA_OPTS: "-Xmx512m -Djava.security.egd=file:/dev/./urandom"
@@ -46,7 +46,7 @@ services:
     networks:
       - wms-network
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:9501/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9191/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5

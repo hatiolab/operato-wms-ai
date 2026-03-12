@@ -8,7 +8,7 @@ Konfigurasikan konfigurasi yang berkaitan dengan Server (Operato), yang terdiri 
   - Jika permintaan yang dimulai dengan '/rest' path konteks diterima dari klien, mereka akan diteruskan ke baseUrl ini menggunakan metode yang sama, dan responsnya dikirim kembali ke klien.
 
   Contoh:
-  baseUrl: 'http://localhost:8080/rest'
+  baseUrl: 'http://localhost:9191/rest'
 
 ## Default
 

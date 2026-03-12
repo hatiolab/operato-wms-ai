@@ -16,11 +16,11 @@
                  │ /* → static files │  (프론트엔드 dist-app)
                  │ /rest/* → backend │  (리버스 프록시)
                  └────────┬──────────┘
-                          │ :9501 (내부만)
+                          │ :9191 (내부만)
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              operato-wms-ai (Spring Boot)                    │
-│                  expose 9501 (내부 전용)                      │
+│                  expose 9191 (내부 전용)                      │
 │                                                             │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
 │  │  base/   │  │ inbound/ │  │outbound/ │  │  stock/  │   │
@@ -137,14 +137,14 @@ packages/
 ```
 docker-compose.yml
 ├── nginx            (Port 80) — 프론트엔드 정적 파일 + 리버스 프록시
-├── operato-wms-ai   (expose 9501) — Spring Boot JAR (내부 전용), linux/amd64
+├── operato-wms-ai   (expose 9191) — Spring Boot JAR (내부 전용), linux/amd64
 ├── postgres         (Port 15432 → 5432) — PostgreSQL 16
 └── redis            (Port 6379) — Redis 7
 ```
 
 **주요 특징**:
 - Nginx가 외부 요청을 받아 정적 파일 서빙 + API 프록시 역할
-- 백엔드 포트(9501)는 내부 네트워크에서만 접근 가능 (보안 강화)
+- 백엔드 포트(9191)는 내부 네트워크에서만 접근 가능 (보안 강화)
 - 프론트엔드와 백엔드 독립 배포 가능 (프론트엔드 변경 시 백엔드 재시작 불필요)
 
 > 상세: `docs/operations/` 하위 Docker 가이드 참조
