@@ -23,7 +23,8 @@ docs/
 │   └── database-specification.md      - DB 스키마, ERD, 테이블 정의
 │
 ├── implementation/                # 구현 관련 문서
-│   └── api-list.md                    - REST API 엔드포인트 목록 및 명세
+│   ├── api-list.md                    - REST API 엔드포인트 목록 및 명세
+│   └── development-environment.md     - 개발 환경 구성 가이드 (VSCode)
 │
 ├── operations/                    # 배포 및 운영
 │   ├── operations-strategy.md         - 배포 전략, 환경별 구성, 모니터링
@@ -45,7 +46,7 @@ docs/
 └── README.md                      # 이 문서 (문서 디렉토리 가이드)
 ```
 
-**총 문서 수**: 17개 (README 포함)
+**총 문서 수**: 18개 (README 포함)
 
 ---
 
@@ -96,8 +97,9 @@ docs/
 | 문서 | 설명 |
 |------|------|
 | [api-list.md](implementation/api-list.md) | REST API 엔드포인트 목록 및 명세 |
+| [development-environment.md](implementation/development-environment.md) | 로컬 개발 환경 구성 가이드 (VSCode, Nginx 미사용) |
 
-**용도**: API 개발 및 연동 시 참조
+**용도**: API 개발 및 연동, 개발 환경 설정
 
 ---
 
@@ -145,7 +147,8 @@ docs/
 1. [overview.md](overview/overview.md) — 프로젝트 전체 맥락 파악
 2. [architecture.md](architecture/architecture.md) — 시스템 구조 이해
 3. [requirements.md](requirement/requirements.md) — 업무 도메인 이해
-4. [backend-docker.md](operations/backend-docker.md) — 개발 환경 설정
+4. [development-environment.md](implementation/development-environment.md) — 로컬 개발 환경 설정 (VSCode)
+5. [backend-docker.md](operations/backend-docker.md) — Docker 배포 환경 (선택)
 
 ### 기능 개발
 1. [requirements.md](requirement/requirements.md) — 요구사항 확인
