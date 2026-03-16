@@ -38,7 +38,7 @@ module.exports = {
     ormconfig: {
         name: 'default',
         type: 'postgres',
-        database: 'operatowms',
+        database: 'britestone_3pl_dev',
         host: 'localhost',
         port: 15432,
         username: 'postgres',
