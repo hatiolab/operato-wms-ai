@@ -14,19 +14,21 @@ import xyz.elidom.util.ValueUtil;
  * RWA(Return Warehouse Authorization) 반품 지시 헤더 Entity
  *
  * 반품 지시의 헤더 정보를 관리
- * - 반품 유형: CUSTOMER_RETURN, VENDOR_RETURN, DEFECT_RETURN, STOCK_ADJUST, EXPIRED_RETURN
- * - 상태: REQUEST, APPROVED, RECEIVING, INSPECTING, INSPECTED, DISPOSED, COMPLETED, CLOSED, REJECTED, CANCELLED
+ * - 반품 유형: CUSTOMER_RETURN, VENDOR_RETURN, DEFECT_RETURN, STOCK_ADJUST,
+ * EXPIRED_RETURN
+ * - 상태: REQUEST, APPROVED, RECEIVING, INSPECTING, INSPECTED, DISPOSED,
+ * COMPLETED, CLOSED, REJECTED, CANCELLED
  */
-@Table(name = "rwa_orders", idStrategy = GenerationRule.UUID, uniqueFields="rwaNo,domainId", indexes = {
-	@Index(name = "ix_rwa_orders_0", columnList = "rwa_no,domain_id", unique = true),
-	@Index(name = "ix_rwa_orders_1", columnList = "com_cd,domain_id"),
-	@Index(name = "ix_rwa_orders_2", columnList = "wh_cd,domain_id"),
-	@Index(name = "ix_rwa_orders_3", columnList = "com_cd,status,domain_id"),
-	@Index(name = "ix_rwa_orders_4", columnList = "rwa_req_date,com_cd,domain_id"),
-	@Index(name = "ix_rwa_orders_5", columnList = "rwa_type,com_cd,domain_id"),
-	@Index(name = "ix_rwa_orders_6", columnList = "order_no,com_cd,domain_id"),
-	@Index(name = "ix_rwa_orders_7", columnList = "cust_cd,com_cd,domain_id"),
-	@Index(name = "ix_rwa_orders_8", columnList = "vend_cd,com_cd,domain_id")
+@Table(name = "rwa_orders", idStrategy = GenerationRule.UUID, uniqueFields = "rwaNo,domainId", indexes = {
+		@Index(name = "ix_rwa_orders_0", columnList = "rwa_no,domain_id", unique = true),
+		@Index(name = "ix_rwa_orders_1", columnList = "com_cd,domain_id"),
+		@Index(name = "ix_rwa_orders_2", columnList = "wh_cd,domain_id"),
+		@Index(name = "ix_rwa_orders_3", columnList = "com_cd,status,domain_id"),
+		@Index(name = "ix_rwa_orders_4", columnList = "rwa_req_date,com_cd,domain_id"),
+		@Index(name = "ix_rwa_orders_5", columnList = "rwa_type,com_cd,domain_id"),
+		@Index(name = "ix_rwa_orders_6", columnList = "order_no,com_cd,domain_id"),
+		@Index(name = "ix_rwa_orders_7", columnList = "cust_cd,com_cd,domain_id"),
+		@Index(name = "ix_rwa_orders_8", columnList = "vend_cd,com_cd,domain_id")
 })
 public class RwaOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
@@ -64,13 +66,15 @@ public class RwaOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String rwaEndDate;
 
 	/**
-	 * 상태 (REQUEST/APPROVED/RECEIVING/INSPECTING/INSPECTED/DISPOSED/COMPLETED/CLOSED/REJECTED/CANCELLED)
+	 * 상태
+	 * (REQUEST/APPROVED/RECEIVING/INSPECTING/INSPECTED/DISPOSED/COMPLETED/CLOSED/REJECTED/CANCELLED)
 	 */
 	@Column(name = "status", length = 20)
 	private String status;
 
 	/**
-	 * 반품 유형 (CUSTOMER_RETURN/VENDOR_RETURN/DEFECT_RETURN/STOCK_ADJUST/EXPIRED_RETURN)
+	 * 반품 유형
+	 * (CUSTOMER_RETURN/VENDOR_RETURN/DEFECT_RETURN/STOCK_ADJUST/EXPIRED_RETURN)
 	 */
 	@Column(name = "rwa_type", nullable = false, length = 30)
 	private String rwaType;
@@ -560,7 +564,7 @@ public class RwaOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 		// 반품 번호 자동 채번 (RWA-YYYYMMDD-XXXXX)
 		if (ValueUtil.isEmpty(this.rwaNo)) {
-			String dateStr = DateUtil.toString(new java.util.Date(), "yyyyMMdd");
+			String dateStr = DateUtil.todayStr("yyyyMMdd");
 			// TODO: 일련번호 채번 서비스 구현 필요
 			// this.rwaNo = WmsRwaConstants.RWA_NO_PREFIX + dateStr + "-" + getNextSeq();
 			this.rwaNo = this.rwaReqNo;

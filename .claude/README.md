@@ -12,7 +12,10 @@ Claude Code 프로젝트 설정 및 커스텀 명령(skill) 모음.
 ├── commands/           # 커스텀 slash commands (skills)
 │   ├── build.md        # /build — Gradle 빌드 실행
 │   ├── commit.md       # /commit — git commit 생성
-│   └── log.md          # /log — 작업 로그 기록
+│   ├── log.md          # /log — 작업 로그 기록
+│   ├── translate.md    # /translate — terminologies 미번역 항목 번역
+│   ├── code_by_entity_column.md  # /code_by_entity_column — Entity 특정 필드 공통코드 등록
+│   └── code_by_entity.md        # /code_by_entity — Entity 공통코드 대상 필드 자동 식별·일괄 등록
 └── README.md           # 이 파일
 ```
 

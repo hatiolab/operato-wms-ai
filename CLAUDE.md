@@ -98,3 +98,7 @@ docker compose up -d
 | `/build` | `.claude/commands/build.md` | 백엔드(`operato-wms-ai`) Gradle 빌드 실행. 옵션: 기본/테스트 제외/클린/Docker용 |
 | `/commit` | `.claude/commands/commit.md` | 이 대화의 작업 내용을 git commit으로 기록. 한국어 메시지, 선택적 스테이징, 푸시는 명시 요청 시에만 |
 | `/log` | `.claude/commands/log.md` | 오늘 작업 내용을 `.ai/logs/YYYY-MM-DD.md`에 기록 |
+| `/translate` | `.claude/commands/translate.md` | terminologies 테이블의 미번역 항목을 locale별(ko/en/zh)로 번역하여 DB 업데이트 |
+| `/code_by_entity_column` | `.claude/commands/code_by_entity_column.md` | Entity 필드의 코드 값을 common_codes/common_code_details 테이블에 등록. 인자: `EntityName fieldName` |
+| `/code_by_entity` | `.claude/commands/code_by_entity.md` | Entity의 공통코드 대상 필드를 자동 식별하여 일괄 등록. 인자: `EntityName` |
+| `/entity_meta_by_entity` | `.claude/commands/entity_meta_by_entity.md` | Entity 클래스를 분석하여 entities + entity_columns 메타데이터 자동 등록. 인자: `EntityName` |
