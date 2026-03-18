@@ -2,8 +2,7 @@ import { css, html } from 'lit-element'
 
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
-import { client } from '@operato/graphql'
-import gql from 'graphql-tag'
+import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
 import Chart from 'chart.js/auto'
 
 class RwaHome extends localize(i18next)(PageView) {
@@ -100,12 +99,12 @@ class RwaHome extends localize(i18next)(PageView) {
 
         .chart-container {
           width: 100%;
-          height: 300px;
+          height: 250px;
           position: relative;
         }
 
         #typeChart {
-          max-height: 300px;
+          max-height: 250px;
         }
 
         /* 알림 영역 */
@@ -225,14 +224,14 @@ class RwaHome extends localize(i18next)(PageView) {
 
   get context() {
     return {
-      title: `반품 관리`
+      title: `반품 대시보드`
     }
   }
 
   render() {
     return html`
-      <h2>🏠 반품 관리 대시보드</h2>
-      <p page-description>이 메뉴는 Operato WES 반품을 관리하는 메뉴입니다.</p>
+      <!--h2>🏠 반품 대시보드</h2>
+      <p page-description>이 메뉴는 Operato WES 반품을 관리하는 메뉴입니다.</p-->
 
       ${this.loading
         ? html`<div class="loading">데이터 로딩 중...</div>`
@@ -242,7 +241,7 @@ class RwaHome extends localize(i18next)(PageView) {
               <section>
                 <h3 class="section-title">📊 오늘의 반품 현황</h3>
                 <div class="status-cards">
-                  <div class="status-card request" @click="${() => this._navigateTo('rwa-order-list', 'REQUEST')}">
+                  <div class="status-card request" @click="${() => this._navigateTo('rwa-orders', 'REQUEST')}">
                     <div class="label">요청대기</div>
                     <div class="count">${this.statusCounts.REQUEST || 0}</div>
                     <div class="subtitle">승인 대기 중</div>
@@ -252,12 +251,12 @@ class RwaHome extends localize(i18next)(PageView) {
                     <div class="count">${this.statusCounts.RECEIVING || 0}</div>
                     <div class="subtitle">입고 진행 중</div>
                   </div>
-                  <div class="status-card inspecting" @click="${() => this._navigateTo('rwa-inspection-list')}">
+                  <div class="status-card inspecting" @click="${() => this._navigateTo('rwa-inspections')}">
                     <div class="label">검수중</div>
                     <div class="count">${this.statusCounts.INSPECTING || 0}</div>
                     <div class="subtitle">검수 진행 중</div>
                   </div>
-                  <div class="status-card disposing" @click="${() => this._navigateTo('rwa-disposition-list')}">
+                  <div class="status-card disposing" @click="${() => this._navigateTo('rwa-dispositions')}">
                     <div class="label">처분중</div>
                     <div class="count">${this.statusCounts.DISPOSED || 0}</div>
                     <div class="subtitle">처분 결정 대기</div>
@@ -275,24 +274,24 @@ class RwaHome extends localize(i18next)(PageView) {
 
               <!-- 주의 항목 -->
               ${this.alerts && this.alerts.length > 0
-                ? html`
+            ? html`
                     <section class="alerts-section">
                       <h3 class="section-title">⚠️ 주의 항목</h3>
                       ${this.alerts.map(
-                        alert => html`
+              alert => html`
                           <div class="alert-item ${alert.type}">
                             <span class="icon">${alert.icon}</span>
                             <span class="message">${alert.message}</span>
                           </div>
                         `
-                      )}
+            )}
                     </section>
                   `
-                : ''}
+            : ''}
 
               <!-- 바로가기 -->
               <section>
-                <h3 class="section-title">🎯 바로가기</h3>
+                <!--h3 class="section-title">🎯 바로가기</h3-->
                 <div class="quick-actions">
                   <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-order-new')}">
                     <span class="icon">📝</span>반품 요청
@@ -300,10 +299,10 @@ class RwaHome extends localize(i18next)(PageView) {
                   <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-receive-list')}">
                     <span class="icon">📥</span>입고 처리
                   </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-inspection-list')}">
+                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-inspections')}">
                     <span class="icon">🔍</span>검수 작업
                   </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-disposition-list')}">
+                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-dispositions')}">
                     <span class="icon">🗂️</span>처분 결정
                   </button>
                 </div>
@@ -346,49 +345,30 @@ class RwaHome extends localize(i18next)(PageView) {
 
   async _fetchStatusCounts() {
     try {
-      const response = await fetch('/rest/rwa_trx/dashboard/status-counts')
-      if (!response.ok) throw new Error('Failed to fetch status counts')
-      const data = await response.json()
-      return data
+      const data = await ServiceUtil.restGet('rwa_trx/dashboard/status-counts')
+      return data || { REQUEST: 0, RECEIVING: 0, INSPECTING: 0, DISPOSED: 0 }
     } catch (error) {
       console.error('상태별 건수 조회 실패:', error)
-      // Fallback: Mock 데이터
-      return {
-        REQUEST: 0,
-        RECEIVING: 0,
-        INSPECTING: 0,
-        DISPOSED: 0
-      }
+      return { REQUEST: 0, RECEIVING: 0, INSPECTING: 0, DISPOSED: 0 }
     }
   }
 
   async _fetchTypeStats() {
     try {
-      const response = await fetch('/rest/rwa_trx/dashboard/type-stats')
-      if (!response.ok) throw new Error('Failed to fetch type stats')
-      const data = await response.json()
-      return data
+      const data = await ServiceUtil.restGet('rwa_trx/dashboard/type-stats')
+      return data || { CUSTOMER: 0, SUPPLIER: 0, DEFECTIVE: 0, OTHER: 0 }
     } catch (error) {
       console.error('유형별 통계 조회 실패:', error)
-      // Fallback: Mock 데이터
-      return {
-        CUSTOMER: 0,
-        SUPPLIER: 0,
-        DEFECTIVE: 0,
-        OTHER: 0
-      }
+      return { CUSTOMER: 0, SUPPLIER: 0, DEFECTIVE: 0, OTHER: 0 }
     }
   }
 
   async _generateAlerts() {
     try {
-      const response = await fetch('/rest/rwa_trx/dashboard/alerts')
-      if (!response.ok) throw new Error('Failed to fetch alerts')
-      const data = await response.json()
-      return data
+      const data = await ServiceUtil.restGet('rwa_trx/dashboard/alerts')
+      return data || []
     } catch (error) {
       console.error('알림 데이터 조회 실패:', error)
-      // Fallback: 빈 배열
       return []
     }
   }
@@ -450,13 +430,7 @@ class RwaHome extends localize(i18next)(PageView) {
   }
 
   _navigateTo(page, filter) {
-    // Things Factory 라우팅
-    let path = `/${page}`
-    if (filter) {
-      path += `?status=${filter}`
-    }
-    history.pushState(null, '', path)
-    window.dispatchEvent(new CustomEvent('location-changed'))
+    UiUtil.pageNavigate(page, filter ? { status: filter } : null)
   }
 
   pageDisposed(lifecycle) {

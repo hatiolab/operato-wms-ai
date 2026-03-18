@@ -76,8 +76,8 @@ public class RwaTransactionService extends AbstractQueryService {
 		if (rwaOrder.getInspFlag() == null) {
 			// 설정값 조회 (기본: true)
 			String inspRequiredStr = this.runtimeConfSvc.getRuntimeConfigValue(
-				rwaOrder.getComCd(), rwaOrder.getWhCd(),
-				WmsRwaConfigConstants.RWA_INSPECTION_REQUIRED_FLAG);
+					rwaOrder.getComCd(), rwaOrder.getWhCd(),
+					WmsRwaConfigConstants.RWA_INSPECTION_REQUIRED_FLAG);
 			boolean inspRequired = ValueUtil.toBoolean(inspRequiredStr, true);
 			rwaOrder.setInspFlag(inspRequired);
 		}
@@ -92,7 +92,7 @@ public class RwaTransactionService extends AbstractQueryService {
 	 * 반품 지시 생성 with 상세 항목
 	 *
 	 * @param rwaOrder 반품 지시 정보
-	 * @param items 반품 상세 항목 목록
+	 * @param items    반품 상세 항목 목록
 	 * @return 생성된 반품 지시
 	 */
 	@Transactional
@@ -112,7 +112,7 @@ public class RwaTransactionService extends AbstractQueryService {
 				// SKU 명 조회
 				if (ValueUtil.isEmpty(item.getSkuNm()) && ValueUtil.isNotEmpty(item.getSkuCd())) {
 					SKU sku = this.queryManager.selectByCondition(SKU.class,
-						new SKU(rwaOrder.getDomainId(), rwaOrder.getComCd(), item.getSkuCd()));
+							new SKU(rwaOrder.getDomainId(), rwaOrder.getComCd(), item.getSkuCd()));
 					if (sku != null) {
 						item.setSkuNm(sku.getSkuNm());
 					}
@@ -158,7 +158,7 @@ public class RwaTransactionService extends AbstractQueryService {
 		// 2. 상태 검증
 		if (!WmsRwaConstants.STATUS_REQUEST.equals(rwaOrder.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"승인 가능한 상태가 아닙니다. 현재 상태: " + rwaOrder.getStatus());
+					"승인 가능한 상태가 아닙니다. 현재 상태: " + rwaOrder.getStatus());
 		}
 
 		// 3. 승인 처리
@@ -171,8 +171,8 @@ public class RwaTransactionService extends AbstractQueryService {
 		// 4. 상세 항목 상태 업데이트
 		String sql = "UPDATE rwa_order_items SET status = :status WHERE rwa_order_id = :rwaOrderId AND domain_id = :domainId";
 		this.queryManager.executeBySql(sql, ValueUtil.newMap(
-			"status,rwaOrderId,domainId",
-			WmsRwaConstants.STATUS_APPROVED, rwaOrderId, rwaOrder.getDomainId()));
+				"status,rwaOrderId,domainId",
+				WmsRwaConstants.STATUS_APPROVED, rwaOrderId, rwaOrder.getDomainId()));
 
 		return rwaOrder;
 	}
@@ -180,8 +180,8 @@ public class RwaTransactionService extends AbstractQueryService {
 	/**
 	 * 반품 지시 거부
 	 *
-	 * @param rwaOrderId 반품 지시 ID
-	 * @param rejectedBy 거부자 ID
+	 * @param rwaOrderId   반품 지시 ID
+	 * @param rejectedBy   거부자 ID
 	 * @param rejectReason 거부 사유
 	 * @return 거부된 반품 지시
 	 */
@@ -196,7 +196,7 @@ public class RwaTransactionService extends AbstractQueryService {
 		// 2. 상태 검증
 		if (!WmsRwaConstants.STATUS_REQUEST.equals(rwaOrder.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"거부 가능한 상태가 아닙니다. 현재 상태: " + rwaOrder.getStatus());
+					"거부 가능한 상태가 아닙니다. 현재 상태: " + rwaOrder.getStatus());
 		}
 
 		// 3. 거부 처리
@@ -216,8 +216,8 @@ public class RwaTransactionService extends AbstractQueryService {
 	 * 반품 입고 처리
 	 *
 	 * @param rwaOrderItemId 반품 상세 ID
-	 * @param rwaQty 실제 입고 수량
-	 * @param locCd 입고 로케이션
+	 * @param rwaQty         실제 입고 수량
+	 * @param locCd          입고 로케이션
 	 * @return 업데이트된 반품 상세
 	 */
 	@Transactional
@@ -230,9 +230,9 @@ public class RwaTransactionService extends AbstractQueryService {
 
 		// 2. 상태 검증
 		if (!WmsRwaConstants.STATUS_APPROVED.equals(item.getStatus()) &&
-			!WmsRwaConstants.STATUS_RECEIVING.equals(item.getStatus())) {
+				!WmsRwaConstants.STATUS_RECEIVING.equals(item.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"입고 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
+					"입고 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
 		}
 
 		// 3. 입고 처리
@@ -256,7 +256,7 @@ public class RwaTransactionService extends AbstractQueryService {
 	 * 반품 검수 처리
 	 *
 	 * @param rwaOrderItemId 반품 상세 ID
-	 * @param inspection 검수 정보
+	 * @param inspection     검수 정보
 	 * @return 생성된 검수 기록
 	 */
 	@Transactional
@@ -269,9 +269,9 @@ public class RwaTransactionService extends AbstractQueryService {
 
 		// 2. 상태 검증
 		if (!WmsRwaConstants.STATUS_RECEIVING.equals(item.getStatus()) &&
-			!WmsRwaConstants.STATUS_INSPECTING.equals(item.getStatus())) {
+				!WmsRwaConstants.STATUS_INSPECTING.equals(item.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"검수 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
+					"검수 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
 		}
 
 		// 3. 검수 기록 생성
@@ -304,7 +304,7 @@ public class RwaTransactionService extends AbstractQueryService {
 		// 2. 검수 완료 여부 확인
 		if (item.getInspectedQty() == null || item.getInspectedQty() < item.getRwaQty()) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"검수가 완료되지 않았습니다. 검수 수량: " + item.getInspectedQty() + " / 입고 수량: " + item.getRwaQty());
+					"검수가 완료되지 않았습니다. 검수 수량: " + item.getInspectedQty() + " / 입고 수량: " + item.getRwaQty());
 		}
 
 		// 3. 상태 업데이트
@@ -325,7 +325,7 @@ public class RwaTransactionService extends AbstractQueryService {
 	 * 반품 처분 처리
 	 *
 	 * @param rwaOrderItemId 반품 상세 ID
-	 * @param disposition 처분 정보
+	 * @param disposition    처분 정보
 	 * @return 생성된 처분 기록
 	 */
 	@Transactional
@@ -339,7 +339,7 @@ public class RwaTransactionService extends AbstractQueryService {
 		// 2. 상태 검증
 		if (!WmsRwaConstants.STATUS_INSPECTED.equals(item.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"처분 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
+					"처분 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
 		}
 
 		// 3. 처분 유형별 필수 필드 검증
@@ -378,15 +378,15 @@ public class RwaTransactionService extends AbstractQueryService {
 
 		// 2. 모든 상세 항목이 처분 완료 상태인지 확인
 		String sql = "SELECT COUNT(*) FROM rwa_order_items WHERE rwa_order_id = :rwaOrderId " +
-					 "AND domain_id = :domainId AND status != :status";
+				"AND domain_id = :domainId AND status != :status";
 		int incompleteCount = this.queryManager.selectBySql(sql,
-			ValueUtil.newMap("rwaOrderId,domainId,status",
-				rwaOrderId, rwaOrder.getDomainId(), WmsRwaConstants.STATUS_DISPOSED),
-			Integer.class);
+				ValueUtil.newMap("rwaOrderId,domainId,status",
+						rwaOrderId, rwaOrder.getDomainId(), WmsRwaConstants.STATUS_DISPOSED),
+				Integer.class);
 
 		if (incompleteCount > 0) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"모든 상세 항목이 처분 완료되지 않았습니다. 미완료 항목: " + incompleteCount);
+					"모든 상세 항목이 처분 완료되지 않았습니다. 미완료 항목: " + incompleteCount);
 		}
 
 		// 3. 완료 처리
@@ -414,7 +414,7 @@ public class RwaTransactionService extends AbstractQueryService {
 		// 2. 상태 검증
 		if (!WmsRwaConstants.STATUS_COMPLETED.equals(rwaOrder.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"마감 가능한 상태가 아닙니다. 현재 상태: " + rwaOrder.getStatus());
+					"마감 가능한 상태가 아닙니다. 현재 상태: " + rwaOrder.getStatus());
 		}
 
 		// 3. 마감 처리
@@ -431,15 +431,15 @@ public class RwaTransactionService extends AbstractQueryService {
 	/**
 	 * 반품 지시 목록 조회
 	 *
-	 * @param comCd 화주사 코드
-	 * @param status 상태
-	 * @param rwaType 반품 유형
+	 * @param comCd     화주사 코드
+	 * @param status    상태
+	 * @param rwaType   반품 유형
 	 * @param startDate 시작일
-	 * @param endDate 종료일
+	 * @param endDate   종료일
 	 * @return 반품 지시 목록
 	 */
 	public List<RwaOrder> listRwaOrders(String comCd, String status, String rwaType,
-										 String startDate, String endDate) {
+			String startDate, String endDate) {
 		Query query = new Query();
 		query.addFilter("domainId", Domain.currentDomainId());
 
@@ -569,13 +569,14 @@ public class RwaTransactionService extends AbstractQueryService {
 
 		// 2. 상세 항목 상태 집계
 		String sql = "SELECT status, COUNT(*) as cnt FROM rwa_order_items " +
-					 "WHERE rwa_order_id = :rwaOrderId AND domain_id = :domainId " +
-					 "GROUP BY status";
+				"WHERE rwa_order_id = :rwaOrderId AND domain_id = :domainId " +
+				"GROUP BY status";
 
 		@SuppressWarnings("unchecked")
-		List<Map<String, Object>> statusCounts = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql,
-			ValueUtil.newMap("rwaOrderId,domainId", rwaOrderId, rwaOrder.getDomainId()),
-			Map.class, 0, 0);
+		List<Map<String, Object>> statusCounts = (List<Map<String, Object>>) (List<?>) this.queryManager
+				.selectListBySql(sql,
+						ValueUtil.newMap("rwaOrderId,domainId", rwaOrderId, rwaOrder.getDomainId()),
+						Map.class, 0, 0);
 
 		if (statusCounts.isEmpty()) {
 			return;
@@ -596,7 +597,7 @@ public class RwaTransactionService extends AbstractQueryService {
 				allDisposed = false;
 			}
 			if (!WmsRwaConstants.STATUS_INSPECTED.equals(status) &&
-				!WmsRwaConstants.STATUS_DISPOSED.equals(status)) {
+					!WmsRwaConstants.STATUS_DISPOSED.equals(status)) {
 				allInspected = false;
 			}
 			if (WmsRwaConstants.STATUS_RECEIVING.equals(status)) {
@@ -632,8 +633,8 @@ public class RwaTransactionService extends AbstractQueryService {
 	/**
 	 * 대시보드 - 상태별 건수 조회
 	 *
-	 * @param comCd 화주사 코드 (optional)
-	 * @param whCd 창고 코드 (optional)
+	 * @param comCd      화주사 코드 (optional)
+	 * @param whCd       창고 코드 (optional)
 	 * @param targetDate 기준일 (optional, 기본값: 오늘)
 	 * @return 상태별 건수 Map { status: count }
 	 */
@@ -641,9 +642,9 @@ public class RwaTransactionService extends AbstractQueryService {
 		String date = ValueUtil.isNotEmpty(targetDate) ? targetDate : DateUtil.todayStr();
 
 		String sql = "SELECT status, COUNT(*) as count " +
-					 "FROM rwa_orders " +
-					 "WHERE domain_id = :domainId " +
-					 "AND rwa_req_date = :targetDate ";
+				"FROM rwa_orders " +
+				"WHERE domain_id = :domainId " +
+				"AND rwa_req_date = :targetDate ";
 
 		Map<String, Object> params = ValueUtil.newMap("domainId,targetDate", Domain.currentDomainId(), date);
 
@@ -660,11 +661,10 @@ public class RwaTransactionService extends AbstractQueryService {
 
 		@SuppressWarnings("unchecked")
 		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
-			sql, params, Map.class, 0, 0);
+				sql, params, Map.class, 0, 0);
 
 		// 결과를 Map으로 변환
-		Map<String, Object> statusCounts = ValueUtil.newMap();
-		statusCounts.put("REQUEST", 0);
+		Map<String, Object> statusCounts = ValueUtil.newMap("REQUEST", 0);
 		statusCounts.put("APPROVED", 0);
 		statusCounts.put("RECEIVING", 0);
 		statusCounts.put("INSPECTING", 0);
@@ -685,10 +685,10 @@ public class RwaTransactionService extends AbstractQueryService {
 	/**
 	 * 대시보드 - 반품 유형별 통계 조회
 	 *
-	 * @param comCd 화주사 코드 (optional)
-	 * @param whCd 창고 코드 (optional)
+	 * @param comCd     화주사 코드 (optional)
+	 * @param whCd      창고 코드 (optional)
 	 * @param startDate 시작일 (optional, 기본값: 오늘)
-	 * @param endDate 종료일 (optional, 기본값: 오늘)
+	 * @param endDate   종료일 (optional, 기본값: 오늘)
 	 * @return 유형별 건수 Map { rwaType: count }
 	 */
 	public Map<String, Object> getDashboardTypeStats(String comCd, String whCd, String startDate, String endDate) {
@@ -696,13 +696,13 @@ public class RwaTransactionService extends AbstractQueryService {
 		String end = ValueUtil.isNotEmpty(endDate) ? endDate : DateUtil.todayStr();
 
 		String sql = "SELECT rwa_type, COUNT(*) as count " +
-					 "FROM rwa_orders " +
-					 "WHERE domain_id = :domainId " +
-					 "AND rwa_req_date >= :startDate " +
-					 "AND rwa_req_date <= :endDate ";
+				"FROM rwa_orders " +
+				"WHERE domain_id = :domainId " +
+				"AND rwa_req_date >= :startDate " +
+				"AND rwa_req_date <= :endDate ";
 
 		Map<String, Object> params = ValueUtil.newMap("domainId,startDate,endDate",
-			Domain.currentDomainId(), start, end);
+				Domain.currentDomainId(), start, end);
 
 		if (ValueUtil.isNotEmpty(comCd)) {
 			sql += "AND com_cd = :comCd ";
@@ -717,11 +717,10 @@ public class RwaTransactionService extends AbstractQueryService {
 
 		@SuppressWarnings("unchecked")
 		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
-			sql, params, Map.class, 0, 0);
+				sql, params, Map.class, 0, 0);
 
 		// 결과를 Map으로 변환
-		Map<String, Object> typeStats = ValueUtil.newMap();
-		typeStats.put("CUSTOMER", 0);
+		Map<String, Object> typeStats = ValueUtil.newMap("CUSTOMER", 0);
 		typeStats.put("SUPPLIER", 0);
 		typeStats.put("DEFECTIVE", 0);
 		typeStats.put("OTHER", 0);
@@ -739,7 +738,7 @@ public class RwaTransactionService extends AbstractQueryService {
 	 * 대시보드 - 알림 데이터 조회
 	 *
 	 * @param comCd 화주사 코드 (optional)
-	 * @param whCd 창고 코드 (optional)
+	 * @param whCd  창고 코드 (optional)
 	 * @return 알림 목록 List<Map<String, Object>>
 	 */
 	public List<Map<String, Object>> getDashboardAlerts(String comCd, String whCd) {
@@ -747,13 +746,13 @@ public class RwaTransactionService extends AbstractQueryService {
 
 		// 1. 검수 지연 알림 (24시간 이상 대기)
 		String sql1 = "SELECT COUNT(*) as count " +
-					  "FROM rwa_order_items " +
-					  "WHERE domain_id = :domainId " +
-					  "AND status = :status " +
-					  "AND updated_at < (NOW() - INTERVAL '24 hours')";
+				"FROM rwa_order_items " +
+				"WHERE domain_id = :domainId " +
+				"AND status = :status " +
+				"AND updated_at < (NOW() - INTERVAL '24 hours')";
 
 		Map<String, Object> params1 = ValueUtil.newMap("domainId,status",
-			Domain.currentDomainId(), WmsRwaConstants.STATUS_RECEIVING);
+				Domain.currentDomainId(), WmsRwaConstants.STATUS_RECEIVING);
 
 		if (ValueUtil.isNotEmpty(comCd)) {
 			sql1 += " AND com_cd = :comCd";
@@ -766,8 +765,7 @@ public class RwaTransactionService extends AbstractQueryService {
 
 		Integer delayedInspectionCount = this.queryManager.selectBySql(sql1, params1, Integer.class);
 		if (delayedInspectionCount != null && delayedInspectionCount > 0) {
-			Map<String, Object> alert = ValueUtil.newMap();
-			alert.put("type", "warning");
+			Map<String, Object> alert = ValueUtil.newMap("type", "warning");
 			alert.put("icon", "⏰");
 			alert.put("message", "검수 지연: " + delayedInspectionCount + "건 (24시간 이상 대기)");
 			alerts.add(alert);
@@ -775,13 +773,13 @@ public class RwaTransactionService extends AbstractQueryService {
 
 		// 2. 처분 대기 알림 (48시간 이상 대기)
 		String sql2 = "SELECT COUNT(*) as count " +
-					  "FROM rwa_order_items " +
-					  "WHERE domain_id = :domainId " +
-					  "AND status = :status " +
-					  "AND updated_at < (NOW() - INTERVAL '48 hours')";
+				"FROM rwa_order_items " +
+				"WHERE domain_id = :domainId " +
+				"AND status = :status " +
+				"AND updated_at < (NOW() - INTERVAL '48 hours')";
 
 		Map<String, Object> params2 = ValueUtil.newMap("domainId,status",
-			Domain.currentDomainId(), WmsRwaConstants.STATUS_INSPECTED);
+				Domain.currentDomainId(), WmsRwaConstants.STATUS_INSPECTED);
 
 		if (ValueUtil.isNotEmpty(comCd)) {
 			sql2 += " AND com_cd = :comCd";
@@ -794,8 +792,7 @@ public class RwaTransactionService extends AbstractQueryService {
 
 		Integer delayedDispositionCount = this.queryManager.selectBySql(sql2, params2, Integer.class);
 		if (delayedDispositionCount != null && delayedDispositionCount > 0) {
-			Map<String, Object> alert = ValueUtil.newMap();
-			alert.put("type", "warning");
+			Map<String, Object> alert = ValueUtil.newMap("type", "warning");
 			alert.put("icon", "⚠️");
 			alert.put("message", "처분 대기: " + delayedDispositionCount + "건 (48시간 이상 대기)");
 			alerts.add(alert);

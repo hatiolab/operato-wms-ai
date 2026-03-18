@@ -2,9 +2,11 @@ import { css, html } from 'lit-element'
 
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
-import { client } from '@operato/graphql'
-import gql from 'graphql-tag'
+import { openPopup } from '@operato/layout'
+import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
 import Chart from 'chart.js/auto'
+
+import './vas-order-new-popup'
 
 class VasHome extends localize(i18next)(PageView) {
   static get styles() {
@@ -100,12 +102,12 @@ class VasHome extends localize(i18next)(PageView) {
 
         .chart-container {
           width: 100%;
-          height: 300px;
+          height: 250px;
           position: relative;
         }
 
         #typeChart {
-          max-height: 300px;
+          max-height: 250px;
         }
 
         /* 알림 영역 */
@@ -225,15 +227,12 @@ class VasHome extends localize(i18next)(PageView) {
 
   get context() {
     return {
-      title: `유통가공 관리`
+      title: `유통가공 대시보드`
     }
   }
 
   render() {
     return html`
-      <h2>🏠 유통가공 관리 대시보드</h2>
-      <p page-description>이 메뉴는 Operato WES 유통가공을 관리하는 메뉴입니다.</p>
-
       ${this.loading
         ? html`<div class="loading">데이터 로딩 중...</div>`
         : html`
@@ -242,12 +241,12 @@ class VasHome extends localize(i18next)(PageView) {
               <section>
                 <h3 class="section-title">📊 오늘의 작업 현황</h3>
                 <div class="status-cards">
-                  <div class="status-card plan" @click="${() => this._navigateTo('vas-order-list', 'PLAN')}">
+                  <div class="status-card plan" @click="${() => this._navigateTo('vas-orders', 'PLAN')}">
                     <div class="label">대기중</div>
                     <div class="count">${this.statusCounts.PLAN || 0}</div>
                     <div class="subtitle">승인 대기</div>
                   </div>
-                  <div class="status-card approved" @click="${() => this._navigateTo('vas-order-list', 'APPROVED')}">
+                  <div class="status-card approved" @click="${() => this._navigateTo('vas-orders', 'APPROVED')}">
                     <div class="label">승인완료</div>
                     <div class="count">${this.statusCounts.APPROVED || 0}</div>
                     <div class="subtitle">작업 대기</div>
@@ -257,7 +256,7 @@ class VasHome extends localize(i18next)(PageView) {
                     <div class="count">${this.statusCounts.IN_PROGRESS || 0}</div>
                     <div class="subtitle">진행 중</div>
                   </div>
-                  <div class="status-card completed" @click="${() => this._navigateTo('vas-result-list')}">
+                  <div class="status-card completed" @click="${() => this._navigateTo('vas-results')}">
                     <div class="label">완료</div>
                     <div class="count">${this.statusCounts.COMPLETED || 0}</div>
                     <div class="subtitle">오늘 완료</div>
@@ -275,35 +274,35 @@ class VasHome extends localize(i18next)(PageView) {
 
               <!-- 주의 항목 -->
               ${this.alerts && this.alerts.length > 0
-                ? html`
+            ? html`
                     <section class="alerts-section">
                       <h3 class="section-title">⚠️ 주의 항목</h3>
                       ${this.alerts.map(
-                        alert => html`
+              alert => html`
                           <div class="alert-item ${alert.type}">
                             <span class="icon">${alert.icon}</span>
                             <span class="message">${alert.message}</span>
                           </div>
                         `
-                      )}
+            )}
                     </section>
                   `
-                : ''}
+            : ''}
 
               <!-- 바로가기 -->
               <section>
-                <h3 class="section-title">🎯 바로가기</h3>
+                <!--h3 class="section-title">🎯 바로가기</h3-->
                 <div class="quick-actions">
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('vas-order-new')}">
+                  <button class="quick-action-btn" @click="${this._openOrderNewPopup}">
                     <span class="icon">📝</span>작업 지시 생성
                   </button>
                   <button class="quick-action-btn" @click="${() => this._navigateTo('vas-work-monitor')}">
                     <span class="icon">📊</span>작업 진행 현황
                   </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('vas-result-list')}">
+                  <button class="quick-action-btn" @click="${() => this._navigateTo('vas-results')}">
                     <span class="icon">📋</span>실적 조회
                   </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('vas-bom-list')}">
+                  <button class="quick-action-btn" @click="${() => this._navigateTo('vas-boms')}">
                     <span class="icon">📦</span>BOM 관리
                   </button>
                 </div>
@@ -346,49 +345,30 @@ class VasHome extends localize(i18next)(PageView) {
 
   async _fetchStatusCounts() {
     try {
-      const response = await fetch('/rest/vas_trx/dashboard/status-counts')
-      if (!response.ok) throw new Error('Failed to fetch status counts')
-      const data = await response.json()
-      return data
+      const data = await ServiceUtil.restGet('vas_trx/dashboard/status-counts')
+      return data || { PLAN: 0, APPROVED: 0, IN_PROGRESS: 0, COMPLETED: 0 }
     } catch (error) {
       console.error('상태별 건수 조회 실패:', error)
-      // Fallback: Mock 데이터
-      return {
-        PLAN: 0,
-        APPROVED: 0,
-        IN_PROGRESS: 0,
-        COMPLETED: 0
-      }
+      return { PLAN: 0, APPROVED: 0, IN_PROGRESS: 0, COMPLETED: 0 }
     }
   }
 
   async _fetchTypeStats() {
     try {
-      const response = await fetch('/rest/vas_trx/dashboard/type-stats')
-      if (!response.ok) throw new Error('Failed to fetch type stats')
-      const data = await response.json()
-      return data
+      const data = await ServiceUtil.restGet('vas_trx/dashboard/type-stats')
+      return data || { ASSEMBLY: 0, DISASSEMBLY: 0, REPACK: 0, LABELING: 0 }
     } catch (error) {
       console.error('유형별 통계 조회 실패:', error)
-      // Fallback: Mock 데이터
-      return {
-        ASSEMBLY: 0,
-        DISASSEMBLY: 0,
-        REPACK: 0,
-        LABELING: 0
-      }
+      return { ASSEMBLY: 0, DISASSEMBLY: 0, REPACK: 0, LABELING: 0 }
     }
   }
 
   async _generateAlerts() {
     try {
-      const response = await fetch('/rest/vas_trx/dashboard/alerts')
-      if (!response.ok) throw new Error('Failed to fetch alerts')
-      const data = await response.json()
-      return data
+      const data = await ServiceUtil.restGet('vas_trx/dashboard/alerts')
+      return data || []
     } catch (error) {
       console.error('알림 데이터 조회 실패:', error)
-      // Fallback: 빈 배열
       return []
     }
   }
@@ -449,14 +429,23 @@ class VasHome extends localize(i18next)(PageView) {
     })
   }
 
+  _openOrderNewPopup() {
+    openPopup(
+      html`<vas-order-new-popup
+        @order-created="${() => {
+          this._fetchDashboardData()
+        }}"
+      ></vas-order-new-popup>`,
+      {
+        backdrop: true,
+        size: 'large',
+        title: '작업 지시 생성'
+      }
+    )
+  }
+
   _navigateTo(page, filter) {
-    // Things Factory 라우팅
-    let path = `/${page}`
-    if (filter) {
-      path += `?status=${filter}`
-    }
-    history.pushState(null, '', path)
-    window.dispatchEvent(new CustomEvent('location-changed'))
+    UiUtil.pageNavigate(page, filter ? { status: filter } : null)
   }
 
   pageDisposed(lifecycle) {

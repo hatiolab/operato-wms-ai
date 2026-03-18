@@ -276,11 +276,11 @@ public class RwaTransactionController extends AbstractRestService {
 	@GetMapping("/rwa_orders")
 	@ApiDesc(description = "List RWA Orders")
 	public List<RwaOrder> listRwaOrders(
-			@RequestParam(required = false) String comCd,
-			@RequestParam(required = false) String status,
-			@RequestParam(required = false) String rwaType,
-			@RequestParam(required = false) String startDate,
-			@RequestParam(required = false) String endDate) {
+			@RequestParam(name = "comCd", required = false) String comCd,
+			@RequestParam(name = "status", required = false) String status,
+			@RequestParam(name = "rwaType", required = false) String rwaType,
+			@RequestParam(name = "startDate", required = false) String startDate,
+			@RequestParam(name = "endDate", required = false) String endDate) {
 		return this.rwaService.listRwaOrders(comCd, status, rwaType, startDate, endDate);
 	}
 
@@ -366,9 +366,9 @@ public class RwaTransactionController extends AbstractRestService {
 	@GetMapping("/dashboard/status-counts")
 	@ApiDesc(description = "Get Dashboard Status Counts")
 	public Map<String, Object> getDashboardStatusCounts(
-			@RequestParam(required = false) String comCd,
-			@RequestParam(required = false) String whCd,
-			@RequestParam(required = false) String targetDate) {
+			@RequestParam(name = "comCd", required = false) String comCd,
+			@RequestParam(name = "whCd", required = false) String whCd,
+			@RequestParam(name = "targetDate", required = false) String targetDate) {
 		return this.rwaService.getDashboardStatusCounts(comCd, whCd, targetDate);
 	}
 
@@ -386,10 +386,10 @@ public class RwaTransactionController extends AbstractRestService {
 	@GetMapping("/dashboard/type-stats")
 	@ApiDesc(description = "Get Dashboard Type Statistics")
 	public Map<String, Object> getDashboardTypeStats(
-			@RequestParam(required = false) String comCd,
-			@RequestParam(required = false) String whCd,
-			@RequestParam(required = false) String startDate,
-			@RequestParam(required = false) String endDate) {
+			@RequestParam(name = "comCd", required = false) String comCd,
+			@RequestParam(name = "whCd", required = false) String whCd,
+			@RequestParam(name = "startDate", required = false) String startDate,
+			@RequestParam(name = "endDate", required = false) String endDate) {
 		return this.rwaService.getDashboardTypeStats(comCd, whCd, startDate, endDate);
 	}
 
@@ -405,8 +405,8 @@ public class RwaTransactionController extends AbstractRestService {
 	@GetMapping("/dashboard/alerts")
 	@ApiDesc(description = "Get Dashboard Alerts")
 	public List<Map<String, Object>> getDashboardAlerts(
-			@RequestParam(required = false) String comCd,
-			@RequestParam(required = false) String whCd) {
+			@RequestParam(name = "comCd", required = false) String comCd,
+			@RequestParam(name = "whCd", required = false) String whCd) {
 		return this.rwaService.getDashboardAlerts(comCd, whCd);
 	}
 }

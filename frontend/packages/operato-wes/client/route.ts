@@ -1,5 +1,6 @@
 import './pages/rwa/rwa-home'
 import './pages/vas/vas-home'
+import './pages/vas/vas-work-monitor'
 
 import './pages/work/rcv-work-page'
 import './pages/work/rcv-work-item-element'

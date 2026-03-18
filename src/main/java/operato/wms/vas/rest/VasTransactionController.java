@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -291,7 +292,32 @@ public class VasTransactionController {
 	}
 
 	/********************************************************************************************************
-	 * 7. 대시보드 통계 API
+	 * 7. 모니터링 API
+	 ********************************************************************************************************/
+
+	/**
+	 * 작업 진행 모니터링 - 주문 목록 조회 (자재 진행 요약 포함)
+	 *
+	 * GET /rest/vas_trx/monitor/orders
+	 *
+	 * @param status 상태 필터 (optional, 쉼표 구분 가능. 기본값: IN_PROGRESS,APPROVED,MATERIAL_READY)
+	 * @return 주문 목록 (자재 진행 요약 포함)
+	 */
+	@GetMapping(value = "/monitor/orders", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get Monitor Orders with Material Summary")
+	public List<Map<String, Object>> getMonitorOrders(
+			@RequestParam(name = "status", required = false) String status) {
+
+		List<String> statuses = null;
+		if (ValueUtil.isNotEmpty(status)) {
+			statuses = java.util.Arrays.asList(status.split(","));
+		}
+
+		return this.vasService.getMonitorOrders(statuses);
+	}
+
+	/********************************************************************************************************
+	 * 8. 대시보드 통계 API
 	 ********************************************************************************************************/
 
 	/**
@@ -307,9 +333,9 @@ public class VasTransactionController {
 	@GetMapping("/dashboard/status-counts")
 	@ApiDesc(description = "Get Dashboard Status Counts")
 	public Map<String, Object> getDashboardStatusCounts(
-			@RequestParam(required = false) String comCd,
-			@RequestParam(required = false) String whCd,
-			@RequestParam(required = false) String targetDate) {
+			@RequestParam(name = "comCd", required = false) String comCd,
+			@RequestParam(name = "whCd", required = false) String whCd,
+			@RequestParam(name = "targetDate", required = false) String targetDate) {
 		return this.vasService.getDashboardStatusCounts(comCd, whCd, targetDate);
 	}
 
@@ -327,10 +353,10 @@ public class VasTransactionController {
 	@GetMapping("/dashboard/type-stats")
 	@ApiDesc(description = "Get Dashboard Type Statistics")
 	public Map<String, Object> getDashboardTypeStats(
-			@RequestParam(required = false) String comCd,
-			@RequestParam(required = false) String whCd,
-			@RequestParam(required = false) String startDate,
-			@RequestParam(required = false) String endDate) {
+			@RequestParam(name = "comCd", required = false) String comCd,
+			@RequestParam(name = "whCd", required = false) String whCd,
+			@RequestParam(name = "startDate", required = false) String startDate,
+			@RequestParam(name = "endDate", required = false) String endDate) {
 		return this.vasService.getDashboardTypeStats(comCd, whCd, startDate, endDate);
 	}
 
@@ -346,8 +372,8 @@ public class VasTransactionController {
 	@GetMapping("/dashboard/alerts")
 	@ApiDesc(description = "Get Dashboard Alerts")
 	public List<Map<String, Object>> getDashboardAlerts(
-			@RequestParam(required = false) String comCd,
-			@RequestParam(required = false) String whCd) {
+			@RequestParam(name = "comCd", required = false) String comCd,
+			@RequestParam(name = "whCd", required = false) String whCd) {
 		return this.vasService.getDashboardAlerts(comCd, whCd);
 	}
 }

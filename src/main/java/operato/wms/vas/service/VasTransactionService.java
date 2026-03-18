@@ -630,7 +630,63 @@ public class VasTransactionService extends AbstractQueryService {
 	}
 
 	/********************************************************************************************************
-	 * 8. 대시보드 통계 API
+	 * 8. 모니터링 API
+	 ********************************************************************************************************/
+
+	/**
+	 * 작업 진행 모니터링 - 주문 목록 조회 (자재 진행 요약 포함)
+	 *
+	 * @param statuses 조회할 상태 목록 (null이면 IN_PROGRESS, APPROVED, MATERIAL_READY)
+	 * @return 주문 목록 (자재 진행 요약 포함)
+	 */
+	public List<Map<String, Object>> getMonitorOrders(List<String> statuses) {
+		if (statuses == null || statuses.isEmpty()) {
+			statuses = java.util.Arrays.asList(
+				WmsVasConstants.STATUS_IN_PROGRESS,
+				WmsVasConstants.STATUS_APPROVED,
+				WmsVasConstants.STATUS_MATERIAL_READY
+			);
+		}
+
+		String sql = "SELECT vo.id, vo.vas_no, vo.vas_type, vo.status, " +
+					 "vo.plan_qty, vo.completed_qty, vo.com_cd, vo.wh_cd, " +
+					 "vo.worker_id, vo.priority, vo.work_loc_cd, " +
+					 "vo.started_at, vo.approved_at, vo.vas_req_date, " +
+					 "vo.attr01 as set_sku_cd, vo.remarks, " +
+					 "COALESCE(mi.total_items, 0) as total_items, " +
+					 "COALESCE(mi.picked_items, 0) as picked_items, " +
+					 "COALESCE(mi.total_req_qty, 0) as total_req_qty, " +
+					 "COALESCE(mi.total_picked_qty, 0) as total_picked_qty " +
+					 "FROM vas_orders vo " +
+					 "LEFT JOIN ( " +
+					 "  SELECT vas_order_id, " +
+					 "    COUNT(*) as total_items, " +
+					 "    SUM(CASE WHEN status IN ('PICKED','IN_USE','COMPLETED') THEN 1 ELSE 0 END) as picked_items, " +
+					 "    SUM(COALESCE(req_qty, 0)) as total_req_qty, " +
+					 "    SUM(COALESCE(picked_qty, 0)) as total_picked_qty " +
+					 "  FROM vas_order_items " +
+					 "  WHERE domain_id = :domainId " +
+					 "  GROUP BY vas_order_id " +
+					 ") mi ON vo.id = mi.vas_order_id " +
+					 "WHERE vo.domain_id = :domainId " +
+					 "AND vo.status IN (:statuses) " +
+					 "ORDER BY " +
+					 "  CASE vo.priority WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END, " +
+					 "  vo.started_at DESC NULLS LAST, vo.approved_at DESC NULLS LAST";
+
+		Map<String, Object> params = new java.util.HashMap<>();
+		params.put("domainId", Domain.currentDomainId());
+		params.put("statuses", statuses);
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
+			sql, params, Map.class, 0, 0);
+
+		return results;
+	}
+
+	/********************************************************************************************************
+	 * 9. 대시보드 통계 API
 	 ********************************************************************************************************/
 
 	/**
