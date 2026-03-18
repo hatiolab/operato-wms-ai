@@ -348,4 +348,65 @@ public class RwaTransactionController extends AbstractRestService {
 		condition.setRwaOrderItemId(itemId);
 		return this.queryManager.selectByCondition(RwaDisposition.class, condition);
 	}
+
+	/********************************************************************************************************
+	 * 7. 대시보드 통계 API
+	 ********************************************************************************************************/
+
+	/**
+	 * 대시보드 - 상태별 건수 조회
+	 *
+	 * GET /rest/rwa_trx/dashboard/status-counts
+	 *
+	 * @param comCd 화주사 코드 (optional)
+	 * @param whCd 창고 코드 (optional)
+	 * @param targetDate 기준일 (optional, 기본값: 오늘)
+	 * @return 상태별 건수 Map { status: count }
+	 */
+	@GetMapping("/dashboard/status-counts")
+	@ApiDesc(description = "Get Dashboard Status Counts")
+	public Map<String, Object> getDashboardStatusCounts(
+			@RequestParam(required = false) String comCd,
+			@RequestParam(required = false) String whCd,
+			@RequestParam(required = false) String targetDate) {
+		return this.rwaService.getDashboardStatusCounts(comCd, whCd, targetDate);
+	}
+
+	/**
+	 * 대시보드 - 반품 유형별 통계 조회
+	 *
+	 * GET /rest/rwa_trx/dashboard/type-stats
+	 *
+	 * @param comCd 화주사 코드 (optional)
+	 * @param whCd 창고 코드 (optional)
+	 * @param startDate 시작일 (optional, 기본값: 오늘)
+	 * @param endDate 종료일 (optional, 기본값: 오늘)
+	 * @return 유형별 건수 Map { rwaType: count }
+	 */
+	@GetMapping("/dashboard/type-stats")
+	@ApiDesc(description = "Get Dashboard Type Statistics")
+	public Map<String, Object> getDashboardTypeStats(
+			@RequestParam(required = false) String comCd,
+			@RequestParam(required = false) String whCd,
+			@RequestParam(required = false) String startDate,
+			@RequestParam(required = false) String endDate) {
+		return this.rwaService.getDashboardTypeStats(comCd, whCd, startDate, endDate);
+	}
+
+	/**
+	 * 대시보드 - 알림 데이터 조회
+	 *
+	 * GET /rest/rwa_trx/dashboard/alerts
+	 *
+	 * @param comCd 화주사 코드 (optional)
+	 * @param whCd 창고 코드 (optional)
+	 * @return 알림 목록 List<Map<String, Object>>
+	 */
+	@GetMapping("/dashboard/alerts")
+	@ApiDesc(description = "Get Dashboard Alerts")
+	public List<Map<String, Object>> getDashboardAlerts(
+			@RequestParam(required = false) String comCd,
+			@RequestParam(required = false) String whCd) {
+		return this.rwaService.getDashboardAlerts(comCd, whCd);
+	}
 }

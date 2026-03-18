@@ -2,11 +2,14 @@ import { css, html } from 'lit-element'
 
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
+import { client } from '@operato/graphql'
+import gql from 'graphql-tag'
+import Chart from 'chart.js/auto'
 
 class RwaHome extends localize(i18next)(PageView) {
-    static get styles() {
-        return [
-            css`
+  static get styles() {
+    return [
+      css`
         :host {
           display: block;
           background-color: var(--md-sys-color-background);
@@ -18,138 +21,451 @@ class RwaHome extends localize(i18next)(PageView) {
           font: var(--title-font);
           color: var(--title-text-color);
         }
-        input {
-          display: block;
-        }
         [page-description] {
           margin: var(--page-description-margin);
           font: var(--page-description-font);
           color: var(--page-description-color);
         }
-        [button-primary] {
-          background-color: var(--button-primary-background-color);
-          border: var(--button-border);
-          border-radius: var(--button-border-radius);
-          padding: var(--button-padding);
-          color: var(--button-primary-color);
-          font: var(--button-primary-font);
-          text-transform: var(--button-text-transform);
-          text-decoration: none;
+
+        /* 대시보드 레이아웃 */
+        .dashboard-container {
+          display: flex;
+          flex-direction: column;
+          gap: var(--spacing-large, 24px);
         }
-        [button-primary]:hover {
-          background-color: var(--button-primary-active-background-color);
-          box-shadow: var(--button-active-box-shadow);
+
+        /* 섹션 타이틀 */
+        .section-title {
+          font-size: 18px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-background);
+          margin-bottom: var(--spacing-medium, 16px);
+          display: flex;
+          align-items: center;
+          gap: 8px;
         }
-        img {
-          max-width: 45%;
-          float: right;
+
+        /* 상태 카드 그리드 */
+        .status-cards {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: var(--spacing-medium, 16px);
         }
-        @media screen and (max-width: 600px) {
-          img {
-            display: none;
+
+        .status-card {
+          background: var(--md-sys-color-surface);
+          border-radius: 12px;
+          padding: var(--spacing-large, 24px);
+          box-shadow: var(--box-shadow-light, 0 2px 4px rgba(0, 0, 0, 0.1));
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .status-card:hover {
+          box-shadow: var(--box-shadow-normal, 0 4px 8px rgba(0, 0, 0, 0.15));
+          transform: translateY(-2px);
+        }
+
+        .status-card .label {
+          font-size: 14px;
+          color: var(--md-sys-color-on-surface-variant);
+          margin-bottom: 8px;
+        }
+
+        .status-card .count {
+          font-size: 32px;
+          font-weight: 700;
+          color: var(--md-sys-color-on-surface);
+        }
+
+        .status-card .subtitle {
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant);
+          margin-top: 4px;
+        }
+
+        /* 상태별 색상 */
+        .status-card.request { border-left: 4px solid #9E9E9E; }
+        .status-card.receiving { border-left: 4px solid #00BCD4; }
+        .status-card.inspecting { border-left: 4px solid #FF9800; }
+        .status-card.disposing { border-left: 4px solid #9C27B0; }
+
+        /* 차트 컨테이너 */
+        .chart-section {
+          background: var(--md-sys-color-surface);
+          border-radius: 12px;
+          padding: var(--spacing-large, 24px);
+          box-shadow: var(--box-shadow-light, 0 2px 4px rgba(0, 0, 0, 0.1));
+        }
+
+        .chart-container {
+          width: 100%;
+          height: 300px;
+          position: relative;
+        }
+
+        #typeChart {
+          max-height: 300px;
+        }
+
+        /* 알림 영역 */
+        .alerts-section {
+          background: var(--md-sys-color-surface);
+          border-radius: 12px;
+          padding: var(--spacing-large, 24px);
+          box-shadow: var(--box-shadow-light, 0 2px 4px rgba(0, 0, 0, 0.1));
+        }
+
+        .alert-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px;
+          margin-bottom: 8px;
+          border-radius: 8px;
+          background: #FFF3E0;
+          border-left: 4px solid #FF9800;
+        }
+
+        .alert-item.warning {
+          background: #FFEBEE;
+          border-left-color: #F44336;
+        }
+
+        .alert-item .icon {
+          font-size: 24px;
+        }
+
+        .alert-item .message {
+          flex: 1;
+          font-size: 14px;
+          color: var(--md-sys-color-on-surface);
+        }
+
+        /* 바로가기 버튼 */
+        .quick-actions {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: var(--spacing-medium, 16px);
+        }
+
+        .quick-action-btn {
+          background: var(--md-sys-color-primary);
+          color: var(--md-sys-color-on-primary);
+          border: none;
+          border-radius: 8px;
+          padding: 16px 24px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-align: center;
+        }
+
+        .quick-action-btn:hover {
+          background: var(--md-sys-color-primary-container);
+          box-shadow: var(--box-shadow-normal, 0 4px 8px rgba(0, 0, 0, 0.15));
+          transform: translateY(-2px);
+        }
+
+        .quick-action-btn .icon {
+          margin-right: 8px;
+        }
+
+        /* 로딩 상태 */
+        .loading {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 200px;
+          font-size: 16px;
+          color: var(--md-sys-color-on-surface-variant);
+        }
+
+        /* 반응형 */
+        @media screen and (max-width: 768px) {
+          .status-cards {
+            grid-template-columns: repeat(2, 1fr);
+          }
+
+          .quick-actions {
+            grid-template-columns: 1fr;
           }
         }
       `
-        ]
+    ]
+  }
+
+  static get properties() {
+    return {
+      loading: Boolean,
+      statusCounts: Object,
+      typeStats: Object,
+      alerts: Array
     }
+  }
 
-    static get properties() {
-        return {
-            bizplaces: Array
-        }
+  constructor() {
+    super()
+    this.loading = true
+    this.statusCounts = {
+      REQUEST: 0,
+      RECEIVING: 0,
+      INSPECTING: 0,
+      DISPOSED: 0
     }
-
-    get context() {
-        return {
-            title: `반품 관리`
-        }
+    this.typeStats = {
+      CUSTOMER: 0,
+      SUPPLIER: 0,
+      DEFECTIVE: 0,
+      OTHER: 0
     }
+    this.alerts = []
+  }
 
-    render() {
-        return html`
-      <h2>반품 관리</h2>
-      <p page-description>이 메뉴는 Operato WES 반품를 관리하는 메뉴입니다.</p>
+  get context() {
+    return {
+      title: `반품 관리`
+    }
+  }
 
-      <img src="/assets/images/rwa/rwa-home.png" />
+  render() {
+    return html`
+      <h2>🏠 반품 관리 대시보드</h2>
+      <p page-description>이 메뉴는 Operato WES 반품을 관리하는 메뉴입니다.</p>
+
+      ${this.loading
+        ? html`<div class="loading">데이터 로딩 중...</div>`
+        : html`
+            <div class="dashboard-container">
+              <!-- 오늘의 반품 현황 -->
+              <section>
+                <h3 class="section-title">📊 오늘의 반품 현황</h3>
+                <div class="status-cards">
+                  <div class="status-card request" @click="${() => this._navigateTo('rwa-order-list', 'REQUEST')}">
+                    <div class="label">요청대기</div>
+                    <div class="count">${this.statusCounts.REQUEST || 0}</div>
+                    <div class="subtitle">승인 대기 중</div>
+                  </div>
+                  <div class="status-card receiving" @click="${() => this._navigateTo('rwa-receive-list')}">
+                    <div class="label">입고중</div>
+                    <div class="count">${this.statusCounts.RECEIVING || 0}</div>
+                    <div class="subtitle">입고 진행 중</div>
+                  </div>
+                  <div class="status-card inspecting" @click="${() => this._navigateTo('rwa-inspection-list')}">
+                    <div class="label">검수중</div>
+                    <div class="count">${this.statusCounts.INSPECTING || 0}</div>
+                    <div class="subtitle">검수 진행 중</div>
+                  </div>
+                  <div class="status-card disposing" @click="${() => this._navigateTo('rwa-disposition-list')}">
+                    <div class="label">처분중</div>
+                    <div class="count">${this.statusCounts.DISPOSED || 0}</div>
+                    <div class="subtitle">처분 결정 대기</div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- 반품 유형별 현황 -->
+              <section class="chart-section">
+                <h3 class="section-title">📈 반품 유형별 현황</h3>
+                <div class="chart-container">
+                  <canvas id="typeChart"></canvas>
+                </div>
+              </section>
+
+              <!-- 주의 항목 -->
+              ${this.alerts && this.alerts.length > 0
+                ? html`
+                    <section class="alerts-section">
+                      <h3 class="section-title">⚠️ 주의 항목</h3>
+                      ${this.alerts.map(
+                        alert => html`
+                          <div class="alert-item ${alert.type}">
+                            <span class="icon">${alert.icon}</span>
+                            <span class="message">${alert.message}</span>
+                          </div>
+                        `
+                      )}
+                    </section>
+                  `
+                : ''}
+
+              <!-- 바로가기 -->
+              <section>
+                <h3 class="section-title">🎯 바로가기</h3>
+                <div class="quick-actions">
+                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-order-new')}">
+                    <span class="icon">📝</span>반품 요청
+                  </button>
+                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-receive-list')}">
+                    <span class="icon">📥</span>입고 처리
+                  </button>
+                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-inspection-list')}">
+                    <span class="icon">🔍</span>검수 작업
+                  </button>
+                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-disposition-list')}">
+                    <span class="icon">🗂️</span>처분 결정
+                  </button>
+                </div>
+              </section>
+            </div>
+          `}
     `
+  }
+
+  async pageUpdated(changes, lifecycle, before) {
+    if (this.active) {
+      await this._fetchDashboardData()
+    }
+  }
+
+  async _fetchDashboardData() {
+    try {
+      this.loading = true
+
+      // 상태별 건수 조회
+      const statusResponse = await this._fetchStatusCounts()
+      this.statusCounts = statusResponse
+
+      // 유형별 통계 조회
+      const typeResponse = await this._fetchTypeStats()
+      this.typeStats = typeResponse
+
+      // 알림 데이터 생성
+      this.alerts = await this._generateAlerts()
+
+      this.loading = false
+
+      // 차트 렌더링
+      this.updateComplete.then(() => this._renderChart())
+    } catch (error) {
+      console.error('대시보드 데이터 로딩 실패:', error)
+      this.loading = false
+    }
+  }
+
+  async _fetchStatusCounts() {
+    try {
+      const response = await fetch('/rest/rwa_trx/dashboard/status-counts')
+      if (!response.ok) throw new Error('Failed to fetch status counts')
+      const data = await response.json()
+      return data
+    } catch (error) {
+      console.error('상태별 건수 조회 실패:', error)
+      // Fallback: Mock 데이터
+      return {
+        REQUEST: 0,
+        RECEIVING: 0,
+        INSPECTING: 0,
+        DISPOSED: 0
+      }
+    }
+  }
+
+  async _fetchTypeStats() {
+    try {
+      const response = await fetch('/rest/rwa_trx/dashboard/type-stats')
+      if (!response.ok) throw new Error('Failed to fetch type stats')
+      const data = await response.json()
+      return data
+    } catch (error) {
+      console.error('유형별 통계 조회 실패:', error)
+      // Fallback: Mock 데이터
+      return {
+        CUSTOMER: 0,
+        SUPPLIER: 0,
+        DEFECTIVE: 0,
+        OTHER: 0
+      }
+    }
+  }
+
+  async _generateAlerts() {
+    try {
+      const response = await fetch('/rest/rwa_trx/dashboard/alerts')
+      if (!response.ok) throw new Error('Failed to fetch alerts')
+      const data = await response.json()
+      return data
+    } catch (error) {
+      console.error('알림 데이터 조회 실패:', error)
+      // Fallback: 빈 배열
+      return []
+    }
+  }
+
+  _renderChart() {
+    const canvas = this.shadowRoot.querySelector('#typeChart')
+    if (!canvas) return
+
+    // 기존 차트가 있으면 삭제
+    if (this._chart) {
+      this._chart.destroy()
     }
 
-    updated(changes) {
-        /*
-         * If this page properties are changed, this callback will be invoked.
-         * This callback will be called back only when this page is activated.
-         */
-        if (changes.has('applications')) {
-            /* do something */
+    const ctx = canvas.getContext('2d')
+    this._chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['고객 반품', '공급사 반품', '불량품', '기타'],
+        datasets: [
+          {
+            label: '반품 건수',
+            data: [
+              this.typeStats.CUSTOMER || 0,
+              this.typeStats.SUPPLIER || 0,
+              this.typeStats.DEFECTIVE || 0,
+              this.typeStats.OTHER || 0
+            ],
+            backgroundColor: ['#2196F3', '#4CAF50', '#FF9800', '#9E9E9E'],
+            borderRadius: 8
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            callbacks: {
+              label: context => {
+                return `${context.label}: ${context.parsed.y}건`
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              stepSize: 10,
+              callback: value => `${value}건`
+            }
+          }
         }
-    }
+      }
+    })
+  }
 
-    stateChanged(state) {
-        // this.bizplaces = state.hub?.bizplaces
+  _navigateTo(page, filter) {
+    // Things Factory 라우팅
+    let path = `/${page}`
+    if (filter) {
+      path += `?status=${filter}`
     }
+    history.pushState(null, '', path)
+    window.dispatchEvent(new CustomEvent('location-changed'))
+  }
 
-    /*
-     * page lifecycle
-     *
-     * - pageInitialized(lifecycle)
-     * - pageUpdated(changes, lifecycle, changedBefore)
-     * - pageDisposed(lifecycle)
-     *
-     * lifecycle value has
-     * - active : this page is activated
-     * - page : first path of href
-     * - resourceId : second path of href
-     * - params : search params object of href
-     * - initialized : initialized state of this page
-     *
-     * you can update lifecycle values, or add custom values
-     * by calling this.pageUpdate({ ...values }, force)
-     * If lifecycle values changed by this.pageUpdate(...),
-     * this.pageUpdated(...) will be called back right after.
-     * If you want to invoke this.pageUpdated(...) callback,
-     * set force argument to true.
-     *
-     * you can re-initialize this page
-     * by calling this.pageReset().
-     * this.pageInitialized(...) followed by this.pageDispose(...) will be invoked
-     * by calling this.pageReset().
-     *
-     * you can invoke this.pageDisposed()
-     * by calling this.pageDispose()
-     */
-
-    pageInitialized(lifecycle) {
-        /*
-         * This page is initialized.
-         * It's right time to configure of this page.
-         *
-         * - called before when this page activated first
-         * - called when i18next resource is updated (loaded, changed, ..)
-         * - called right after this.pageReset()
-         */
+  pageDisposed(lifecycle) {
+    // Chart 정리
+    if (this._chart) {
+      this._chart.destroy()
+      this._chart = null
     }
-
-    async pageUpdated(changes, lifecycle, before) {
-        if (this.active) {
-            /*
-             * this page is activated
-             */
-        } else {
-            /* this page is deactivated */
-        }
-    }
-
-    pageDisposed(lifecycle) {
-        /*
-         * This page is disposed.
-         * It's right time to release system resources.
-         *
-         * - called just before (re)pageInitialized
-         * - called right after when i18next resource updated (loaded, changed, ..)
-         * - called right after this.pageReset()
-         * - called right after this.pageDispose()
-         */
-    }
+  }
 }
 
 window.customElements.define('rwa-home', RwaHome)

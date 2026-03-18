@@ -83,7 +83,8 @@
     "@things-factory/routing-base": "^7.0.0",
     "@things-factory/setting-ui": "^7.0.0",
     "@things-factory/shell": "^7.0.0",
-    "@things-factory/system": "^7.0.0"
+    "@things-factory/system": "^7.0.0",
+    "chart.js": "^4.4.1"
   },
   "devDependencies": {
     "@things-factory/builder": "^7.0.0",

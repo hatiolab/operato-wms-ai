@@ -624,4 +624,183 @@ public class RwaTransactionService extends AbstractQueryService {
 			this.queryManager.update(rwaOrder, "status");
 		}
 	}
+
+	/********************************************************************************************************
+	 * 8. 대시보드 통계 API
+	 ********************************************************************************************************/
+
+	/**
+	 * 대시보드 - 상태별 건수 조회
+	 *
+	 * @param comCd 화주사 코드 (optional)
+	 * @param whCd 창고 코드 (optional)
+	 * @param targetDate 기준일 (optional, 기본값: 오늘)
+	 * @return 상태별 건수 Map { status: count }
+	 */
+	public Map<String, Object> getDashboardStatusCounts(String comCd, String whCd, String targetDate) {
+		String date = ValueUtil.isNotEmpty(targetDate) ? targetDate : DateUtil.todayStr();
+
+		String sql = "SELECT status, COUNT(*) as count " +
+					 "FROM rwa_orders " +
+					 "WHERE domain_id = :domainId " +
+					 "AND rwa_req_date = :targetDate ";
+
+		Map<String, Object> params = ValueUtil.newMap("domainId,targetDate", Domain.currentDomainId(), date);
+
+		if (ValueUtil.isNotEmpty(comCd)) {
+			sql += "AND com_cd = :comCd ";
+			params.put("comCd", comCd);
+		}
+		if (ValueUtil.isNotEmpty(whCd)) {
+			sql += "AND wh_cd = :whCd ";
+			params.put("whCd", whCd);
+		}
+
+		sql += "GROUP BY status";
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
+			sql, params, Map.class, 0, 0);
+
+		// 결과를 Map으로 변환
+		Map<String, Object> statusCounts = ValueUtil.newMap();
+		statusCounts.put("REQUEST", 0);
+		statusCounts.put("APPROVED", 0);
+		statusCounts.put("RECEIVING", 0);
+		statusCounts.put("INSPECTING", 0);
+		statusCounts.put("INSPECTED", 0);
+		statusCounts.put("DISPOSED", 0);
+		statusCounts.put("COMPLETED", 0);
+		statusCounts.put("CLOSED", 0);
+
+		for (Map<String, Object> row : results) {
+			String status = (String) row.get("status");
+			Object count = row.get("count");
+			statusCounts.put(status, count);
+		}
+
+		return statusCounts;
+	}
+
+	/**
+	 * 대시보드 - 반품 유형별 통계 조회
+	 *
+	 * @param comCd 화주사 코드 (optional)
+	 * @param whCd 창고 코드 (optional)
+	 * @param startDate 시작일 (optional, 기본값: 오늘)
+	 * @param endDate 종료일 (optional, 기본값: 오늘)
+	 * @return 유형별 건수 Map { rwaType: count }
+	 */
+	public Map<String, Object> getDashboardTypeStats(String comCd, String whCd, String startDate, String endDate) {
+		String start = ValueUtil.isNotEmpty(startDate) ? startDate : DateUtil.todayStr();
+		String end = ValueUtil.isNotEmpty(endDate) ? endDate : DateUtil.todayStr();
+
+		String sql = "SELECT rwa_type, COUNT(*) as count " +
+					 "FROM rwa_orders " +
+					 "WHERE domain_id = :domainId " +
+					 "AND rwa_req_date >= :startDate " +
+					 "AND rwa_req_date <= :endDate ";
+
+		Map<String, Object> params = ValueUtil.newMap("domainId,startDate,endDate",
+			Domain.currentDomainId(), start, end);
+
+		if (ValueUtil.isNotEmpty(comCd)) {
+			sql += "AND com_cd = :comCd ";
+			params.put("comCd", comCd);
+		}
+		if (ValueUtil.isNotEmpty(whCd)) {
+			sql += "AND wh_cd = :whCd ";
+			params.put("whCd", whCd);
+		}
+
+		sql += "GROUP BY rwa_type";
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
+			sql, params, Map.class, 0, 0);
+
+		// 결과를 Map으로 변환
+		Map<String, Object> typeStats = ValueUtil.newMap();
+		typeStats.put("CUSTOMER", 0);
+		typeStats.put("SUPPLIER", 0);
+		typeStats.put("DEFECTIVE", 0);
+		typeStats.put("OTHER", 0);
+
+		for (Map<String, Object> row : results) {
+			String rwaType = (String) row.get("rwa_type");
+			Object count = row.get("count");
+			typeStats.put(rwaType, count);
+		}
+
+		return typeStats;
+	}
+
+	/**
+	 * 대시보드 - 알림 데이터 조회
+	 *
+	 * @param comCd 화주사 코드 (optional)
+	 * @param whCd 창고 코드 (optional)
+	 * @return 알림 목록 List<Map<String, Object>>
+	 */
+	public List<Map<String, Object>> getDashboardAlerts(String comCd, String whCd) {
+		List<Map<String, Object>> alerts = new java.util.ArrayList<>();
+
+		// 1. 검수 지연 알림 (24시간 이상 대기)
+		String sql1 = "SELECT COUNT(*) as count " +
+					  "FROM rwa_order_items " +
+					  "WHERE domain_id = :domainId " +
+					  "AND status = :status " +
+					  "AND updated_at < (NOW() - INTERVAL '24 hours')";
+
+		Map<String, Object> params1 = ValueUtil.newMap("domainId,status",
+			Domain.currentDomainId(), WmsRwaConstants.STATUS_RECEIVING);
+
+		if (ValueUtil.isNotEmpty(comCd)) {
+			sql1 += " AND com_cd = :comCd";
+			params1.put("comCd", comCd);
+		}
+		if (ValueUtil.isNotEmpty(whCd)) {
+			sql1 += " AND wh_cd = :whCd";
+			params1.put("whCd", whCd);
+		}
+
+		Integer delayedInspectionCount = this.queryManager.selectBySql(sql1, params1, Integer.class);
+		if (delayedInspectionCount != null && delayedInspectionCount > 0) {
+			Map<String, Object> alert = ValueUtil.newMap();
+			alert.put("type", "warning");
+			alert.put("icon", "⏰");
+			alert.put("message", "검수 지연: " + delayedInspectionCount + "건 (24시간 이상 대기)");
+			alerts.add(alert);
+		}
+
+		// 2. 처분 대기 알림 (48시간 이상 대기)
+		String sql2 = "SELECT COUNT(*) as count " +
+					  "FROM rwa_order_items " +
+					  "WHERE domain_id = :domainId " +
+					  "AND status = :status " +
+					  "AND updated_at < (NOW() - INTERVAL '48 hours')";
+
+		Map<String, Object> params2 = ValueUtil.newMap("domainId,status",
+			Domain.currentDomainId(), WmsRwaConstants.STATUS_INSPECTED);
+
+		if (ValueUtil.isNotEmpty(comCd)) {
+			sql2 += " AND com_cd = :comCd";
+			params2.put("comCd", comCd);
+		}
+		if (ValueUtil.isNotEmpty(whCd)) {
+			sql2 += " AND wh_cd = :whCd";
+			params2.put("whCd", whCd);
+		}
+
+		Integer delayedDispositionCount = this.queryManager.selectBySql(sql2, params2, Integer.class);
+		if (delayedDispositionCount != null && delayedDispositionCount > 0) {
+			Map<String, Object> alert = ValueUtil.newMap();
+			alert.put("type", "warning");
+			alert.put("icon", "⚠️");
+			alert.put("message", "처분 대기: " + delayedDispositionCount + "건 (48시간 이상 대기)");
+			alerts.add(alert);
+		}
+
+		return alerts;
+	}
 }

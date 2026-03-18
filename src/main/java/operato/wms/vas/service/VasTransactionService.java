@@ -1,0 +1,813 @@
+package operato.wms.vas.service;
+
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import operato.wms.base.entity.SKU;
+import operato.wms.base.entity.VasBom;
+import operato.wms.base.entity.VasBomItem;
+import operato.wms.base.service.WmsBaseService;
+import operato.wms.vas.WmsVasConstants;
+import operato.wms.vas.entity.VasOrder;
+import operato.wms.vas.entity.VasOrderItem;
+import operato.wms.vas.entity.VasResult;
+import xyz.anythings.sys.service.AbstractQueryService;
+import xyz.elidom.dbist.dml.Query;
+import xyz.elidom.sys.entity.Domain;
+import xyz.elidom.sys.util.ThrowUtil;
+import xyz.elidom.util.DateUtil;
+import xyz.elidom.util.ValueUtil;
+
+/**
+ * VAS(Value-Added Service) 모듈 트랜잭션 처리 서비스
+ *
+ * 유통가공 프로세스:
+ * 1. 작업 지시 생성 (PLAN) → createVasOrder()
+ * 2. 작업 지시 승인 (APPROVED) → approveVasOrder()
+ * 3. 자재 배정 및 피킹 (MATERIAL_READY) → allocateMaterials(), pickMaterials()
+ * 4. 작업 시작 (IN_PROGRESS) → startVasWork()
+ * 5. 실적 등록 (IN_PROGRESS) → registerResult()
+ * 6. 작업 완료 (COMPLETED) → completeVasOrder()
+ * 7. 작업 마감 (CLOSED) → closeVasOrder()
+ * 8. 작업 취소 (CANCELLED) → cancelVasOrder()
+ *
+ * @author HatioLab
+ */
+@Component
+public class VasTransactionService extends AbstractQueryService {
+
+	/**
+	 * WMS 기본 서비스
+	 */
+	@Autowired
+	protected WmsBaseService wmsBaseSvc;
+
+	/********************************************************************************************************
+	 * 1. 작업 지시 생성 및 승인
+	 ********************************************************************************************************/
+
+	/**
+	 * 유통가공 작업 지시 생성 (BOM 기반 자재 자동 전개)
+	 *
+	 * @param vasOrder 작업 지시 정보
+	 * @return 생성된 작업 지시
+	 */
+	@Transactional
+	public VasOrder createVasOrder(VasOrder vasOrder) {
+		// 1. 필수 필드 검증
+		this.validateVasOrder(vasOrder);
+
+		// 2. BOM 유효성 검증 (SET_ASSEMBLY, DISASSEMBLY인 경우)
+		if (vasOrder.getVasBomId() != null) {
+			VasBom bom = this.queryManager.select(VasBom.class, vasOrder.getVasBomId());
+			if (bom == null || !WmsVasConstants.BOM_STATUS_ACTIVE.equals(bom.getStatus())) {
+				throw ThrowUtil.newValidationErrorWithNoLog("유효한 BOM이 아닙니다. BOM ID: " + vasOrder.getVasBomId());
+			}
+
+			// BOM 유효기간 검증
+			String today = DateUtil.todayStr();
+			if (ValueUtil.isNotEmpty(bom.getValidFrom()) && today.compareTo(bom.getValidFrom()) < 0) {
+				throw ThrowUtil.newValidationErrorWithNoLog(
+					"BOM 유효 시작일 이전입니다. 유효 시작일: " + bom.getValidFrom());
+			}
+			if (ValueUtil.isNotEmpty(bom.getValidTo()) && today.compareTo(bom.getValidTo()) > 0) {
+				throw ThrowUtil.newValidationErrorWithNoLog(
+					"BOM 유효 종료일 이후입니다. 유효 종료일: " + bom.getValidTo());
+			}
+
+			// 세트 상품 코드 설정
+			if (ValueUtil.isEmpty(vasOrder.getAttr01())) {
+				vasOrder.setAttr01(bom.getSetSkuCd()); // set_sku_cd를 attr01에 저장
+			}
+		}
+
+		// 3. 기본값 설정
+		if (ValueUtil.isEmpty(vasOrder.getVasReqDate())) {
+			vasOrder.setVasReqDate(DateUtil.todayStr());
+		}
+
+		if (vasOrder.getCompletedQty() == null) {
+			vasOrder.setCompletedQty(0.0);
+		}
+
+		// 4. 작업 지시 생성
+		this.queryManager.insert(vasOrder);
+
+		// 5. BOM 기반 자재 전개 (vas_bom_items → vas_order_items)
+		if (vasOrder.getVasBomId() != null) {
+			this.expandBomToOrderItems(vasOrder);
+		}
+
+		return vasOrder;
+	}
+
+	/**
+	 * BOM 기반 자재 전개
+	 *
+	 * vas_bom_items를 조회하여 vas_order_items에 자재 소요 계획 생성
+	 * req_qty = plan_qty × component_qty
+	 *
+	 * @param vasOrder 작업 지시
+	 */
+	private void expandBomToOrderItems(VasOrder vasOrder) {
+		Query query = new Query();
+		query.addFilter("domainId", vasOrder.getDomainId());
+		query.addFilter("vasBomId", vasOrder.getVasBomId());
+		query.addOrder("bomSeq", true);
+
+		List<VasBomItem> bomItems = this.queryManager.selectList(VasBomItem.class, query);
+
+		if (bomItems.isEmpty()) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+				"BOM에 구성 품목이 없습니다. BOM ID: " + vasOrder.getVasBomId());
+		}
+
+		for (VasBomItem bomItem : bomItems) {
+			VasOrderItem orderItem = new VasOrderItem();
+			orderItem.setDomainId(vasOrder.getDomainId());
+			orderItem.setVasOrderId(vasOrder.getId());
+			orderItem.setSkuCd(bomItem.getSkuCd());
+			orderItem.setSkuNm(bomItem.getSkuNm());
+			orderItem.setReqQty(vasOrder.getPlanQty() * bomItem.getComponentQty());
+			orderItem.setStatus(WmsVasConstants.ITEM_STATUS_PLANNED);
+			orderItem.setWorkLocCd(vasOrder.getWorkLocCd());
+
+			this.queryManager.insert(orderItem);
+		}
+	}
+
+	/**
+	 * 작업 지시 승인
+	 *
+	 * @param vasOrderId 작업 지시 ID
+	 * @param approvedBy 승인자 ID
+	 * @return 승인된 작업 지시
+	 */
+	@Transactional
+	public VasOrder approveVasOrder(String vasOrderId, String approvedBy) {
+		// 1. 작업 지시 조회
+		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
+		if (vasOrder == null) {
+			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
+		}
+
+		// 2. 상태 검증
+		if (!WmsVasConstants.STATUS_PLAN.equals(vasOrder.getStatus())) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+				"승인 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
+		}
+
+		// 3. 승인 처리
+		vasOrder.setStatus(WmsVasConstants.STATUS_APPROVED);
+		vasOrder.setApprovedBy(approvedBy);
+		vasOrder.setApprovedAt(new Date());
+
+		this.queryManager.update(vasOrder, "status", "approvedBy", "approvedAt");
+
+		return vasOrder;
+	}
+
+	/**
+	 * 작업 지시 취소
+	 *
+	 * @param vasOrderId 작업 지시 ID
+	 * @param cancelReason 취소 사유
+	 * @return 취소된 작업 지시
+	 */
+	@Transactional
+	public VasOrder cancelVasOrder(String vasOrderId, String cancelReason) {
+		// 1. 작업 지시 조회
+		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
+		if (vasOrder == null) {
+			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
+		}
+
+		// 2. 상태 검증 (승인 전까지만 취소 가능)
+		if (!WmsVasConstants.STATUS_PLAN.equals(vasOrder.getStatus()) &&
+			!WmsVasConstants.STATUS_APPROVED.equals(vasOrder.getStatus())) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+				"취소 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
+		}
+
+		// 3. 취소 처리
+		vasOrder.setStatus(WmsVasConstants.STATUS_CANCELLED);
+		vasOrder.setRemarks(cancelReason);
+
+		this.queryManager.update(vasOrder, "status", "remarks");
+
+		// 4. 상세 항목 상태 업데이트
+		String sql = "UPDATE vas_order_items SET status = :status " +
+					 "WHERE vas_order_id = :vasOrderId AND domain_id = :domainId";
+		this.queryManager.executeBySql(sql, ValueUtil.newMap(
+			"status,vasOrderId,domainId",
+			WmsVasConstants.ITEM_STATUS_COMPLETED, vasOrderId, vasOrder.getDomainId()));
+
+		return vasOrder;
+	}
+
+	/********************************************************************************************************
+	 * 2. 자재 배정 및 피킹
+	 ********************************************************************************************************/
+
+	/**
+	 * 자재 배정
+	 *
+	 * @param vasOrderItemId 작업 지시 상세 ID
+	 * @param allocQty 배정 수량
+	 * @param srcLocCd 피킹 로케이션
+	 * @param lotNo 로트 번호
+	 * @return 업데이트된 작업 지시 상세
+	 */
+	@Transactional
+	public VasOrderItem allocateMaterial(String vasOrderItemId, Double allocQty,
+										  String srcLocCd, String lotNo) {
+		// 1. 작업 지시 상세 조회
+		VasOrderItem item = this.queryManager.select(VasOrderItem.class, vasOrderItemId);
+		if (item == null) {
+			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시 상세를 찾을 수 없습니다. ID: " + vasOrderItemId);
+		}
+
+		// 2. 상태 검증
+		if (!WmsVasConstants.ITEM_STATUS_PLANNED.equals(item.getStatus()) &&
+			!WmsVasConstants.ITEM_STATUS_ALLOCATED.equals(item.getStatus())) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+				"배정 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
+		}
+
+		// 3. 수량 검증
+		if (allocQty > item.getReqQty()) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+				"배정 수량이 소요 수량을 초과합니다. 소요: " + item.getReqQty() + ", 배정: " + allocQty);
+		}
+
+		// 4. 배정 처리
+		item.setAllocQty(allocQty);
+		item.setSrcLocCd(srcLocCd);
+		item.setLotNo(lotNo);
+		item.setStatus(WmsVasConstants.ITEM_STATUS_ALLOCATED);
+
+		this.queryManager.update(item, "allocQty", "srcLocCd", "lotNo", "status");
+
+		return item;
+	}
+
+	/**
+	 * 자재 피킹 처리
+	 *
+	 * @param vasOrderItemId 작업 지시 상세 ID
+	 * @param pickedQty 피킹 수량
+	 * @return 업데이트된 작업 지시 상세
+	 */
+	@Transactional
+	public VasOrderItem pickMaterial(String vasOrderItemId, Double pickedQty) {
+		// 1. 작업 지시 상세 조회
+		VasOrderItem item = this.queryManager.select(VasOrderItem.class, vasOrderItemId);
+		if (item == null) {
+			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시 상세를 찾을 수 없습니다. ID: " + vasOrderItemId);
+		}
+
+		// 2. 상태 검증
+		if (!WmsVasConstants.ITEM_STATUS_ALLOCATED.equals(item.getStatus()) &&
+			!WmsVasConstants.ITEM_STATUS_PICKING.equals(item.getStatus())) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+				"피킹 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
+		}
+
+		// 3. 수량 검증
+		if (pickedQty > item.getAllocQty()) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+				"피킹 수량이 배정 수량을 초과합니다. 배정: " + item.getAllocQty() + ", 피킹: " + pickedQty);
+		}
+
+		// 4. 피킹 처리
+		item.setPickedQty(pickedQty);
+		item.setStatus(WmsVasConstants.ITEM_STATUS_PICKED);
+
+		this.queryManager.update(item, "pickedQty", "status");
+
+		// 5. 헤더 상태 자동 업데이트
+		this.updateVasOrderStatus(item.getVasOrderId());
+
+		return item;
+	}
+
+	/********************************************************************************************************
+	 * 3. 작업 시작 및 진행
+	 ********************************************************************************************************/
+
+	/**
+	 * 작업 시작
+	 *
+	 * @param vasOrderId 작업 지시 ID
+	 * @param workerId 작업자 ID
+	 * @return 작업 시작된 작업 지시
+	 */
+	@Transactional
+	public VasOrder startVasWork(String vasOrderId, String workerId) {
+		// 1. 작업 지시 조회
+		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
+		if (vasOrder == null) {
+			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
+		}
+
+		// 2. 상태 검증
+		if (!WmsVasConstants.STATUS_MATERIAL_READY.equals(vasOrder.getStatus())) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+				"작업 시작 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
+		}
+
+		// 3. 작업 시작 처리
+		vasOrder.setStatus(WmsVasConstants.STATUS_IN_PROGRESS);
+		vasOrder.setWorkerId(workerId);
+		vasOrder.setStartedAt(new Date());
+
+		this.queryManager.update(vasOrder, "status", "workerId", "startedAt");
+
+		// 4. 상세 항목 상태 업데이트
+		String sql = "UPDATE vas_order_items SET status = :status " +
+					 "WHERE vas_order_id = :vasOrderId AND domain_id = :domainId " +
+					 "AND status = :prevStatus";
+		this.queryManager.executeBySql(sql, ValueUtil.newMap(
+			"status,vasOrderId,domainId,prevStatus",
+			WmsVasConstants.ITEM_STATUS_IN_USE, vasOrderId, vasOrder.getDomainId(),
+			WmsVasConstants.ITEM_STATUS_PICKED));
+
+		return vasOrder;
+	}
+
+	/********************************************************************************************************
+	 * 4. 실적 등록
+	 ********************************************************************************************************/
+
+	/**
+	 * 실적 등록
+	 *
+	 * @param vasOrderId 작업 지시 ID
+	 * @param result 실적 정보
+	 * @return 생성된 실적
+	 */
+	@Transactional
+	public VasResult registerResult(String vasOrderId, VasResult result) {
+		// 1. 작업 지시 조회
+		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
+		if (vasOrder == null) {
+			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
+		}
+
+		// 2. 상태 검증
+		if (!WmsVasConstants.STATUS_IN_PROGRESS.equals(vasOrder.getStatus())) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+				"실적 등록 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
+		}
+
+		// 3. 실적 기록 생성
+		result.setVasOrderId(vasOrderId);
+		result.setDomainId(vasOrder.getDomainId());
+
+		if (ValueUtil.isEmpty(result.getWorkedAt())) {
+			result.setWorkedAt(new Date());
+		}
+
+		this.queryManager.insert(result);
+
+		// 4. completed_qty 누적 업데이트
+		double currentCompleted = vasOrder.getCompletedQty() != null ? vasOrder.getCompletedQty() : 0.0;
+		vasOrder.setCompletedQty(currentCompleted + result.getResultQty());
+		this.queryManager.update(vasOrder, "completedQty");
+
+		// TODO: 재고 처리 로직 구현
+		// processInventoryByVasType(vasOrder, result);
+
+		return result;
+	}
+
+	/********************************************************************************************************
+	 * 5. 작업 완료 및 마감
+	 ********************************************************************************************************/
+
+	/**
+	 * 작업 완료 처리
+	 *
+	 * @param vasOrderId 작업 지시 ID
+	 * @return 완료된 작업 지시
+	 */
+	@Transactional
+	public VasOrder completeVasOrder(String vasOrderId) {
+		// 1. 작업 지시 조회
+		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
+		if (vasOrder == null) {
+			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
+		}
+
+		// 2. 상태 검증
+		if (!WmsVasConstants.STATUS_IN_PROGRESS.equals(vasOrder.getStatus())) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+				"완료 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
+		}
+
+		// 3. 실적 수량 검증 (선택적)
+		if (vasOrder.getCompletedQty() < vasOrder.getPlanQty()) {
+			// 경고만 출력 (부분 완료 허용)
+			this.logger.warn("완성 수량이 계획 수량보다 적습니다. 계획: {}, 완성: {}",
+				vasOrder.getPlanQty(), vasOrder.getCompletedQty());
+		}
+
+		// 4. 완료 처리
+		vasOrder.setStatus(WmsVasConstants.STATUS_COMPLETED);
+		vasOrder.setCompletedAt(new Date());
+		vasOrder.setVasEndDate(DateUtil.todayStr());
+
+		this.queryManager.update(vasOrder, "status", "completedAt", "vasEndDate");
+
+		// 5. 상세 항목 상태 업데이트
+		String sql = "UPDATE vas_order_items SET status = :status " +
+					 "WHERE vas_order_id = :vasOrderId AND domain_id = :domainId";
+		this.queryManager.executeBySql(sql, ValueUtil.newMap(
+			"status,vasOrderId,domainId",
+			WmsVasConstants.ITEM_STATUS_COMPLETED, vasOrderId, vasOrder.getDomainId()));
+
+		return vasOrder;
+	}
+
+	/**
+	 * 작업 마감 처리
+	 *
+	 * @param vasOrderId 작업 지시 ID
+	 * @return 마감된 작업 지시
+	 */
+	@Transactional
+	public VasOrder closeVasOrder(String vasOrderId) {
+		// 1. 작업 지시 조회
+		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
+		if (vasOrder == null) {
+			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
+		}
+
+		// 2. 상태 검증
+		if (!WmsVasConstants.STATUS_COMPLETED.equals(vasOrder.getStatus())) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+				"마감 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
+		}
+
+		// 3. 마감 처리
+		vasOrder.setStatus(WmsVasConstants.STATUS_CLOSED);
+		this.queryManager.update(vasOrder, "status");
+
+		return vasOrder;
+	}
+
+	/********************************************************************************************************
+	 * 6. 조회 메서드
+	 ********************************************************************************************************/
+
+	/**
+	 * 작업 지시 목록 조회
+	 *
+	 * @param comCd 화주사 코드
+	 * @param status 상태
+	 * @param vasType 유통가공 유형
+	 * @param startDate 시작일
+	 * @param endDate 종료일
+	 * @return 작업 지시 목록
+	 */
+	public List<VasOrder> listVasOrders(String comCd, String status, String vasType,
+										 String startDate, String endDate) {
+		Query query = new Query();
+		query.addFilter("domainId", Domain.currentDomainId());
+
+		if (ValueUtil.isNotEmpty(comCd)) {
+			query.addFilter("comCd", comCd);
+		}
+		if (ValueUtil.isNotEmpty(status)) {
+			query.addFilter("status", status);
+		}
+		if (ValueUtil.isNotEmpty(vasType)) {
+			query.addFilter("vasType", vasType);
+		}
+		if (ValueUtil.isNotEmpty(startDate)) {
+			query.addFilter("vasReqDate", ">=", startDate);
+		}
+		if (ValueUtil.isNotEmpty(endDate)) {
+			query.addFilter("vasReqDate", "<=", endDate);
+		}
+
+		query.addOrder("vasReqDate", false);
+		query.addOrder("vasNo", false);
+
+		return this.queryManager.selectList(VasOrder.class, query);
+	}
+
+	/**
+	 * 작업 지시 상세 목록 조회
+	 *
+	 * @param vasOrderId 작업 지시 ID
+	 * @return 작업 지시 상세 목록
+	 */
+	public List<VasOrderItem> listVasOrderItems(String vasOrderId) {
+		Query query = new Query();
+		query.addFilter("domainId", Domain.currentDomainId());
+		query.addFilter("vasOrderId", vasOrderId);
+		query.addOrder("vasSeq", true);
+
+		return this.queryManager.selectList(VasOrderItem.class, query);
+	}
+
+	/**
+	 * 실적 목록 조회
+	 *
+	 * @param vasOrderId 작업 지시 ID
+	 * @return 실적 목록
+	 */
+	public List<VasResult> listVasResults(String vasOrderId) {
+		Query query = new Query();
+		query.addFilter("domainId", Domain.currentDomainId());
+		query.addFilter("vasOrderId", vasOrderId);
+		query.addOrder("resultSeq", true);
+
+		return this.queryManager.selectList(VasResult.class, query);
+	}
+
+	/**
+	 * BOM 구성 품목 조회
+	 *
+	 * @param vasBomId BOM ID
+	 * @return BOM 구성 품목 목록
+	 */
+	public List<VasBomItem> listBomItems(String vasBomId) {
+		Query query = new Query();
+		query.addFilter("domainId", Domain.currentDomainId());
+		query.addFilter("vasBomId", vasBomId);
+		query.addOrder("bomSeq", true);
+
+		return this.queryManager.selectList(VasBomItem.class, query);
+	}
+
+	/********************************************************************************************************
+	 * 7. 유틸리티 메서드
+	 ********************************************************************************************************/
+
+	/**
+	 * 작업 지시 검증
+	 *
+	 * @param vasOrder 작업 지시
+	 */
+	private void validateVasOrder(VasOrder vasOrder) {
+		if (ValueUtil.isEmpty(vasOrder.getComCd())) {
+			throw ThrowUtil.newValidationErrorWithNoLog("화주사 코드는 필수입니다.");
+		}
+		if (ValueUtil.isEmpty(vasOrder.getVasType())) {
+			throw ThrowUtil.newValidationErrorWithNoLog("유통가공 유형은 필수입니다.");
+		}
+		if (vasOrder.getPlanQty() == null || vasOrder.getPlanQty() <= 0) {
+			throw ThrowUtil.newValidationErrorWithNoLog("계획 수량은 0보다 커야 합니다.");
+		}
+
+		// SET_ASSEMBLY, DISASSEMBLY 유형은 BOM 필수
+		if ((WmsVasConstants.VAS_TYPE_SET_ASSEMBLY.equals(vasOrder.getVasType()) ||
+			 WmsVasConstants.VAS_TYPE_DISASSEMBLY.equals(vasOrder.getVasType())) &&
+			ValueUtil.isEmpty(vasOrder.getVasBomId())) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+				vasOrder.getVasType() + " 유형은 BOM이 필수입니다.");
+		}
+	}
+
+	/**
+	 * 작업 지시 상태 자동 업데이트
+	 *
+	 * 상세 항목의 상태에 따라 헤더 상태를 자동으로 업데이트
+	 *
+	 * @param vasOrderId 작업 지시 ID
+	 */
+	private void updateVasOrderStatus(String vasOrderId) {
+		// 1. 작업 지시 조회
+		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
+		if (vasOrder == null) {
+			return;
+		}
+
+		// 2. 상세 항목 상태 집계
+		String sql = "SELECT status, COUNT(*) as cnt FROM vas_order_items " +
+					 "WHERE vas_order_id = :vasOrderId AND domain_id = :domainId " +
+					 "GROUP BY status";
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> statusCounts = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql,
+			ValueUtil.newMap("vasOrderId,domainId", vasOrderId, vasOrder.getDomainId()),
+			Map.class, 0, 0);
+
+		if (statusCounts.isEmpty()) {
+			return;
+		}
+
+		// 3. 상태 판정
+		String newStatus = vasOrder.getStatus();
+
+		boolean allPicked = true;
+
+		for (Map<String, Object> statusCount : statusCounts) {
+			String status = (String) statusCount.get("status");
+
+			if (!WmsVasConstants.ITEM_STATUS_PICKED.equals(status)) {
+				allPicked = false;
+			}
+		}
+
+		// 4. 상태 결정 (모든 자재가 PICKED 상태이면 MATERIAL_READY로 전환)
+		if (allPicked && WmsVasConstants.STATUS_APPROVED.equals(vasOrder.getStatus())) {
+			newStatus = WmsVasConstants.STATUS_MATERIAL_READY;
+		}
+
+		// 5. 상태 업데이트
+		if (!newStatus.equals(vasOrder.getStatus())) {
+			vasOrder.setStatus(newStatus);
+			this.queryManager.update(vasOrder, "status");
+		}
+	}
+
+	/********************************************************************************************************
+	 * 8. 대시보드 통계 API
+	 ********************************************************************************************************/
+
+	/**
+	 * 대시보드 - 상태별 건수 조회
+	 *
+	 * @param comCd 화주사 코드 (optional)
+	 * @param whCd 창고 코드 (optional)
+	 * @param targetDate 기준일 (optional, 기본값: 오늘)
+	 * @return 상태별 건수 Map { status: count }
+	 */
+	public Map<String, Object> getDashboardStatusCounts(String comCd, String whCd, String targetDate) {
+		String date = ValueUtil.isNotEmpty(targetDate) ? targetDate : DateUtil.todayStr();
+
+		String sql = "SELECT status, COUNT(*) as count " +
+					 "FROM vas_orders " +
+					 "WHERE domain_id = :domainId " +
+					 "AND vas_req_date = :targetDate ";
+
+		Map<String, Object> params = ValueUtil.newMap("domainId,targetDate", Domain.currentDomainId(), date);
+
+		if (ValueUtil.isNotEmpty(comCd)) {
+			sql += "AND com_cd = :comCd ";
+			params.put("comCd", comCd);
+		}
+		if (ValueUtil.isNotEmpty(whCd)) {
+			sql += "AND wh_cd = :whCd ";
+			params.put("whCd", whCd);
+		}
+
+		sql += "GROUP BY status";
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
+			sql, params, Map.class, 0, 0);
+
+		// 결과를 Map으로 변환
+		Map<String, Object> statusCounts = new java.util.HashMap<>();
+		statusCounts.put("PLAN", 0);
+		statusCounts.put("APPROVED", 0);
+		statusCounts.put("MATERIAL_READY", 0);
+		statusCounts.put("IN_PROGRESS", 0);
+		statusCounts.put("COMPLETED", 0);
+		statusCounts.put("CLOSED", 0);
+		statusCounts.put("CANCELLED", 0);
+
+		for (Map<String, Object> row : results) {
+			String status = (String) row.get("status");
+			Object count = row.get("count");
+			statusCounts.put(status, count);
+		}
+
+		return statusCounts;
+	}
+
+	/**
+	 * 대시보드 - VAS 유형별 통계 조회
+	 *
+	 * @param comCd 화주사 코드 (optional)
+	 * @param whCd 창고 코드 (optional)
+	 * @param startDate 시작일 (optional, 기본값: 오늘)
+	 * @param endDate 종료일 (optional, 기본값: 오늘)
+	 * @return 유형별 건수 Map { vasType: count }
+	 */
+	public Map<String, Object> getDashboardTypeStats(String comCd, String whCd, String startDate, String endDate) {
+		String start = ValueUtil.isNotEmpty(startDate) ? startDate : DateUtil.todayStr();
+		String end = ValueUtil.isNotEmpty(endDate) ? endDate : DateUtil.todayStr();
+
+		String sql = "SELECT vas_type, COUNT(*) as count " +
+					 "FROM vas_orders " +
+					 "WHERE domain_id = :domainId " +
+					 "AND vas_req_date >= :startDate " +
+					 "AND vas_req_date <= :endDate ";
+
+		Map<String, Object> params = ValueUtil.newMap("domainId,startDate,endDate",
+			Domain.currentDomainId(), start, end);
+
+		if (ValueUtil.isNotEmpty(comCd)) {
+			sql += "AND com_cd = :comCd ";
+			params.put("comCd", comCd);
+		}
+		if (ValueUtil.isNotEmpty(whCd)) {
+			sql += "AND wh_cd = :whCd ";
+			params.put("whCd", whCd);
+		}
+
+		sql += "GROUP BY vas_type";
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
+			sql, params, Map.class, 0, 0);
+
+		// 결과를 Map으로 변환
+		Map<String, Object> typeStats = new java.util.HashMap<>();
+		typeStats.put("ASSEMBLY", 0);
+		typeStats.put("DISASSEMBLY", 0);
+		typeStats.put("REPACK", 0);
+		typeStats.put("LABELING", 0);
+
+		for (Map<String, Object> row : results) {
+			String vasType = (String) row.get("vas_type");
+			Object count = row.get("count");
+			typeStats.put(vasType, count);
+		}
+
+		return typeStats;
+	}
+
+	/**
+	 * 대시보드 - 알림 데이터 조회
+	 *
+	 * @param comCd 화주사 코드 (optional)
+	 * @param whCd 창고 코드 (optional)
+	 * @return 알림 목록 List<Map<String, Object>>
+	 */
+	public List<Map<String, Object>> getDashboardAlerts(String comCd, String whCd) {
+		List<Map<String, Object>> alerts = new java.util.ArrayList<>();
+
+		// 1. 자재 부족 알림
+		String sql1 = "SELECT COUNT(DISTINCT voi.vas_order_id) as count " +
+					  "FROM vas_order_items voi " +
+					  "INNER JOIN vas_orders vo ON voi.vas_order_id = vo.id " +
+					  "WHERE voi.domain_id = :domainId " +
+					  "AND voi.status IN (:statuses) " +
+					  "AND (voi.alloc_qty IS NULL OR voi.alloc_qty < voi.req_qty)";
+
+		Map<String, Object> params1 = ValueUtil.newMap("domainId", Domain.currentDomainId());
+		params1.put("statuses", java.util.Arrays.asList(
+			WmsVasConstants.ITEM_STATUS_PLANNED,
+			WmsVasConstants.ITEM_STATUS_ALLOCATED
+		));
+
+		if (ValueUtil.isNotEmpty(comCd)) {
+			sql1 += " AND vo.com_cd = :comCd";
+			params1.put("comCd", comCd);
+		}
+		if (ValueUtil.isNotEmpty(whCd)) {
+			sql1 += " AND vo.wh_cd = :whCd";
+			params1.put("whCd", whCd);
+		}
+
+		Integer materialShortageCount = this.queryManager.selectBySql(sql1, params1, Integer.class);
+		if (materialShortageCount != null && materialShortageCount > 0) {
+			Map<String, Object> alert = new java.util.HashMap<>();
+			alert.put("type", "warning");
+			alert.put("icon", "📦");
+			alert.put("message", "자재 부족: " + materialShortageCount + "건 (배정 필요)");
+			alerts.add(alert);
+		}
+
+		// 2. 작업 지연 알림 (승인 후 24시간 이상 진행 없음)
+		String sql2 = "SELECT COUNT(*) as count " +
+					  "FROM vas_orders " +
+					  "WHERE domain_id = :domainId " +
+					  "AND status = :status " +
+					  "AND approved_at < (NOW() - INTERVAL '24 hours')";
+
+		Map<String, Object> params2 = ValueUtil.newMap("domainId,status",
+			Domain.currentDomainId(), WmsVasConstants.STATUS_APPROVED);
+
+		if (ValueUtil.isNotEmpty(comCd)) {
+			sql2 += " AND com_cd = :comCd";
+			params2.put("comCd", comCd);
+		}
+		if (ValueUtil.isNotEmpty(whCd)) {
+			sql2 += " AND wh_cd = :whCd";
+			params2.put("whCd", whCd);
+		}
+
+		Integer delayedWorkCount = this.queryManager.selectBySql(sql2, params2, Integer.class);
+		if (delayedWorkCount != null && delayedWorkCount > 0) {
+			Map<String, Object> alert = new java.util.HashMap<>();
+			alert.put("type", "warning");
+			alert.put("icon", "⏰");
+			alert.put("message", "작업 지연: " + delayedWorkCount + "건 (24시간 이상 대기)");
+			alerts.add(alert);
+		}
+
+		return alerts;
+	}
+}
