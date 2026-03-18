@@ -658,9 +658,7 @@ Entity를 등록할 때 시스템이 자동으로 추가하는 필드 (entity_co
 | `updated_at` | 수정일시 |
 | `updater_id` | 수정자 ID |
 
-### 4.6 기존 RWA 모듈 Seed SQL 참조
+### 4.6 Seed SQL 참고
 
-| 파일 | 내용 |
-|------|------|
-| `src/main/resources/sql/V001__rwa_resource_seed.sql` | Entity 4개 + EntityColumn 113개 |
-| `src/main/resources/sql/V002__rwa_common_code_seed.sql` | RWA_ORDER_STATUS 공통코드 |
+> Seed SQL은 초기 개발 시 참고용으로 생성되었으며, `/entity_meta_by_entity` skill이 이를 대체한다.
+> Entity 클래스 분석으로 entities, entity_columns, terminologies, common_codes, common_code_details를 자동 등록하므로 별도 Seed SQL 작성이 불필요하다.

@@ -18,4 +18,4 @@ export class InvWorkPage extends MetaGristMixin(p13n(localize(i18next)(PageView)
   }
 }
 
-customElements.define('inv-work-page', InvWorkPage)
+window.customElements.define('inv-work-page', InvWorkPage)

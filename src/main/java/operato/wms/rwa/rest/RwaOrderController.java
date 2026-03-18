@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import operato.wms.rwa.entity.RwaOrder;
 import operato.wms.rwa.entity.RwaOrderItem;
-import xyz.elidom.dbist.dml.Filter;
 import xyz.elidom.dbist.dml.Order;
 import xyz.elidom.dbist.dml.Page;
 import xyz.elidom.dbist.dml.Query;
