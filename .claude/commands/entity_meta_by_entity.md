@@ -1,4 +1,4 @@
-지정된 Entity 클래스를 분석하여 `entities` + `entity_columns` 테이블에 메타데이터를 자동 등록해줘.
+지정된 Entity 클래스를 분석하여 `entities` + `entity_columns` + `terminologies` + `common_codes` + `common_code_details` 테이블에 메타데이터를 자동 등록해줘.
 
 파라미터: $ARGUMENTS
 - Entity 클래스명 (예: `RwaOrder`) 또는 패키지 경로 (예: `operato.wms.rwa.entity.RwaOrder`)
@@ -204,23 +204,141 @@ INSERT INTO entity_columns (
 ) VALUES (%s, ..., now(), now())
 ```
 
-### 7. 결과 보고
+### 7. terminologies INSERT
 
-- Entity 정보 테이블: 이름, 테이블명, bundle, 마스터-디테일 관계
-- entity_columns 요약: 총 컬럼 수, CommonCode 필드 수, 검색 필드 수, 그리드 표시 필드 수
-- 도메인별 INSERT 건수 (entities / entity_columns)
-- CommonCode 필드 목록 (ref_name 포함)
+entity_columns 등록 완료 후, 각 컬럼에 대해 4개 locale별 terminology 레코드를 생성한다.
+
+#### locale 목록
+
+`ko`, `en`, `ja`, `zh` (4개 언어)
+
+#### terminologies 컬럼 매핑
+
+| 항목 | 결정 규칙 |
+|------|----------|
+| `id` | **생략** (uuid_generate_v4() 기본값) |
+| `domain_id` | 현재 도메인 ID |
+| `name` | entity_columns의 `name` 값 (예: `rwa_no`) |
+| `category` | `label` (고정) |
+| `locale` | `ko` / `en` / `ja` / `zh` |
+| `display` | 아래 규칙 참조 |
+| `created_at` | `now()` |
+| `updated_at` | `now()` |
+
+#### display 값 결정
+
+- `ko`: entity_column의 `description` (Javadoc 한국어 설명, 예: `반품 번호`)
+- `en` / `ja` / `zh`: `label.{field_name}` (미번역 플레이스홀더)
+  - 미번역 항목은 `/translate` 명령으로 번역 가능
+
+#### 중복 확인 후 INSERT
+
+```python
+# 도메인별, locale별 중복 확인
+SELECT id FROM terminologies
+WHERE domain_id = %s AND locale = %s AND category = 'label' AND name = %s
+# 이미 존재하면 SKIP
+
+# terminologies INSERT (id 생략)
+INSERT INTO terminologies (domain_id, name, locale, category, display, created_at, updated_at)
+VALUES (%s, %s, %s, 'label', %s, now(), now())
+```
+
+> **참고**: `/translate` skill의 미번역 판별식 `display = category || '.' || name` 과 호환.
+> `ko` locale은 한국어 번역이 설정되므로 미번역 대상이 아님.
+> `en`/`ja`/`zh` locale은 `display = 'label.{field_name}'` = `category || '.' || name` 이므로 `/translate`로 번역 가능.
+
+### 8. common_codes + common_code_details INSERT
+
+entity_columns 분석에서 `ref_type = 'CommonCode'`인 필드를 식별하여 공통코드를 등록한다.
+
+#### 공통코드 대상 식별
+
+2단계에서 이미 분석된 정보를 활용한다:
+- Javadoc에 슬래시(`/`) 구분 허용값이 있는 String 필드
+- 예: `상태 (PLAN/APPROVED/MATERIAL_READY/...)` → CommonCode 대상
+
+**제외 대상:**
+- FK 참조 필드 (`*_id`)
+- 자유 입력 필드 (코드, 명칭, 설명, 날짜, 번호 등)
+- 확장 필드 (`attr01`~`attr05`)
+- 비고 (`remarks`)
+
+#### 코드명 결정
+
+```
+패턴: {TABLE_NAME_SINGULAR}_{COLUMN_NAME} (대문자, 언더스코어)
+테이블명에서 마지막 's'(복수형)는 제거: vas_orders → VAS_ORDER
+예: vas_orders.status → VAS_ORDER_STATUS
+    vas_orders.vas_type → VAS_ORDER_VAS_TYPE
+```
+
+#### 상수 클래스에서 코드 값 수집
+
+- 같은 모듈의 `Wms*Constants.java`에서 해당 필드와 매핑되는 상수 그룹을 찾는다
+- 상수의 Javadoc 주석에서 한국어 설명을 추출한다
+- 예: `STATUS_PLAN = "PLAN"` + Javadoc `상태: 계획` → name=`PLAN`, description=`계획`
+
+#### 중복 확인 후 INSERT
+
+```python
+# === common_codes (마스터) ===
+# 도메인별 중복 확인
+SELECT id FROM common_codes WHERE domain_id = %s AND name = %s
+# 이미 존재하면 SKIP
+
+# common_codes INSERT (id 생략)
+INSERT INTO common_codes (domain_id, name, description, bundle, created_at, updated_at)
+VALUES (%s, %s, %s, %s, now(), now())
+RETURNING id
+
+# === common_code_details (상세) ===
+# 도메인별 중복 확인
+SELECT id FROM common_code_details WHERE domain_id = %s AND parent_id = %s AND name = %s
+# 이미 존재하면 SKIP
+
+# common_code_details INSERT (id 생략, created_at/updated_at 없음!)
+INSERT INTO common_code_details (domain_id, parent_id, name, description, rank)
+VALUES (%s, %s, %s, %s, %s)
+```
+
+- `rank`: 10, 20, 30, ... (10씩 증가)
+
+### 9. 결과 보고
+
+- **Entity 정보**: 이름, 테이블명, bundle, 마스터-디테일 관계
+- **entity_columns 요약**: 총 컬럼 수, CommonCode 필드 수, 검색 필드 수, 그리드 표시 필드 수
+- **terminologies 요약**: 총 INSERT 건수 (도메인 × 컬럼 × locale), 미번역(en/ja/zh) 건수
+- **common_codes 요약**: 코드명 목록, 코드별 상세 값 수, 총 INSERT 건수
+- **도메인별 INSERT 건수**: entities / entity_columns / terminologies / common_code_details
+
+### 10. 자동 번역 실행
+
+모든 메타데이터 등록이 완료되면 자동으로 `/translate` skill을 호출하여 미번역 항목(`en/ja/zh`)을 번역한다.
+
+```
+/translate
+```
+
+이를 통해 사용자가 한 번의 명령으로 메타데이터 등록과 다국어 번역까지 모두 완료할 수 있다.
 
 ## 주의사항
 
-- `entities`, `entity_columns` 테이블의 `id` 컬럼은 `uuid_generate_v4()` 기본값 → INSERT 시 **생략**
+- `entities`, `entity_columns`, `terminologies` 테이블의 `id` 컬럼은 `uuid_generate_v4()` 기본값 → INSERT 시 **생략**
 - `search_url`, `multi_save_url`: 첫글자 `/`를 붙이지 **않는다**
 - `id_field`: Entity에 `id` 필드가 있으면 반드시 `id`로 설정
 - `data_prop`: 기본값은 `items`
 - 시스템 자동 추가 필드 (`domain_id`, `created_at`, `creator_id`, `updated_at`, `updater_id`)는 entity_columns에 등록하지 않는다
 - `search_rank`, `sort_rank`, `grid_rank`는 **10부터 시작**하여 **10씩 증가** (10, 20, 30, ...)
 - CommonCode 필드의 `search_editor`/`grid_editor`는 `code-combo`
-- `common_codes` 등록은 이 skill의 범위가 아님 (별도 `/code_by_entity` 사용)
-- Unique 제약: `entities`는 `(domain_id, name)`, `entity_columns`는 `(domain_id, entity_id, name)`
+- Unique 제약:
+  - `entities`: `(domain_id, name)`
+  - `entity_columns`: `(domain_id, entity_id, name)`
+  - `terminologies`: `(domain_id, locale, category, name)`
+  - `common_codes`: `(domain_id, name)`
+  - `common_code_details`: `(domain_id, parent_id, name)`
+- `common_code_details` 테이블에는 `created_at`/`updated_at` 컬럼이 **없음** — INSERT 시 반드시 제외
+- `ko` 이외 locale의 display는 미번역 플레이스홀더 (`label.{field_name}`) → `/translate`로 번역
+- 이미 존재하는 데이터는 SKIP (중복 INSERT 방지)
 - 마스터-디테일 관계에서 마스터 Entity가 DB에 없으면 경고 출력 후 `master_id = NULL`로 진행
 - `operato-service-dev-guide.md` 문서의 규칙을 최우선으로 따른다
