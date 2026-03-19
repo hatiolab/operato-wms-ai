@@ -214,9 +214,9 @@ class RwaHome extends localize(i18next)(PageView) {
       DISPOSED: 0
     }
     this.typeStats = {
-      CUSTOMER: 0,
-      SUPPLIER: 0,
-      DEFECTIVE: 0,
+      CUSTOMER_RETURN: 0,
+      VENDOR_RETURN: 0,
+      DEFECT_RETURN: 0,
       OTHER: 0
     }
     this.alerts = []
@@ -356,10 +356,10 @@ class RwaHome extends localize(i18next)(PageView) {
   async _fetchTypeStats() {
     try {
       const data = await ServiceUtil.restGet('rwa_trx/dashboard/type-stats')
-      return data || { CUSTOMER: 0, SUPPLIER: 0, DEFECTIVE: 0, OTHER: 0 }
+      return data || { CUSTOMER_RETURN: 0, VENDOR_RETURN: 0, DEFECT_RETURN: 0, OTHER: 0 }
     } catch (error) {
       console.error('유형별 통계 조회 실패:', error)
-      return { CUSTOMER: 0, SUPPLIER: 0, DEFECTIVE: 0, OTHER: 0 }
+      return { CUSTOMER_RETURN: 0, VENDOR_RETURN: 0, DEFECT_RETURN: 0, OTHER: 0 }
     }
   }
 
@@ -391,9 +391,9 @@ class RwaHome extends localize(i18next)(PageView) {
           {
             label: '반품 건수',
             data: [
-              this.typeStats.CUSTOMER || 0,
-              this.typeStats.SUPPLIER || 0,
-              this.typeStats.DEFECTIVE || 0,
+              this.typeStats.CUSTOMER_RETURN || 0,
+              this.typeStats.VENDOR_RETURN || 0,
+              this.typeStats.DEFECT_RETURN || 0,
               this.typeStats.OTHER || 0
             ],
             backgroundColor: ['#2196F3', '#4CAF50', '#FF9800', '#9E9E9E'],

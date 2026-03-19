@@ -105,7 +105,7 @@ public class RwaTransactionController extends AbstractRestService {
 	 *
 	 * POST /rest/rwa_trx/rwa_orders/{id}/approve
 	 *
-	 * @param id 반품 지시 ID
+	 * @param id     반품 지시 ID
 	 * @param params { approvedBy: "user_id" }
 	 * @return 승인된 반품 지시
 	 */
@@ -123,7 +123,7 @@ public class RwaTransactionController extends AbstractRestService {
 	 *
 	 * POST /rest/rwa_trx/rwa_orders/{id}/reject
 	 *
-	 * @param id 반품 지시 ID
+	 * @param id     반품 지시 ID
 	 * @param params { rejectedBy: "user_id", rejectReason: "..." }
 	 * @return 거부된 반품 지시
 	 */
@@ -146,7 +146,7 @@ public class RwaTransactionController extends AbstractRestService {
 	 *
 	 * POST /rest/rwa_trx/rwa_orders/{id}/items/{itemId}/receive
 	 *
-	 * @param id 반품 지시 ID (미사용, URL 일관성 유지)
+	 * @param id     반품 지시 ID (미사용, URL 일관성 유지)
 	 * @param itemId 반품 상세 ID
 	 * @param params { rwaQty: 10.0, locCd: "A-01-01" }
 	 * @return 업데이트된 반품 상세
@@ -171,8 +171,8 @@ public class RwaTransactionController extends AbstractRestService {
 	 *
 	 * POST /rest/rwa_trx/rwa_orders/{id}/items/{itemId}/inspect
 	 *
-	 * @param id 반품 지시 ID (미사용, URL 일관성 유지)
-	 * @param itemId 반품 상세 ID
+	 * @param id         반품 지시 ID (미사용, URL 일관성 유지)
+	 * @param itemId     반품 상세 ID
 	 * @param inspection 검수 정보
 	 * @return 생성된 검수 기록
 	 */
@@ -190,7 +190,7 @@ public class RwaTransactionController extends AbstractRestService {
 	 *
 	 * POST /rest/rwa_trx/rwa_orders/{id}/items/{itemId}/complete_inspection
 	 *
-	 * @param id 반품 지시 ID (미사용, URL 일관성 유지)
+	 * @param id     반품 지시 ID (미사용, URL 일관성 유지)
 	 * @param itemId 반품 상세 ID
 	 * @return 업데이트된 반품 상세
 	 */
@@ -211,8 +211,8 @@ public class RwaTransactionController extends AbstractRestService {
 	 *
 	 * POST /rest/rwa_trx/rwa_orders/{id}/items/{itemId}/dispose
 	 *
-	 * @param id 반품 지시 ID (미사용, URL 일관성 유지)
-	 * @param itemId 반품 상세 ID
+	 * @param id          반품 지시 ID (미사용, URL 일관성 유지)
+	 * @param itemId      반품 상세 ID
 	 * @param disposition 처분 정보
 	 * @return 생성된 처분 기록
 	 */
@@ -266,11 +266,11 @@ public class RwaTransactionController extends AbstractRestService {
 	 *
 	 * GET /rest/rwa_trx/rwa_orders
 	 *
-	 * @param comCd 화주사 코드
-	 * @param status 상태
-	 * @param rwaType 반품 유형
+	 * @param comCd     화주사 코드
+	 * @param status    상태
+	 * @param rwaType   반품 유형
 	 * @param startDate 시작일 (rwaReqDate >= startDate)
-	 * @param endDate 종료일 (rwaReqDate <= endDate)
+	 * @param endDate   종료일 (rwaReqDate <= endDate)
 	 * @return 반품 지시 목록
 	 */
 	@GetMapping("/rwa_orders")
@@ -317,7 +317,7 @@ public class RwaTransactionController extends AbstractRestService {
 	 *
 	 * GET /rest/rwa_trx/rwa_orders/{id}/items/{itemId}/inspections
 	 *
-	 * @param id 반품 지시 ID (미사용, URL 일관성 유지)
+	 * @param id     반품 지시 ID (미사용, URL 일관성 유지)
 	 * @param itemId 반품 상세 ID
 	 * @return 검수 기록 목록
 	 */
@@ -334,7 +334,7 @@ public class RwaTransactionController extends AbstractRestService {
 	 *
 	 * GET /rest/rwa_trx/rwa_orders/{id}/items/{itemId}/disposition
 	 *
-	 * @param id 반품 지시 ID (미사용, URL 일관성 유지)
+	 * @param id     반품 지시 ID (미사용, URL 일관성 유지)
 	 * @param itemId 반품 상세 ID
 	 * @return 처분 기록 (1:1 관계)
 	 */
@@ -358,17 +358,17 @@ public class RwaTransactionController extends AbstractRestService {
 	 *
 	 * GET /rest/rwa_trx/dashboard/status-counts
 	 *
-	 * @param comCd 화주사 코드 (optional)
-	 * @param whCd 창고 코드 (optional)
+	 * @param comCd      화주사 코드 (optional)
+	 * @param whCd       창고 코드 (optional)
 	 * @param targetDate 기준일 (optional, 기본값: 오늘)
 	 * @return 상태별 건수 Map { status: count }
 	 */
 	@GetMapping("/dashboard/status-counts")
 	@ApiDesc(description = "Get Dashboard Status Counts")
 	public Map<String, Object> getDashboardStatusCounts(
-			@RequestParam(name = "comCd", required = false) String comCd,
-			@RequestParam(name = "whCd", required = false) String whCd,
-			@RequestParam(name = "targetDate", required = false) String targetDate) {
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd", required = false) String whCd,
+			@RequestParam(name = "target_date", required = false) String targetDate) {
 		return this.rwaService.getDashboardStatusCounts(comCd, whCd, targetDate);
 	}
 
@@ -377,19 +377,19 @@ public class RwaTransactionController extends AbstractRestService {
 	 *
 	 * GET /rest/rwa_trx/dashboard/type-stats
 	 *
-	 * @param comCd 화주사 코드 (optional)
-	 * @param whCd 창고 코드 (optional)
+	 * @param comCd     화주사 코드 (optional)
+	 * @param whCd      창고 코드 (optional)
 	 * @param startDate 시작일 (optional, 기본값: 오늘)
-	 * @param endDate 종료일 (optional, 기본값: 오늘)
+	 * @param endDate   종료일 (optional, 기본값: 오늘)
 	 * @return 유형별 건수 Map { rwaType: count }
 	 */
 	@GetMapping("/dashboard/type-stats")
 	@ApiDesc(description = "Get Dashboard Type Statistics")
 	public Map<String, Object> getDashboardTypeStats(
-			@RequestParam(name = "comCd", required = false) String comCd,
-			@RequestParam(name = "whCd", required = false) String whCd,
-			@RequestParam(name = "startDate", required = false) String startDate,
-			@RequestParam(name = "endDate", required = false) String endDate) {
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd", required = false) String whCd,
+			@RequestParam(name = "start_date", required = false) String startDate,
+			@RequestParam(name = "end_date", required = false) String endDate) {
 		return this.rwaService.getDashboardTypeStats(comCd, whCd, startDate, endDate);
 	}
 
@@ -399,14 +399,14 @@ public class RwaTransactionController extends AbstractRestService {
 	 * GET /rest/rwa_trx/dashboard/alerts
 	 *
 	 * @param comCd 화주사 코드 (optional)
-	 * @param whCd 창고 코드 (optional)
+	 * @param whCd  창고 코드 (optional)
 	 * @return 알림 목록 List<Map<String, Object>>
 	 */
 	@GetMapping("/dashboard/alerts")
 	@ApiDesc(description = "Get Dashboard Alerts")
 	public List<Map<String, Object>> getDashboardAlerts(
-			@RequestParam(name = "comCd", required = false) String comCd,
-			@RequestParam(name = "whCd", required = false) String whCd) {
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd", required = false) String whCd) {
 		return this.rwaService.getDashboardAlerts(comCd, whCd);
 	}
 }

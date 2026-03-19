@@ -71,7 +71,7 @@ public class VasTransactionController {
 	/**
 	 * 작업 지시 승인
 	 *
-	 * @param id 작업 지시 ID
+	 * @param id     작업 지시 ID
 	 * @param params approvedBy (승인자 ID)
 	 * @return 승인된 작업 지시
 	 */
@@ -89,7 +89,7 @@ public class VasTransactionController {
 	/**
 	 * 작업 지시 취소
 	 *
-	 * @param id 작업 지시 ID
+	 * @param id     작업 지시 ID
 	 * @param params cancelReason (취소 사유)
 	 * @return 취소된 작업 지시
 	 */
@@ -149,7 +149,7 @@ public class VasTransactionController {
 	/**
 	 * 자재 일괄 배정
 	 *
-	 * @param id 작업 지시 ID
+	 * @param id    작업 지시 ID
 	 * @param items 배정 대상 항목 목록 (itemId, allocQty, srcLocCd, lotNo)
 	 * @return 업데이트된 작업 지시 상세 목록
 	 */
@@ -174,7 +174,7 @@ public class VasTransactionController {
 	/**
 	 * 자재 일괄 피킹
 	 *
-	 * @param id 작업 지시 ID
+	 * @param id    작업 지시 ID
 	 * @param items 피킹 대상 항목 목록 (itemId, pickedQty)
 	 * @return 업데이트된 작업 지시 상세 목록
 	 */
@@ -201,7 +201,7 @@ public class VasTransactionController {
 	/**
 	 * 작업 시작
 	 *
-	 * @param id 작업 지시 ID
+	 * @param id     작업 지시 ID
 	 * @param params workerId (작업자 ID)
 	 * @return 작업 시작된 작업 지시
 	 */
@@ -223,7 +223,7 @@ public class VasTransactionController {
 	/**
 	 * 실적 등록
 	 *
-	 * @param id 작업 지시 ID
+	 * @param id     작업 지시 ID
 	 * @param result 실적 정보
 	 * @return 생성된 실적
 	 */
@@ -272,21 +272,21 @@ public class VasTransactionController {
 	/**
 	 * 작업 지시 목록 조회
 	 *
-	 * @param comCd 화주사 코드
-	 * @param status 상태
-	 * @param vasType 유통가공 유형
+	 * @param comCd     화주사 코드
+	 * @param status    상태
+	 * @param vasType   유통가공 유형
 	 * @param startDate 시작일
-	 * @param endDate 종료일
+	 * @param endDate   종료일
 	 * @return 작업 지시 목록
 	 */
 	@PostMapping(value = "/vas_orders/search", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Search VAS Orders")
 	public List<VasOrder> searchVasOrders(
-			@RequestParam(name = "comCd", required = false) String comCd,
+			@RequestParam(name = "com_cd", required = false) String comCd,
 			@RequestParam(name = "status", required = false) String status,
-			@RequestParam(name = "vasType", required = false) String vasType,
-			@RequestParam(name = "startDate", required = false) String startDate,
-			@RequestParam(name = "endDate", required = false) String endDate) {
+			@RequestParam(name = "vas_type", required = false) String vasType,
+			@RequestParam(name = "start_date", required = false) String startDate,
+			@RequestParam(name = "end_date", required = false) String endDate) {
 
 		return this.vasService.listVasOrders(comCd, status, vasType, startDate, endDate);
 	}
@@ -300,7 +300,8 @@ public class VasTransactionController {
 	 *
 	 * GET /rest/vas_trx/monitor/orders
 	 *
-	 * @param status 상태 필터 (optional, 쉼표 구분 가능. 기본값: IN_PROGRESS,APPROVED,MATERIAL_READY)
+	 * @param status 상태 필터 (optional, 쉼표 구분 가능. 기본값:
+	 *               IN_PROGRESS,APPROVED,MATERIAL_READY)
 	 * @return 주문 목록 (자재 진행 요약 포함)
 	 */
 	@GetMapping(value = "/monitor/orders", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -325,17 +326,17 @@ public class VasTransactionController {
 	 *
 	 * GET /rest/vas_trx/dashboard/status-counts
 	 *
-	 * @param comCd 화주사 코드 (optional)
-	 * @param whCd 창고 코드 (optional)
+	 * @param comCd      화주사 코드 (optional)
+	 * @param whCd       창고 코드 (optional)
 	 * @param targetDate 기준일 (optional, 기본값: 오늘)
 	 * @return 상태별 건수 Map { status: count }
 	 */
 	@GetMapping("/dashboard/status-counts")
 	@ApiDesc(description = "Get Dashboard Status Counts")
 	public Map<String, Object> getDashboardStatusCounts(
-			@RequestParam(name = "comCd", required = false) String comCd,
-			@RequestParam(name = "whCd", required = false) String whCd,
-			@RequestParam(name = "targetDate", required = false) String targetDate) {
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd", required = false) String whCd,
+			@RequestParam(name = "target_date", required = false) String targetDate) {
 		return this.vasService.getDashboardStatusCounts(comCd, whCd, targetDate);
 	}
 
@@ -344,19 +345,19 @@ public class VasTransactionController {
 	 *
 	 * GET /rest/vas_trx/dashboard/type-stats
 	 *
-	 * @param comCd 화주사 코드 (optional)
-	 * @param whCd 창고 코드 (optional)
+	 * @param comCd     화주사 코드 (optional)
+	 * @param whCd      창고 코드 (optional)
 	 * @param startDate 시작일 (optional, 기본값: 오늘)
-	 * @param endDate 종료일 (optional, 기본값: 오늘)
+	 * @param endDate   종료일 (optional, 기본값: 오늘)
 	 * @return 유형별 건수 Map { vasType: count }
 	 */
 	@GetMapping("/dashboard/type-stats")
 	@ApiDesc(description = "Get Dashboard Type Statistics")
 	public Map<String, Object> getDashboardTypeStats(
-			@RequestParam(name = "comCd", required = false) String comCd,
-			@RequestParam(name = "whCd", required = false) String whCd,
-			@RequestParam(name = "startDate", required = false) String startDate,
-			@RequestParam(name = "endDate", required = false) String endDate) {
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd", required = false) String whCd,
+			@RequestParam(name = "start_date", required = false) String startDate,
+			@RequestParam(name = "end_date", required = false) String endDate) {
 		return this.vasService.getDashboardTypeStats(comCd, whCd, startDate, endDate);
 	}
 
@@ -366,14 +367,14 @@ public class VasTransactionController {
 	 * GET /rest/vas_trx/dashboard/alerts
 	 *
 	 * @param comCd 화주사 코드 (optional)
-	 * @param whCd 창고 코드 (optional)
+	 * @param whCd  창고 코드 (optional)
 	 * @return 알림 목록 List<Map<String, Object>>
 	 */
 	@GetMapping("/dashboard/alerts")
 	@ApiDesc(description = "Get Dashboard Alerts")
 	public List<Map<String, Object>> getDashboardAlerts(
-			@RequestParam(name = "comCd", required = false) String comCd,
-			@RequestParam(name = "whCd", required = false) String whCd) {
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd", required = false) String whCd) {
 		return this.vasService.getDashboardAlerts(comCd, whCd);
 	}
 }

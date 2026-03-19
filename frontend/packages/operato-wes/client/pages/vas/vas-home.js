@@ -308,7 +308,7 @@ class VasHome extends localize(i18next)(PageView) {
                     <span class="icon">📋</span>실적 조회
                   </button>
                   <button class="quick-action-btn" @click="${() => this._navigateTo('vas-boms')}">
-                    <span class="icon">📦</span>BOM 관리
+                    <span class="icon">📦</span>세트 상품 관리
                   </button>
                 </div>
               </section>

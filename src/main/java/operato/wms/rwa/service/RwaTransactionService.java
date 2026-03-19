@@ -720,9 +720,9 @@ public class RwaTransactionService extends AbstractQueryService {
 				sql, params, Map.class, 0, 0);
 
 		// 결과를 Map으로 변환
-		Map<String, Object> typeStats = ValueUtil.newMap("CUSTOMER", 0);
-		typeStats.put("SUPPLIER", 0);
-		typeStats.put("DEFECTIVE", 0);
+		Map<String, Object> typeStats = ValueUtil.newMap("CUSTOMER_RETURN", 0);
+		typeStats.put("VENDOR_RETURN", 0);
+		typeStats.put("DEFECT_RETURN", 0);
 		typeStats.put("OTHER", 0);
 
 		for (Map<String, Object> row : results) {
