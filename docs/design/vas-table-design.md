@@ -284,7 +284,7 @@ CREATE INDEX ix_vas_order_items_5 ON vas_order_items (src_loc_cd, domain_id);
 **설명**: 유통가공 작업 완료 후의 실적 기록 (완성품 및 불량품 수량)
 
 **Lifecycle**:
-- `@PrePersist`: `result_seq` 자동 채번, `worked_at` 기본값 현재 일시
+- `@PrePersist`: `result_seq` 자동 채번, `work_date` 기본값 오늘 날짜
 - `@PostPersist`: `vas_orders.completed_qty` 자동 업데이트, 재고 처리 트리거
 
 | Java Field | 컬럼 | 타입 | Null | 길이 | 설명 |
@@ -300,7 +300,7 @@ CREATE INDEX ix_vas_order_items_5 ON vas_order_items (src_loc_cd, domain_id);
 | destLocCd | dest_loc_cd | VARCHAR | Y | 20 | 적치 로케이션 (완성품 보관 위치) |
 | lotNo | lot_no | VARCHAR | Y | 30 | 로트 번호 |
 | workerId | worker_id | VARCHAR | Y | 32 | 작업자 ID |
-| workedAt | worked_at | DATETIME | N | - | 작업 일시 |
+| workDate | work_date | VARCHAR | N | 10 | 작업 일자 (YYYY-MM-DD) |
 | stockTxnId | stock_txn_id | VARCHAR | Y | 40 | 재고 트랜잭션 ID (재고 처리 후 참조) |
 | remarks | remarks | VARCHAR | Y | 1000 | 비고 |
 
@@ -310,7 +310,7 @@ CREATE UNIQUE INDEX ix_vas_results_0 ON vas_results (vas_order_id, result_seq, d
 CREATE INDEX ix_vas_results_1 ON vas_results (vas_order_id, domain_id);
 CREATE INDEX ix_vas_results_2 ON vas_results (set_sku_cd, domain_id);
 CREATE INDEX ix_vas_results_3 ON vas_results (worker_id, domain_id);
-CREATE INDEX ix_vas_results_4 ON vas_results (worked_at, domain_id);
+CREATE INDEX ix_vas_results_4 ON vas_results (work_date, domain_id);
 CREATE INDEX ix_vas_results_5 ON vas_results (stock_txn_id, domain_id);
 ```
 
@@ -437,10 +437,10 @@ CREATE INDEX ix_vas_order_items_sku ON vas_order_items (sku_cd, status, domain_i
 CREATE INDEX ix_vas_orders_priority ON vas_orders (priority, status, vas_req_date, domain_id);
 
 -- 작업자별 실적 이력
-CREATE INDEX ix_vas_results_worker ON vas_results (worker_id, worked_at, domain_id);
+CREATE INDEX ix_vas_results_worker ON vas_results (worker_id, work_date, domain_id);
 
 -- 완성품별 실적 집계
-CREATE INDEX ix_vas_results_set_sku ON vas_results (set_sku_cd, worked_at, domain_id);
+CREATE INDEX ix_vas_results_set_sku ON vas_results (set_sku_cd, work_date, domain_id);
 
 -- BOM 마스터 세트 상품 검색
 CREATE INDEX ix_vas_boms_set_sku ON vas_boms (com_cd, set_sku_cd, status, domain_id);

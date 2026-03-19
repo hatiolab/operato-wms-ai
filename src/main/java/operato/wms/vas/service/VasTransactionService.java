@@ -378,8 +378,8 @@ public class VasTransactionService extends AbstractQueryService {
 			result.setSetSkuNm(vasBom.getSetSkuNm());
 		}
 
-		if (ValueUtil.isEmpty(result.getWorkedAt())) {
-			result.setWorkedAt(new Date());
+		if (ValueUtil.isEmpty(result.getWorkDate())) {
+			result.setWorkDate(DateUtil.todayStr());
 		}
 
 		this.queryManager.insert(result);

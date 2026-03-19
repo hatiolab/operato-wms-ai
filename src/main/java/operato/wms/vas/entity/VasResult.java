@@ -21,7 +21,7 @@ import xyz.elidom.util.ValueUtil;
 		@Index(name = "ix_vas_results_1", columnList = "vas_order_id,domain_id"),
 		@Index(name = "ix_vas_results_2", columnList = "set_sku_cd,domain_id"),
 		@Index(name = "ix_vas_results_3", columnList = "worker_id,domain_id"),
-		@Index(name = "ix_vas_results_4", columnList = "worked_at,domain_id"),
+		@Index(name = "ix_vas_results_4", columnList = "work_date,domain_id"),
 		@Index(name = "ix_vas_results_5", columnList = "stock_txn_id,domain_id")
 })
 public class VasResult extends xyz.elidom.orm.entity.basic.ElidomStampHook {
@@ -102,10 +102,10 @@ public class VasResult extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String workerId;
 
 	/**
-	 * 작업 일시
+	 * 작업 일자 (YYYY-MM-DD)
 	 */
-	@Column(name = "worked_at", nullable = false)
-	private java.util.Date workedAt;
+	@Column(name = "work_date", nullable = false, length = 10)
+	private String workDate;
 
 	/**
 	 * 재고 트랜잭션 ID (재고 처리 후 참조)
@@ -222,12 +222,12 @@ public class VasResult extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.workerId = workerId;
 	}
 
-	public java.util.Date getWorkedAt() {
-		return workedAt;
+	public String getWorkDate() {
+		return workDate;
 	}
 
-	public void setWorkedAt(java.util.Date workedAt) {
-		this.workedAt = workedAt;
+	public void setWorkDate(String workDate) {
+		this.workDate = workDate;
 	}
 
 	public String getStockTxnId() {
@@ -260,9 +260,9 @@ public class VasResult extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 			this.resultSeq = (maxSeq != null ? maxSeq : 0) + 1;
 		}
 
-		// 작업 일시 기본값
-		if (this.workedAt == null) {
-			this.workedAt = new java.util.Date();
+		// 작업 일자 기본값 (오늘)
+		if (ValueUtil.isEmpty(this.workDate)) {
+			this.workDate = xyz.elidom.util.DateUtil.todayStr("yyyy-MM-dd");
 		}
 
 		// 불량 수량 초기화
