@@ -10,6 +10,7 @@ import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
  * - 2단계: 소요 자재 확인 (BOM 자동 전개, 재고 확인)
  */
 class VasOrderNewPopup extends localize(i18next)(LitElement) {
+  /** 컴포넌트 스타일 정의 */
   static get styles() {
     return [
       css`
@@ -352,6 +353,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     ]
   }
 
+  /** 컴포넌트 반응형 속성 정의 */
   static get properties() {
     return {
       step: Number,
@@ -365,6 +367,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 생성자 - 위자드 초기 단계 및 폼 데이터 초기화 */
   constructor() {
     super()
     this.step = 1
@@ -386,11 +389,13 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     this.stockInfo = {}
   }
 
+  /** 컴포넌트가 DOM에 연결될 때 BOM 목록 조회 */
   connectedCallback() {
     super.connectedCallback()
     this._fetchBomList()
   }
 
+  /** 화면 렌더링 - 스텝 인디케이터, 폼 내용, 하단 버튼 구성 */
   render() {
     return html`
       <!-- 스텝 인디케이터 -->
@@ -406,6 +411,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     `
   }
 
+  /** 위자드 단계 표시기 렌더링 (1단계: 기본정보, 2단계: 소요자재) */
   _renderStepIndicator() {
     return html`
       <div class="step-indicator">
@@ -422,6 +428,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     `
   }
 
+  /** 1단계 렌더링 - 기본 정보 입력 폼 (화주사, 창고, BOM, 요청일, 수량 등) */
   _renderStep1() {
     return html`
       <div class="form-section-title">기본 정보 입력</div>
@@ -447,9 +454,9 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
         </div>
 
         <div class="form-group full-width">
-          <label>BOM 선택<span class="required">*</span></label>
+          <label>세트 상품 선택<span class="required">*</span></label>
           <select @change="${this._onBomSelect}">
-            <option value="">-- BOM을 선택하세요 --</option>
+            <option value="">-- 세트 상품을 선택하세요 --</option>
             ${this.bomList.map(
       bom => html`
                 <option value="${bom.id}" ?selected="${this.formData.vasBomId === bom.id}">
@@ -512,7 +519,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
         </div>
 
         <div class="form-group">
-          <label>작업장</label>
+          <label>작업장 로케이션</label>
           <input
             type="text"
             .value="${this.formData.workLocCd}"
@@ -533,6 +540,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     `
   }
 
+  /** 2단계 렌더링 - BOM 소요 자재 목록 및 재고 상태 확인 */
   _renderStep2() {
     if (this.loadingBomItems) {
       return html`<div class="loading-overlay">소요 자재를 조회하고 있습니다...</div>`
@@ -613,6 +621,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     `
   }
 
+  /** 하단 버튼 렌더링 - 단계에 따라 이전/다음/저장 버튼 표시 */
   _renderButtons() {
     return html`
       <div class="button-bar">
@@ -633,6 +642,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
    * 데이터 조회
    * ============================================================ */
 
+  /** 활성 상태인 BOM 목록 조회 (세트 상품 선택 드롭다운용) */
   async _fetchBomList() {
     try {
       const filters = [{ name: 'status', value: 'ACTIVE' }]
@@ -644,6 +654,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 선택한 BOM의 구성 품목 목록 조회 및 재고 정보 연계 */
   async _fetchBomItems(bomId) {
     try {
       this.loadingBomItems = true
@@ -660,6 +671,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     }
   }
 
+  /** BOM 구성 품목별 재고 수량 조회 (SKU/창고 기준) */
   async _fetchStockInfo() {
     this.stockInfo = {}
 
@@ -689,10 +701,12 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
    * 이벤트 핸들러
    * ============================================================ */
 
+  /** 폼 필드값 변경 (불변성 유지를 위해 spread 연산자 사용) */
   _updateField(field, value) {
     this.formData = { ...this.formData, [field]: value }
   }
 
+  /** BOM 선택 변경 시 화주사/창고 자동 설정 및 VAS 유형 반영 */
   _onBomSelect(e) {
     const bomId = e.target.value
     this._updateField('vasBomId', bomId)
@@ -717,6 +731,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 다음 단계로 이동 - 필수 입력값 검증 후 BOM 구성 품목 조회 */
   _goToNextStep() {
     // 필수 입력값 검증
     const errors = this._validateStep1()
@@ -732,10 +747,12 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 이전 단계(1단계)로 돌아가기 */
   _goToPrevStep() {
     this.step = 1
   }
 
+  /** 취소 버튼 클릭 - popup-closed 이벤트 발행 후 팝업 닫기 */
   _onCancel() {
     this.dispatchEvent(
       new CustomEvent('popup-closed', {
@@ -747,6 +764,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     this._closePopup()
   }
 
+  /** 저장 버튼 클릭 - 작업 지시 생성 API 호출 후 order-created 이벤트 발행 */
   async _onSave() {
     if (this.saving) return
 
@@ -792,6 +810,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
    * 유틸리티
    * ============================================================ */
 
+  /** 1단계 필수 입력값 검증 (화주사, BOM, 요청일, 계획수량) */
   _validateStep1() {
     const errors = []
     if (!this.formData.comCd) errors.push('화주사를 입력해주세요.')
@@ -803,11 +822,13 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     return errors
   }
 
+  /** 오늘 날짜를 YYYY-MM-DD 형식 문자열로 반환 */
   _todayStr() {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
+  /** VAS 유형 코드를 한글 라벨로 변환 */
   _vasTypeLabel(type) {
     const labels = {
       SET_ASSEMBLY: '세트 구성',
@@ -819,6 +840,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     return labels[type] || type || '-'
   }
 
+  /** 알림 메시지 표시 (notify 커스텀 이벤트 발행) */
   _showNotification(message, type = 'info') {
     document.dispatchEvent(
       new CustomEvent('notify', {
@@ -827,6 +849,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     )
   }
 
+  /** 현재 팝업 닫기 */
   _closePopup() {
     UiUtil.closePopupBy(this)
   }

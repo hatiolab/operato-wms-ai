@@ -15,6 +15,7 @@ import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
  * - 알림 영역 (자재 부족, 작업 지연)
  */
 class VasWorkMonitor extends localize(i18next)(PageView) {
+  /** 컴포넌트 스타일 정의 */
   static get styles() {
     return [
       css`
@@ -513,6 +514,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     ]
   }
 
+  /** 컴포넌트 반응형 속성 정의 */
   static get properties() {
     return {
       loading: Boolean,
@@ -524,6 +526,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     }
   }
 
+  /** 생성자 - 초기 상태값 및 자동 새로고침 타이머 초기화 */
   constructor() {
     super()
     this.loading = true
@@ -535,12 +538,14 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     this._refreshTimer = null
   }
 
+  /** 페이지 컨텍스트 반환 - 브라우저 타이틀 등에 사용 */
   get context() {
     return {
       title: '유통가공 작업 진행 모니터링'
     }
   }
 
+  /** 화면 렌더링 - 헤더, 필터, 요약 칩, 작업 카드 목록, 알림 구성 */
   render() {
     return html`
       <!-- 페이지 헤더 -->
@@ -582,6 +587,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     `
   }
 
+  /** 상태 필터 바 렌더링 (전체/작업중/자재준비/승인됨) */
   _renderFilterBar() {
     return html`
       <div class="filter-bar">
@@ -604,6 +610,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     `
   }
 
+  /** 상태별 건수 요약 칩 렌더링 (클릭 시 필터 변경) */
   _renderSummaryBar() {
     const all = this.orders.length
     const inProgress = this.orders.filter(o => o.status === 'IN_PROGRESS').length
@@ -640,6 +647,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     `
   }
 
+  /** 개별 작업 주문 카드 렌더링 (진행률, 자재 상태, 지표, 액션 버튼) */
   _renderOrderCard(order) {
     const planQty = order.plan_qty || 0
     const completedQty = order.completed_qty || 0
@@ -739,6 +747,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     `
   }
 
+  /** 카드 하단 액션 버튼 렌더링 (상태에 따라 작업시작/완료/상세보기) */
   _renderCardActions(order) {
     const status = order.status
     const actions = []
@@ -768,6 +777,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     return actions
   }
 
+  /** 알림 영역 렌더링 (자재 부족, 작업 지연 등 경고 표시) */
   _renderAlerts() {
     return html`
       <div class="alerts-section">
@@ -784,6 +794,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     `
   }
 
+  /** 작업 목록이 비어있을 때 빈 상태 표시 */
   _renderEmptyState() {
     return html`
       <div class="empty-state">
@@ -798,11 +809,13 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
    * 생명주기
    * ============================================================ */
 
+  /** 현재 필터 조건에 맞는 주문 목록 반환 */
   get _filteredOrders() {
     if (this.statusFilter === 'ALL') return this.orders
     return this.orders.filter(o => o.status === this.statusFilter)
   }
 
+  /** 페이지 활성화 시 데이터 새로고침 및 자동 갱신 시작 */
   async pageUpdated(changes, lifecycle, before) {
     if (this.active) {
       await this._refresh()
@@ -810,6 +823,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     }
   }
 
+  /** 페이지 해제 시 자동 새로고침 타이머 정리 */
   pageDisposed(lifecycle) {
     this._stopAutoRefresh()
   }
@@ -818,6 +832,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
    * 데이터 조회
    * ============================================================ */
 
+  /** 모니터링 데이터 새로고침 (주문 목록 + 알림 동시 조회) */
   async _refresh() {
     try {
       this.loading = this.orders.length === 0
@@ -842,6 +857,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
    * 자동 새로고침
    * ============================================================ */
 
+  /** 10초 간격 자동 새로고침 타이머 시작 */
   _startAutoRefresh() {
     this._stopAutoRefresh()
     if (this.autoRefresh) {
@@ -851,6 +867,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     }
   }
 
+  /** 자동 새로고침 타이머 중지 */
   _stopAutoRefresh() {
     if (this._refreshTimer) {
       clearInterval(this._refreshTimer)
@@ -858,6 +875,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     }
   }
 
+  /** 자동 새로고침 토글 (켜기/끄기) */
   _toggleAutoRefresh() {
     this.autoRefresh = !this.autoRefresh
     if (this.autoRefresh) {
@@ -871,6 +889,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
    * 액션 핸들러
    * ============================================================ */
 
+  /** 작업 시작 API 호출 후 화면 갱신 */
   async _startWork(order) {
     try {
       await ServiceUtil.restPost(`vas_trx/vas_orders/${order.id}/start`)
@@ -880,6 +899,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     }
   }
 
+  /** 작업 완료 API 호출 후 화면 갱신 */
   async _completeWork(order) {
     try {
       await ServiceUtil.restPost(`vas_trx/vas_orders/${order.id}/complete`)
@@ -889,14 +909,16 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     }
   }
 
+  /** 주문 상세 페이지로 이동 (vas_no 기준) */
   _viewDetail(order) {
-    UiUtil.pageNavigate('vas-order-detail', { id: order.id, vasNo: order.vas_no })
+    UiUtil.pageNavigate('vas-orders', { vas_no: order.vas_no })
   }
 
   /* ============================================================
    * 유틸리티
    * ============================================================ */
 
+  /** VAS 유형 코드를 한글 라벨로 변환 */
   _vasTypeLabel(type) {
     const map = {
       SET_ASSEMBLY: '세트구성',
@@ -908,6 +930,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     return map[type] || type || '-'
   }
 
+  /** 주문 상태 코드를 한글 라벨로 변환 */
   _statusLabel(status) {
     const map = {
       PLAN: '계획',
@@ -921,6 +944,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     return map[status] || status || '-'
   }
 
+  /** 작업 시작 시각으로부터 경과 시간 계산 (예: "2h 30m") */
   _getElapsedTime(startedAt) {
     if (!startedAt) return null
     const start = new Date(startedAt)
@@ -936,6 +960,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     return `${minutes}m`
   }
 
+  /** 날짜 문자열을 HH:MM 시간 형식으로 변환 */
   _formatTime(dateStr) {
     if (!dateStr) return null
     const d = new Date(dateStr)
@@ -943,11 +968,13 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   }
 
+  /** 현재 시각을 HH:MM:SS 문자열로 반환 */
   _nowTimeStr() {
     const d = new Date()
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
   }
 
+  /** 알림 메시지 표시 (notify 커스텀 이벤트 발행) */
   _notify(message, type = 'info') {
     document.dispatchEvent(
       new CustomEvent('notify', {

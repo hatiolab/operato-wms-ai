@@ -12,7 +12,8 @@
 3. [UiUtil — 페이지 이동 및 UI 유틸리티](#3-uiutil--페이지-이동-및-ui-유틸리티)
 4. [openPopup — 팝업 열기](#4-openpopup--팝업-열기)
 5. [데이터 컨벤션 (snake_case)](#5-데이터-컨벤션-snake_case)
-6. [자주 하는 실수와 해결책](#6-자주-하는-실수와-해결책)
+6. [코딩 컨벤션 — 메소드 한글 주석](#6-코딩-컨벤션--메소드-한글-주석)
+7. [자주 하는 실수와 해결책](#7-자주-하는-실수와-해결책)
 
 ---
 
@@ -485,9 +486,103 @@ const requestBody = {
 
 ---
 
-## 6. 자주 하는 실수와 해결책
+## 6. 코딩 컨벤션 — 메소드 한글 주석
 
-### 6.1 fetch() 직접 사용
+### 필수 규칙
+
+**모든 메소드에는 반드시 한글 JSDoc 주석(`/** ... */`)을 작성해야 합니다.**
+
+이 규칙은 클래스 내 모든 메소드에 적용됩니다:
+- `static get` (styles, properties)
+- 생명주기 메소드 (constructor, connectedCallback, pageUpdated, pageDisposed)
+- render 메소드 및 부분 렌더링 메소드 (`_renderXxx`)
+- 데이터 조회 메소드 (`_fetchXxx`)
+- 이벤트 핸들러 (`_onXxx`, `_handleXxx`)
+- 유틸리티 메소드
+- getter / setter
+
+### 주석 형식
+
+```javascript
+/** 한 줄 설명 */
+메소드명() { ... }
+```
+
+- `/** */` (JSDoc 스타일) 사용 — `//` 한 줄 주석이 아닌 JSDoc 블록 주석 사용
+- 메소드 바로 위에 작성
+- 메소드가 **무엇을 하는지** 간결하게 설명 (구현 방법이 아닌 목적 위주)
+- 괄호 안에 부가 설명을 추가하면 가독성이 좋음
+
+### 올바른 예시
+
+```javascript
+class VasHome extends localize(i18next)(PageView) {
+  /** 컴포넌트 스타일 정의 */
+  static get styles() { ... }
+
+  /** 컴포넌트 반응형 속성 정의 */
+  static get properties() { ... }
+
+  /** 생성자 - 초기 상태값 설정 */
+  constructor() { ... }
+
+  /** 페이지 컨텍스트 반환 - 브라우저 타이틀 등에 사용 */
+  get context() { ... }
+
+  /** 화면 렌더링 - 로딩 상태이면 로딩 표시, 아니면 대시보드 전체 출력 */
+  render() { ... }
+
+  /** 페이지 활성화 시 대시보드 데이터 조회 */
+  async pageUpdated(changes, lifecycle, before) { ... }
+
+  /** 대시보드 데이터 일괄 조회 (상태별 건수, 유형별 통계, 알림) */
+  async _fetchDashboardData() { ... }
+
+  /** VAS 주문 상태별 건수 조회 (대기/승인/진행/완료) */
+  async _fetchStatusCounts() { ... }
+
+  /** Chart.js를 이용한 VAS 유형별 막대 차트 렌더링 */
+  _renderChart() { ... }
+
+  /** 작업 지시 생성 팝업 열기 */
+  _openOrderNewPopup() { ... }
+
+  /** 지정된 페이지로 이동 (필터 조건 포함 가능) */
+  _navigateTo(page, filter) { ... }
+
+  /** 페이지 해제 시 Chart 인스턴스 정리 */
+  pageDisposed(lifecycle) { ... }
+}
+```
+
+### 잘못된 예시
+
+```javascript
+// X — 주석 없음
+async _fetchData() { ... }
+
+// X — 영어 주석
+/** Fetch dashboard data */
+async _fetchDashboardData() { ... }
+
+// X — 한 줄 주석(//) 사용
+// 대시보드 데이터 조회
+async _fetchDashboardData() { ... }
+
+// X — 너무 장황한 설명
+/**
+ * 이 메소드는 백엔드 API를 호출하여 대시보드에 필요한
+ * 상태별 건수, 유형별 통계, 알림 데이터를 각각 조회한 후
+ * 컴포넌트 속성에 할당하고 차트를 렌더링합니다.
+ */
+async _fetchDashboardData() { ... }
+```
+
+---
+
+## 7. 자주 하는 실수와 해결책
+
+### 7.1 fetch() 직접 사용
 
 ```javascript
 // X — 인증 토큰이 포함되지 않아 401/403 에러 발생
@@ -497,7 +592,7 @@ const response = await fetch('/rest/vas_trx/dashboard/status-counts')
 const data = await ServiceUtil.restGet('vas_trx/dashboard/status-counts')
 ```
 
-### 6.2 history.pushState 직접 사용
+### 7.2 history.pushState 직접 사용
 
 ```javascript
 // X — Things Factory 라우터가 인식하지 못해 화면 전환 안됨
@@ -507,7 +602,7 @@ history.pushState(null, '', '/vas-orders')
 UiUtil.pageNavigate('vas-orders')
 ```
 
-### 6.3 URL에 /rest/ 접두사 포함
+### 7.3 URL에 /rest/ 접두사 포함
 
 ```javascript
 // X — /rest/가 중복 추가됨
@@ -517,7 +612,7 @@ await ServiceUtil.restGet('/rest/vas_trx/dashboard/alerts')
 await ServiceUtil.restGet('vas_trx/dashboard/alerts')
 ```
 
-### 6.4 백엔드 @RequestParam name 속성 누락
+### 7.4 백엔드 @RequestParam name 속성 누락
 
 Spring Boot에서 `-parameters` 컴파일러 플래그 없이 빌드하면 파라미터 이름을 추론할 수 없습니다.
 
@@ -533,7 +628,7 @@ public Map<String, Object> getDashboardStatusCounts(
     @RequestParam(name = "comCd", required = false) String comCd) { ... }
 ```
 
-### 6.5 팝업 닫기
+### 7.5 팝업 닫기
 
 ```javascript
 // X — 팝업이 닫히지 않음

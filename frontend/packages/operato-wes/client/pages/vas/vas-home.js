@@ -9,6 +9,7 @@ import Chart from 'chart.js/auto'
 import './vas-order-new-popup'
 
 class VasHome extends localize(i18next)(PageView) {
+  /** 컴포넌트 스타일 정의 */
   static get styles() {
     return [
       css`
@@ -198,6 +199,7 @@ class VasHome extends localize(i18next)(PageView) {
     ]
   }
 
+  /** 컴포넌트 반응형 속성 정의 */
   static get properties() {
     return {
       loading: Boolean,
@@ -207,6 +209,7 @@ class VasHome extends localize(i18next)(PageView) {
     }
   }
 
+  /** 생성자 - 초기 상태값 설정 */
   constructor() {
     super()
     this.loading = true
@@ -225,12 +228,14 @@ class VasHome extends localize(i18next)(PageView) {
     this.alerts = []
   }
 
+  /** 페이지 컨텍스트 반환 - 브라우저 타이틀 등에 사용 */
   get context() {
     return {
       title: `유통가공 대시보드`
     }
   }
 
+  /** 화면 렌더링 - 로딩 상태이면 로딩 표시, 아니면 대시보드 전체 출력 */
   render() {
     return html`
       ${this.loading
@@ -312,12 +317,14 @@ class VasHome extends localize(i18next)(PageView) {
     `
   }
 
+  /** 페이지 활성화 시 대시보드 데이터 조회 */
   async pageUpdated(changes, lifecycle, before) {
     if (this.active) {
       await this._fetchDashboardData()
     }
   }
 
+  /** 대시보드 데이터 일괄 조회 (상태별 건수, 유형별 통계, 알림) */
   async _fetchDashboardData() {
     try {
       this.loading = true
@@ -343,6 +350,7 @@ class VasHome extends localize(i18next)(PageView) {
     }
   }
 
+  /** VAS 주문 상태별 건수 조회 (대기/승인/진행/완료) */
   async _fetchStatusCounts() {
     try {
       const data = await ServiceUtil.restGet('vas_trx/dashboard/status-counts')
@@ -353,6 +361,7 @@ class VasHome extends localize(i18next)(PageView) {
     }
   }
 
+  /** VAS 유형별 통계 조회 (세트구성/해체/재포장/라벨링) */
   async _fetchTypeStats() {
     try {
       const data = await ServiceUtil.restGet('vas_trx/dashboard/type-stats')
@@ -363,6 +372,7 @@ class VasHome extends localize(i18next)(PageView) {
     }
   }
 
+  /** 대시보드 알림 데이터 조회 (자재 부족, 지연 등) */
   async _generateAlerts() {
     try {
       const data = await ServiceUtil.restGet('vas_trx/dashboard/alerts')
@@ -373,6 +383,7 @@ class VasHome extends localize(i18next)(PageView) {
     }
   }
 
+  /** Chart.js를 이용한 VAS 유형별 막대 차트 렌더링 */
   _renderChart() {
     const canvas = this.shadowRoot.querySelector('#typeChart')
     if (!canvas) return
@@ -429,6 +440,7 @@ class VasHome extends localize(i18next)(PageView) {
     })
   }
 
+  /** 작업 지시 생성 팝업 열기 */
   _openOrderNewPopup() {
     openPopup(
       html`<vas-order-new-popup
@@ -444,10 +456,12 @@ class VasHome extends localize(i18next)(PageView) {
     )
   }
 
+  /** 지정된 페이지로 이동 (필터 조건 포함 가능) */
   _navigateTo(page, filter) {
     UiUtil.pageNavigate(page, filter ? { status: filter } : null)
   }
 
+  /** 페이지 해제 시 Chart 인스턴스 정리 */
   pageDisposed(lifecycle) {
     // Chart 정리
     if (this._chart) {
