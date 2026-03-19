@@ -945,4 +945,103 @@ public class OutboundTransactionController extends AbstractRestService {
         this.printoutCtrl.showPdfByPrintTemplateName(req, res, template,
                 ValueUtil.newMap("releaseOrder", releaseOrder));
     }
+
+    /********************************************************************************************************
+     * 대 시 보 드   A P I
+     ********************************************************************************************************/
+
+    /**
+     * 대시보드 - 출고 상태별 건수 조회
+     *
+     * GET /rest/outbound_trx/dashboard/status-counts
+     *
+     * @param comCd      화주사 코드 (optional)
+     * @param whCd       창고 코드 (optional)
+     * @param targetDate 기준일 (optional, 기본값: 오늘)
+     * @return 상태별 건수 Map { status: count }
+     */
+    @RequestMapping(value = "/dashboard/status-counts", method = RequestMethod.GET, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Get Dashboard Status Counts")
+    public Map<String, Object> getDashboardStatusCounts(
+            @RequestParam(name = "com_cd", required = false) String comCd,
+            @RequestParam(name = "wh_cd", required = false) String whCd,
+            @RequestParam(name = "target_date", required = false) String targetDate) {
+        return this.outbTrxService.getDashboardStatusCounts(comCd, whCd, targetDate);
+    }
+
+    /**
+     * 대시보드 - 출고 유형별 통계 조회
+     *
+     * GET /rest/outbound_trx/dashboard/type-stats
+     *
+     * @param comCd     화주사 코드 (optional)
+     * @param whCd      창고 코드 (optional)
+     * @param startDate 시작일 (optional, 기본값: 오늘)
+     * @param endDate   종료일 (optional, 기본값: 오늘)
+     * @return 유형별 건수 Map { rlsType: count }
+     */
+    @RequestMapping(value = "/dashboard/type-stats", method = RequestMethod.GET, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Get Dashboard Type Statistics")
+    public Map<String, Object> getDashboardTypeStats(
+            @RequestParam(name = "com_cd", required = false) String comCd,
+            @RequestParam(name = "wh_cd", required = false) String whCd,
+            @RequestParam(name = "start_date", required = false) String startDate,
+            @RequestParam(name = "end_date", required = false) String endDate) {
+        return this.outbTrxService.getDashboardTypeStats(comCd, whCd, startDate, endDate);
+    }
+
+    /**
+     * 대시보드 - 피킹 통계 조회
+     *
+     * GET /rest/outbound_trx/dashboard/picking-stats
+     *
+     * @param comCd      화주사 코드 (optional)
+     * @param whCd       창고 코드 (optional)
+     * @param targetDate 기준일 (optional, 기본값: 오늘)
+     * @return 피킹 상태별 건수 Map { pickStatus: count }
+     */
+    @RequestMapping(value = "/dashboard/picking-stats", method = RequestMethod.GET, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Get Dashboard Picking Statistics")
+    public Map<String, Object> getDashboardPickingStats(
+            @RequestParam(name = "com_cd", required = false) String comCd,
+            @RequestParam(name = "wh_cd", required = false) String whCd,
+            @RequestParam(name = "target_date", required = false) String targetDate) {
+        return this.outbTrxService.getDashboardPickingStats(comCd, whCd, targetDate);
+    }
+
+    /**
+     * 대시보드 - 사업 유형별 통계 조회
+     *
+     * GET /rest/outbound_trx/dashboard/business-type-stats
+     *
+     * @param comCd      화주사 코드 (optional)
+     * @param whCd       창고 코드 (optional)
+     * @param targetDate 기준일 (optional, 기본값: 오늘)
+     * @return 사업 유형별 건수 Map { bizType: count }
+     */
+    @RequestMapping(value = "/dashboard/business-type-stats", method = RequestMethod.GET, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Get Dashboard Business Type Statistics")
+    public Map<String, Object> getDashboardBusinessTypeStats(
+            @RequestParam(name = "com_cd", required = false) String comCd,
+            @RequestParam(name = "wh_cd", required = false) String whCd,
+            @RequestParam(name = "target_date", required = false) String targetDate) {
+        return this.outbTrxService.getDashboardBusinessTypeStats(comCd, whCd, targetDate);
+    }
+
+    /**
+     * 대시보드 - 알림 데이터 조회
+     *
+     * GET /rest/outbound_trx/dashboard/alerts
+     *
+     * @param comCd 화주사 코드 (optional)
+     * @param whCd  창고 코드 (optional)
+     * @return 알림 목록 List<Map<String, Object>>
+     */
+    @RequestMapping(value = "/dashboard/alerts", method = RequestMethod.GET, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Get Dashboard Alerts")
+    public List<Map<String, Object>> getDashboardAlerts(
+            @RequestParam(name = "com_cd", required = false) String comCd,
+            @RequestParam(name = "wh_cd", required = false) String whCd) {
+        return this.outbTrxService.getDashboardAlerts(comCd, whCd);
+    }
 }

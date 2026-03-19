@@ -1358,4 +1358,300 @@ public class OutboundTransactionService extends AbstractQueryService {
         
         return templateName;
     }
+
+    /********************************************************************************************************
+     *                                        대 시 보 드   A P I
+     ********************************************************************************************************/
+
+    /**
+     * 대시보드 - 출고 상태별 건수 조회
+     *
+     * @param comCd 화주사 코드
+     * @param whCd 창고 코드
+     * @param targetDate 기준일 (기본값: 오늘)
+     * @return 상태별 건수 Map
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getDashboardStatusCounts(String comCd, String whCd, String targetDate) {
+        String date = ValueUtil.isNotEmpty(targetDate) ? targetDate : DateUtil.todayStr();
+        Long domainId = Domain.currentDomainId();
+
+        String sql = "SELECT status, COUNT(*) as count " +
+                "FROM release_orders " +
+                "WHERE domain_id = :domainId " +
+                "AND rls_ord_date = :targetDate ";
+
+        if (ValueUtil.isNotEmpty(comCd)) {
+            sql += "AND com_cd = :comCd ";
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            sql += "AND wh_cd = :whCd ";
+        }
+
+        sql += "GROUP BY status";
+
+        Map<String, Object> params = ValueUtil.newMap("domainId,targetDate", domainId, date);
+        if (ValueUtil.isNotEmpty(comCd)) {
+            params.put("comCd", comCd);
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            params.put("whCd", whCd);
+        }
+
+        List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+
+        // 결과를 Map으로 변환
+        Map<String, Object> statusCounts = ValueUtil.newMap(
+                "REG,READY,RUN,END",
+                0, 0, 0, 0
+        );
+
+        for (Map<String, Object> row : results) {
+            String status = ValueUtil.toString(row.get("status"));
+            Integer count = ValueUtil.toInteger(row.get("count"));
+            statusCounts.put(status, count);
+        }
+
+        return statusCounts;
+    }
+
+    /**
+     * 대시보드 - 출고 유형별 통계 조회
+     *
+     * @param comCd 화주사 코드
+     * @param whCd 창고 코드
+     * @param startDate 시작일 (기본값: 오늘)
+     * @param endDate 종료일 (기본값: 오늘)
+     * @return 유형별 건수 Map
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getDashboardTypeStats(String comCd, String whCd, String startDate, String endDate) {
+        String sDate = ValueUtil.isNotEmpty(startDate) ? startDate : DateUtil.todayStr();
+        String eDate = ValueUtil.isNotEmpty(endDate) ? endDate : DateUtil.todayStr();
+        Long domainId = Domain.currentDomainId();
+
+        String sql = "SELECT rls_type, COUNT(*) as count " +
+                "FROM release_orders " +
+                "WHERE domain_id = :domainId " +
+                "AND rls_ord_date BETWEEN :startDate AND :endDate ";
+
+        if (ValueUtil.isNotEmpty(comCd)) {
+            sql += "AND com_cd = :comCd ";
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            sql += "AND wh_cd = :whCd ";
+        }
+
+        sql += "GROUP BY rls_type";
+
+        Map<String, Object> params = ValueUtil.newMap("domainId,startDate,endDate", domainId, sDate, eDate);
+        if (ValueUtil.isNotEmpty(comCd)) {
+            params.put("comCd", comCd);
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            params.put("whCd", whCd);
+        }
+
+        List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+
+        // 결과를 Map으로 변환
+        Map<String, Object> typeStats = ValueUtil.newMap(
+                "NORMAL,RETURN,TRANSFER,SCRAP,ETC",
+                0, 0, 0, 0, 0
+        );
+
+        for (Map<String, Object> row : results) {
+            String rlsType = ValueUtil.toString(row.get("rls_type"));
+            Integer count = ValueUtil.toInteger(row.get("count"));
+            if (ValueUtil.isNotEmpty(rlsType)) {
+                typeStats.put(rlsType, count);
+            }
+        }
+
+        return typeStats;
+    }
+
+    /**
+     * 대시보드 - 피킹 통계 조회
+     *
+     * @param comCd 화주사 코드
+     * @param whCd 창고 코드
+     * @param targetDate 기준일 (기본값: 오늘)
+     * @return 피킹 상태별 건수 Map
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getDashboardPickingStats(String comCd, String whCd, String targetDate) {
+        String date = ValueUtil.isNotEmpty(targetDate) ? targetDate : DateUtil.todayStr();
+        Long domainId = Domain.currentDomainId();
+
+        String sql = "SELECT status, COUNT(*) as count " +
+                "FROM picking_orders " +
+                "WHERE domain_id = :domainId " +
+                "AND order_date = :targetDate ";
+
+        if (ValueUtil.isNotEmpty(comCd)) {
+            sql += "AND com_cd = :comCd ";
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            sql += "AND wh_cd = :whCd ";
+        }
+
+        sql += "GROUP BY status";
+
+        Map<String, Object> params = ValueUtil.newMap("domainId,targetDate", domainId, date);
+        if (ValueUtil.isNotEmpty(comCd)) {
+            params.put("comCd", comCd);
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            params.put("whCd", whCd);
+        }
+
+        List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+
+        // 결과를 Map으로 변환
+        Map<String, Object> pickingStats = ValueUtil.newMap(
+                "WAIT,RUN,END",
+                0, 0, 0
+        );
+
+        for (Map<String, Object> row : results) {
+            String status = ValueUtil.toString(row.get("status"));
+            Integer count = ValueUtil.toInteger(row.get("count"));
+            pickingStats.put(status, count);
+        }
+
+        return pickingStats;
+    }
+
+    /**
+     * 대시보드 - 사업 유형별 통계 조회
+     *
+     * @param comCd 화주사 코드
+     * @param whCd 창고 코드
+     * @param targetDate 기준일 (기본값: 오늘)
+     * @return 사업 유형별 건수 Map
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getDashboardBusinessTypeStats(String comCd, String whCd, String targetDate) {
+        String date = ValueUtil.isNotEmpty(targetDate) ? targetDate : DateUtil.todayStr();
+        Long domainId = Domain.currentDomainId();
+
+        String sql = "SELECT biz_type, COUNT(*) as count " +
+                "FROM release_orders " +
+                "WHERE domain_id = :domainId " +
+                "AND rls_ord_date = :targetDate ";
+
+        if (ValueUtil.isNotEmpty(comCd)) {
+            sql += "AND com_cd = :comCd ";
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            sql += "AND wh_cd = :whCd ";
+        }
+
+        sql += "GROUP BY biz_type";
+
+        Map<String, Object> params = ValueUtil.newMap("domainId,targetDate", domainId, date);
+        if (ValueUtil.isNotEmpty(comCd)) {
+            params.put("comCd", comCd);
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            params.put("whCd", whCd);
+        }
+
+        List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+
+        // 결과를 Map으로 변환
+        Map<String, Object> bizTypeStats = ValueUtil.newMap(
+                "B2B,B2C",
+                0, 0
+        );
+
+        for (Map<String, Object> row : results) {
+            String bizType = ValueUtil.toString(row.get("biz_type"));
+            Integer count = ValueUtil.toInteger(row.get("count"));
+            if (ValueUtil.isNotEmpty(bizType)) {
+                // biz_type 값이 'B2B_OUT' 또는 'B2C_OUT' 형태일 수 있으므로 변환
+                if (bizType.contains("B2B")) {
+                    bizTypeStats.put("B2B", count);
+                } else if (bizType.contains("B2C")) {
+                    bizTypeStats.put("B2C", count);
+                }
+            }
+        }
+
+        return bizTypeStats;
+    }
+
+    /**
+     * 대시보드 - 알림 데이터 조회
+     *
+     * @param comCd 화주사 코드
+     * @param whCd 창고 코드
+     * @return 알림 목록
+     */
+    public List<Map<String, Object>> getDashboardAlerts(String comCd, String whCd) {
+        Long domainId = Domain.currentDomainId();
+        String today = DateUtil.todayStr();
+        List<Map<String, Object>> alerts = new ArrayList<>();
+
+        // 1. 지연 출고 건수 조회 (출고 예정일이 지났는데 아직 RUN 상태인 건)
+        String delaySql = "SELECT COUNT(*) as count " +
+                "FROM release_orders " +
+                "WHERE domain_id = :domainId " +
+                "AND status IN ('REG', 'READY', 'RUN') " +
+                "AND rls_ord_date < :today ";
+
+        if (ValueUtil.isNotEmpty(comCd)) {
+            delaySql += "AND com_cd = :comCd ";
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            delaySql += "AND wh_cd = :whCd ";
+        }
+
+        Map<String, Object> params = ValueUtil.newMap("domainId,today", domainId, today);
+        if (ValueUtil.isNotEmpty(comCd)) {
+            params.put("comCd", comCd);
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            params.put("whCd", whCd);
+        }
+
+        int delayCount = this.queryManager.selectBySql(delaySql, params, Integer.class);
+        if (delayCount > 0) {
+            Map<String, Object> alert = ValueUtil.newMap(
+                    "type,icon,message",
+                    "warning",
+                    "⚠️",
+                    "지연 출고 " + delayCount + "건이 있습니다."
+            );
+            alerts.add(alert);
+        }
+
+        // 2. 피킹 대기 건수 조회
+        String pickWaitSql = "SELECT COUNT(*) as count " +
+                "FROM picking_orders " +
+                "WHERE domain_id = :domainId " +
+                "AND status = 'WAIT' " +
+                "AND order_date = :today ";
+
+        if (ValueUtil.isNotEmpty(comCd)) {
+            pickWaitSql += "AND com_cd = :comCd ";
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            pickWaitSql += "AND wh_cd = :whCd ";
+        }
+
+        int pickWaitCount = this.queryManager.selectBySql(pickWaitSql, params, Integer.class);
+        if (pickWaitCount > 0) {
+            Map<String, Object> alert = ValueUtil.newMap(
+                    "type,icon,message",
+                    "info",
+                    "📦",
+                    "피킹 대기 " + pickWaitCount + "건이 있습니다."
+            );
+            alerts.add(alert);
+        }
+
+        return alerts;
+    }
 }
