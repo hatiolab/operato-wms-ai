@@ -197,4 +197,41 @@ export class ValueUtil {
     });
     return arr;
   }
+
+  /**
+   * @description 오늘 날짜를 지정한 포맷 문자열로 반환
+   ***************************************************
+   * @param {String} format 날짜 포맷 (예: 'YYYY-MM-DD', 'YYYY/MM/DD', 'YYYYMMDD', 'MM-DD-YYYY')
+   * @returns {String} 포맷된 오늘 날짜 문자열
+   */
+  static todayFormatted(format = 'YYYY-MM-DD') {
+    return ValueUtil.formatDate(new Date(), format)
+  }
+
+  /**
+   * @description 입력 날짜를 지정한 포맷 문자열로 반환
+   ***************************************************
+   * @param {Date|String|Number} date 날짜 (Date 객체, ISO 문자열, timestamp)
+   * @param {String} format 날짜 포맷 (예: 'YYYY-MM-DD', 'YYYY/MM/DD HH:mm:ss')
+   * @returns {String} 포맷된 날짜 문자열
+   */
+  static formatDate(date, format = 'YYYY-MM-DD') {
+    const d = date instanceof Date ? date : new Date(date)
+    if (isNaN(d.getTime())) return ''
+
+    const yyyy = String(d.getFullYear())
+    const MM = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    const HH = String(d.getHours()).padStart(2, '0')
+    const mm = String(d.getMinutes()).padStart(2, '0')
+    const ss = String(d.getSeconds()).padStart(2, '0')
+
+    return format
+      .replace('YYYY', yyyy)
+      .replace('MM', MM)
+      .replace('DD', dd)
+      .replace('HH', HH)
+      .replace('mm', mm)
+      .replace('ss', ss)
+  }
 }

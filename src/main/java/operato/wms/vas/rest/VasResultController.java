@@ -27,61 +27,60 @@ import xyz.elidom.dbist.dml.Page;
 @Transactional
 @ResponseStatus(HttpStatus.OK)
 @RequestMapping("/rest/vas_results")
-@ServiceDesc(description="VasResult Service API")
+@ServiceDesc(description = "VasResult Service API")
 public class VasResultController extends AbstractRestService {
 
 	@Override
 	protected Class<?> entityClass() {
 		return VasResult.class;
 	}
-  
-	@GetMapping(produces=MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description="Search (Pagination) By Search Conditions")  
+
+	@GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Search (Pagination) By Search Conditions")
 	public Page<?> index(
-		@RequestParam(name="page", required=false) Integer page, 
-		@RequestParam(name="limit", required=false) Integer limit, 
-		@RequestParam(name="select", required=false) String select, 
-		@RequestParam(name="sort", required=false) String sort,
-		@RequestParam(name="query", required=false) String query) {   
+			@RequestParam(name = "page", required = false) Integer page,
+			@RequestParam(name = "limit", required = false) Integer limit,
+			@RequestParam(name = "select", required = false) String select,
+			@RequestParam(name = "sort", required = false) String sort,
+			@RequestParam(name = "query", required = false) String query) {
 		return this.search(this.entityClass(), page, limit, select, sort, query);
 	}
 
-	@GetMapping(value="/{id}", produces=MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description="Find one by ID")
+	@GetMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Find one by ID")
 	public VasResult findOne(@PathVariable("id") String id) {
 		return this.getOne(this.entityClass(), id);
 	}
 
-	@GetMapping(value="/{id}/exist", produces=MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description="Check exists By ID")
+	@GetMapping(value = "/{id}/exist", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Check exists By ID")
 	public Boolean isExist(@PathVariable("id") String id) {
 		return this.isExistOne(this.entityClass(), id);
 	}
 
-	@PostMapping(consumes=MediaType.APPLICATION_JSON_VALUE, produces=MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseStatus(HttpStatus.CREATED)
-	@ApiDesc(description="Create")
+	@ApiDesc(description = "Create")
 	public VasResult create(@RequestBody VasResult input) {
 		return this.createOne(input);
 	}
 
-	@PutMapping(value="/{id}", consumes=MediaType.APPLICATION_JSON_VALUE, produces=MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description="Update")
+	@PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Update")
 	public VasResult update(@PathVariable("id") String id, @RequestBody VasResult input) {
 		return this.updateOne(input);
 	}
-  
-	@DeleteMapping(value="/{id}", produces=MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description="Delete")
+
+	@DeleteMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Delete")
 	public void delete(@PathVariable("id") String id) {
 		this.deleteOne(this.entityClass(), id);
-	}  
-  
-	@PostMapping(value="/update_multiple", consumes=MediaType.APPLICATION_JSON_VALUE, produces=MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description="Create, Update or Delete multiple at one time")
+	}
+
+	@PostMapping(value = "/update_multiple", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Create, Update or Delete multiple at one time")
 	public Boolean multipleUpdate(@RequestBody List<VasResult> list) {
 		return this.cudMultipleData(this.entityClass(), list);
 	}
 
-  
 }

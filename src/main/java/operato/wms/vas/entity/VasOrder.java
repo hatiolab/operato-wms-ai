@@ -1,11 +1,16 @@
 package operato.wms.vas.entity;
 
+import java.util.HashMap;
+
 import operato.wms.vas.WmsVasConstants;
+import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
 import xyz.elidom.dbist.annotation.Index;
 import xyz.elidom.dbist.annotation.PrimaryKey;
 import xyz.elidom.dbist.annotation.Table;
+import xyz.elidom.sys.entity.Domain;
+import xyz.elidom.util.BeanUtil;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -14,7 +19,8 @@ import xyz.elidom.util.ValueUtil;
  *
  * 유통가공 작업 지시의 헤더 정보를 관리
  * - 유통가공 유형: SET_ASSEMBLY, DISASSEMBLY, REPACK, LABEL, CUSTOM
- * - 상태: PLAN, APPROVED, MATERIAL_READY, IN_PROGRESS, COMPLETED, CLOSED, CANCELLED
+ * - 상태: PLAN, APPROVED, MATERIAL_READY, IN_PROGRESS, COMPLETED, CLOSED,
+ * CANCELLED
  */
 @Table(name = "vas_orders", idStrategy = GenerationRule.UUID, uniqueFields = "vasNo,domainId", indexes = {
 		@Index(name = "ix_vas_orders_0", columnList = "vas_no,domain_id", unique = true),
@@ -447,9 +453,8 @@ public class VasOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 		// 유통가공 번호 자동 채번 (VAS-YYYYMMDD-XXXXX)
 		if (ValueUtil.isEmpty(this.vasNo)) {
-			String dateStr = DateUtil.todayStr("yyyyMMdd");
-			// TODO: 일련번호 채번 서비스 구현 필요
-			this.vasNo = this.vasReqNo;
+			this.vasNo = (String) BeanUtil.get(ICustomService.class).doCustomService(Domain.currentDomainId(),
+					"diy-generate-vas-no", new HashMap<String, Object>());
 		}
 
 		// 요청 일자가 없는 경우 당일 날짜 설정

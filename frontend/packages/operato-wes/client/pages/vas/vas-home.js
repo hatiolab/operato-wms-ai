@@ -3,7 +3,7 @@ import { css, html } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
 import { openPopup } from '@operato/layout'
-import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, UiUtil, ValueUtil } from '@operato-app/metapage/dist-client'
 import Chart from 'chart.js/auto'
 
 import './vas-order-new-popup'
@@ -246,17 +246,17 @@ class VasHome extends localize(i18next)(PageView) {
               <section>
                 <h3 class="section-title">📊 오늘의 작업 현황</h3>
                 <div class="status-cards">
-                  <div class="status-card plan" @click="${() => this._navigateTo('vas-orders', 'PLAN')}">
+                  <div class="status-card plan" @click="${() => this._navigateTo('vas-orders', { status: 'PLAN', vas_req_date: ValueUtil.todayFormatted() })}">
                     <div class="label">대기중</div>
                     <div class="count">${this.statusCounts.PLAN || 0}</div>
                     <div class="subtitle">승인 대기</div>
                   </div>
-                  <div class="status-card approved" @click="${() => this._navigateTo('vas-orders', 'APPROVED')}">
+                  <div class="status-card approved" @click="${() => this._navigateTo('vas-orders', { status: 'APPROVED', vas_req_date: ValueUtil.todayFormatted() })}">
                     <div class="label">승인완료</div>
                     <div class="count">${this.statusCounts.APPROVED || 0}</div>
                     <div class="subtitle">작업 대기</div>
                   </div>
-                  <div class="status-card in-progress" @click="${() => this._navigateTo('vas-work-monitor')}">
+                  <div class="status-card in-progress" @click="${() => this._navigateTo('vas-work-monitor', { status: 'IN_PROGRESS', vas_req_date: ValueUtil.todayFormatted() })}">
                     <div class="label">작업중</div>
                     <div class="count">${this.statusCounts.IN_PROGRESS || 0}</div>
                     <div class="subtitle">진행 중</div>
@@ -301,7 +301,7 @@ class VasHome extends localize(i18next)(PageView) {
                   <button class="quick-action-btn" @click="${this._openOrderNewPopup}">
                     <span class="icon">📝</span>작업 지시 생성
                   </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('vas-work-monitor')}">
+                  <button class="quick-action-btn" @click="${() => this._navigateTo('vas-work-monitor', { status: 'IN_PROGRESS', vas_req_date: ValueUtil.todayFormatted() })}">
                     <span class="icon">📊</span>작업 진행 현황
                   </button>
                   <button class="quick-action-btn" @click="${() => this._navigateTo('vas-results')}">
@@ -458,7 +458,7 @@ class VasHome extends localize(i18next)(PageView) {
 
   /** 지정된 페이지로 이동 (필터 조건 포함 가능) */
   _navigateTo(page, filter) {
-    UiUtil.pageNavigate(page, filter ? { status: filter } : null)
+    UiUtil.pageNavigate(page, filter ? filter : {})
   }
 
   /** 페이지 해제 시 Chart 인스턴스 정리 */

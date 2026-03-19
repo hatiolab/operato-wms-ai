@@ -42,6 +42,12 @@ public class VasResult extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String vasOrderId;
 
 	/**
+	 * 유통가공 작업 지시 번호 (vas_orders.vas_no 참조)
+	 */
+	@Column(name = "vas_no", length = 30)
+	private String vasNo;
+
+	/**
 	 * 실적 순번 (자동 채번)
 	 */
 	@Column(name = "result_seq", nullable = false)
@@ -134,6 +140,14 @@ public class VasResult extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setVasOrderId(String vasOrderId) {
 		this.vasOrderId = vasOrderId;
+	}
+
+	public String getVasNo() {
+		return vasNo;
+	}
+
+	public void setVasNo(String vasNo) {
+		this.vasNo = vasNo;
 	}
 
 	public Integer getResultSeq() {

@@ -73,11 +73,11 @@ public class VasTransactionService extends AbstractQueryService {
 			String today = DateUtil.todayStr();
 			if (ValueUtil.isNotEmpty(bom.getValidFrom()) && today.compareTo(bom.getValidFrom()) < 0) {
 				throw ThrowUtil.newValidationErrorWithNoLog(
-					"BOM 유효 시작일 이전입니다. 유효 시작일: " + bom.getValidFrom());
+						"BOM 유효 시작일 이전입니다. 유효 시작일: " + bom.getValidFrom());
 			}
 			if (ValueUtil.isNotEmpty(bom.getValidTo()) && today.compareTo(bom.getValidTo()) > 0) {
 				throw ThrowUtil.newValidationErrorWithNoLog(
-					"BOM 유효 종료일 이후입니다. 유효 종료일: " + bom.getValidTo());
+						"BOM 유효 종료일 이후입니다. 유효 종료일: " + bom.getValidTo());
 			}
 
 			// 세트 상품 코드 설정
@@ -124,7 +124,7 @@ public class VasTransactionService extends AbstractQueryService {
 
 		if (bomItems.isEmpty()) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"BOM에 구성 품목이 없습니다. BOM ID: " + vasOrder.getVasBomId());
+					"BOM에 구성 품목이 없습니다. BOM ID: " + vasOrder.getVasBomId());
 		}
 
 		for (VasBomItem bomItem : bomItems) {
@@ -159,7 +159,7 @@ public class VasTransactionService extends AbstractQueryService {
 		// 2. 상태 검증
 		if (!WmsVasConstants.STATUS_PLAN.equals(vasOrder.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"승인 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
+					"승인 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
 		}
 
 		// 3. 승인 처리
@@ -175,7 +175,7 @@ public class VasTransactionService extends AbstractQueryService {
 	/**
 	 * 작업 지시 취소
 	 *
-	 * @param vasOrderId 작업 지시 ID
+	 * @param vasOrderId   작업 지시 ID
 	 * @param cancelReason 취소 사유
 	 * @return 취소된 작업 지시
 	 */
@@ -189,9 +189,9 @@ public class VasTransactionService extends AbstractQueryService {
 
 		// 2. 상태 검증 (승인 전까지만 취소 가능)
 		if (!WmsVasConstants.STATUS_PLAN.equals(vasOrder.getStatus()) &&
-			!WmsVasConstants.STATUS_APPROVED.equals(vasOrder.getStatus())) {
+				!WmsVasConstants.STATUS_APPROVED.equals(vasOrder.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"취소 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
+					"취소 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
 		}
 
 		// 3. 취소 처리
@@ -202,10 +202,10 @@ public class VasTransactionService extends AbstractQueryService {
 
 		// 4. 상세 항목 상태 업데이트
 		String sql = "UPDATE vas_order_items SET status = :status " +
-					 "WHERE vas_order_id = :vasOrderId AND domain_id = :domainId";
+				"WHERE vas_order_id = :vasOrderId AND domain_id = :domainId";
 		this.queryManager.executeBySql(sql, ValueUtil.newMap(
-			"status,vasOrderId,domainId",
-			WmsVasConstants.ITEM_STATUS_COMPLETED, vasOrderId, vasOrder.getDomainId()));
+				"status,vasOrderId,domainId",
+				WmsVasConstants.ITEM_STATUS_COMPLETED, vasOrderId, vasOrder.getDomainId()));
 
 		return vasOrder;
 	}
@@ -218,14 +218,14 @@ public class VasTransactionService extends AbstractQueryService {
 	 * 자재 배정
 	 *
 	 * @param vasOrderItemId 작업 지시 상세 ID
-	 * @param allocQty 배정 수량
-	 * @param srcLocCd 피킹 로케이션
-	 * @param lotNo 로트 번호
+	 * @param allocQty       배정 수량
+	 * @param srcLocCd       피킹 로케이션
+	 * @param lotNo          로트 번호
 	 * @return 업데이트된 작업 지시 상세
 	 */
 	@Transactional
 	public VasOrderItem allocateMaterial(String vasOrderItemId, Double allocQty,
-										  String srcLocCd, String lotNo) {
+			String srcLocCd, String lotNo) {
 		// 1. 작업 지시 상세 조회
 		VasOrderItem item = this.queryManager.select(VasOrderItem.class, vasOrderItemId);
 		if (item == null) {
@@ -234,15 +234,15 @@ public class VasTransactionService extends AbstractQueryService {
 
 		// 2. 상태 검증
 		if (!WmsVasConstants.ITEM_STATUS_PLANNED.equals(item.getStatus()) &&
-			!WmsVasConstants.ITEM_STATUS_ALLOCATED.equals(item.getStatus())) {
+				!WmsVasConstants.ITEM_STATUS_ALLOCATED.equals(item.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"배정 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
+					"배정 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
 		}
 
 		// 3. 수량 검증
 		if (allocQty > item.getReqQty()) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"배정 수량이 소요 수량을 초과합니다. 소요: " + item.getReqQty() + ", 배정: " + allocQty);
+					"배정 수량이 소요 수량을 초과합니다. 소요: " + item.getReqQty() + ", 배정: " + allocQty);
 		}
 
 		// 4. 배정 처리
@@ -260,7 +260,7 @@ public class VasTransactionService extends AbstractQueryService {
 	 * 자재 피킹 처리
 	 *
 	 * @param vasOrderItemId 작업 지시 상세 ID
-	 * @param pickedQty 피킹 수량
+	 * @param pickedQty      피킹 수량
 	 * @return 업데이트된 작업 지시 상세
 	 */
 	@Transactional
@@ -273,15 +273,15 @@ public class VasTransactionService extends AbstractQueryService {
 
 		// 2. 상태 검증
 		if (!WmsVasConstants.ITEM_STATUS_ALLOCATED.equals(item.getStatus()) &&
-			!WmsVasConstants.ITEM_STATUS_PICKING.equals(item.getStatus())) {
+				!WmsVasConstants.ITEM_STATUS_PICKING.equals(item.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"피킹 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
+					"피킹 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
 		}
 
 		// 3. 수량 검증
 		if (pickedQty > item.getAllocQty()) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"피킹 수량이 배정 수량을 초과합니다. 배정: " + item.getAllocQty() + ", 피킹: " + pickedQty);
+					"피킹 수량이 배정 수량을 초과합니다. 배정: " + item.getAllocQty() + ", 피킹: " + pickedQty);
 		}
 
 		// 4. 피킹 처리
@@ -304,7 +304,7 @@ public class VasTransactionService extends AbstractQueryService {
 	 * 작업 시작
 	 *
 	 * @param vasOrderId 작업 지시 ID
-	 * @param workerId 작업자 ID
+	 * @param workerId   작업자 ID
 	 * @return 작업 시작된 작업 지시
 	 */
 	@Transactional
@@ -318,7 +318,7 @@ public class VasTransactionService extends AbstractQueryService {
 		// 2. 상태 검증
 		if (!WmsVasConstants.STATUS_MATERIAL_READY.equals(vasOrder.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"작업 시작 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
+					"작업 시작 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
 		}
 
 		// 3. 작업 시작 처리
@@ -330,12 +330,12 @@ public class VasTransactionService extends AbstractQueryService {
 
 		// 4. 상세 항목 상태 업데이트
 		String sql = "UPDATE vas_order_items SET status = :status " +
-					 "WHERE vas_order_id = :vasOrderId AND domain_id = :domainId " +
-					 "AND status = :prevStatus";
+				"WHERE vas_order_id = :vasOrderId AND domain_id = :domainId " +
+				"AND status = :prevStatus";
 		this.queryManager.executeBySql(sql, ValueUtil.newMap(
-			"status,vasOrderId,domainId,prevStatus",
-			WmsVasConstants.ITEM_STATUS_IN_USE, vasOrderId, vasOrder.getDomainId(),
-			WmsVasConstants.ITEM_STATUS_PICKED));
+				"status,vasOrderId,domainId,prevStatus",
+				WmsVasConstants.ITEM_STATUS_IN_USE, vasOrderId, vasOrder.getDomainId(),
+				WmsVasConstants.ITEM_STATUS_PICKED));
 
 		return vasOrder;
 	}
@@ -348,7 +348,7 @@ public class VasTransactionService extends AbstractQueryService {
 	 * 실적 등록
 	 *
 	 * @param vasOrderId 작업 지시 ID
-	 * @param result 실적 정보
+	 * @param result     실적 정보
 	 * @return 생성된 실적
 	 */
 	@Transactional
@@ -362,12 +362,21 @@ public class VasTransactionService extends AbstractQueryService {
 		// 2. 상태 검증
 		if (!WmsVasConstants.STATUS_IN_PROGRESS.equals(vasOrder.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"실적 등록 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
+					"실적 등록 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
 		}
 
 		// 3. 실적 기록 생성
 		result.setVasOrderId(vasOrderId);
+		result.setVasNo(vasOrder.getVasNo());
+		result.setResultType(vasOrder.getVasType());
 		result.setDomainId(vasOrder.getDomainId());
+
+		String setBomId = vasOrder.getVasBomId();
+		if (ValueUtil.isNotEmpty(setBomId)) {
+			VasBom vasBom = this.queryManager.select(VasBom.class, setBomId);
+			result.setSetSkuCd(vasBom.getSetSkuCd());
+			result.setSetSkuNm(vasBom.getSetSkuNm());
+		}
 
 		if (ValueUtil.isEmpty(result.getWorkedAt())) {
 			result.setWorkedAt(new Date());
@@ -407,14 +416,14 @@ public class VasTransactionService extends AbstractQueryService {
 		// 2. 상태 검증
 		if (!WmsVasConstants.STATUS_IN_PROGRESS.equals(vasOrder.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"완료 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
+					"완료 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
 		}
 
 		// 3. 실적 수량 검증 (선택적)
 		if (vasOrder.getCompletedQty() < vasOrder.getPlanQty()) {
 			// 경고만 출력 (부분 완료 허용)
 			this.logger.warn("완성 수량이 계획 수량보다 적습니다. 계획: {}, 완성: {}",
-				vasOrder.getPlanQty(), vasOrder.getCompletedQty());
+					vasOrder.getPlanQty(), vasOrder.getCompletedQty());
 		}
 
 		// 4. 완료 처리
@@ -426,10 +435,10 @@ public class VasTransactionService extends AbstractQueryService {
 
 		// 5. 상세 항목 상태 업데이트
 		String sql = "UPDATE vas_order_items SET status = :status " +
-					 "WHERE vas_order_id = :vasOrderId AND domain_id = :domainId";
+				"WHERE vas_order_id = :vasOrderId AND domain_id = :domainId";
 		this.queryManager.executeBySql(sql, ValueUtil.newMap(
-			"status,vasOrderId,domainId",
-			WmsVasConstants.ITEM_STATUS_COMPLETED, vasOrderId, vasOrder.getDomainId()));
+				"status,vasOrderId,domainId",
+				WmsVasConstants.ITEM_STATUS_COMPLETED, vasOrderId, vasOrder.getDomainId()));
 
 		return vasOrder;
 	}
@@ -451,7 +460,7 @@ public class VasTransactionService extends AbstractQueryService {
 		// 2. 상태 검증
 		if (!WmsVasConstants.STATUS_COMPLETED.equals(vasOrder.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				"마감 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
+					"마감 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
 		}
 
 		// 3. 마감 처리
@@ -468,15 +477,15 @@ public class VasTransactionService extends AbstractQueryService {
 	/**
 	 * 작업 지시 목록 조회
 	 *
-	 * @param comCd 화주사 코드
-	 * @param status 상태
-	 * @param vasType 유통가공 유형
+	 * @param comCd     화주사 코드
+	 * @param status    상태
+	 * @param vasType   유통가공 유형
 	 * @param startDate 시작일
-	 * @param endDate 종료일
+	 * @param endDate   종료일
 	 * @return 작업 지시 목록
 	 */
 	public List<VasOrder> listVasOrders(String comCd, String status, String vasType,
-										 String startDate, String endDate) {
+			String startDate, String endDate) {
 		Query query = new Query();
 		query.addFilter("domainId", Domain.currentDomainId());
 
@@ -569,10 +578,10 @@ public class VasTransactionService extends AbstractQueryService {
 
 		// SET_ASSEMBLY, DISASSEMBLY 유형은 BOM 필수
 		if ((WmsVasConstants.VAS_TYPE_SET_ASSEMBLY.equals(vasOrder.getVasType()) ||
-			 WmsVasConstants.VAS_TYPE_DISASSEMBLY.equals(vasOrder.getVasType())) &&
-			ValueUtil.isEmpty(vasOrder.getVasBomId())) {
+				WmsVasConstants.VAS_TYPE_DISASSEMBLY.equals(vasOrder.getVasType())) &&
+				ValueUtil.isEmpty(vasOrder.getVasBomId())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
-				vasOrder.getVasType() + " 유형은 BOM이 필수입니다.");
+					vasOrder.getVasType() + " 유형은 BOM이 필수입니다.");
 		}
 	}
 
@@ -592,13 +601,14 @@ public class VasTransactionService extends AbstractQueryService {
 
 		// 2. 상세 항목 상태 집계
 		String sql = "SELECT status, COUNT(*) as cnt FROM vas_order_items " +
-					 "WHERE vas_order_id = :vasOrderId AND domain_id = :domainId " +
-					 "GROUP BY status";
+				"WHERE vas_order_id = :vasOrderId AND domain_id = :domainId " +
+				"GROUP BY status";
 
 		@SuppressWarnings("unchecked")
-		List<Map<String, Object>> statusCounts = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql,
-			ValueUtil.newMap("vasOrderId,domainId", vasOrderId, vasOrder.getDomainId()),
-			Map.class, 0, 0);
+		List<Map<String, Object>> statusCounts = (List<Map<String, Object>>) (List<?>) this.queryManager
+				.selectListBySql(sql,
+						ValueUtil.newMap("vasOrderId,domainId", vasOrderId, vasOrder.getDomainId()),
+						Map.class, 0, 0);
 
 		if (statusCounts.isEmpty()) {
 			return;
@@ -642,37 +652,36 @@ public class VasTransactionService extends AbstractQueryService {
 	public List<Map<String, Object>> getMonitorOrders(List<String> statuses) {
 		if (statuses == null || statuses.isEmpty()) {
 			statuses = java.util.Arrays.asList(
-				WmsVasConstants.STATUS_IN_PROGRESS,
-				WmsVasConstants.STATUS_APPROVED,
-				WmsVasConstants.STATUS_MATERIAL_READY
-			);
+					WmsVasConstants.STATUS_IN_PROGRESS,
+					WmsVasConstants.STATUS_APPROVED,
+					WmsVasConstants.STATUS_MATERIAL_READY);
 		}
 
 		String sql = "SELECT vo.id, vo.vas_no, vo.vas_type, vo.status, " +
-					 "vo.plan_qty, vo.completed_qty, vo.com_cd, vo.wh_cd, " +
-					 "vo.worker_id, vo.priority, vo.work_loc_cd, " +
-					 "vo.started_at, vo.approved_at, vo.vas_req_date, " +
-					 "vo.attr01 as set_sku_cd, vo.remarks, " +
-					 "COALESCE(mi.total_items, 0) as total_items, " +
-					 "COALESCE(mi.picked_items, 0) as picked_items, " +
-					 "COALESCE(mi.total_req_qty, 0) as total_req_qty, " +
-					 "COALESCE(mi.total_picked_qty, 0) as total_picked_qty " +
-					 "FROM vas_orders vo " +
-					 "LEFT JOIN ( " +
-					 "  SELECT vas_order_id, " +
-					 "    COUNT(*) as total_items, " +
-					 "    SUM(CASE WHEN status IN ('PICKED','IN_USE','COMPLETED') THEN 1 ELSE 0 END) as picked_items, " +
-					 "    SUM(COALESCE(req_qty, 0)) as total_req_qty, " +
-					 "    SUM(COALESCE(picked_qty, 0)) as total_picked_qty " +
-					 "  FROM vas_order_items " +
-					 "  WHERE domain_id = :domainId " +
-					 "  GROUP BY vas_order_id " +
-					 ") mi ON vo.id = mi.vas_order_id " +
-					 "WHERE vo.domain_id = :domainId " +
-					 "AND vo.status IN (:statuses) " +
-					 "ORDER BY " +
-					 "  CASE vo.priority WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END, " +
-					 "  vo.started_at DESC NULLS LAST, vo.approved_at DESC NULLS LAST";
+				"vo.plan_qty, vo.completed_qty, vo.com_cd, vo.wh_cd, " +
+				"vo.worker_id, vo.priority, vo.work_loc_cd, " +
+				"vo.started_at, vo.approved_at, vo.vas_req_date, " +
+				"vo.attr01 as set_sku_cd, vo.remarks, " +
+				"COALESCE(mi.total_items, 0) as total_items, " +
+				"COALESCE(mi.picked_items, 0) as picked_items, " +
+				"COALESCE(mi.total_req_qty, 0) as total_req_qty, " +
+				"COALESCE(mi.total_picked_qty, 0) as total_picked_qty " +
+				"FROM vas_orders vo " +
+				"LEFT JOIN ( " +
+				"  SELECT vas_order_id, " +
+				"    COUNT(*) as total_items, " +
+				"    SUM(CASE WHEN status IN ('PICKED','IN_USE','COMPLETED') THEN 1 ELSE 0 END) as picked_items, " +
+				"    SUM(COALESCE(req_qty, 0)) as total_req_qty, " +
+				"    SUM(COALESCE(picked_qty, 0)) as total_picked_qty " +
+				"  FROM vas_order_items " +
+				"  WHERE domain_id = :domainId " +
+				"  GROUP BY vas_order_id " +
+				") mi ON vo.id = mi.vas_order_id " +
+				"WHERE vo.domain_id = :domainId " +
+				"AND vo.status IN (:statuses) " +
+				"ORDER BY " +
+				"  CASE vo.priority WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END, " +
+				"  vo.started_at DESC NULLS LAST, vo.approved_at DESC NULLS LAST";
 
 		Map<String, Object> params = new java.util.HashMap<>();
 		params.put("domainId", Domain.currentDomainId());
@@ -680,7 +689,7 @@ public class VasTransactionService extends AbstractQueryService {
 
 		@SuppressWarnings("unchecked")
 		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
-			sql, params, Map.class, 0, 0);
+				sql, params, Map.class, 0, 0);
 
 		return results;
 	}
@@ -692,8 +701,8 @@ public class VasTransactionService extends AbstractQueryService {
 	/**
 	 * 대시보드 - 상태별 건수 조회
 	 *
-	 * @param comCd 화주사 코드 (optional)
-	 * @param whCd 창고 코드 (optional)
+	 * @param comCd      화주사 코드 (optional)
+	 * @param whCd       창고 코드 (optional)
 	 * @param targetDate 기준일 (optional, 기본값: 오늘)
 	 * @return 상태별 건수 Map { status: count }
 	 */
@@ -701,9 +710,9 @@ public class VasTransactionService extends AbstractQueryService {
 		String date = ValueUtil.isNotEmpty(targetDate) ? targetDate : DateUtil.todayStr();
 
 		String sql = "SELECT status, COUNT(*) as count " +
-					 "FROM vas_orders " +
-					 "WHERE domain_id = :domainId " +
-					 "AND vas_req_date = :targetDate ";
+				"FROM vas_orders " +
+				"WHERE domain_id = :domainId " +
+				"AND vas_req_date = :targetDate ";
 
 		Map<String, Object> params = ValueUtil.newMap("domainId,targetDate", Domain.currentDomainId(), date);
 
@@ -720,7 +729,7 @@ public class VasTransactionService extends AbstractQueryService {
 
 		@SuppressWarnings("unchecked")
 		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
-			sql, params, Map.class, 0, 0);
+				sql, params, Map.class, 0, 0);
 
 		// 결과를 Map으로 변환
 		Map<String, Object> statusCounts = new java.util.HashMap<>();
@@ -744,10 +753,10 @@ public class VasTransactionService extends AbstractQueryService {
 	/**
 	 * 대시보드 - VAS 유형별 통계 조회
 	 *
-	 * @param comCd 화주사 코드 (optional)
-	 * @param whCd 창고 코드 (optional)
+	 * @param comCd     화주사 코드 (optional)
+	 * @param whCd      창고 코드 (optional)
 	 * @param startDate 시작일 (optional, 기본값: 오늘)
-	 * @param endDate 종료일 (optional, 기본값: 오늘)
+	 * @param endDate   종료일 (optional, 기본값: 오늘)
 	 * @return 유형별 건수 Map { vasType: count }
 	 */
 	public Map<String, Object> getDashboardTypeStats(String comCd, String whCd, String startDate, String endDate) {
@@ -755,13 +764,13 @@ public class VasTransactionService extends AbstractQueryService {
 		String end = ValueUtil.isNotEmpty(endDate) ? endDate : DateUtil.todayStr();
 
 		String sql = "SELECT vas_type, COUNT(*) as count " +
-					 "FROM vas_orders " +
-					 "WHERE domain_id = :domainId " +
-					 "AND vas_req_date >= :startDate " +
-					 "AND vas_req_date <= :endDate ";
+				"FROM vas_orders " +
+				"WHERE domain_id = :domainId " +
+				"AND vas_req_date >= :startDate " +
+				"AND vas_req_date <= :endDate ";
 
 		Map<String, Object> params = ValueUtil.newMap("domainId,startDate,endDate",
-			Domain.currentDomainId(), start, end);
+				Domain.currentDomainId(), start, end);
 
 		if (ValueUtil.isNotEmpty(comCd)) {
 			sql += "AND com_cd = :comCd ";
@@ -776,7 +785,7 @@ public class VasTransactionService extends AbstractQueryService {
 
 		@SuppressWarnings("unchecked")
 		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
-			sql, params, Map.class, 0, 0);
+				sql, params, Map.class, 0, 0);
 
 		// 결과를 Map으로 변환
 		Map<String, Object> typeStats = new java.util.HashMap<>();
@@ -798,7 +807,7 @@ public class VasTransactionService extends AbstractQueryService {
 	 * 대시보드 - 알림 데이터 조회
 	 *
 	 * @param comCd 화주사 코드 (optional)
-	 * @param whCd 창고 코드 (optional)
+	 * @param whCd  창고 코드 (optional)
 	 * @return 알림 목록 List<Map<String, Object>>
 	 */
 	public List<Map<String, Object>> getDashboardAlerts(String comCd, String whCd) {
@@ -806,17 +815,16 @@ public class VasTransactionService extends AbstractQueryService {
 
 		// 1. 자재 부족 알림
 		String sql1 = "SELECT COUNT(DISTINCT voi.vas_order_id) as count " +
-					  "FROM vas_order_items voi " +
-					  "INNER JOIN vas_orders vo ON voi.vas_order_id = vo.id " +
-					  "WHERE voi.domain_id = :domainId " +
-					  "AND voi.status IN (:statuses) " +
-					  "AND (voi.alloc_qty IS NULL OR voi.alloc_qty < voi.req_qty)";
+				"FROM vas_order_items voi " +
+				"INNER JOIN vas_orders vo ON voi.vas_order_id = vo.id " +
+				"WHERE voi.domain_id = :domainId " +
+				"AND voi.status IN (:statuses) " +
+				"AND (voi.alloc_qty IS NULL OR voi.alloc_qty < voi.req_qty)";
 
 		Map<String, Object> params1 = ValueUtil.newMap("domainId", Domain.currentDomainId());
 		params1.put("statuses", java.util.Arrays.asList(
-			WmsVasConstants.ITEM_STATUS_PLANNED,
-			WmsVasConstants.ITEM_STATUS_ALLOCATED
-		));
+				WmsVasConstants.ITEM_STATUS_PLANNED,
+				WmsVasConstants.ITEM_STATUS_ALLOCATED));
 
 		if (ValueUtil.isNotEmpty(comCd)) {
 			sql1 += " AND vo.com_cd = :comCd";
@@ -838,13 +846,13 @@ public class VasTransactionService extends AbstractQueryService {
 
 		// 2. 작업 지연 알림 (승인 후 24시간 이상 진행 없음)
 		String sql2 = "SELECT COUNT(*) as count " +
-					  "FROM vas_orders " +
-					  "WHERE domain_id = :domainId " +
-					  "AND status = :status " +
-					  "AND approved_at < (NOW() - INTERVAL '24 hours')";
+				"FROM vas_orders " +
+				"WHERE domain_id = :domainId " +
+				"AND status = :status " +
+				"AND approved_at < (NOW() - INTERVAL '24 hours')";
 
 		Map<String, Object> params2 = ValueUtil.newMap("domainId,status",
-			Domain.currentDomainId(), WmsVasConstants.STATUS_APPROVED);
+				Domain.currentDomainId(), WmsVasConstants.STATUS_APPROVED);
 
 		if (ValueUtil.isNotEmpty(comCd)) {
 			sql2 += " AND com_cd = :comCd";

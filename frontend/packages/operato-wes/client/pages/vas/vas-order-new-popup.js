@@ -360,6 +360,9 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
       saving: Boolean,
       bomList: Array,
       bomItems: Array,
+      companies: Array,
+      warehouses: Array,
+      locations: Array,
       formData: Object,
       selectedBom: Object,
       loadingBomItems: Boolean,
@@ -374,6 +377,9 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     this.saving = false
     this.bomList = []
     this.bomItems = []
+    this.companies = []
+    this.warehouses = []
+    this.locations = []
     this.formData = {
       comCd: '',
       whCd: '',
@@ -389,10 +395,13 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     this.stockInfo = {}
   }
 
-  /** 컴포넌트가 DOM에 연결될 때 BOM 목록 조회 */
+  /** 컴포넌트가 DOM에 연결될 때 BOM/화주사/창고 목록 조회 */
   connectedCallback() {
     super.connectedCallback()
     this._fetchBomList()
+    this._fetchCompanies()
+    this._fetchWarehouses()
+    this._fetchLocations()
   }
 
   /** 화면 렌더링 - 스텝 인디케이터, 폼 내용, 하단 버튼 구성 */
@@ -435,22 +444,30 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
       <div class="form-grid">
         <div class="form-group">
           <label>화주사<span class="required">*</span></label>
-          <input
-            type="text"
-            .value="${this.formData.comCd}"
-            @input="${e => this._updateField('comCd', e.target.value)}"
-            placeholder="화주사 코드"
-          />
+          <select @change="${e => this._updateField('comCd', e.target.value)}">
+            <option value="">-- 화주사 선택 --</option>
+            ${this.companies.map(
+              c => html`
+                <option value="${c.com_cd}" ?selected="${this.formData.comCd === c.com_cd}">
+                  ${c.com_cd} - ${c.com_nm || c.name || c.com_cd}
+                </option>
+              `
+            )}
+          </select>
         </div>
 
         <div class="form-group">
           <label>창고<span class="required">*</span></label>
-          <input
-            type="text"
-            .value="${this.formData.whCd}"
-            @input="${e => this._updateField('whCd', e.target.value)}"
-            placeholder="창고 코드"
-          />
+          <select @change="${e => this._updateField('whCd', e.target.value)}">
+            <option value="">-- 창고 선택 --</option>
+            ${this.warehouses.map(
+              w => html`
+                <option value="${w.wh_cd}" ?selected="${this.formData.whCd === w.wh_cd}">
+                  ${w.wh_cd} - ${w.wh_nm || w.name || w.wh_cd}
+                </option>
+              `
+            )}
+          </select>
         </div>
 
         <div class="form-group full-width">
@@ -520,12 +537,16 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
 
         <div class="form-group">
           <label>작업장 로케이션</label>
-          <input
-            type="text"
-            .value="${this.formData.workLocCd}"
-            @input="${e => this._updateField('workLocCd', e.target.value)}"
-            placeholder="작업장 코드 (예: VAS-ZONE-01)"
-          />
+          <select @change="${e => this._updateField('workLocCd', e.target.value)}">
+            <option value="">-- 작업장 선택 --</option>
+            ${this.locations.map(
+              loc => html`
+                <option value="${loc.loc_cd}" ?selected="${this.formData.workLocCd === loc.loc_cd}">
+                  ${loc.loc_cd}${loc.loc_type ? ` (${loc.loc_type})` : ''}
+                </option>
+              `
+            )}
+          </select>
         </div>
 
         <div class="form-group full-width">
@@ -641,6 +662,40 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
   /* ============================================================
    * 데이터 조회
    * ============================================================ */
+
+  /** 화주사 목록 조회 */
+  async _fetchCompanies() {
+    try {
+      const data = await ServiceUtil.searchByPagination('companies', [], null, 1, 100)
+      this.companies = data?.items || []
+    } catch (err) {
+      console.error('화주사 목록 조회 실패:', err)
+      this.companies = []
+    }
+  }
+
+  /** 창고 목록 조회 */
+  async _fetchWarehouses() {
+    try {
+      const data = await ServiceUtil.searchByPagination('warehouses', [], null, 1, 100)
+      this.warehouses = data?.items || []
+    } catch (err) {
+      console.error('창고 목록 조회 실패:', err)
+      this.warehouses = []
+    }
+  }
+
+  /** 로케이션 목록 조회 */
+  async _fetchLocations() {
+    try {
+      const filters = [{ name: 'loc_type', value: 'VAS' }]
+      const data = await ServiceUtil.searchByPagination('locations', filters, null, 1, 100)
+      this.locations = data?.items || []
+    } catch (err) {
+      console.error('로케이션 목록 조회 실패:', err)
+      this.locations = []
+    }
+  }
 
   /** 활성 상태인 BOM 목록 조회 (세트 상품 선택 드롭다운용) */
   async _fetchBomList() {

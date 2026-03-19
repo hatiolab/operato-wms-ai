@@ -614,12 +614,6 @@ class VasWorkPage extends localize(i18next)(PageView) {
   /** 주문 선택 화면 렌더링 (바코드 스캔 + 작업 주문 목록) */
   _renderOrderSelect() {
     return html`
-      <div class="pda-header">
-        <span></span>
-        <h2>VAS 작업 (PDA)</h2>
-        <button class="back-btn" @click="${this._refresh}" title="새로고침">&#x21bb;</button>
-      </div>
-
       <div class="pda-content">
         <div class="order-select-section">
           <!-- 바코드 스캔 입력 -->
@@ -635,20 +629,21 @@ class VasWorkPage extends localize(i18next)(PageView) {
                 autofocus
               />
               <button class="scan-btn" @click="${this._onScanSearch}" title="검색">&#x1F50D;</button>
+              <button class="scan-btn" @click="${this._refresh}" title="새로고침">&#x21bb;</button>
             </div>
           </div>
 
           <!-- 작업 주문 목록 -->
           ${this.loading
-            ? html`<div class="loading">주문 목록 조회 중...</div>`
-            : this.orders.length === 0
-              ? html`
+        ? html`<div class="loading">주문 목록 조회 중...</div>`
+        : this.orders.length === 0
+          ? html`
                   <div class="empty-state">
                     <span class="empty-icon">&#x1F4CB;</span>
                     <span class="empty-text">작업 가능한 주문이 없습니다</span>
                   </div>
                 `
-              : html`
+          : html`
                   <div class="order-list">
                     <div class="order-list-title">작업 가능 주문 (${this.orders.length}건)</div>
                     ${this.orders.map(order => html`
@@ -672,15 +667,9 @@ class VasWorkPage extends localize(i18next)(PageView) {
    * 3단계 작업 화면
    * ============================================================ */
 
-  /** 작업 화면 렌더링 (헤더 + 스텝 인디케이터 + 주문 정보 + 단계별 내용) */
+  /** 작업 화면 렌더링 (스텝 인디케이터 + 주문 정보 + 단계별 내용) */
   _renderWorkScreen() {
     return html`
-      <div class="pda-header">
-        <button class="back-btn" @click="${this._backToOrderSelect}" title="뒤로">&larr;</button>
-        <h2>${this.selectedOrder?.vas_no || 'VAS 작업'}</h2>
-        <span></span>
-      </div>
-
       <div class="pda-content">
         <!-- 스텝 인디케이터 -->
         ${this._renderStepIndicator()}
@@ -690,10 +679,10 @@ class VasWorkPage extends localize(i18next)(PageView) {
 
         <!-- 단계별 내용 -->
         ${this.step === 1
-          ? this._renderStep1Picking()
-          : this.step === 2
-            ? this._renderStep2Work()
-            : this._renderStep3Putaway()}
+        ? this._renderStep1Picking()
+        : this.step === 2
+          ? this._renderStep2Work()
+          : this._renderStep3Putaway()}
 
         <!-- 하단 버튼 -->
         ${this._renderBottomActions()}
@@ -768,8 +757,8 @@ class VasWorkPage extends localize(i18next)(PageView) {
       <!-- 자재 목록 -->
       <div class="pick-list">
         ${this.orderItems.length === 0
-          ? html`<div class="loading">자재 정보 조회 중...</div>`
-          : this.orderItems.map((item, idx) => html`
+        ? html`<div class="loading">자재 정보 조회 중...</div>`
+        : this.orderItems.map((item, idx) => html`
               <div class="pick-item ${item._picked ? 'picked' : ''} ${item._active ? 'active' : ''}">
                 <div class="sku-name">${item.sku_nm || item.sku_cd || `품목 ${idx + 1}`}</div>
                 <div class="sku-info">
@@ -832,10 +821,10 @@ class VasWorkPage extends localize(i18next)(PageView) {
         </div>
 
         ${this.completedQty + this.defectQty > planQty
-          ? html`<div style="color: #F44336; font-size: 14px; font-weight: 600; text-align: center;">
+        ? html`<div style="color: #F44336; font-size: 14px; font-weight: 600; text-align: center;">
               &#x26A0; 완성 + 불량 수량이 계획 수량(${planQty})을 초과합니다
             </div>`
-          : ''}
+        : ''}
       </div>
     `
   }
@@ -876,12 +865,12 @@ class VasWorkPage extends localize(i18next)(PageView) {
     return html`
       <div class="bottom-actions">
         ${this.step > 1
-          ? html`<button class="pda-btn outline" @click="${this._prevStep}">&#x2190; 이전</button>`
-          : html`<button class="pda-btn outline" @click="${this._backToOrderSelect}">취소</button>`}
+        ? html`<button class="pda-btn outline" @click="${this._prevStep}">&#x2190; 이전</button>`
+        : html`<button class="pda-btn outline" @click="${this._backToOrderSelect}">취소</button>`}
 
         ${this.step < 3
-          ? html`<button class="pda-btn primary" @click="${this._nextStep}">다음 &#x2192;</button>`
-          : html`<button class="pda-btn success" @click="${this._completeWork}">완료</button>`}
+        ? html`<button class="pda-btn primary" @click="${this._nextStep}">다음 &#x2192;</button>`
+        : html`<button class="pda-btn success" @click="${this._completeWork}">완료</button>`}
       </div>
     `
   }
@@ -1080,7 +1069,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
       // 실적 등록 API 호출
       try {
         await ServiceUtil.restPost(`vas_trx/vas_orders/${this.selectedOrder.id}/results`, {
-          completed_qty: this.completedQty,
+          result_qty: this.completedQty,
           defect_qty: this.defectQty
         })
         this._showFeedback('실적 등록 완료', 'success')
