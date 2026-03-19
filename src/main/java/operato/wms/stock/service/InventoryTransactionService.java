@@ -54,9 +54,9 @@ public class InventoryTransactionService extends AbstractQueryService {
      */
     @Autowired
     protected EventPublisher eventPublisher;
-    
+
     /********************************************************************************************************
-     *                                        재 고 체 크 서 비 스
+     * 재 고 체 크 서 비 스
      ********************************************************************************************************/
 
     /**
@@ -73,7 +73,7 @@ public class InventoryTransactionService extends AbstractQueryService {
         Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,skuCd", domainId, comCd, whCd, skuCd);
         return this.queryManager.selectBySql(sql, params, Double.class);
     }
-    
+
     /**
      * 화주사, 창고, 존 별 상품 가용 재고 수량 리턴
      * 
@@ -86,10 +86,11 @@ public class InventoryTransactionService extends AbstractQueryService {
      */
     public Double getAvailableStockByZone(Long domainId, String comCd, String whCd, String zoneCd, String skuCd) {
         String sql = this.stockQueryStore.getAvailableStockQty();
-        Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,skuCd,zoneCd", domainId, comCd, whCd, skuCd, zoneCd);
+        Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,skuCd,zoneCd", domainId, comCd, whCd, skuCd,
+                zoneCd);
         return this.queryManager.selectBySql(sql, params, Double.class);
     }
-    
+
     /**
      * 화주사, 창고, 로케이션 별 상품 가용 재고 수량 리턴
      * 
@@ -102,10 +103,11 @@ public class InventoryTransactionService extends AbstractQueryService {
      */
     public Double getAvailableStockByLoc(Long domainId, String comCd, String whCd, String locCd, String skuCd) {
         String sql = this.stockQueryStore.getAvailableStockQty();
-        Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,skuCd,locCd", domainId, comCd, whCd, skuCd, locCd);
+        Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,skuCd,locCd", domainId, comCd, whCd, skuCd,
+                locCd);
         return this.queryManager.selectBySql(sql, params, Double.class);
     }
-    
+
     /**
      * 화주사, 창고, 로케이션, Lot No 별 상품 가용 재고 수량 리턴
      * 
@@ -118,10 +120,11 @@ public class InventoryTransactionService extends AbstractQueryService {
      */
     public Double getAvailableStockByLotNo(Long domainId, String comCd, String whCd, String skuCd, String lotNo) {
         String sql = this.stockQueryStore.getAvailableStockQty();
-        Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,skuCd,lotNo", domainId, comCd, whCd, skuCd, lotNo);
+        Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,skuCd,lotNo", domainId, comCd, whCd, skuCd,
+                lotNo);
         return this.queryManager.selectBySql(sql, params, Double.class);
     }
-    
+
     /**
      * 화주사, 창고, 로케이션, 제조일자 별 상품 가용 재고 수량 리턴
      * 
@@ -134,10 +137,11 @@ public class InventoryTransactionService extends AbstractQueryService {
      */
     public Double getAvailableStockByPrdDate(Long domainId, String comCd, String whCd, String skuCd, String prdDate) {
         String sql = this.stockQueryStore.getAvailableStockQty();
-        Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,skuCd,prdDate", domainId, comCd, whCd, skuCd, prdDate);
+        Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,skuCd,prdDate", domainId, comCd, whCd, skuCd,
+                prdDate);
         return this.queryManager.selectBySql(sql, params, Double.class);
     }
-    
+
     /**
      * 화주사, 창고, 로케이션, 유효기간 별 상품 가용 재고 수량 리턴
      * 
@@ -148,12 +152,14 @@ public class InventoryTransactionService extends AbstractQueryService {
      * @param expiredDate
      * @return
      */
-    public Double getAvailableStockByExpiredDate(Long domainId, String comCd, String whCd, String skuCd, String expiredDate) {
+    public Double getAvailableStockByExpiredDate(Long domainId, String comCd, String whCd, String skuCd,
+            String expiredDate) {
         String sql = this.stockQueryStore.getAvailableStockQty();
-        Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,skuCd,expiredDate", domainId, comCd, whCd, skuCd, expiredDate);
+        Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,skuCd,expiredDate", domainId, comCd, whCd,
+                skuCd, expiredDate);
         return this.queryManager.selectBySql(sql, params, Double.class);
     }
-    
+
     /**
      * 화주사, 창고별 상품 리스트 별 가용 재고 수량 리턴
      * 
@@ -161,15 +167,17 @@ public class InventoryTransactionService extends AbstractQueryService {
      * @param exceptionWhenNotEnough
      * @return
      */
-    public List<SimpleStockCheck> getSimpleAvailableStockSummary(List<SimpleStockCheck> stockCheckList, boolean exceptionWhenNotEnough) {
-        for(SimpleStockCheck stock : stockCheckList) {
-            double availQty = this.getAvailableStockByWh(stock.getDomainId(), stock.getComCd(), stock.getWhCd(), stock.getSkuCd());
+    public List<SimpleStockCheck> getSimpleAvailableStockSummary(List<SimpleStockCheck> stockCheckList,
+            boolean exceptionWhenNotEnough) {
+        for (SimpleStockCheck stock : stockCheckList) {
+            double availQty = this.getAvailableStockByWh(stock.getDomainId(), stock.getComCd(), stock.getWhCd(),
+                    stock.getSkuCd());
             stock.setInvQty(availQty);
         }
-        
+
         return stockCheckList;
     }
-    
+
     /**
      * 재고 체크 조건에 따른 상품 리스트 별 가용 재고 수량 리턴
      * 
@@ -178,10 +186,10 @@ public class InventoryTransactionService extends AbstractQueryService {
      * @return
      */
     public List<StockCheck> getAvailableStockSummary(List<StockCheck> stockCheckList, boolean exceptionWhenNotEnough) {
-        // TODO 
+        // TODO
         return stockCheckList;
     }
-    
+
     /**
      * 화주사, 창고별 상품 리스트 별 가용 재고가 충분한 지 체크
      * 
@@ -191,24 +199,26 @@ public class InventoryTransactionService extends AbstractQueryService {
      */
     public boolean isAvailableStocks(List<SimpleStockCheck> stockCheckList, boolean exceptionWhenNotEnough) {
         boolean isEnough = true;
-        
-        for(SimpleStockCheck stock : stockCheckList) {
+
+        for (SimpleStockCheck stock : stockCheckList) {
             double invQty = stock.getInvQty();
-            double availQty = this.getAvailableStockByWh(stock.getDomainId(), stock.getComCd(), stock.getWhCd(), stock.getSkuCd());
-            
-            if(invQty > availQty) {
-                if(exceptionWhenNotEnough) {
-                    throw new ElidomRuntimeException("상품 [" + stock.getSkuCd() + "]가 가용 재고가 출고 수량 [" + stock.getInvQty() + "] 보다 적습니다.");
+            double availQty = this.getAvailableStockByWh(stock.getDomainId(), stock.getComCd(), stock.getWhCd(),
+                    stock.getSkuCd());
+
+            if (invQty > availQty) {
+                if (exceptionWhenNotEnough) {
+                    throw new ElidomRuntimeException(
+                            "상품 [" + stock.getSkuCd() + "]가 가용 재고가 출고 수량 [" + stock.getInvQty() + "] 보다 적습니다.");
                 } else {
                     isEnough = false;
                     break;
                 }
             }
         }
-        
+
         return isEnough;
     }
-    
+
     /**
      * 재고 체크 조건에 따른 상품 리스트 별 가용 재고가 충분한 지 체크
      * 
@@ -220,44 +230,47 @@ public class InventoryTransactionService extends AbstractQueryService {
         // TODO
         return true;
     }
-    
+
     /**
      * 창고, 화주사, 상품 코드, 주문 수량으로 option에 맞도록 가용 재고 리스트를 조회
      * 
      * @param domainId
-     * @param whCd 창고 코드 
-     * @param comCd 화주사 코드
-     * @param skuCd 상품 코드
-     * @param zoneCd 로케이션 존, 빈 값 가능
-     * @param locCd 로케이션, 빈 값 가능
-     * @param orderQty 주문 수량
-     * @param reserveStrategy 가용 재고 조회 옵션 - 유통기한 (expired_date), 제조일 (prd_date), 선입 선출 (fifo)
+     * @param whCd                   창고 코드
+     * @param comCd                  화주사 코드
+     * @param skuCd                  상품 코드
+     * @param zoneCd                 로케이션 존, 빈 값 가능
+     * @param locCd                  로케이션, 빈 값 가능
+     * @param orderQty               주문 수량
+     * @param reserveStrategy        가용 재고 조회 옵션 - 유통기한 (expired_date), 제조일
+     *                               (prd_date), 선입 선출 (fifo)
      * @param exceptionWhenNotEnough 가용 재고가 충분치 않은 경우 예외 발생
      * @return
      */
-    public List<Inventory> getAvailableInvQty(Long domainId, String whCd, String comCd, String skuCd, String zoneCd, String locCd, double orderQty, String reserveStrategy, boolean exceptionWhenNotEnough) {
+    public List<Inventory> getAvailableInvQty(Long domainId, String whCd, String comCd, String skuCd, String zoneCd,
+            String locCd, double orderQty, String reserveStrategy, boolean exceptionWhenNotEnough) {
         String sql = this.stockQueryStore.getAvailableStocksByQty();
-        Map<String, Object> invQueryParams = ValueUtil.newMap("domainId,whCd,comCd,skuCd,ordQty", domainId, whCd, comCd, skuCd, orderQty);
-        if(ValueUtil.isNotEmpty(zoneCd)) {
+        Map<String, Object> invQueryParams = ValueUtil.newMap("domainId,whCd,comCd,skuCd,ordQty", domainId, whCd, comCd,
+                skuCd, orderQty);
+        if (ValueUtil.isNotEmpty(zoneCd)) {
             invQueryParams.put("zoneCd", zoneCd);
         }
-        if(ValueUtil.isNotEmpty(locCd)) {
+        if (ValueUtil.isNotEmpty(locCd)) {
             invQueryParams.put("locCd", locCd);
         }
-        
+
         List<Inventory> invList = queryManager.selectListBySql(sql, invQueryParams, Inventory.class, 0, 0);
-        
-        if(ValueUtil.isEmpty(invList) && exceptionWhenNotEnough) {
+
+        if (ValueUtil.isEmpty(invList) && exceptionWhenNotEnough) {
             throw new ElidomRuntimeException("상품 [" + skuCd + "]의 가용 재고가 부족합니다.");
         }
-        
+
         return invList;
     }
-    
+
     /********************************************************************************************************
-     *                                        재 고 예 약 서 비 스
+     * 재 고 예 약 서 비 스
      ********************************************************************************************************/
-    
+
     /**
      * 출고 주문 번호로 예약 재고 조회
      * 
@@ -268,7 +281,7 @@ public class InventoryTransactionService extends AbstractQueryService {
         Map<String, Object> params = ValueUtil.newMap("domainId,whCd,comCd,rlsOrdNo", domainId, whCd, comCd, rlsOrdNo);
         return this.queryManager.selectListBySql(sql, params, Inventory.class, 0, 0);
     }
-    
+
     /**
      * 바코드 별 재고 예약 처리
      * 
@@ -285,34 +298,39 @@ public class InventoryTransactionService extends AbstractQueryService {
      * @param lineNo
      * @return
      */
-    public List<Inventory> reserveInvByBarcode(Long domainId, String whCd, String comCd, String skuCd, String zoneCd, String locCd, double reservQty, String reserveStrategy, boolean exceptionWhenNotEnough, String rlsOrdNo, String rlsLineNo) {
-        List<Inventory> invList = this.getAvailableInvQty(domainId, whCd, comCd, skuCd, zoneCd, locCd, reservQty, reserveStrategy, exceptionWhenNotEnough);
+    public List<Inventory> reserveInvByBarcode(Long domainId, String whCd, String comCd, String skuCd, String zoneCd,
+            String locCd, double reservQty, String reserveStrategy, boolean exceptionWhenNotEnough, String rlsOrdNo,
+            String rlsLineNo) {
+        List<Inventory> invList = this.getAvailableInvQty(domainId, whCd, comCd, skuCd, zoneCd, locCd, reservQty,
+                reserveStrategy, exceptionWhenNotEnough);
         return this.reserveInvByBarcode(invList, reservQty, rlsOrdNo, rlsLineNo);
     }
-    
+
     /**
      * 바코드 별 재고 예약 처리
      * 
      * @param inventories 예약 대상 재고 바코드 리스트
-     * @param reservQty 총 예약 수량
-     * @param rlsOrdNo 출고 번호
-     * @param lineNo 출고 라인 번호
+     * @param reservQty   총 예약 수량
+     * @param rlsOrdNo    출고 번호
+     * @param lineNo      출고 라인 번호
      * @return
      */
-    public List<Inventory> reserveInvByBarcode(List<Inventory> inventories, double reservQty, String rlsOrdNo, String rlsLineNo) {
+    public List<Inventory> reserveInvByBarcode(List<Inventory> inventories, double reservQty, String rlsOrdNo,
+            String rlsLineNo) {
         double remainOrdQty = reservQty;
         List<Inventory> reservedInvs = new ArrayList<Inventory>();
-        
+
         for (Inventory inv : inventories) {
             if (remainOrdQty > 0) {
                 // 1. 재고 조회
                 inv = this.queryManager.select(Inventory.class, inv.getId());
-                
+
                 // 2. 부분 재고 예약 처리
-                if (remainOrdQty < inv.getInvQty()) {                    
+                if (remainOrdQty < inv.getInvQty()) {
                     // 2.1 재고 분할 처리
-                    Inventory[] sInv = this.splitInventory(inv.getDomainId(), inv.getId(), remainOrdQty, "RESERVATION", false);
-                    
+                    Inventory[] sInv = this.splitInventory(inv.getDomainId(), inv.getId(), remainOrdQty, "RESERVATION",
+                            false);
+
                     // 2.2 분할 재고 예약 처리
                     Inventory splitInv = sInv[0];
                     splitInv.setStatus(Inventory.STATUS_RESERVED);
@@ -321,35 +339,35 @@ public class InventoryTransactionService extends AbstractQueryService {
                     splitInv.setRlsLineNo(rlsLineNo);
                     this.queryManager.insert(Inventory.class, splitInv);
                     reservedInvs.add(splitInv);
-                    
+
                     // 2.3 메인 재고 업데이트
                     Inventory mainInv = sInv[1];
                     this.queryManager.update(Inventory.class, mainInv);
-                    
+
                     // 2.4 잔여 주문 수량 = 0
                     remainOrdQty = 0.0f;
-                    
-                // 3. 전체 재고 예약 처리
+
+                    // 3. 전체 재고 예약 처리
                 } else {
-                    // 3.1 Inventory 할당 : 전체 할당 
+                    // 3.1 Inventory 할당 : 전체 할당
                     inv.setStatus(Inventory.STATUS_RESERVED);
                     inv.setLastTranCd(Inventory.TRANSACTION_RESERVE);
                     inv.setRlsOrdNo(rlsOrdNo);
                     inv.setRlsLineNo(rlsLineNo);
                     this.queryManager.update(Inventory.class, inv);
                     reservedInvs.add(inv);
-                    
+
                     // 3.2 잔여 주문 수량 = 주문 수량 - 재고 수량
                     remainOrdQty = remainOrdQty - inv.getInvQty();
                 }
             }
         }
-        
+
         return reservedInvs;
     }
-    
+
     /********************************************************************************************************
-     *                                        재 고 예 약 취 소 서 비 스
+     * 재 고 예 약 취 소 서 비 스
      ********************************************************************************************************/
 
     /**
@@ -368,34 +386,34 @@ public class InventoryTransactionService extends AbstractQueryService {
         condition.setComCd(comCd);
         condition.setRlsOrdNo(rlsOrdNo);
         List<Inventory> invList = this.queryManager.selectList(Inventory.class, condition);
-        
+
         condition.setRlsOrdNo(null);
         condition.setStatus(Inventory.STATUS_STORED);
-        
+
         // 2. 예약 재고를 찾아 모두 예약 취소
         for (Inventory inv : invList) {
             condition.setBarcode(inv.getBarcode());
             Inventory storedInv = this.queryManager.selectByCondition(Inventory.class, condition);
-            
-            if(storedInv == null) {
-                // 보관 중인 동일 바코드가 없는 경우 
+
+            if (storedInv == null) {
+                // 보관 중인 동일 바코드가 없는 경우
                 inv.setStatus(Inventory.STATUS_STORED);
                 inv.setLastTranCd(Inventory.TRANSACTION_IN);
                 inv.setRlsOrdNo(null);
                 this.queryManager.update(Inventory.class, inv);
-                
+
             } else {
                 // 보관 중인 동일 바코드가 있는 경우 - 보관 재고 수량 병합
                 storedInv.setInvQty(storedInv.getInvQty() + inv.getInvQty());
                 storedInv.setLastTranCd(Inventory.TRANSACTION_MERGE);
                 this.queryManager.update(storedInv, "invQty", "lastTranCd");
-                
+
                 // 재고 삭제
                 this.queryManager.delete(inv);
             }
         }
     }
-    
+
     /**
      * 가용 재고 체크별(INV_CHECK_ONLY) 출고 주문 전체 예약된 재고 취소 처리
      * 
@@ -412,47 +430,48 @@ public class InventoryTransactionService extends AbstractQueryService {
         condition.setComCd(comCd);
         condition.setRlsOrdNo(rlsOrdNo);
         List<Inventory> invList = this.queryManager.selectList(Inventory.class, condition);
-        
+
         condition.setRlsOrdNo(null);
         condition.setStatus(Inventory.STATUS_STORED);
-        
+
         // 2. 예약 재고를 찾아 모두 예약 취소
         for (Inventory inv : invList) {
             condition.setBarcode(inv.getBarcode());
-            // 재고 이력에서 마지막 보관 상태의 로케이션 조회 
+            // 재고 이력에서 마지막 보관 상태의 로케이션 조회
             String sql = this.stockQueryStore.getLastLocCdByHistory();
-            Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,barcode,status", domainId, comCd, whCd, inv.getBarcode(), Inventory.STATUS_STORED);
+            Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,barcode,status", domainId, comCd, whCd,
+                    inv.getBarcode(), Inventory.STATUS_STORED);
             String lastLocCd = this.queryManager.selectBySql(sql, params, String.class);
-            
-            if ( ValueUtil.isNotEmpty(lastLocCd) ) {
-            	condition.setLocCd(lastLocCd);
+
+            if (ValueUtil.isNotEmpty(lastLocCd)) {
+                condition.setLocCd(lastLocCd);
             }
             Inventory storedInv = this.queryManager.selectByCondition(Inventory.class, condition);
-            
-            if(storedInv == null) {
-                // 보관 중인 동일 바코드가 없는 경우 
+
+            if (storedInv == null) {
+                // 보관 중인 동일 바코드가 없는 경우
                 inv.setStatus(Inventory.STATUS_STORED);
                 inv.setLastTranCd(Inventory.TRANSACTION_IN);
                 inv.setRlsOrdNo(null);
                 inv.setReservedQty(0.0);
                 inv.setRlsLineNo(null);
-                if ( ValueUtil.isNotEmpty(lastLocCd) ) {
-                	inv.setLocCd(lastLocCd);
+                if (ValueUtil.isNotEmpty(lastLocCd)) {
+                    inv.setLocCd(lastLocCd);
                 }
                 this.queryManager.update(Inventory.class, inv);
-                
+
             } else {
                 // 보관 중인 동일 바코드가 있는 경우 - 보관 재고 수량 병합
                 storedInv.setInvQty(storedInv.getInvQty() + inv.getInvQty());
                 storedInv.setLastTranCd(Inventory.TRANSACTION_MERGE);
                 this.queryManager.update(storedInv, "invQty", "lastTranCd");
-                
+
                 // 재고 삭제
                 this.queryManager.delete(inv);
             }
         }
     }
-    
+
     /**
      * 가용 재고 체크 (INV_CHECK_ONLY) 출고 라인 예약된 재고 취소 처리
      * 
@@ -461,7 +480,8 @@ public class InventoryTransactionService extends AbstractQueryService {
      * @param comCd
      * @param rlsOrdNo
      */
-    public void cancelReserveLineForPickingByInvCheckOnly(Long domainId, String whCd, String comCd, String rlsOrdNo, String rlsLineNo) {
+    public void cancelReserveLineForPickingByInvCheckOnly(Long domainId, String whCd, String comCd, String rlsOrdNo,
+            String rlsLineNo) {
         // 1. 출고 지시 번호로 예약 재고 조회
         Inventory condition = new Inventory();
         condition.setDomainId(domainId);
@@ -470,22 +490,23 @@ public class InventoryTransactionService extends AbstractQueryService {
         condition.setRlsOrdNo(rlsOrdNo);
         condition.setRlsLineNo(rlsLineNo);
         condition.setStatus(Inventory.STATUS_PICK);
-        
+
         Inventory reservedInv = this.queryManager.selectByCondition(Inventory.class, condition);
         // 2. 예약 재고 예약 취소
-        if ( ValueUtil.isNotEmpty(reservedInv) ) {
-        	this.cancelReservedInventory(reservedInv);
+        if (ValueUtil.isNotEmpty(reservedInv)) {
+            this.cancelReservedInventory(reservedInv);
         }
-        
+
     }
-    
+
     /**
-     * 예약된 재고 취소 처리 
+     * 예약된 재고 취소 처리
+     * 
      * @param reservedInventory
      */
     public void cancelReservedInventory(Inventory reservedInventory) {
-    	
-    	Inventory condition = new Inventory();
+
+        Inventory condition = new Inventory();
         condition.setDomainId(reservedInventory.getDomainId());
         condition.setWhCd(reservedInventory.getWhCd());
         condition.setComCd(reservedInventory.getComCd());
@@ -493,46 +514,48 @@ public class InventoryTransactionService extends AbstractQueryService {
         condition.setRlsLineNo(null);
         condition.setStatus(Inventory.STATUS_STORED);
         condition.setBarcode(reservedInventory.getBarcode());
-        
-        // 재고 이력에서 마지막 보관 상태의 로케이션 조회 
+
+        // 재고 이력에서 마지막 보관 상태의 로케이션 조회
         String sql = this.stockQueryStore.getLastLocCdByHistory();
-        Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,barcode,status", reservedInventory.getDomainId(), reservedInventory.getComCd(), reservedInventory.getWhCd(), reservedInventory.getBarcode(), Inventory.STATUS_STORED);
+        Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,barcode,status",
+                reservedInventory.getDomainId(), reservedInventory.getComCd(), reservedInventory.getWhCd(),
+                reservedInventory.getBarcode(), Inventory.STATUS_STORED);
         String lastLocCd = this.queryManager.selectBySql(sql, params, String.class);
-        
-        if ( ValueUtil.isNotEmpty(lastLocCd) ) {
-        	condition.setLocCd(lastLocCd);
+
+        if (ValueUtil.isNotEmpty(lastLocCd)) {
+            condition.setLocCd(lastLocCd);
         }
-        
+
         List<Inventory> storedInvList = this.queryManager.selectList(Inventory.class, condition);
-        
-        if(storedInvList == null) {
-            // 보관 중인 동일 바코드가 없는 경우 
-        	reservedInventory.setStatus(Inventory.STATUS_STORED);
-        	reservedInventory.setLastTranCd(Inventory.TRANSACTION_IN);
-            if ( ValueUtil.isNotEmpty(lastLocCd) ) {
-            	reservedInventory.setLocCd(lastLocCd);
+
+        if (storedInvList == null) {
+            // 보관 중인 동일 바코드가 없는 경우
+            reservedInventory.setStatus(Inventory.STATUS_STORED);
+            reservedInventory.setLastTranCd(Inventory.TRANSACTION_IN);
+            if (ValueUtil.isNotEmpty(lastLocCd)) {
+                reservedInventory.setLocCd(lastLocCd);
             }
             reservedInventory.setRlsOrdNo(null);
             reservedInventory.setRlsLineNo(null);
             reservedInventory.setReservedQty(0.0);
             this.queryManager.update(Inventory.class, reservedInventory);
-            
+
         } else {
-        	Inventory storedInv = storedInvList.get(0);
+            Inventory storedInv = storedInvList.get(0);
             // 보관 중인 동일 바코드가 있는 경우 - 보관 재고 수량 병합
             storedInv.setInvQty(storedInv.getInvQty() + reservedInventory.getInvQty());
             storedInv.setLastTranCd(Inventory.TRANSACTION_MERGE);
             this.queryManager.update(storedInv, "invQty", "lastTranCd");
-            
+
             // 재고 삭제
             this.queryManager.delete(reservedInventory);
         }
     }
-    
+
     /********************************************************************************************************
-     *                                        재 고 트 랜 잭 션 서 비 스
+     * 재 고 트 랜 잭 션 서 비 스
      ********************************************************************************************************/
-    
+
     /**
      * 출고 처리를 위한 재고 조회
      * 
@@ -545,18 +568,21 @@ public class InventoryTransactionService extends AbstractQueryService {
      * @param exceptionWhenNotExist
      * @return
      */
-    public Inventory findInventoryForRelease(Long domainId, String comCd, String whCd, String barcode, String locCd, String skuCd, boolean exceptionWhenNotExist) {
+    public Inventory findInventoryForRelease(Long domainId, String comCd, String whCd, String barcode, String locCd,
+            String skuCd, boolean exceptionWhenNotExist) {
         String sql = this.stockQueryStore.getInventoryForRelease();
-        Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,barcode,locCd,skuCd", domainId, comCd, whCd, barcode, locCd, skuCd);
+        Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,barcode,locCd,skuCd", domainId, comCd, whCd,
+                barcode, locCd, skuCd);
         List<Inventory> invList = this.queryManager.selectListBySql(sql, params, Inventory.class, 0, 0);
-        
-        if(ValueUtil.isEmpty(invList) && exceptionWhenNotExist) {
-            throw new ElidomRuntimeException("바코드 [" + barcode + "], 로케이션 [" + locCd + "]에 출고 처리할 상품 [" + skuCd + "] 재고가 존재하지 않습니다.");
+
+        if (ValueUtil.isEmpty(invList) && exceptionWhenNotExist) {
+            throw new ElidomRuntimeException(
+                    "바코드 [" + barcode + "], 로케이션 [" + locCd + "]에 출고 처리할 상품 [" + skuCd + "] 재고가 존재하지 않습니다.");
         }
-        
+
         return invList.get(0);
     }
-    
+
     /**
      * 출고 처리를 위한 재고 조회
      * 
@@ -569,18 +595,20 @@ public class InventoryTransactionService extends AbstractQueryService {
      * @param exceptionWhenNotExist
      * @return
      */
-    public List<Inventory> searchAvailableInventoryForRelease(Long domainId, String comCd, String whCd, String skuCd, boolean exceptionWhenNotExist) {
+    public List<Inventory> searchAvailableInventoryForRelease(Long domainId, String comCd, String whCd, String skuCd,
+            boolean exceptionWhenNotExist) {
         String sql = this.stockQueryStore.getInventoryForRelease();
         Map<String, Object> params = ValueUtil.newMap("domainId,comCd,whCd,skuCd", domainId, comCd, whCd, skuCd);
         List<Inventory> invList = this.queryManager.selectListBySql(sql, params, Inventory.class, 0, 0);
-        
-        if(ValueUtil.isEmpty(invList) && exceptionWhenNotExist) {
-            throw new ElidomRuntimeException("화주사 [" + comCd + "], 창고 [" + whCd + "]에 출고 처리할 상품 [" + skuCd + "]의 가용 재고가 존재하지 않습니다.");
+
+        if (ValueUtil.isEmpty(invList) && exceptionWhenNotExist) {
+            throw new ElidomRuntimeException(
+                    "화주사 [" + comCd + "], 창고 [" + whCd + "]에 출고 처리할 상품 [" + skuCd + "]의 가용 재고가 존재하지 않습니다.");
         }
-        
+
         return invList;
     }
-    
+
     /**
      * 재고 출고를 위한 출고장 이동 처리
      * 
@@ -592,10 +620,11 @@ public class InventoryTransactionService extends AbstractQueryService {
      * @param remark
      * @return
      */
-    public Inventory moveInventoryForRelease(Inventory inventory, String rlsOrdNo, String rlsLineNo, double outQty, String locCd, String remark) {
+    public Inventory moveInventoryForRelease(Inventory inventory, String rlsOrdNo, String rlsLineNo, double outQty,
+            String locCd, String remark) {
         double invQty = inventory.getInvQty();
-        
-        if(invQty > outQty) {
+
+        if (invQty > outQty) {
             Inventory[] invs = this.splitInventory(inventory, outQty, null, false);
             Inventory invToOut = invs[0];
             invToOut.setLastTranCd(Inventory.TRANSACTION_OUT);
@@ -608,7 +637,7 @@ public class InventoryTransactionService extends AbstractQueryService {
             this.queryManager.insert(invToOut);
             this.queryManager.update(invs[1]);
             inventory = invToOut;
-            
+
         } else {
             inventory.setLastTranCd(Inventory.TRANSACTION_OUT);
             inventory.setStatus(Inventory.STATUS_PICK);
@@ -619,7 +648,7 @@ public class InventoryTransactionService extends AbstractQueryService {
             inventory.setRemarks(remark);
             this.queryManager.update(inventory);
         }
-        
+
         return inventory;
     }
 
@@ -630,16 +659,16 @@ public class InventoryTransactionService extends AbstractQueryService {
      * @return
      */
     public List<Inventory> finalReleaseInventories(List<Inventory> inventories) {
-        for(Inventory inv : inventories) {
+        for (Inventory inv : inventories) {
             inv.setReservedQty(inv.getInvQty());
             inv.setInvQty(0.0);
             inv.setLastTranCd(Inventory.TRANSACTION_OUT);
         }
-        
+
         this.queryManager.updateBatch(inventories);
         return inventories;
     }
-    
+
     /**
      * 최종 출고 확정 처리
      * 
@@ -653,7 +682,7 @@ public class InventoryTransactionService extends AbstractQueryService {
         this.queryManager.update(inventory);
         return inventory;
     }
-    
+
     /**
      * 재고 입고 적치 처리
      * 
@@ -664,53 +693,53 @@ public class InventoryTransactionService extends AbstractQueryService {
     public Inventory putAway(Long domainId, InvTransaction input) {
         // 재고 조회 & 기본 체크 포인트 체크
         Inventory inventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_IN);
-        
-        if(ValueUtil.isEqualIgnoreCase(inventory.getLastTranCd(), Inventory.TRANSACTION_IN)) {
+
+        if (ValueUtil.isEqualIgnoreCase(inventory.getLastTranCd(), Inventory.TRANSACTION_IN)) {
             throw ThrowUtil.newValidationErrorWithNoLog("이미 입고 처리되었습니다.");
         }
-        
-        if(ValueUtil.isEmpty(input.getLocCd())) {
+
+        if (ValueUtil.isEmpty(input.getLocCd())) {
             throw ThrowUtil.newValidationErrorWithNoLog("To 로케이션 값이 없습니다.");
         }
-        
-        if(ValueUtil.isEmpty(input.getInvQty()) || input.getInvQty() == 0.0f) {
+
+        if (ValueUtil.isEmpty(input.getInvQty()) || input.getInvQty() == 0.0f) {
             input.setInvQty(inventory.getInvQty());
         }
-        
-        if(input.getInvQty() > inventory.getInvQty()) {
+
+        if (input.getInvQty() > inventory.getInvQty()) {
             throw ThrowUtil.newValidationErrorWithNoLog("입력 수량이 재고 수량보다 큽니다.");
         }
-        
+
         // 로케이션 조회 & 기본 체크 포인트 체크
         Location toLoc = this.findAndCheckLocation(domainId, input.getLocCd(), Inventory.TRANSACTION_IN);
-        
+
         // 혼적 가능 여부 체크
         this.checkMixableLocation(toLoc, inventory.getSkuCd());
-        
+
         // 바코드 재고 수량, 작업자 입력 수량 체크
         double invQty = inventory.getInvQty();
         double inputQty = input.getInvQty();
-        
+
         // 바코드 재고 수량이 입력 수량보다 크다면 재고 분할 처리
-        if(invQty > inputQty) {
+        if (invQty > inputQty) {
             Inventory[] invs = this.splitInventory(inventory, inputQty, null, false);
             Inventory remainInv = invs[1];
             this.queryManager.update(remainInv);
             inventory = invs[0];
         }
-                
+
         // 적치 처리
         inventory.setLastTranCd(Inventory.TRANSACTION_IN);
         inventory.setStatus(Inventory.STATUS_STORED);
         this.queryManager.upsert(inventory);
-        
+
         // 재고 이동 처리
         this.moveInventory(inventory, input.getLocCd(), null);
-        
+
         // 재고 리턴
         return inventory;
     }
-    
+
     /**
      * 재고 이동 처리
      * 
@@ -721,52 +750,53 @@ public class InventoryTransactionService extends AbstractQueryService {
      */
     public Inventory moveInventory(Inventory inventory, String locCd, String remark) {
         // 이동 로케이션 값 체크
-        if(ValueUtil.isEmpty(locCd)) {
+        if (ValueUtil.isEmpty(locCd)) {
             throw ThrowUtil.newValidationErrorWithNoLog("이동 로케이션 값이 없습니다.");
         }
-        
+
         // 재고 조회 & 기본 체크 포인트 체크
         this.checkInventoryForTrx(inventory, Inventory.TRANSACTION_MOVE);
 
-        // 로케이션 조회 & 기본 체크 포인트 체크 
+        // 로케이션 조회 & 기본 체크 포인트 체크
         Location toLoc = this.findAndCheckLocation(inventory.getDomainId(), locCd, Inventory.TRANSACTION_MOVE);
-        
-        if(ValueUtil.isEqualIgnoreCase(inventory.getLocCd(), toLoc.getLocCd())) {
+
+        if (ValueUtil.isEqualIgnoreCase(inventory.getLocCd(), toLoc.getLocCd())) {
             throw ThrowUtil.newValidationErrorWithNoLog("이동하려는 로케이션이 재고의 로케이션과 동일합니다.");
         }
-        
-        if(ValueUtil.isNotEqual(inventory.getWhCd(), toLoc.getWhCd())) {
-            throw ThrowUtil.newValidationErrorWithNoLog("이동하려는 로케이션의 창고와 재고의 창고가 다릅니다. 창고간의 이동은 Transfer 트랜잭션으로 출고/입고 처리되어야 합니다.");
+
+        if (ValueUtil.isNotEqual(inventory.getWhCd(), toLoc.getWhCd())) {
+            throw ThrowUtil.newValidationErrorWithNoLog(
+                    "이동하려는 로케이션의 창고와 재고의 창고가 다릅니다. 창고간의 이동은 Transfer 트랜잭션으로 출고/입고 처리되어야 합니다.");
         }
-        
-        // From 로케이션 조회 & 기본 체크 포인트 체크 
+
+        // From 로케이션 조회 & 기본 체크 포인트 체크
         this.findAndCheckLocation(inventory.getDomainId(), inventory.getLocCd(), null);
-        
+
         // 혼적 가능 여부 체크
         this.checkMixableLocation(toLoc, inventory.getSkuCd());
-        
+
         // 로케이션에 동일 바코드 조회
         Inventory cond = new Inventory(inventory.getDomainId(), inventory.getBarcode(), locCd);
         cond.setSkuCd(inventory.getSkuCd());
         Inventory alreadyExistInv = this.queryManager.selectByCondition(Inventory.class, cond);
-        
+
         // 로케이션에 동일 바코드 재고가 이미 있다면 병합 처리
-        if(alreadyExistInv != null) {
+        if (alreadyExistInv != null) {
             return this.mergeInventory(alreadyExistInv, inventory, remark);
         }
-        
+
         // 재고 이동 트랜잭션 처리
         inventory.setLocCd(toLoc.getLocCd());
         inventory.setLastTranCd(Inventory.TRANSACTION_MOVE);
-        if(ValueUtil.isNotEmpty(remark)) {
+        if (ValueUtil.isNotEmpty(remark)) {
             inventory.setRemarks(remark);
         }
         this.queryManager.upsert(inventory);
-        
+
         // 재고 정보 리턴
         return inventory;
     }
-    
+
     /**
      * 재고 이동 처리
      * 
@@ -776,26 +806,26 @@ public class InventoryTransactionService extends AbstractQueryService {
      */
     public Inventory moveInventory(Long domainId, InvTransaction input) {
         // 이동 로케이션 값 체크
-        if(ValueUtil.isEmpty(input.getToLocCd())) {
+        if (ValueUtil.isEmpty(input.getToLocCd())) {
             throw ThrowUtil.newValidationErrorWithNoLog("이동 로케이션 값이 없습니다.");
         }
-        
+
         // 재고 이동 사유값 체크
-        if(ValueUtil.isEmpty(input.getReason())) {
+        if (ValueUtil.isEmpty(input.getReason())) {
             throw ThrowUtil.newValidationErrorWithNoLog("사유 값이 없습니다.");
         }
-        
+
         // 재고 조회 & 기본 체크 포인트 체크
         Inventory inventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_MOVE);
 
         // 재고 이동 처리
-        if(ValueUtil.isEmpty(input.getToQty())) {
+        if (ValueUtil.isEmpty(input.getToQty())) {
             return this.moveInventory(inventory, input.getToLocCd(), input.getReason());
         } else {
             return this.moveInventory(inventory, input.getToLocCd(), input.getToQty(), input.getReason());
         }
     }
-    
+
     /**
      * 재고 바코드에서 모든 재고를 이동하는 것이 아니고 moveQty 만큼만 이동 처리
      * 
@@ -808,19 +838,19 @@ public class InventoryTransactionService extends AbstractQueryService {
     public Inventory moveInventory(Inventory inventory, String locCd, double moveQty, String remark) {
         // 바코드 재고 수량, 작업자 입력 수량 체크
         double invQty = inventory.getInvQty();
-        
+
         // 바코드 재고 수량이 이동할 수량보다 크다면 재고 분할 처리
-        if(invQty > moveQty) {
+        if (invQty > moveQty) {
             Inventory[] invs = this.splitInventory(inventory, moveQty, null, false);
             Inventory remainInv = invs[1];
             this.queryManager.update(remainInv);
             inventory = invs[0];
         }
-        
+
         // 재고 이동 처리
         return this.moveInventory(inventory, locCd, remark);
     }
-        
+
     /**
      * 재고 스크랩 로케이션 이동 처리
      * 
@@ -829,41 +859,41 @@ public class InventoryTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory scrapInventory(Long domainId, InvTransaction input) {
-        if(ValueUtil.isEmpty(input.getToLocCd())) {
+        if (ValueUtil.isEmpty(input.getToLocCd())) {
             throw ThrowUtil.newValidationErrorWithNoLog("이동 로케이션 값이 없습니다.");
         }
-        
-        if(ValueUtil.isEmpty(input.getReason())) {
+
+        if (ValueUtil.isEmpty(input.getReason())) {
             throw ThrowUtil.newValidationErrorWithNoLog("사유 값이 없습니다.");
         }
-        
+
         // 재고 조회 & 기본 체크 포인트 체크
         Inventory inventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_SCRAP);
 
-        // 로케이션 조회 & 기본 체크 포인트 체크 
+        // 로케이션 조회 & 기본 체크 포인트 체크
         Location toLoc = this.findAndCheckLocation(domainId, input.getToLocCd(), Inventory.TRANSACTION_SCRAP);
-        
-        if(ValueUtil.isEqualIgnoreCase(inventory.getLocCd(), toLoc.getLocCd())) {
+
+        if (ValueUtil.isEqualIgnoreCase(inventory.getLocCd(), toLoc.getLocCd())) {
             throw ThrowUtil.newValidationErrorWithNoLog("이동하려는 로케이션이 재고의 로케이션과 동일합니다.");
         }
-        
-        if(ValueUtil.isNotEqual(inventory.getWhCd(), toLoc.getWhCd())) {
+
+        if (ValueUtil.isNotEqual(inventory.getWhCd(), toLoc.getWhCd())) {
             throw ThrowUtil.newValidationErrorWithNoLog("이동하려는 로케이션의 창고와 재고의 창고가 다릅니다.");
         }
-        
+
         // From 로케이션 조회 & 기본 체크 포인트 체크
         this.findAndCheckLocation(domainId, inventory.getLocCd(), Inventory.TRANSACTION_MOVE);
-        
+
         // 재고 이동 트랜잭션 처리
         inventory.setLocCd(toLoc.getLocCd());
         inventory.setRemarks(input.getReason());
         inventory.setLastTranCd(Inventory.TRANSACTION_SCRAP);
         this.queryManager.update(inventory);
-        
+
         // 리턴
         return inventory;
     }
-    
+
     /**
      * 재고 분할 처리
      * 
@@ -875,7 +905,7 @@ public class InventoryTransactionService extends AbstractQueryService {
         Inventory[] inv = this.splitInventory(domainId, input.getId(), input.getToQty(), input.getReason(), true);
         return inv[1];
     }
-    
+
     /**
      * 재고 분할 처리
      * 
@@ -886,22 +916,23 @@ public class InventoryTransactionService extends AbstractQueryService {
      * @param saveFlag
      * @return
      */
-    public Inventory[] splitInventory(Long domainId, String inventoryId, double splitQty, String remark, boolean saveFlag) {
-        if(splitQty <= 0.0f) {
+    public Inventory[] splitInventory(Long domainId, String inventoryId, double splitQty, String remark,
+            boolean saveFlag) {
+        if (splitQty <= 0.0f) {
             throw ThrowUtil.newValidationErrorWithNoLog("분할 수량 값이 없습니다.");
         }
-        
-        if(ValueUtil.isEmpty(remark)) {
+
+        if (ValueUtil.isEmpty(remark)) {
             throw ThrowUtil.newValidationErrorWithNoLog("사유 값이 없습니다.");
         }
-        
+
         // 재고 조회 & 기본 체크 포인트 체크
         Inventory inventory = this.findAndCheckInventory(domainId, inventoryId, Inventory.TRANSACTION_SPLIT);
 
         // 재고 분할 처리
         return this.splitInventory(inventory, splitQty, remark, saveFlag);
     }
-    
+
     /**
      * 재고 분할 처리
      * 
@@ -913,8 +944,8 @@ public class InventoryTransactionService extends AbstractQueryService {
      */
     public Inventory[] splitInventory(Inventory inventory, double splitQty, String remark, boolean saveFlag) {
         double remainQty = inventory.getInvQty() - splitQty;
-        
-        if(remainQty < 0) {
+
+        if (remainQty < 0) {
             throw ThrowUtil.newValidationErrorWithNoLog("분할 수량이 재고 수량보다 큽니다.");
         }
 
@@ -922,23 +953,23 @@ public class InventoryTransactionService extends AbstractQueryService {
         inventory.setInvQty(remainQty);
         inventory.setRemarks(remark);
         inventory.setLastTranCd(Inventory.TRANSACTION_SPLIT);
-        if(saveFlag) {
+        if (saveFlag) {
             this.queryManager.update(inventory);
         }
-        
+
         // 재고 복사
         Inventory splitInv = ValueUtil.populate(inventory, new Inventory());
         splitInv.setId(null);
         splitInv.setInvQty(splitQty);
-        
-        if(saveFlag) {
+
+        if (saveFlag) {
             this.queryManager.insert(splitInv);
         }
-        
+
         // 리턴
         return new Inventory[] { splitInv, inventory };
     }
-    
+
     /**
      * 두 개의 재고 바코드 병합 처리
      * 
@@ -950,15 +981,15 @@ public class InventoryTransactionService extends AbstractQueryService {
     public Inventory mergeInventory(Inventory mainInv, Inventory mergeInv, String remark) {
         mainInv.setInvQty(mainInv.getInvQty() + mergeInv.getInvQty());
         mainInv.setLastTranCd(Inventory.TRANSACTION_MERGE);
-        if(ValueUtil.isNotEmpty(remark)) {
+        if (ValueUtil.isNotEmpty(remark)) {
             mainInv.setRemarks(remark);
         }
-        
+
         this.queryManager.update(mainInv, "lastTranCd", "invQty", "updatedAt");
         this.queryManager.delete(mergeInv);
         return mainInv;
     }
-    
+
     /**
      * 재고 병합 처리
      * 
@@ -970,7 +1001,7 @@ public class InventoryTransactionService extends AbstractQueryService {
         // TODO 구현 ...
         return null;
     }
-    
+
     /**
      * 재고 홀드 처리
      * 
@@ -979,23 +1010,23 @@ public class InventoryTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory holdInventory(Long domainId, InvTransaction input) {
-        if(ValueUtil.isEmpty(input.getReason())) {
+        if (ValueUtil.isEmpty(input.getReason())) {
             throw ThrowUtil.newValidationErrorWithNoLog("사유 값이 없습니다.");
         }
-        
+
         // 재고 조회 & 기본 체크 포인트 체크
         Inventory inventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_HOLD);
-        
+
         // 재고 홀드 트랜잭션 처리
         inventory.setStatus(Inventory.STATUS_LOCK);
         inventory.setRemarks(input.getReason());
         inventory.setLastTranCd(Inventory.TRANSACTION_HOLD);
         this.queryManager.update(inventory);
-        
+
         // 리턴
         return inventory;
     }
-    
+
     /**
      * 재고 홀드 해제 처리
      * 
@@ -1004,23 +1035,23 @@ public class InventoryTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory releaseHoldInventory(Long domainId, InvTransaction input) {
-        if(ValueUtil.isEmpty(input.getReason())) {
+        if (ValueUtil.isEmpty(input.getReason())) {
             throw ThrowUtil.newValidationErrorWithNoLog("사유 값이 없습니다.");
         }
-        
+
         // 재고 조회 & 기본 체크 포인트 체크
         Inventory inventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_RELEASE_HOLD);
-        
+
         // 재고 릴리즈 트랜잭션 처리 - 보관 중 상태로 전환 ...
         inventory.setStatus(Inventory.STATUS_STORED);
         inventory.setRemarks(input.getReason());
         inventory.setLastTranCd(Inventory.TRANSACTION_RELEASE_HOLD);
         this.queryManager.update(inventory);
-        
+
         // 리턴
         return inventory;
     }
-    
+
     /**
      * 재고 조정 처리
      * 
@@ -1029,27 +1060,27 @@ public class InventoryTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory adjustInventory(Long domainId, InvTransaction input) {
-        if(ValueUtil.isEmpty(input.getToQty())) {
+        if (ValueUtil.isEmpty(input.getToQty())) {
             throw ThrowUtil.newValidationErrorWithNoLog("재고 조정 수량 값이 없습니다.");
         }
-        
-        if(ValueUtil.isEmpty(input.getReason())) {
+
+        if (ValueUtil.isEmpty(input.getReason())) {
             throw ThrowUtil.newValidationErrorWithNoLog("사유 값이 없습니다.");
         }
-        
+
         // 재고 조회 & 기본 체크 포인트 체크
         Inventory inventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_ADJUST);
-        
+
         // 재고 조정 트랜잭션 처리
         inventory.setInvQty(input.getToQty());
         inventory.setRemarks(input.getReason());
         inventory.setLastTranCd(Inventory.TRANSACTION_ADJUST);
         this.queryManager.update(inventory);
-        
+
         // 리턴
         return inventory;
     }
-    
+
     /**
      * 재고 ID로 재고 정보 조회 & 기본 체크 포인트 체크
      * 
@@ -1065,7 +1096,7 @@ public class InventoryTransactionService extends AbstractQueryService {
         this.checkInventoryForTrx(inventory, tranCd);
         return inventory;
     }
-    
+
     /**
      * 재고 트랜잭션 전 재고 상태 체크
      * 
@@ -1074,36 +1105,36 @@ public class InventoryTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory checkInventoryForTrx(Inventory inventory, String tranCd) {
-        if(inventory == null) {
+        if (inventory == null) {
             throw ThrowUtil.newValidationErrorWithNoLog("존재하지 않는 재고 바코드입니다.");
         }
-        
-        if(inventory.getDelFlag()) {
+
+        if (inventory.getDelFlag()) {
             throw ThrowUtil.newValidationErrorWithNoLog("이미 종료된 재고 바코드입니다.");
         }
-        
-        if(inventory.getInvQty() == 0) {
+
+        if (inventory.getInvQty() == 0) {
             throw ThrowUtil.newValidationErrorWithNoLog("재고 수량이 0 입니다.");
         }
-        
-        if(ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_HOLD)) {
-            if(ValueUtil.isEqualIgnoreCase(inventory.getStatus(), Inventory.STATUS_LOCK)) {
+
+        if (ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_HOLD)) {
+            if (ValueUtil.isEqualIgnoreCase(inventory.getStatus(), Inventory.STATUS_LOCK)) {
                 throw ThrowUtil.newValidationErrorWithNoLog("이미 홀드 처리된 재고입니다.");
             }
-            
-        } else if(ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_RELEASE_HOLD)) {
-            if(ValueUtil.isNotEqual(inventory.getStatus(), Inventory.STATUS_LOCK)) {
+
+        } else if (ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_RELEASE_HOLD)) {
+            if (ValueUtil.isNotEqual(inventory.getStatus(), Inventory.STATUS_LOCK)) {
                 throw ThrowUtil.newValidationErrorWithNoLog("홀드 처리된 재고가 아닙니다.");
             }
         } else {
-            if(ValueUtil.isEqualIgnoreCase(inventory.getStatus(), Inventory.STATUS_LOCK)) {
+            if (ValueUtil.isEqualIgnoreCase(inventory.getStatus(), Inventory.STATUS_LOCK)) {
                 throw ThrowUtil.newValidationErrorWithNoLog("홀드 처리된 재고입니다.");
             }
         }
-        
+
         return inventory;
     }
-    
+
     /**
      * 로케이션 코드로 로케이션 조회 & 기본 체크 포인트 체크
      * 
@@ -1117,59 +1148,438 @@ public class InventoryTransactionService extends AbstractQueryService {
         condition.setDomainId(domainId);
         condition.setLocCd(locCd);
         Location location = this.queryManager.selectByCondition(Location.class, condition);
-        
-        if(location == null) {
+
+        if (location == null) {
             throw ThrowUtil.newValidationErrorWithNoLog("로케이션 [" + locCd + "]이 존재하지 않습니다.");
         }
-        
-        if(location.getDelFlag()) {
+
+        if (location.getDelFlag()) {
             throw ThrowUtil.newValidationErrorWithNoLog("로케이션 [" + locCd + "]은 사용하지 않는 로케이션입니다.");
         }
-        
-        if(ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_MOVE)) {
-            if(ValueUtil.isEqualIgnoreCase(location.getRestrictType(), Inventory.TRANSACTION_MOVE)) {
+
+        if (ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_MOVE)) {
+            if (ValueUtil.isEqualIgnoreCase(location.getRestrictType(), Inventory.TRANSACTION_MOVE)) {
                 throw ThrowUtil.newValidationErrorWithNoLog("이동 제한이 걸린 로케이션이라 이동이 불가합니다.");
             }
         }
-        
-        if(ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_IN)) {
-            if(ValueUtil.isEqualIgnoreCase(location.getLocType(), "RCV-WAIT")) {
+
+        if (ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_IN)) {
+            if (ValueUtil.isEqualIgnoreCase(location.getLocType(), "RCV-WAIT")) {
                 throw ThrowUtil.newValidationErrorWithNoLog("입고 대기 존에 적치는 불가능합니다.");
             }
-            
-            if(ValueUtil.isEqualIgnoreCase(location.getRestrictType(), Inventory.TRANSACTION_IN)) {
+
+            if (ValueUtil.isEqualIgnoreCase(location.getRestrictType(), Inventory.TRANSACTION_IN)) {
                 throw ThrowUtil.newValidationErrorWithNoLog("입고 제한이 걸린 로케이션이라 입고가 불가합니다.");
             }
         }
-        
-        if(ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_OUT)) {
-            if(ValueUtil.isEqualIgnoreCase(location.getRestrictType(), Inventory.TRANSACTION_OUT)) {
+
+        if (ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_OUT)) {
+            if (ValueUtil.isEqualIgnoreCase(location.getRestrictType(), Inventory.TRANSACTION_OUT)) {
                 throw ThrowUtil.newValidationErrorWithNoLog("출고 제한이 걸린 로케이션이라 출고가 불가합니다.");
             }
         }
-        
-        if(ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_SCRAP)) {
-            if(ValueUtil.isNotEqual(location.getLocType(), "DEFECT")) {
+
+        if (ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_SCRAP)) {
+            if (ValueUtil.isNotEqual(location.getLocType(), "DEFECT")) {
                 throw ThrowUtil.newValidationErrorWithNoLog("이동하려는 로케이션 유형이 불량(DEFECT) 유형이 아닙니다.");
             }
         }
-        
+
         return location;
     }
-    
+
     /**
      * 로케이션 혼적 체크
-     * 
+     *
      * @param toLoc
      * @param skuCd
      */
     public void checkMixableLocation(Location toLoc, String skuCd) {
-        if(toLoc.getMixableFlag() == null || !toLoc.getMixableFlag()) {
+        if (toLoc.getMixableFlag() == null || !toLoc.getMixableFlag()) {
             String sql = "select distinct(sku_cd) from inventories where domain_id = :domainId and loc_cd = :locCd and del_flag = false and inv_qty > 0";
-            List<String> skuList = this.queryManager.selectListBySql(sql, ValueUtil.newMap("domainId,locCd", toLoc.getDomainId(), toLoc.getLocCd()), String.class, 0, 0);
-            if(skuList.size() >= 1 && !skuList.contains(skuCd)) {
+            List<String> skuList = this.queryManager.selectListBySql(sql,
+                    ValueUtil.newMap("domainId,locCd", toLoc.getDomainId(), toLoc.getLocCd()), String.class, 0, 0);
+            if (skuList.size() >= 1 && !skuList.contains(skuCd)) {
                 throw ThrowUtil.newValidationErrorWithNoLog("다른 상품과 혼적이 불가한 로케이션입니다.");
             }
         }
+    }
+
+    /********************************************************************************************************
+     * 대 시 보 드 A P I
+     ********************************************************************************************************/
+
+    /**
+     * 대시보드 - 재고 현황 조회
+     *
+     * @param comCd 화주사 코드
+     * @param whCd  창고 코드
+     * @return 재고 현황 Map
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getDashboardStatusCounts(String comCd, String whCd) {
+        Long domainId = xyz.elidom.sys.entity.Domain.currentDomainId();
+
+        // 전체 SKU 수 및 총 수량
+        String totalSql = "SELECT COUNT(DISTINCT sku_cd) as sku_count, SUM(inv_qty) as total_qty " +
+                "FROM inventories " +
+                "WHERE domain_id = :domainId " +
+                "AND del_flag = 'N' ";
+
+        if (ValueUtil.isNotEmpty(comCd)) {
+            totalSql += "AND com_cd = :comCd ";
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            totalSql += "AND wh_cd = :whCd ";
+        }
+
+        Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+        if (ValueUtil.isNotEmpty(comCd)) {
+            params.put("comCd", comCd);
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            params.put("whCd", whCd);
+        }
+
+        Map<String, Object> totalResult = (Map<String, Object>) this.queryManager.selectBySql(totalSql, params,
+                Map.class);
+
+        // 상태별 수량
+        String statusSql = "SELECT status, SUM(inv_qty) as qty " +
+                "FROM inventories " +
+                "WHERE domain_id = :domainId " +
+                "AND del_flag = 'N' ";
+
+        if (ValueUtil.isNotEmpty(comCd)) {
+            statusSql += "AND com_cd = :comCd ";
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            statusSql += "AND wh_cd = :whCd ";
+        }
+
+        statusSql += "GROUP BY status";
+
+        List<Map<String, Object>> statusResults = (List<Map<String, Object>>) (List<?>) this.queryManager
+                .selectListBySql(statusSql, params, Map.class, 0, 0);
+
+        Map<String, Object> statusCounts = ValueUtil.newMap(
+                "total_sku,total_qty,stored_qty,reserved_qty,picking_qty,locked_qty,bad_qty,shortage_count",
+                ValueUtil.toInteger(totalResult.get("sku_count"), 0),
+                ValueUtil.toInteger(totalResult.get("total_qty"), 0),
+                0, 0, 0, 0, 0, 0);
+
+        for (Map<String, Object> row : statusResults) {
+            String status = ValueUtil.toString(row.get("status"));
+            Integer qty = ValueUtil.toInteger(row.get("qty"));
+
+            if (ValueUtil.isEqual(status, Inventory.STATUS_STORED)) {
+                statusCounts.put("stored_qty", qty);
+            } else if (ValueUtil.isEqual(status, Inventory.STATUS_RESERVED)) {
+                statusCounts.put("reserved_qty", qty);
+            } else if (ValueUtil.isEqual(status, Inventory.STATUS_PICK)) {
+                statusCounts.put("picking_qty", qty);
+            } else if (ValueUtil.isEqual(status, Inventory.STATUS_LOCK)) {
+                statusCounts.put("locked_qty", qty);
+            } else if (ValueUtil.isEqual(status, Inventory.STATUS_BAD)) {
+                statusCounts.put("bad_qty", qty);
+            }
+        }
+
+        // TODO: 부족 재고 계산 (safety_stock 컬럼이 있는 경우)
+        // String shortageSql = "SELECT COUNT(*) as count FROM inventories WHERE
+        // inv_qty < safety_stock";
+
+        return statusCounts;
+    }
+
+    /**
+     * 대시보드 - 재고 상태별 통계 조회
+     *
+     * @param comCd 화주사 코드
+     * @param whCd  창고 코드
+     * @return 상태별 수량 Map
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getDashboardStatusStats(String comCd, String whCd) {
+        Long domainId = xyz.elidom.sys.entity.Domain.currentDomainId();
+
+        String sql = "SELECT status, SUM(inv_qty) as qty " +
+                "FROM inventories " +
+                "WHERE domain_id = :domainId " +
+                "AND del_flag = 'N' " +
+                "AND status IN ('" + Inventory.STATUS_STORED + "', '" +
+                Inventory.STATUS_RESERVED + "', '" +
+                Inventory.STATUS_PICK + "', '" +
+                Inventory.STATUS_LOCK + "', '" +
+                Inventory.STATUS_BAD + "') ";
+
+        if (ValueUtil.isNotEmpty(comCd)) {
+            sql += "AND com_cd = :comCd ";
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            sql += "AND wh_cd = :whCd ";
+        }
+
+        sql += "GROUP BY status";
+
+        Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+        if (ValueUtil.isNotEmpty(comCd)) {
+            params.put("comCd", comCd);
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            params.put("whCd", whCd);
+        }
+
+        List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql,
+                params, Map.class, 0, 0);
+
+        Map<String, Object> statusStats = ValueUtil.newMap(
+                "STORED,RESERVED,PICKING,LOCKED,BAD",
+                0, 0, 0, 0, 0);
+
+        for (Map<String, Object> row : results) {
+            String status = ValueUtil.toString(row.get("status"));
+            Integer qty = ValueUtil.toInteger(row.get("qty"));
+
+            if (ValueUtil.isEqual(status, Inventory.STATUS_STORED)) {
+                statusStats.put("STORED", qty);
+            } else if (ValueUtil.isEqual(status, Inventory.STATUS_RESERVED)) {
+                statusStats.put("RESERVED", qty);
+            } else if (ValueUtil.isEqual(status, Inventory.STATUS_PICK)) {
+                statusStats.put("PICKING", qty);
+            } else if (ValueUtil.isEqual(status, Inventory.STATUS_LOCK)) {
+                statusStats.put("LOCKED", qty);
+            } else if (ValueUtil.isEqual(status, Inventory.STATUS_BAD)) {
+                statusStats.put("BAD", qty);
+            }
+        }
+
+        return statusStats;
+    }
+
+    /**
+     * 대시보드 - 유효기한 상태별 통계 조회
+     *
+     * @param comCd 화주사 코드
+     * @param whCd  창고 코드
+     * @return 유효기한 상태별 통계 Map
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getDashboardExpireStats(String comCd, String whCd) {
+        Long domainId = xyz.elidom.sys.entity.Domain.currentDomainId();
+
+        String sql = "SELECT " +
+                "  expire_status, " +
+                "  COUNT(DISTINCT sku_cd) as sku_count, " +
+                "  SUM(inv_qty) as qty " +
+                "FROM inventories " +
+                "WHERE domain_id = :domainId " +
+                "AND del_flag = 'N' ";
+
+        if (ValueUtil.isNotEmpty(comCd)) {
+            sql += "AND com_cd = :comCd ";
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            sql += "AND wh_cd = :whCd ";
+        }
+
+        sql += "GROUP BY expire_status";
+
+        Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+        if (ValueUtil.isNotEmpty(comCd)) {
+            params.put("comCd", comCd);
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            params.put("whCd", whCd);
+        }
+
+        List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql,
+                params, Map.class, 0, 0);
+
+        Map<String, Object> expireStats = ValueUtil.newMap("NORMAL", ValueUtil.newMap("sku_count,qty", 0, 0));
+        expireStats.put("IMMINENT", ValueUtil.newMap("sku_count,qty", 0, 0));
+        expireStats.put("EXPIRED", ValueUtil.newMap("sku_count,qty", 0, 0));
+
+        for (Map<String, Object> row : results) {
+            String expireStatus = ValueUtil.toString(row.get("expire_status"));
+            Integer skuCount = ValueUtil.toInteger(row.get("sku_count"));
+            Integer qty = ValueUtil.toInteger(row.get("qty"));
+
+            if (ValueUtil.isEqual(expireStatus, Inventory.EXPIRE_STATUS_NORMAL)) {
+                expireStats.put("NORMAL", ValueUtil.newMap("sku_count,qty", skuCount, qty));
+            } else if (ValueUtil.isEqual(expireStatus, Inventory.EXPIRE_STATUS_IMMINENT)) {
+                expireStats.put("IMMINENT", ValueUtil.newMap("sku_count,qty", skuCount, qty));
+            } else if (ValueUtil.isEqual(expireStatus, Inventory.EXPIRE_STATUS_EXPIRED)) {
+                expireStats.put("EXPIRED", ValueUtil.newMap("sku_count,qty", skuCount, qty));
+            }
+        }
+
+        return expireStats;
+    }
+
+    /**
+     * 대시보드 - 로케이션 유형별 통계 조회
+     *
+     * @param comCd 화주사 코드
+     * @param whCd  창고 코드
+     * @return 로케이션 유형별 통계 Map
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getDashboardLocationStats(String comCd, String whCd) {
+        Long domainId = xyz.elidom.sys.entity.Domain.currentDomainId();
+
+        String sql = "SELECT " +
+                "  CASE " +
+                "    WHEN l.loc_type IN ('STORAGE', 'RACK') THEN 'STORAGE' " +
+                "    WHEN l.loc_type = 'PICKABLE' THEN 'PICKING' " +
+                "    ELSE 'OTHER' " +
+                "  END as loc_group, " +
+                "  COUNT(l.id) as total, " +
+                "  COUNT(i.id) as used " +
+                "FROM locations l " +
+                "LEFT JOIN inventories i ON l.loc_cd = i.loc_cd " +
+                "  AND i.domain_id = :domainId " +
+                "  AND i.inv_qty > 0 " +
+                "  AND i.del_flag = 'N' ";
+
+        if (ValueUtil.isNotEmpty(comCd)) {
+            sql += "  AND i.com_cd = :comCd ";
+        }
+
+        sql += "WHERE l.domain_id = :domainId ";
+
+        if (ValueUtil.isNotEmpty(whCd)) {
+            sql += "AND l.wh_cd = :whCd ";
+        }
+
+        sql += "GROUP BY " +
+                "  CASE " +
+                "    WHEN l.loc_type IN ('STORAGE', 'RACK') THEN 'STORAGE' " +
+                "    WHEN l.loc_type = 'PICKABLE' THEN 'PICKING' " +
+                "    ELSE 'OTHER' " +
+                "  END";
+
+        Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+        if (ValueUtil.isNotEmpty(comCd)) {
+            params.put("comCd", comCd);
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            params.put("whCd", whCd);
+        }
+
+        List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql,
+                params, Map.class, 0, 0);
+
+        Map<String, Object> locationStats = ValueUtil.newMap("STORAGE",
+                ValueUtil.newMap("total,used,usage_rate", 0, 0, 0.0));
+        locationStats.put("PICKING", ValueUtil.newMap("total,used,usage_rate", 0, 0, 0.0));
+        locationStats.put("OTHER", ValueUtil.newMap("total,used,usage_rate", 0, 0, 0.0));
+
+        for (Map<String, Object> row : results) {
+            String locGroup = ValueUtil.toString(row.get("loc_group"));
+            Integer total = ValueUtil.toInteger(row.get("total"));
+            Integer used = ValueUtil.toInteger(row.get("used"));
+            Double usageRate = total > 0 ? (used * 100.0 / total) : 0.0;
+
+            locationStats.put(locGroup, ValueUtil.newMap("total,used,usage_rate", total, used, usageRate));
+        }
+
+        return locationStats;
+    }
+
+    /**
+     * 대시보드 - 알림 데이터 조회
+     *
+     * @param comCd 화주사 코드
+     * @param whCd  창고 코드
+     * @return 알림 목록
+     */
+    public List<Map<String, Object>> getDashboardAlerts(String comCd, String whCd) {
+        Long domainId = xyz.elidom.sys.entity.Domain.currentDomainId();
+        List<Map<String, Object>> alerts = new ArrayList<>();
+
+        Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+        if (ValueUtil.isNotEmpty(comCd)) {
+            params.put("comCd", comCd);
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            params.put("whCd", whCd);
+        }
+
+        // 1. 유효기한 임박 상품 조회 (IMMINENT)
+        String imminentSql = "SELECT COUNT(DISTINCT sku_cd) as count " +
+                "FROM inventories " +
+                "WHERE domain_id = :domainId " +
+                "AND expire_status = '" + Inventory.EXPIRE_STATUS_IMMINENT + "' " +
+                "AND (del_flag is null OR del_flag = false) ";
+
+        if (ValueUtil.isNotEmpty(comCd)) {
+            imminentSql += "AND com_cd = :comCd ";
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            imminentSql += "AND wh_cd = :whCd ";
+        }
+
+        int imminentCount = this.queryManager.selectBySql(imminentSql, params, Integer.class);
+        if (imminentCount > 0) {
+            Map<String, Object> alert = ValueUtil.newMap(
+                    "type,icon,message",
+                    "warning",
+                    "⏰",
+                    "유효기한 임박 상품 " + imminentCount + "건이 있습니다.");
+            alerts.add(alert);
+        }
+
+        // 2. 유효기한 만료 상품 조회 (EXPIRED)
+        String expiredSql = "SELECT COUNT(DISTINCT sku_cd) as count " +
+                "FROM inventories " +
+                "WHERE domain_id = :domainId " +
+                "AND expire_status = '" + Inventory.EXPIRE_STATUS_EXPIRED + "' " +
+                "AND (del_flag is null OR del_flag = false) ";
+
+        if (ValueUtil.isNotEmpty(comCd)) {
+            expiredSql += "AND com_cd = :comCd ";
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            expiredSql += "AND wh_cd = :whCd ";
+        }
+
+        int expiredCount = this.queryManager.selectBySql(expiredSql, params, Integer.class);
+        if (expiredCount > 0) {
+            Map<String, Object> alert = ValueUtil.newMap(
+                    "type,icon,message",
+                    "error",
+                    "🚫",
+                    "유효기한 만료 상품 " + expiredCount + "건이 있습니다.");
+            alerts.add(alert);
+        }
+
+        // 3. 장기 재고 조회 (90일 이상 미출고)
+        String longTermSql = "SELECT COUNT(DISTINCT sku_cd) as count " +
+                "FROM inventories " +
+                "WHERE domain_id = :domainId " +
+                "AND del_flag = 'N' " +
+                "AND updated_at < CURRENT_DATE - INTERVAL '90 days' ";
+
+        if (ValueUtil.isNotEmpty(comCd)) {
+            longTermSql += "AND com_cd = :comCd ";
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            longTermSql += "AND wh_cd = :whCd ";
+        }
+
+        int longTermCount = this.queryManager.selectBySql(longTermSql, params, Integer.class);
+        if (longTermCount > 0) {
+            Map<String, Object> alert = ValueUtil.newMap(
+                    "type,icon,message",
+                    "info",
+                    "📊",
+                    "90일 이상 미출고 재고 " + longTermCount + "건이 있습니다.");
+            alerts.add(alert);
+        }
+
+        // TODO: 4. 부족 재고 알림 (safety_stock 컬럼이 있는 경우)
+
+        return alerts;
     }
 }
