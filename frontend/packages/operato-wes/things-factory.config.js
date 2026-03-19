@@ -4,6 +4,9 @@ import bootstrap from './dist-client/bootstrap'
 export default {
   route,
   routes: [
+    { tagname: 'inbound-home', page: 'inbound-home' },
+    { tagname: 'outbound-home', page: 'outbound-home' },
+    { tagname: 'stock-home', page: 'stock-home' },
     { tagname: 'rwa-home', page: 'rwa-home' },
     { tagname: 'vas-home', page: 'vas-home' },
     { tagname: 'vas-work-monitor', page: 'vas-work-monitor' },
