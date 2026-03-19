@@ -4,7 +4,7 @@
 - Entity 클래스명 (예: `RwaOrder`) 또는 패키지 경로 (예: `operato.wms.rwa.entity.RwaOrder`)
 - 예시: `/entity_meta_by_entity RwaOrder`
 
-> **참조 문서**: `docs/development/operato-service-dev-guide.md`
+> **참조 문서**: `docs/development/backend-dev-guide.md`
 
 ## 처리 절차
 
@@ -341,4 +341,4 @@ VALUES (%s, %s, %s, %s, %s)
 - `ko` 이외 locale의 display는 미번역 플레이스홀더 (`label.{field_name}`) → `/translate`로 번역
 - 이미 존재하는 데이터는 SKIP (중복 INSERT 방지)
 - 마스터-디테일 관계에서 마스터 Entity가 DB에 없으면 경고 출력 후 `master_id = NULL`로 진행
-- `operato-service-dev-guide.md` 문서의 규칙을 최우선으로 따른다
+- `backend-dev-guide.md` 문서의 규칙을 최우선으로 따른다

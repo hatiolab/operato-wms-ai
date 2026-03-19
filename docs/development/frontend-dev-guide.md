@@ -1,0 +1,579 @@
+# Operato WMS 프론트엔드 개발 가이드
+
+> 이 문서는 커스텀 화면(대시보드, 팝업, 모니터링 등) 개발 시 사용하는
+> 프론트엔드 유틸리티와 패턴을 정리한 가이드입니다.
+
+---
+
+## 목차
+
+1. [import 및 기본 구조](#1-import-및-기본-구조)
+2. [ServiceUtil — 백엔드 API 호출](#2-serviceutil--백엔드-api-호출)
+3. [UiUtil — 페이지 이동 및 UI 유틸리티](#3-uiutil--페이지-이동-및-ui-유틸리티)
+4. [openPopup — 팝업 열기](#4-openpopup--팝업-열기)
+5. [데이터 컨벤션 (snake_case)](#5-데이터-컨벤션-snake_case)
+6. [자주 하는 실수와 해결책](#6-자주-하는-실수와-해결책)
+
+---
+
+## 1. import 및 기본 구조
+
+### 필수 import
+
+```javascript
+import { css, html } from 'lit-element'
+import { i18next, localize } from '@operato/i18n'
+import { PageView } from '@operato/shell'
+import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
+```
+
+### 팝업을 여는 화면에서 추가
+
+```javascript
+import { openPopup } from '@operato/layout'
+```
+
+### 팝업 컴포넌트에서 추가
+
+```javascript
+import { UiUtil } from '@operato-app/metapage/dist-client'
+// UiUtil.closePopupBy(this) 로 팝업 닫기
+```
+
+### 페이지 클래스 기본 구조
+
+```javascript
+class MyPage extends localize(i18next)(PageView) {
+  static get styles() { return [css`...`] }
+  static get properties() { return { ... } }
+
+  get context() {
+    return { title: '페이지 제목' }
+  }
+
+  render() { return html`...` }
+
+  async pageUpdated(changes, lifecycle, before) {
+    if (this.active) {
+      await this._loadData()
+    }
+  }
+
+  pageDisposed(lifecycle) {
+    // 타이머, 차트 등 리소스 정리
+  }
+}
+
+window.customElements.define('my-page', MyPage)
+```
+
+---
+
+## 2. ServiceUtil — 백엔드 API 호출
+
+> **소스 위치**: `frontend/packages/metapage/client/utils/service-util.js`
+
+**반드시 `ServiceUtil`을 사용해야 하는 이유**:
+- 인증 토큰(access_token)을 자동으로 헤더에 포함
+- 도메인 컨텍스트를 자동 처리
+- 에러 발생 시 토스트 메시지 자동 표시
+- `fetch()`를 직접 사용하면 인증이 연동되지 않아 401/403 에러 발생
+
+### 2.1 restGet — GET 요청
+
+```javascript
+static async restGet(url, params)
+```
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `url` | String | 서비스 URL (`/rest/` 접두사 불필요, 자동 추가) |
+| `params` | Object | 쿼리 파라미터 (optional) |
+| **반환** | Object \| null | 응답 데이터 또는 null |
+
+```javascript
+// 단순 조회
+const data = await ServiceUtil.restGet('rwa_trx/dashboard/status-counts')
+
+// 파라미터 포함 조회
+const warehouses = await ServiceUtil.restGet('warehouses/getWarehouseList', {})
+const orders = await ServiceUtil.restGet('picking_orders/getPickedOrderList/byDate', {
+  startDate: '2026-03-01',
+  endDate: '2026-03-18'
+})
+
+// 경로에 ID 포함
+const bomItems = await ServiceUtil.restGet(`vas_boms/${bomId}/items`)
+```
+
+### 2.2 restPost — POST 요청
+
+```javascript
+static async restPost(url, params, confirmTitleKey, confirmMsgKey, successCallback, failureCallback)
+```
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `url` | String | 서비스 URL |
+| `params` | Object | 요청 body |
+| `confirmTitleKey` | String | 확인 팝업 타이틀 용어 키 (optional, null이면 팝업 안 띄움) |
+| `confirmMsgKey` | String | 확인 팝업 메시지 용어 키 (optional) |
+| `successCallback` | Function | 성공 콜백 (optional) |
+| `failureCallback` | Function | 실패 콜백 (optional) |
+| **반환** | Object | 응답 데이터 |
+
+```javascript
+// 기본 POST (확인 팝업 없이)
+const result = await ServiceUtil.restPost('vas_trx/vas_orders', {
+  com_cd: 'COM001',
+  wh_cd: 'WH001',
+  plan_qty: 100
+})
+
+// 확인 팝업 포함 POST
+await ServiceUtil.restPost(
+  'vas_trx/vas_orders/123/start',
+  null,
+  'title.confirm',
+  'text.are_you_sure'
+)
+
+// 경로에 ID 포함 (액션 API)
+await ServiceUtil.restPost(`vas_trx/vas_orders/${order.id}/complete`)
+```
+
+### 2.3 restPut — PUT 요청
+
+```javascript
+static async restPut(url, params, confirmTitleKey, confirmMsgKey, successCallback, failureCallback)
+```
+
+시그니처는 `restPost`와 동일합니다.
+
+```javascript
+await ServiceUtil.restPut('vas_orders/update', updateData, null, null, () => {
+  console.log('업데이트 성공')
+})
+```
+
+### 2.4 restDelete — DELETE 요청
+
+```javascript
+static async restDelete(url, params, confirmTitleKey, confirmMsgKey, successCallback, failureCallback)
+```
+
+시그니처는 `restPost`와 동일합니다.
+
+```javascript
+await ServiceUtil.restDelete('vas_orders/123', null, null, null, () => {
+  console.log('삭제 성공')
+})
+```
+
+### 2.5 searchByPagination — 페이지네이션 조회
+
+```javascript
+static async searchByPagination(url, filters, sortings, page, limit, selectFields)
+```
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `url` | String | 조회 서비스 URL (엔티티 테이블명) |
+| `filters` | Array | 조회 조건 `[{ name, operator, value }, ...]` |
+| `sortings` | Array | 정렬 조건 (null 가능) |
+| `page` | Number | 현재 페이지 (기본값: 1) |
+| `limit` | Number | 페이지당 건수 (기본값: 50) |
+| `selectFields` | String \| Array | 조회 필드 (optional) |
+| **반환** | Object \| null | `{ items: [...], total: 100 }` 또는 null |
+
+```javascript
+// 기본 조회
+const data = await ServiceUtil.searchByPagination('vas_boms', filters, null, 1, 100)
+const items = data?.items || []
+
+// 필터 조건 구성
+const filters = [
+  { name: 'com_cd', value: 'COM001' },
+  { name: 'status', operator: 'eq', value: 'APPROVED' }
+]
+
+// 재고 조회 (1건만)
+const stockData = await ServiceUtil.searchByPagination('inventories', [
+  { name: 'sku_cd', value: item.sku_cd },
+  { name: 'wh_cd', value: 'WH001' }
+], null, 1, 1)
+```
+
+### 2.6 findOne — 단건 조회
+
+```javascript
+static async findOne(url, id, selectFields)
+```
+
+```javascript
+const order = await ServiceUtil.findOne('vas_orders', orderId)
+```
+
+### 2.7 기타 유용한 메소드
+
+```javascript
+// 공통코드 조회
+const codeList = await ServiceUtil.codeItems('VAS_ORDER_STATUS')
+
+// 그리드 다중 업데이트
+await ServiceUtil.updateMultipleData(grist, 'vas_orders')
+
+// 그리드 선택 항목 삭제
+await ServiceUtil.deleteListByGristSelected(grist, 'vas_orders')
+
+// Excel 파일 다운로드
+await ServiceUtil.excelFileDownload('reports/vas-orders', params, 'VAS주문목록.xlsx')
+```
+
+---
+
+## 3. UiUtil — 페이지 이동 및 UI 유틸리티
+
+> **소스 위치**: `frontend/packages/metapage/client/utils/ui-util.js`
+
+### 3.1 pageNavigate — 페이지 이동
+
+```javascript
+static pageNavigate(url, params)
+```
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `url` | String | 페이지명 (route에 등록된 값) |
+| `params` | Object \| null | 페이지 파라미터 |
+| **반환** | void | |
+
+**반드시 `UiUtil.pageNavigate`를 사용해야 하는 이유**:
+- Things Factory 라우팅 시스템과 올바르게 연동
+- `history.pushState`를 직접 사용하면 라우팅 이벤트가 발생하지 않아 화면이 전환되지 않음
+
+```javascript
+// 단순 페이지 이동
+UiUtil.pageNavigate('vas-work-monitor')
+
+// 필터 파라미터 포함 이동
+// → URL에 ?pass={"status":"PLAN"} 형태로 변환됨
+UiUtil.pageNavigate('vas-orders', { status: 'PLAN' })
+
+// 상세 페이지 이동
+UiUtil.pageNavigate('vas-order-detail', { id: order.id, vasNo: order.vas_no })
+
+// LitElement 이벤트 핸들러에서 사용
+render() {
+  return html`
+    <div @click="${() => this._navigateTo('vas-orders', 'APPROVED')}">
+      승인완료
+    </div>
+  `
+}
+
+_navigateTo(page, filter) {
+  UiUtil.pageNavigate(page, filter ? { status: filter } : null)
+}
+```
+
+### 3.2 pageNavigateWithSilenceOfParams — 파라미터 숨김 이동
+
+```javascript
+static pageNavigateWithSilenceOfParams(page, params)
+```
+
+주소표시줄에 파라미터를 표시하지 않고 페이지를 이동합니다.
+
+```javascript
+UiUtil.pageNavigateWithSilenceOfParams('vas-order-detail', { id: '123' })
+```
+
+### 3.3 closePopupBy — 팝업 닫기
+
+```javascript
+static closePopupBy(popup)
+```
+
+팝업 컴포넌트 내부에서 자기 자신을 닫을 때 사용합니다.
+
+```javascript
+class MyPopup extends LitElement {
+  _onCancel() {
+    UiUtil.closePopupBy(this)
+  }
+
+  async _onSave() {
+    // 저장 로직...
+    this.dispatchEvent(new CustomEvent('saved'))
+    UiUtil.closePopupBy(this)
+  }
+}
+```
+
+### 3.4 showToast — 토스트 메시지
+
+```javascript
+static showToast(type, message)
+```
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `type` | String | `'info'`, `'success'`, `'warning'`, `'error'` |
+| `message` | String | 표시할 메시지 |
+
+```javascript
+UiUtil.showToast('info', '이미 스캔된 바코드입니다!')
+UiUtil.showToast('success', '저장 완료')
+```
+
+### 3.5 showAlertPopup — 알림 팝업 (확인/취소)
+
+```javascript
+static async showAlertPopup(titleCode, textCode, type, confirmButtonCode, cancelButtonCode)
+```
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `titleCode` | String | 제목 용어 키 (예: `'title.confirm'`, `'title.error'`) |
+| `textCode` | String | 내용 용어 키 또는 문자열 |
+| `type` | String | `'info'`, `'error'`, `'warning'`, `'question'` |
+| `confirmButtonCode` | String | 확인 버튼 용어 키 (예: `'confirm'`) |
+| `cancelButtonCode` | String | 취소 버튼 용어 키 (빈 문자열이면 취소 버튼 숨김) |
+| **반환** | Object | 사용자 응답 (`.isConfirmed` 속성) |
+
+```javascript
+// 에러 알림 (확인 버튼만)
+await UiUtil.showAlertPopup('title.error', '입고 수량이 없습니다.', 'error', 'confirm')
+
+// 확인/취소 팝업
+const result = await UiUtil.showAlertPopup(
+  'button.delete',
+  'text.are_you_sure',
+  'question',
+  'confirm',
+  'cancel'
+)
+if (result.isConfirmed) {
+  // 삭제 실행
+}
+```
+
+### 3.6 기타 유용한 메소드
+
+```javascript
+// 모바일 환경 체크
+if (UiUtil.isMobileEnv()) { ... }
+
+// 현재 로케일
+const locale = UiUtil.currentLocale()  // 'ko', 'en', ...
+
+// 현재 라우팅 정보
+const routing = UiUtil.currentRouting()
+
+// 커스텀 이벤트 전파
+UiUtil.fireCustomEvent('order-updated', { orderId: '123' })
+```
+
+---
+
+## 4. openPopup — 팝업 열기
+
+> **import**: `import { openPopup } from '@operato/layout'`
+
+```javascript
+openPopup(html`<팝업-컴포넌트></팝업-컴포넌트>`, options)
+```
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| 첫번째 | TemplateResult | lit-html 템플릿 |
+| `options.backdrop` | Boolean | 배경 딤 처리 |
+| `options.size` | String | `'large'`, `'medium'`, `'small'` |
+| `options.title` | String | 팝업 타이틀 |
+
+```javascript
+import { openPopup } from '@operato/layout'
+import './my-popup'  // 팝업 컴포넌트 import 필수
+
+// 팝업 열기
+openPopup(
+  html`<my-popup
+    .someData="${this.data}"
+    @saved="${() => this._refresh()}"
+  ></my-popup>`,
+  {
+    backdrop: true,
+    size: 'large',
+    title: '주문 생성'
+  }
+)
+```
+
+### 팝업 컴포넌트 패턴
+
+```javascript
+class MyPopup extends LitElement {
+  // 팝업에서 이벤트를 발행하여 부모에게 알림
+  async _onSave() {
+    const result = await ServiceUtil.restPost('some/api', data)
+    this.dispatchEvent(new CustomEvent('saved', { detail: result }))
+    UiUtil.closePopupBy(this)
+  }
+
+  _onCancel() {
+    UiUtil.closePopupBy(this)
+  }
+}
+```
+
+---
+
+## 5. 데이터 컨벤션 (snake_case)
+
+### 핵심 규칙
+
+**백엔드 API 데이터는 항상 snake_case를 사용합니다.**
+
+| 구분 | 컨벤션 | 예시 |
+|------|--------|------|
+| 백엔드 응답 속성 | snake_case | `order.com_cd`, `item.sku_cd`, `bom.vas_type` |
+| 백엔드 요청 body 키 | snake_case | `{ com_cd: 'COM001', plan_qty: 100 }` |
+| 프론트엔드 내부 상태 | camelCase | `this.formData.comCd`, `this.selectedBom` |
+| searchByPagination 필터 | snake_case | `{ name: 'sku_cd', value: '...' }` |
+
+### 올바른 예시
+
+```javascript
+// 백엔드 응답 데이터 접근 — snake_case
+const items = data?.items || []
+items.forEach(item => {
+  console.log(item.sku_cd)       // O
+  console.log(item.stock_qty)    // O
+  console.log(item.vas_type)     // O
+})
+
+// 백엔드 요청 body 구성 — snake_case
+const requestBody = {
+  com_cd: this.formData.comCd,      // 내부 camelCase → 외부 snake_case
+  wh_cd: this.formData.whCd,
+  vas_bom_id: this.formData.vasBomId,
+  plan_qty: parseFloat(this.formData.planQty)
+}
+await ServiceUtil.restPost('vas_trx/vas_orders', requestBody)
+
+// searchByPagination 필터 — snake_case
+const filters = [
+  { name: 'sku_cd', value: item.sku_cd },
+  { name: 'wh_cd', value: this.formData.whCd }
+]
+```
+
+### 잘못된 예시
+
+```javascript
+// X — 백엔드 응답을 camelCase로 접근하면 undefined
+console.log(item.skuCd)       // undefined!
+console.log(item.stockQty)    // undefined!
+
+// X — 요청 body에 camelCase 사용하면 백엔드에서 인식 못함
+const requestBody = {
+  comCd: 'COM001',        // 백엔드에서 인식 불가!
+  planQty: 100            // 백엔드에서 인식 불가!
+}
+```
+
+---
+
+## 6. 자주 하는 실수와 해결책
+
+### 6.1 fetch() 직접 사용
+
+```javascript
+// X — 인증 토큰이 포함되지 않아 401/403 에러 발생
+const response = await fetch('/rest/vas_trx/dashboard/status-counts')
+
+// O — ServiceUtil 사용
+const data = await ServiceUtil.restGet('vas_trx/dashboard/status-counts')
+```
+
+### 6.2 history.pushState 직접 사용
+
+```javascript
+// X — Things Factory 라우터가 인식하지 못해 화면 전환 안됨
+history.pushState(null, '', '/vas-orders')
+
+// O — UiUtil 사용
+UiUtil.pageNavigate('vas-orders')
+```
+
+### 6.3 URL에 /rest/ 접두사 포함
+
+```javascript
+// X — /rest/가 중복 추가됨
+await ServiceUtil.restGet('/rest/vas_trx/dashboard/alerts')
+
+// O — /rest/ 없이 경로만 전달
+await ServiceUtil.restGet('vas_trx/dashboard/alerts')
+```
+
+### 6.4 백엔드 @RequestParam name 속성 누락
+
+Spring Boot에서 `-parameters` 컴파일러 플래그 없이 빌드하면 파라미터 이름을 추론할 수 없습니다.
+
+```java
+// X — 500 에러 발생 ("Name for argument of type [java.lang.String] not specified")
+@GetMapping("/dashboard/status-counts")
+public Map<String, Object> getDashboardStatusCounts(
+    @RequestParam(required = false) String comCd) { ... }
+
+// O — name 속성 명시
+@GetMapping("/dashboard/status-counts")
+public Map<String, Object> getDashboardStatusCounts(
+    @RequestParam(name = "comCd", required = false) String comCd) { ... }
+```
+
+### 6.5 팝업 닫기
+
+```javascript
+// X — 팝업이 닫히지 않음
+this.remove()
+
+// O — UiUtil 사용
+UiUtil.closePopupBy(this)
+```
+
+---
+
+## 부록: ServiceUtil 전체 메소드 목록
+
+| 메소드 | 설명 | 사용 빈도 |
+|--------|------|----------|
+| `restGet(url, params)` | GET 요청 | 높음 |
+| `restPost(url, params, ...)` | POST 요청 | 높음 |
+| `restPut(url, params, ...)` | PUT 요청 | 보통 |
+| `restDelete(url, params, ...)` | DELETE 요청 | 보통 |
+| `searchByPagination(url, filters, sortings, page, limit)` | 페이지네이션 조회 | 높음 |
+| `findOne(url, id)` | 단건 조회 | 보통 |
+| `codeItems(codeName)` | 공통코드 조회 | 보통 |
+| `updateMultipleData(grist, url)` | 그리드 다중 업데이트 | 보통 |
+| `deleteListByGristSelected(grist, url)` | 그리드 선택 삭제 | 보통 |
+| `patchesForUpdateMultiple(grist)` | 변경 데이터 추출 | 보통 |
+| `validationBeforeSave(grist, patches)` | 저장 전 검증 | 보통 |
+| `getSelectedIdList(grist)` | 선택 ID 목록 | 보통 |
+| `excelFileDownload(url, params, fileName)` | Excel 다운로드 | 낮음 |
+| `callCustomService(btn, svcName, vars)` | 커스텀 서비스 호출 | 낮음 |
+
+## 부록: UiUtil 주요 메소드 목록
+
+| 메소드 | 설명 | 사용 빈도 |
+|--------|------|----------|
+| `pageNavigate(url, params)` | 페이지 이동 | 높음 |
+| `pageNavigateWithSilenceOfParams(page, params)` | 파라미터 숨김 이동 | 낮음 |
+| `closePopupBy(popup)` | 팝업 닫기 | 높음 |
+| `showToast(type, message)` | 토스트 메시지 | 높음 |
+| `showAlertPopup(title, text, type, confirm, cancel)` | 알림/확인 팝업 | 높음 |
+| `isMobileEnv()` | 모바일 환경 체크 | 보통 |
+| `currentLocale()` | 현재 로케일 | 낮음 |
+| `fireCustomEvent(name, detail)` | 커스텀 이벤트 | 낮음 |
+| `getFilterFormData(filterForm)` | 필터 폼 데이터 추출 | 보통 |

@@ -1,6 +1,6 @@
 # Operato WMS 문서 디렉토리
 
-> 최종 업데이트: 2026-03-12
+> 최종 업데이트: 2026-03-18
 
 Operato WMS 프로젝트의 전체 문서를 체계적으로 관리하는 디렉토리입니다.
 
@@ -20,7 +20,15 @@ docs/
 │   └── architecture.md                - 시스템 구조, 기술 스택, 배포 구성
 │
 ├── design/                        # 설계 문서
-│   └── database-specification.md      - DB 스키마, ERD, 테이블 정의
+│   ├── database-specification.md      - DB 스키마, ERD, 테이블 정의
+│   ├── vas-table-design.md            - VAS(유통가공) 테이블 설계
+│   ├── vas-screen-design.md           - VAS(유통가공) 화면 설계
+│   ├── rwa-table-design.md            - RWA(반품) 테이블 설계
+│   └── rwa-screen-design.md           - RWA(반품) 화면 설계
+│
+├── development/                   # 개발 가이드
+│   ├── backend-dev-guide.md           - 백엔드 서비스 개발 가이드 (메타데이터, 엔티티)
+│   └── frontend-dev-guide.md          - 프론트엔드 개발 가이드 (ServiceUtil, UiUtil, 컨벤션)
 │
 ├── implementation/                # 구현 관련 문서
 │   ├── api-list.md                    - REST API 엔드포인트 목록 및 명세
@@ -46,7 +54,7 @@ docs/
 └── README.md                      # 이 문서 (문서 디렉토리 가이드)
 ```
 
-**총 문서 수**: 18개 (README 포함)
+**총 문서 수**: 24개 (README 포함)
 
 ---
 
@@ -87,12 +95,27 @@ docs/
 | 문서 | 설명 |
 |------|------|
 | [database-specification.md](design/database-specification.md) | 데이터베이스 스키마, ERD, 테이블 정의 |
+| [vas-table-design.md](design/vas-table-design.md) | VAS(유통가공) 모듈 테이블 설계 |
+| [vas-screen-design.md](design/vas-screen-design.md) | VAS(유통가공) 모듈 화면 설계 |
+| [rwa-table-design.md](design/rwa-table-design.md) | RWA(반품) 모듈 테이블 설계 |
+| [rwa-screen-design.md](design/rwa-screen-design.md) | RWA(반품) 모듈 화면 설계 |
 
-**용도**: DB 스키마 참조, 마이그레이션 계획 수립
+**용도**: DB 스키마 참조, 화면 설계 참조, 모듈 개발 시 기준 문서
 
 ---
 
-### 5️⃣ 구현 (implementation/)
+### 5️⃣ 개발 가이드 (development/)
+
+| 문서 | 설명 |
+|------|------|
+| [backend-dev-guide.md](development/backend-dev-guide.md) | 백엔드 서비스 개발 가이드 (메타데이터 기반 개발, 엔티티/용어/공통코드 등록) |
+| [frontend-dev-guide.md](development/frontend-dev-guide.md) | 프론트엔드 개발 가이드 (ServiceUtil, UiUtil, openPopup, snake_case 컨벤션) |
+
+**용도**: 새 화면/API 개발 시 필수 참조, 유틸리티 사용법, 코딩 컨벤션
+
+---
+
+### 6️⃣ 구현 (implementation/)
 
 | 문서 | 설명 |
 |------|------|
@@ -103,7 +126,7 @@ docs/
 
 ---
 
-### 6️⃣ 운영 (operations/)
+### 7️⃣ 운영 (operations/)
 
 | 문서 | 설명 |
 |------|------|
@@ -115,7 +138,7 @@ docs/
 
 ---
 
-### 7️⃣ 품질 관리 (quality/)
+### 8️⃣ 품질 관리 (quality/)
 
 | 문서 | 설명 |
 |------|------|
@@ -131,7 +154,7 @@ docs/
 
 ---
 
-### 8️⃣ 로드맵 (roadmap/)
+### 9️⃣ 로드맵 (roadmap/)
 
 | 문서 | 설명 |
 |------|------|
@@ -153,7 +176,9 @@ docs/
 ### 기능 개발
 1. [requirements.md](requirement/requirements.md) — 요구사항 확인
 2. [database-specification.md](design/database-specification.md) — DB 스키마 참조
-3. [api-list.md](implementation/api-list.md) — API 명세 확인
+3. [backend-dev-guide.md](development/backend-dev-guide.md) — 백엔드 개발 패턴 (메타데이터, 엔티티)
+4. [frontend-dev-guide.md](development/frontend-dev-guide.md) — 프론트엔드 개발 패턴 (ServiceUtil, UiUtil)
+5. [api-list.md](implementation/api-list.md) — API 명세 확인
 
 ### 배포 및 운영
 1. [operations-strategy.md](operations/operations-strategy.md) — 배포 전략 수립
