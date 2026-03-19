@@ -6,7 +6,7 @@ export default {
   routes: [
     { tagname: 'inbound-home', page: 'inbound-home' },
     { tagname: 'outbound-home', page: 'outbound-home' },
-    { tagname: 'stock-home', page: 'stock-home' },
+    { tagname: 'inventory-home', page: 'inventory-home' },
     { tagname: 'rwa-home', page: 'rwa-home' },
     { tagname: 'vas-home', page: 'vas-home' },
     { tagname: 'vas-work-monitor', page: 'vas-work-monitor' },

@@ -1,6 +1,6 @@
 import './pages/inbound/inbound-home'
 import './pages/outbound/outbound-home'
-import './pages/stock/stock-home'
+import './pages/inventory/inventory-home'
 import './pages/rwa/rwa-home'
 import './pages/vas/vas-home'
 import './pages/vas/vas-work-monitor'
