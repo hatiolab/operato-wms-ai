@@ -291,6 +291,20 @@ public class VasTransactionController {
 		return this.vasService.listVasOrders(comCd, status, vasType, startDate, endDate);
 	}
 
+	/**
+	 * 작업 지시 상세 항목(자재) 목록 조회
+	 *
+	 * GET /rest/vas_trx/vas_orders/{id}/items
+	 *
+	 * @param id 작업 지시 ID
+	 * @return 작업 지시 상세(VasOrderItem) 목록
+	 */
+	@GetMapping(value = "/vas_orders/{id}/items", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "List VAS Order Items")
+	public List<VasOrderItem> listVasOrderItems(@PathVariable("id") String id) {
+		return this.vasService.listVasOrderItems(id);
+	}
+
 	/********************************************************************************************************
 	 * 7. 모니터링 API
 	 ********************************************************************************************************/
