@@ -13,49 +13,71 @@
 - **배포 방식**: Docker (Nginx + 백엔드 분리, 권장) | 로컬 통합 JAR (선택적)
 
 
+## 행동 지침
+
+### 필수 규칙
+- 커밋 메시지는 **한국어**로 작성 (`feat: 입고 API 추가`)
+- DB 쿼리 시 `domain_id` 조건 **필수** (멀티테넌시)
+- entities 테이블에 엔티티 정보 등록시 `search_url`, `multi_save_url` 값은 첫글자 `/` 없이 작성
+- 코드 변경 후 `./gradlew build -x test`로 컴파일 확인
+
+### 새 Entity 추가 시 필수 절차
+1. Entity Java 클래스 작성 (JPA `@Entity`, `@Table`, Javadoc 한국어 주석)
+2. `/entity_meta_by_entity {EntityName}` — 메타데이터 + 용어 + 공통코드 일괄 등록 + 번역
+3. `docs/design/database-specification.md` 업데이트
+4. Controller/Service 작성하지 않음
+
+### 새 용어/코드 추가 시
+- 새 용어: `/add_terminology {category} {name} {display}`
+- 공통코드: `/code_by_entity_column {EntityName} {fieldName}`
+- 새 용어 추가 후 번역 캐시 초기화: `/clear_frontend_cache`
+
+### 하지 말 것
+- `git add -A` 또는 `git add .` 사용 금지 — 파일 개별 지정
+- `domain_id` 조건 없이 DELETE/UPDATE 쿼리 실행 금지
+- pre-commit hook 실패 시 `--no-verify` 사용 금지
+
+### 참조 문서
+- 백엔드 개발: `docs/development/backend-dev-guide.md`
+- 프론트엔드 개발: `docs/development/frontend-dev-guide.md`
+- DB 스키마: `docs/design/database-specification.md`
+- API 목록: `docs/implementation/api-list.md`
+
+
+## 환경 정보
+
+### DB 접속
+- 백엔드(Spring): `src/main/resources/application-dev.properties` (git 미추적, 템플릿: `application-dev.properties.template`)
+- 프론트엔드(TypeORM): `frontend/packages/operato-wes/config/config.development.js` → `ormconfig` 섹션
+- Skill에서 DB 직접 접속 시: 프론트엔드 `config.development.js`의 `ormconfig`에서 host/port/database/username/password 참조
+- 접속 도구: Python `psycopg2-binary` (psql CLI 미설치 환경 대응)
+
+### 멀티테넌시
+- 모든 업무 테이블에 `domain_id` 컬럼 존재 — 조회/수정/삭제 시 반드시 조건에 포함
+- 도메인 목록: `SELECT id, name FROM domains`
+
+### 주요 경로
+- 엔티티: `src/main/java/operato/wms/{모듈}/entity/`
+- SQL 쿼리: `src/main/resources/query/{모듈}/`
+- 백엔드 설정: `src/main/resources/application.properties`
+- 프론트 페이지: `frontend/packages/operato-wes/client/pages/{모듈}/`
+- 프론트 라우트: `frontend/packages/operato-wes/client/route.js`
+- 정적 페이지 등록: `frontend/packages/operato-wes/things-factory.config.js`
+
+
 ## 빌드 및 실행
 
-### 개발 모드 (권장)
-```bash
-# 통합 실행 (백엔드 + 프론트엔드)
-./scripts/dev.sh
-
-# 또는 개별 실행
-# 터미널 1: 백엔드 (포트 9191)
-./gradlew bootRunDev
-
-# 터미널 2: 프론트엔드 (포트 5907)
-cd frontend && yarn wms:dev
-```
-
-### Docker 배포 (운영 환경 권장)
-```bash
-# Nginx + 백엔드 전체 스택 빌드
-docker compose build
-
-# 실행 (Nginx:80, 백엔드:9191 내부)
-docker compose up -d
-
-# 접속: http://localhost
-# 헬스체크: http://localhost/actuator/health
-```
-
-### 로컬 통합 JAR 빌드 (선택적)
-```bash
-# 프론트엔드 + 백엔드 통합 빌드
-./scripts/build.sh
-# 또는
-./gradlew buildAll
-
-# 결과: build/libs/operato-wms-ai.jar (단일 파일)
-# 주의: application.properties에서 operato.wms.spa.enabled=true 필요
-```
-
-### 기타
-- 환경설정: `application-dev.properties` (git 미추적, 템플릿 제공)
-- VSCode 디버그: Cmd+Shift+D → **operato-wms-ai (debug-dev)** | 원격 attach: 포트 5004
-- 프론트엔드 개발 서버: http://localhost:5907 (포트는 `frontend/packages/operato-wes/config/config.development.js`에서 설정)
+- 개발 (통합): `./scripts/dev.sh` (백엔드 :9191 + 프론트 :5907)
+- 백엔드만: `./gradlew bootRunDev`
+- 프론트만: `cd frontend && yarn wms:dev`
+- 컴파일 확인: `./gradlew build -x test`
+- 테스트: `./gradlew test`
+- Docker: `docker compose build && docker compose up -d` (Nginx :80 → 백엔드 :9191)
+- 통합 JAR: `./scripts/build.sh` 또는 `./gradlew buildAll`
+- 디버그: VSCode Cmd+Shift+D → **operato-wms-ai (debug-dev)** | 원격 attach: 포트 5004
 - 백엔드 API: http://localhost:9191/rest
+
+> 상세: `docs/operations/backend-docker.md`, `docs/implementation/development-environment.md`
 
 
 ## 업무 도메인
@@ -90,18 +112,17 @@ docker compose up -d
 
 ## Claude Skills (`.claude/commands/`)
 
-프로젝트에 등록된 Claude slash command 목록입니다.
-새 skill을 추가할 때마다 이 테이블을 업데이트하세요.
+프로젝트에 등록된 Claude slash command 목록. 새 skill 추가 시 이 테이블을 업데이트하세요.
 
-| 명령 | 파일 | 설명 |
-|------|------|------|
-| `/build` | `.claude/commands/build.md` | 백엔드(`operato-wms-ai`) Gradle 빌드 실행. 옵션: 기본/테스트 제외/클린/Docker용 |
-| `/commit` | `.claude/commands/commit.md` | 이 대화의 작업 내용을 git commit으로 기록. 한국어 메시지, 선택적 스테이징, 푸시는 명시 요청 시에만 |
-| `/log` | `.claude/commands/log.md` | 오늘 작업 내용을 `.ai/logs/YYYY-MM-DD.md`에 기록 |
-| `/create_module` | `.claude/commands/create_module.md` | 새로운 WMS 모듈 패키지 구조 자동 생성 (config/query/web/util + 상수 클래스). 인자: `moduleName` |
-| `/translate` | `.claude/commands/translate.md` | terminologies 테이블의 미번역 항목을 locale별(ko/en/zh)로 번역하여 DB 업데이트 |
-| `/add_terminology` | `.claude/commands/add_terminology.md` | terminologies 테이블에 새로운 용어를 등록. 모든 도메인과 언어(ko/en/ja/zh) 자동 등록. 인자: `category name display` |
-| `/clear_frontend_cache` | `.claude/commands/clear_frontend_cache.md` | 프론트엔드 번역 캐시 삭제 (`frontend/packages/operato-wes/cache/translations/` 초기화) |
-| `/code_by_entity_column` | `.claude/commands/code_by_entity_column.md` | Entity 필드의 코드 값을 common_codes/common_code_details 테이블에 등록. 인자: `EntityName fieldName` |
-| `/code_by_entity` | `.claude/commands/code_by_entity.md` | Entity의 공통코드 대상 필드를 자동 식별하여 일괄 등록. 인자: `EntityName` |
-| `/entity_meta_by_entity` | `.claude/commands/entity_meta_by_entity.md` | Entity 클래스를 분석하여 entities + entity_columns + terminologies + common_codes + common_code_details 메타데이터 자동 등록 후 다국어 번역 실행. 인자: `EntityName` |
+| 명령 | 설명 |
+|------|------|
+| `/build` | 백엔드 Gradle 빌드 (기본/테스트 제외/클린/Docker용) |
+| `/commit` | git commit (한국어 메시지, 선택적 스테이징) |
+| `/log` | 작업 내용을 `.ai/logs/YYYY-MM-DD.md`에 기록 |
+| `/create_module` | 모듈 패키지 구조 생성. 인자: `moduleName` |
+| `/entity_meta_by_entity` | Entity → entities + entity_columns + terminologies + common_codes 일괄 등록 + 번역. 인자: `EntityName` |
+| `/add_terminology` | 용어 등록 (모든 도메인, ko/en/ja/zh). 인자: `category name display` |
+| `/translate` | 미번역 항목 번역 (ko/en/zh) |
+| `/code_by_entity` | Entity 공통코드 일괄 등록. 인자: `EntityName` |
+| `/code_by_entity_column` | 필드별 공통코드 등록. 인자: `EntityName fieldName` |
+| `/clear_frontend_cache` | 프론트엔드 번역 캐시 삭제 |

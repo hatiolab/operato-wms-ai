@@ -12,9 +12,17 @@
       "Bash(git branch *)",
       "Bash(git checkout *)",
       "Bash(git stash *)",
+      "Bash(docker compose *)",
       "Bash(docker-compose *)",
       "Bash(docker ps *)",
-      "Bash(docker logs *)"
+      "Bash(docker logs *)",
+      "Bash(python3 *)",
+      "Bash(pip3 install *)",
+      "Bash(cd frontend && yarn *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(wc *)"
     ],
     "deny": [
       "Bash(git push --force *)",

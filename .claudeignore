@@ -48,7 +48,27 @@ frontend/.pnp.*
 frontend/yarn.lock
 src/main/resources/static/
 
+# --- 프론트엔드 캐시 ---
+frontend/packages/*/cache/
+
 # --- 프론트엔드 템플릿 및 설정 파일 ---
 frontend/templates/
 frontend/.prettierrc
 frontend/.eslintrc*
+
+# --- Gradle bin 출력 (build/와 별도) ---
+bin/
+
+# --- IDE 설정 ---
+.vscode/
+
+# --- 바이너리/폰트/이미지 ---
+*.png
+*.jpg
+*.gif
+*.ico
+*.svg
+*.woff
+*.woff2
+*.ttf
+*.eot

@@ -42,9 +42,9 @@
 | `Boolean` | `boolean` |
 | `java.util.Date` | `datetime` |
 
-#### 시스템 자동 추가 필드 (entity_columns 등록 불필요)
+#### 시스템 자동 추가 필드 (entity_columns 등록 필요)
 
-다음 필드는 프레임워크가 자동 관리하므로 entity_columns에 등록하지 않는다:
+다음 필드는 프레임워크가 자동 관리하므로 entity_columns 테이블에 등록한다.
 - `domain_id`, `created_at`, `creator_id`, `updated_at`, `updater_id`
 
 ### 3. 마스터-디테일 관계 판별
@@ -123,7 +123,7 @@ FK 필드(`*_id`)가 다른 Entity의 테이블을 참조하는지 확인한다.
 - **Entity 참조 필드** (컬럼명이 `_cd`로 끝나는 String 필드):
   - `ref_type` = `Entity`
   - `ref_name` = `{참조 엔티티명}` (컬럼의 의미와 프로젝트 내 Entity 클래스 기반 판단)
-  - 예: `com_cd` → `ref_name = 'Company'`, `wh_cd` → `ref_name = 'Warehouse'`, `sku_cd` → `ref_name = 'Sku'`
+  - 예: `com_cd` → `ref_name = 'Company'`, `wh_cd` → `ref_name = 'Warehouse'`, `sku_cd` → `ref_name = 'SKU'`, `cust_cd` → `ref_name = 'Customer'`, `loc_cd` → `ref_name = 'Location'`, `vend_cd` → `ref_name = 'Vendor'`
 
 #### 에디터 결정 규칙
 
@@ -148,8 +148,8 @@ FK 필드(`*_id`)가 다른 Entity의 테이블을 참조하는지 확인한다.
 |----------|-----------|
 | `integer`, `float` | `far` |
 | `boolean` | `center` |
-| 긴 텍스트, 이름 필드 (`*_nm`) | `left` |
-| 나머지 | `center` |
+| 공통 코드형 데이터, 날짜, 시간 | `center` |
+| 긴 텍스트, 이름 필드 (`*_nm`) 등, 나머지 | `left` |
 
 #### 그리드 너비 (grid_width) 기본값
 
@@ -158,9 +158,9 @@ FK 필드(`*_id`)가 다른 Entity의 테이블을 참조하는지 확인한다.
 | 코드/상태 필드 | 100 |
 | 번호/날짜 필드 | 120~150 |
 | 이름 필드 | 150~200 |
-| 수량/숫자 필드 | 80 |
+| 수량/숫자 필드 | 90 |
 | Boolean 필드 | 80 |
-| 긴 텍스트 | 200 |
+| 긴 텍스트 | 250 |
 
 #### search_oper 결정
 
@@ -328,7 +328,7 @@ VALUES (%s, %s, %s, %s, %s)
 - `search_url`, `multi_save_url`: 첫글자 `/`를 붙이지 **않는다**
 - `id_field`: Entity에 `id` 필드가 있으면 반드시 `id`로 설정
 - `data_prop`: 기본값은 `items`
-- 시스템 자동 추가 필드 (`domain_id`, `created_at`, `creator_id`, `updated_at`, `updater_id`)는 entity_columns에 등록하지 않는다
+- 시스템 자동 추가 필드 (`domain_id`, `created_at`, `creator_id`, `updated_at`, `updater_id`)는 entity_columns 테이블에 등록한다.
 - `search_rank`, `sort_rank`, `grid_rank`는 **10부터 시작**하여 **10씩 증가** (10, 20, 30, ...)
 - CommonCode 필드의 `search_editor`/`grid_editor`는 `code-combo`
 - Unique 제약:
