@@ -562,6 +562,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
       screen: String,
       step: Number,
       orders: Array,
+      bomMap: Object,
       selectedOrder: Object,
       orderItems: Array,
       scanValue: String,
@@ -580,6 +581,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
     this.screen = 'order-select'
     this.step = 1
     this.orders = []
+    this.bomMap = {}
     this.selectedOrder = null
     this.orderItems = []
     this.scanValue = ''
@@ -650,7 +652,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
                       <div class="order-item" @click="${() => this._selectOrder(order)}">
                         <div class="order-no">${order.vas_no || '-'}</div>
                         <div class="order-info">
-                          ${this._vasTypeLabel(order.vas_type)} | ${order.bom_nm || '-'} |
+                          ${this._vasTypeLabel(order.vas_type)} | ${this.bomMap[order.vas_bom_id]?.set_sku_cd || '-'} / ${this.bomMap[order.vas_bom_id]?.set_sku_nm || '-'} |
                           계획: ${order.plan_qty || 0} EA
                         </div>
                         <span class="order-badge ${order.status}">${this._statusLabel(order.status)}</span>
@@ -714,7 +716,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
 
     return html`
       <div class="order-info-card">
-        <div class="title">${order.bom_nm || order.vas_no}</div>
+        <div class="title">${order.vas_no} | (${this.bomMap[order.vas_bom_id].set_sku_cd} / ${this.bomMap[order.vas_bom_id].set_sku_nm})</div>
         <div class="detail-row">
           <span>유형</span>
           <span class="value">${this._vasTypeLabel(order.vas_type)}</span>
@@ -760,9 +762,9 @@ class VasWorkPage extends localize(i18next)(PageView) {
         ? html`<div class="loading">자재 정보 조회 중...</div>`
         : this.orderItems.map((item, idx) => html`
               <div class="pick-item ${item._picked ? 'picked' : ''} ${item._active ? 'active' : ''}">
-                <div class="sku-name">${item.sku_nm || item.sku_cd || `품목 ${idx + 1}`}</div>
+                <div class="sku-name">${item.sku_cd} / ${item.sku_nm}</div>
                 <div class="sku-info">
-                  SKU: ${item.sku_cd || '-'} | 로케: ${item.src_loc_cd || '-'}
+                  로케이션: ${item.src_loc_cd || '-'}
                 </div>
                 <div class="pick-input-row">
                   <input
@@ -890,7 +892,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
    * 데이터 조회
    * ============================================================ */
 
-  /** 작업 가능한 VAS 주문 목록 조회 (승인/자재준비/작업중) */
+  /** 작업 가능한 VAS 주문 목록 조회 (주문 확정/자재 준비 완료/작업 중) */
   async _fetchOrders() {
     try {
       this.loading = true
@@ -898,11 +900,37 @@ class VasWorkPage extends localize(i18next)(PageView) {
         status: 'APPROVED,MATERIAL_READY,IN_PROGRESS'
       })
       this.orders = data || []
+
+      // BOM 정보 일괄 조회
+      await this._fetchBomMap(this.orders)
+
       this.loading = false
     } catch (err) {
       console.error('주문 목록 조회 실패:', err)
       this.orders = []
       this.loading = false
+    }
+  }
+
+  /** 주문 목록의 고유 vas_bom_id로 BOM 정보 일괄 조회 */
+  async _fetchBomMap(orders) {
+    const bomIds = [...new Set(orders.map(o => o.vas_bom_id).filter(Boolean))]
+    const newBomIds = bomIds.filter(id => !this.bomMap[id])
+
+    if (newBomIds.length === 0) return
+
+    try {
+      const results = await Promise.all(
+        newBomIds.map(id => ServiceUtil.restGet(`vas_boms/${id}`).catch(() => null))
+      )
+
+      const updated = { ...this.bomMap }
+      results.forEach((bom, i) => {
+        if (bom) updated[newBomIds[i]] = bom
+      })
+      this.bomMap = updated
+    } catch (err) {
+      console.error('BOM 조회 실패:', err)
     }
   }
 
@@ -1144,10 +1172,10 @@ class VasWorkPage extends localize(i18next)(PageView) {
   /** 주문 상태 코드를 한글 라벨로 변환 */
   _statusLabel(status) {
     const map = {
-      PLAN: '계획',
-      APPROVED: '승인',
-      MATERIAL_READY: '자재준비',
-      IN_PROGRESS: '작업중',
+      PLAN: '등록 중',
+      APPROVED: '주문 확정',
+      MATERIAL_READY: '자재 준비 완료',
+      IN_PROGRESS: '작업 중',
       COMPLETED: '완료'
     }
     return map[status] || status || '-'

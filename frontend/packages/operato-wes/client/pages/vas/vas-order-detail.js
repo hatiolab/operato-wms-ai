@@ -54,21 +54,6 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
           color: var(--md-sys-color-on-surface);
         }
 
-        .close-button {
-          padding: 8px;
-          border: none;
-          background: transparent;
-          cursor: pointer;
-          border-radius: 4px;
-          color: var(--md-sys-color-on-surface-variant);
-          font-size: 20px;
-          line-height: 1;
-        }
-
-        .close-button:hover {
-          background: var(--md-sys-color-surface-variant);
-        }
-
         .status-badge {
           padding: 6px 16px;
           border-radius: 16px;
@@ -90,8 +75,34 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
           gap: var(--spacing-small, 8px);
         }
 
-        .header-actions mwc-button {
-          --mdc-theme-primary: var(--md-sys-color-primary);
+        .header-actions .action-btn {
+          padding: 8px 20px;
+          border: none;
+          border-radius: 6px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .header-actions .action-btn.primary {
+          background: var(--md-sys-color-primary, #1976D2);
+          color: #fff;
+        }
+
+        .header-actions .action-btn.primary:hover {
+          background: #1565C0;
+          box-shadow: 0 2px 6px rgba(25, 118, 210, 0.3);
+        }
+
+        .header-actions .action-btn.danger {
+          background: var(--md-sys-color-surface, #fff);
+          color: #C62828;
+          border: 1px solid #EF9A9A;
+        }
+
+        .header-actions .action-btn.danger:hover {
+          background: #FFEBEE;
         }
 
         .header-info {
@@ -416,15 +427,6 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
   /**
    * 팝업 닫기
    */
-  closePopup() {
-    this.dispatchEvent(new CustomEvent('popup-closed', {
-      composed: true,
-      bubbles: true,
-      detail: { cancelled: false }
-    }))
-    UiUtil.closePopupBy(this)
-  }
-
   /**
    * 상태 라벨 반환
    */
@@ -476,29 +478,24 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
             </span>
           </div>
 
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <div class="header-actions">
-              ${this.canApprove() ? html`
-                <mwc-button raised @click="${this.approveOrder}">
-                  ${TermsUtil.tButton('approve')}
-                </mwc-button>
-              ` : ''}
+          <div class="header-actions">
+            ${this.canApprove() ? html`
+              <button class="action-btn primary" @click="${this.approveOrder}">
+                ${TermsUtil.tButton('approve')}
+              </button>
+            ` : ''}
 
-              ${this.canStartWork() ? html`
-                <mwc-button raised @click="${this.startWork}">
-                  ${TermsUtil.tButton('start_work')}
-                </mwc-button>
-              ` : ''}
+            ${this.canStartWork() ? html`
+              <button class="action-btn primary" @click="${this.startWork}">
+                ${TermsUtil.tButton('start_work')}
+              </button>
+            ` : ''}
 
-              ${this.canCancel() ? html`
-                <mwc-button @click="${this.cancelOrder}">
-                  ${TermsUtil.tButton('cancel')}
-                </mwc-button>
-              ` : ''}
-            </div>
-            <button class="close-button" @click="${this.closePopup}" title="${TermsUtil.tButton('close')}">
-              ✕
-            </button>
+            ${this.canCancel() ? html`
+              <button class="action-btn danger" @click="${this.cancelOrder}">
+                ${TermsUtil.tButton('cancel')}
+              </button>
+            ` : ''}
           </div>
         </div>
 

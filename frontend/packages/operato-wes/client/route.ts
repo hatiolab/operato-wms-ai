@@ -5,6 +5,7 @@ import './pages/rwa/rwa-home'
 import './pages/vas/vas-home'
 import './pages/vas/vas-work-monitor'
 import './pages/vas/vas-order-detail'  // 팝업으로 사용
+import './pages/vas/vas-material-preparation'
 import './pages/work/vas-work-page'
 
 import './pages/work/rcv-work-page'

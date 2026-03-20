@@ -598,7 +598,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
           <select @change="${e => { this.statusFilter = e.target.value }}">
             <option value="ALL" ?selected="${this.statusFilter === 'ALL'}">전체</option>
             <option value="IN_PROGRESS" ?selected="${this.statusFilter === 'IN_PROGRESS'}">작업 중</option>
-            <option value="MATERIAL_READY" ?selected="${this.statusFilter === 'MATERIAL_READY'}">자재 준비 중</option>
+            <option value="MATERIAL_READY" ?selected="${this.statusFilter === 'MATERIAL_READY'}">자재 준비 완료</option>
             <option value="APPROVED" ?selected="${this.statusFilter === 'APPROVED'}">주문 확정</option>
           </select>
         </div>
@@ -637,7 +637,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
           class="summary-chip material-ready ${this.statusFilter === 'MATERIAL_READY' ? 'active' : ''}"
           @click="${() => { this.statusFilter = 'MATERIAL_READY' }}"
         >
-          자재 준비 중<span class="chip-count">${materialReady}</span>
+          자재 준비 완료<span class="chip-count">${materialReady}</span>
         </div>
         <div
           class="summary-chip approved ${this.statusFilter === 'APPROVED' ? 'active' : ''}"
@@ -970,7 +970,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     const map = {
       PLAN: '등록 중',
       APPROVED: '주문 확정',
-      MATERIAL_READY: '자재 준비 중',
+      MATERIAL_READY: '자재 준비 완료',
       IN_PROGRESS: '작업중',
       COMPLETED: '완료',
       CLOSED: '마감',
