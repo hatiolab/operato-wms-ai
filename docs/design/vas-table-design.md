@@ -48,8 +48,9 @@
 |--------|------|------|
 | `vas_boms` | BOM 마스터 (세트 상품 정의) | 1:N → vas_bom_items |
 | `vas_bom_items` | BOM 구성 품목 | N:1 → vas_boms |
-| `vas_orders` | 유통가공 작업 지시 (헤더) | 1:N → vas_order_items, 1:N → vas_results |
+| `vas_orders` | 유통가공 작업 지시 (헤더) | 1:N → vas_order_items, 1:N → vas_results, 1:N → vas_material_picks |
 | `vas_order_items` | 유통가공 작업 지시 상세 | N:1 → vas_orders |
+| `vas_material_picks` | 자재 피킹 지시 및 실적 | N:1 → vas_orders |
 | `vas_results` | 유통가공 실적 | N:1 → vas_orders |
 
 ---
@@ -313,6 +314,56 @@ CREATE INDEX ix_vas_results_3 ON vas_results (worker_id, domain_id);
 CREATE INDEX ix_vas_results_4 ON vas_results (work_date, domain_id);
 CREATE INDEX ix_vas_results_5 ON vas_results (stock_txn_id, domain_id);
 ```
+
+---
+
+### 3.6 vas_material_picks — 자재 피킹 지시 및 실적
+
+**설명**: VAS 작업을 위한 자재(원자재, 부자재) 피킹 지시 및 피킹 실적 관리
+
+**Lifecycle**:
+- `@PrePersist`: `status` 기본값 `REQUESTED`, `picked_qty` 기본값 0
+- `@PreUpdate`: `picked_at` 자동 업데이트 (피킹 완료 시)
+
+| Java Field | 컬럼 | 타입 | Null | 길이 | 설명 |
+|-----------|------|------|------|------|------|
+| id | id | VARCHAR | N | 40 | PK, UUID |
+| vasOrderId | vas_order_id | VARCHAR | N | 40 | FK → vas_orders.id |
+| vasNo | vas_no | VARCHAR | N | 30 | VAS 주문 번호 (조회 편의성) |
+| skuCd | sku_cd | VARCHAR | N | 30 | 자재 SKU 코드 |
+| skuNm | sku_nm | VARCHAR | Y | 255 | 자재 SKU 명 (자동 조회) |
+| fromLocCd | from_loc_cd | VARCHAR | N | 30 | 원본 로케이션 (자재 피킹 위치) |
+| toLocCd | to_loc_cd | VARCHAR | N | 30 | 대상 로케이션 (VAS 작업 로케이션) |
+| pickQty | pick_qty | DOUBLE | N | - | 피킹 지시 수량 |
+| pickedQty | picked_qty | DOUBLE | Y | - | 피킹 완료 수량 (기본값: 0) |
+| lotNo | lot_no | VARCHAR | Y | 30 | 로트 번호 |
+| status | status | VARCHAR | N | 20 | 피킹 상태 (REQUESTED/IN_PROGRESS/COMPLETED/CANCELLED) |
+| pickerId | picker_id | VARCHAR | Y | 32 | 피킹 작업자 ID |
+| pickedAt | picked_at | TIMESTAMP | Y | - | 피킹 완료 시각 |
+| remarks | remarks | VARCHAR | Y | 1000 | 비고 |
+
+**인덱스**:
+```sql
+CREATE INDEX ix_vas_material_picks_0 ON vas_material_picks (vas_order_id, domain_id);
+CREATE INDEX ix_vas_material_picks_1 ON vas_material_picks (vas_no, domain_id);
+CREATE INDEX ix_vas_material_picks_2 ON vas_material_picks (sku_cd, domain_id);
+CREATE INDEX ix_vas_material_picks_3 ON vas_material_picks (status, domain_id);
+CREATE INDEX ix_vas_material_picks_4 ON vas_material_picks (picker_id, domain_id);
+CREATE INDEX ix_vas_material_picks_5 ON vas_material_picks (from_loc_cd, domain_id);
+CREATE INDEX ix_vas_material_picks_6 ON vas_material_picks (to_loc_cd, domain_id);
+```
+
+**피킹 상태 전이**:
+```
+REQUESTED (피킹 요청) → IN_PROGRESS (피킹 중) → COMPLETED (피킹 완료)
+                                            ↘ CANCELLED (취소)
+```
+
+**비즈니스 로직**:
+- 자재 준비 단계에서 BOM 기반으로 자재 피킹 지시 생성
+- PDA에서 피킹 작업 수행
+- 피킹 완료 시 재고 차감 및 VAS 작업 로케이션으로 이동 처리
+- 모든 자재 피킹 완료 시 VAS 주문 상태를 `MATERIAL_READY`로 전환
 
 ---
 
