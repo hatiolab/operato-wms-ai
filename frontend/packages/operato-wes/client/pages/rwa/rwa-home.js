@@ -293,7 +293,7 @@ class RwaHome extends localize(i18next)(PageView) {
               <section>
                 <!--h3 class="section-title">🎯 바로가기</h3-->
                 <div class="quick-actions">
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-order-new')}">
+                  <button class="quick-action-btn" @click="${this._openRwaOrderNew}">
                     <span class="icon">📝</span>반품 요청
                   </button>
                   <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-receive-list')}">
@@ -431,6 +431,17 @@ class RwaHome extends localize(i18next)(PageView) {
 
   _navigateTo(page, filter) {
     UiUtil.pageNavigate(page, filter ? { status: filter } : null)
+  }
+
+  /**
+   * 반품 요청 등록 팝업 열기
+   */
+  _openRwaOrderNew() {
+    const element = document.createElement('rwa-order-new')
+    element.addEventListener('order-created', () => {
+      this._fetchDashboardData()
+    })
+    UiUtil.openPopupByElement('반품 요청 등록', 'large', element, true)
   }
 
   pageDisposed(lifecycle) {

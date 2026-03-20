@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import operato.wms.rwa.entity.RwaDisposition;
 import operato.wms.rwa.entity.RwaOrder;
 import operato.wms.rwa.entity.RwaOrderItem;
 import xyz.elidom.dbist.dml.Order;
