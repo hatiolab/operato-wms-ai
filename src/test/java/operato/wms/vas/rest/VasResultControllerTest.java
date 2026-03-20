@@ -24,7 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *
  * @author HatioLab
  */
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
