@@ -8,12 +8,13 @@
 ## 목차
 
 1. [import 및 기본 구조](#1-import-및-기본-구조)
-2. [ServiceUtil — 백엔드 API 호출](#2-serviceutil--백엔드-api-호출)
-3. [UiUtil — 페이지 이동 및 UI 유틸리티](#3-uiutil--페이지-이동-및-ui-유틸리티)
-4. [openPopup — 팝업 열기](#4-openpopup--팝업-열기)
-5. [데이터 컨벤션 (snake_case)](#5-데이터-컨벤션-snake_case)
-6. [코딩 컨벤션 — 메소드 한글 주석](#6-코딩-컨벤션--메소드-한글-주석)
-7. [자주 하는 실수와 해결책](#7-자주-하는-실수와-해결책)
+2. [TermsUtil — 다국어 처리](#2-termsutil--다국어-처리)
+3. [ServiceUtil — 백엔드 API 호출](#3-serviceutil--백엔드-api-호출)
+4. [UiUtil — 페이지 이동 및 UI 유틸리티](#4-uiutil--페이지-이동-및-ui-유틸리티)
+5. [openPopup — 팝업 열기](#5-openpopup--팝업-열기)
+6. [데이터 컨벤션 (snake_case)](#6-데이터-컨벤션-snake_case)
+7. [코딩 컨벤션 — 메소드 한글 주석](#7-코딩-컨벤션--메소드-한글-주석)
+8. [자주 하는 실수와 해결책](#8-자주-하는-실수와-해결책)
 
 ---
 
@@ -25,7 +26,7 @@
 import { css, html } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
-import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 ```
 
 ### 팝업을 여는 화면에서 추가
@@ -70,7 +71,161 @@ window.customElements.define('my-page', MyPage)
 
 ---
 
-## 2. ServiceUtil — 백엔드 API 호출
+## 2. TermsUtil — 다국어 처리
+
+> **소스 위치**: `frontend/packages/metapage/client/utils/terms-util.ts`
+
+**반드시 `TermsUtil`을 사용해야 하는 이유**:
+- DB의 `terminologies` 테이블에서 자동으로 번역 로드
+- `i18next.t()`보다 간결하고 직관적인 API
+- 카테고리별 메서드로 용어 타입을 명확히 구분
+- 용어가 없어도 defaultValue 대신 용어명 자체를 표시하여 디버깅 용이
+
+### 2.1 주요 메서드
+
+| 메서드 | 용도 | 예시 |
+|--------|------|------|
+| `tLabel(name)` | 라벨/필드명 | `TermsUtil.tLabel('company')` → "화주사" |
+| `tButton(name)` | 버튼명 | `TermsUtil.tButton('approve')` → "승인" |
+| `tText(name)` | 일반 텍스트/메시지 | `TermsUtil.tText('fetch-failed')` → "조회 실패" |
+| `tMenu(name)` | 메뉴명 | `TermsUtil.tMenu('vas-home')` → "유통가공" |
+| `tTitle(name)` | 타이틀 | `TermsUtil.tTitle('dashboard')` → "대시보드" |
+| `tError(name)` | 에러 메시지 | `TermsUtil.tError('invalid-qty')` → "수량 오류" |
+
+### 2.2 기본 사용법
+
+```javascript
+import { TermsUtil } from '@operato-app/metapage/dist-client'
+
+class MyPage extends localize(i18next)(PageView) {
+  /** 페이지 제목 설정 */
+  get context() {
+    return {
+      title: TermsUtil.tLabel('vas-order-detail')  // "VAS 작업 지시 상세"
+    }
+  }
+
+  /** 렌더링 */
+  render() {
+    return html`
+      <!-- 라벨 -->
+      <span>${TermsUtil.tLabel('company')}</span>  <!-- 화주사 -->
+      <span>${TermsUtil.tLabel('warehouse')}</span>  <!-- 창고 -->
+
+      <!-- 버튼 -->
+      <mwc-button @click="${this._onApprove}">
+        ${TermsUtil.tButton('approve')}  <!-- 승인 -->
+      </mwc-button>
+
+      <!-- 메시지 -->
+      <div>${TermsUtil.tText('no-data')}</div>  <!-- 데이터가 없습니다 -->
+    `
+  }
+
+  /** 승인 처리 */
+  async _onApprove() {
+    const confirmed = await UiUtil.confirm(
+      TermsUtil.tText('confirm-approve')  // "승인하시겠습니까?"
+    )
+
+    if (confirmed) {
+      try {
+        await ServiceUtil.restPost('vas_trx/approve', {})
+        UiUtil.showMessage(
+          TermsUtil.tText('approved'),  // "승인되었습니다"
+          'success'
+        )
+      } catch (error) {
+        UiUtil.showMessage(
+          TermsUtil.tText('error-occurred'),  // "오류 발생"
+          'error'
+        )
+      }
+    }
+  }
+}
+```
+
+### 2.3 상태 라벨 매핑
+
+VAS 주문 상태와 같이 코드값을 한글로 변환할 때 사용합니다.
+
+```javascript
+/** VAS 주문 상태 라벨 반환 */
+getStatusLabel(status) {
+  const labels = {
+    'PLAN': TermsUtil.tLabel('plan'),           // 계획
+    'APPROVED': TermsUtil.tLabel('approved'),   // 승인
+    'IN_PROGRESS': TermsUtil.tLabel('in-progress'),  // 작업중
+    'COMPLETED': TermsUtil.tLabel('completed')  // 완료
+  }
+  return labels[status] || status
+}
+
+// 사용
+render() {
+  return html`
+    <span class="status">${this.getStatusLabel(order.status)}</span>
+  `
+}
+```
+
+### 2.4 동적 파라미터 처리
+
+용어에 변수를 포함해야 할 때 사용합니다.
+
+```javascript
+// terminologies 테이블에 등록된 용어:
+// category: 'text', name: 'items-count', display: '총 {{count}}건'
+
+TermsUtil.tText('items-count', { count: 15 })  // "총 15건"
+TermsUtil.tLabel('order-detail', { orderNo: 'VAS-001' })  // "주문 VAS-001 상세"
+```
+
+### 2.5 i18next.t()와 비교
+
+**기존 방식 (i18next.t)**:
+```javascript
+// ❌ 카테고리를 매번 명시해야 함
+i18next.t('label.company', { defaultValue: '화주사' })
+i18next.t('button.approve', { defaultValue: '승인' })
+i18next.t('text.fetch-failed', { defaultValue: '조회 실패' })
+```
+
+**권장 방식 (TermsUtil)**:
+```javascript
+// ✅ 카테고리별 메서드로 간결하게
+TermsUtil.tLabel('company')
+TermsUtil.tButton('approve')
+TermsUtil.tText('fetch-failed')
+```
+
+### 2.6 용어 등록 방법
+
+새 용어를 추가할 때는 `/add_term` skill을 사용합니다.
+
+```bash
+# 라벨 등록
+/add_term label company 화주사
+/add_term label warehouse 창고
+
+# 버튼 등록
+/add_term button approve 승인
+/add_term button cancel 취소
+
+# 텍스트 등록
+/add_term text fetch-failed 조회 실패
+/add_term text no-data 데이터가 없습니다
+```
+
+용어 등록 후 프론트엔드 캐시를 삭제하여 반영:
+```bash
+/clear_frontend_cache
+```
+
+---
+
+## 3. ServiceUtil — 백엔드 API 호출
 
 > **소스 위치**: `frontend/packages/metapage/client/utils/service-util.js`
 

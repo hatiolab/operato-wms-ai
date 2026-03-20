@@ -909,9 +909,17 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     }
   }
 
-  /** 주문 상세 페이지로 이동 (vas_no 기준) */
+  /** 주문 상세 팝업 열기 */
   _viewDetail(order) {
-    UiUtil.pageNavigate('vas-orders', { vas_no: order.vas_no })
+    const element = document.createElement('vas-order-detail')
+    element.vasOrderId = order.id
+
+    UiUtil.openPopupByElement(
+      `${order.vas_no} 상세`,
+      'large',
+      element,
+      true
+    )
   }
 
   /* ============================================================
