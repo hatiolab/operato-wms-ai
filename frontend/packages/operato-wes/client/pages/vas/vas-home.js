@@ -247,24 +247,24 @@ class VasHome extends localize(i18next)(PageView) {
                 <h3 class="section-title">📊 오늘의 작업 현황</h3>
                 <div class="status-cards">
                   <div class="status-card plan" @click="${() => this._navigateTo('vas-orders', { status: 'PLAN', vas_req_date: ValueUtil.todayFormatted() })}">
-                    <div class="label">대기중</div>
+                    <div class="label">등록 중</div>
                     <div class="count">${this.statusCounts.PLAN || 0}</div>
                     <div class="subtitle">승인 대기</div>
                   </div>
                   <div class="status-card approved" @click="${() => this._navigateTo('vas-orders', { status: 'APPROVED', vas_req_date: ValueUtil.todayFormatted() })}">
-                    <div class="label">승인완료</div>
+                    <div class="label">승인 완료</div>
                     <div class="count">${this.statusCounts.APPROVED || 0}</div>
                     <div class="subtitle">작업 대기</div>
                   </div>
                   <div class="status-card in-progress" @click="${() => this._navigateTo('vas-work-monitor', { status: 'IN_PROGRESS', vas_req_date: ValueUtil.todayFormatted() })}">
-                    <div class="label">작업중</div>
+                    <div class="label">작업 중</div>
                     <div class="count">${this.statusCounts.IN_PROGRESS || 0}</div>
                     <div class="subtitle">진행 중</div>
                   </div>
                   <div class="status-card completed" @click="${() => this._navigateTo('vas-results')}">
                     <div class="label">완료</div>
                     <div class="count">${this.statusCounts.COMPLETED || 0}</div>
-                    <div class="subtitle">오늘 완료</div>
+                    <div class="subtitle">작업 완료</div>
                   </div>
                 </div>
               </section>

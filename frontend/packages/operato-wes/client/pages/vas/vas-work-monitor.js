@@ -520,6 +520,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
       loading: Boolean,
       orders: Array,
       alerts: Array,
+      bomMap: Object,
       statusFilter: String,
       autoRefresh: Boolean,
       lastRefreshed: String
@@ -532,6 +533,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     this.loading = true
     this.orders = []
     this.alerts = []
+    this.bomMap = {}
     this.statusFilter = 'ALL'
     this.autoRefresh = true
     this.lastRefreshed = ''
@@ -595,9 +597,9 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
           <label>상태:</label>
           <select @change="${e => { this.statusFilter = e.target.value }}">
             <option value="ALL" ?selected="${this.statusFilter === 'ALL'}">전체</option>
-            <option value="IN_PROGRESS" ?selected="${this.statusFilter === 'IN_PROGRESS'}">작업중</option>
-            <option value="MATERIAL_READY" ?selected="${this.statusFilter === 'MATERIAL_READY'}">자재준비</option>
-            <option value="APPROVED" ?selected="${this.statusFilter === 'APPROVED'}">승인됨</option>
+            <option value="IN_PROGRESS" ?selected="${this.statusFilter === 'IN_PROGRESS'}">작업 중</option>
+            <option value="MATERIAL_READY" ?selected="${this.statusFilter === 'MATERIAL_READY'}">자재 준비 중</option>
+            <option value="APPROVED" ?selected="${this.statusFilter === 'APPROVED'}">주문 확정</option>
           </select>
         </div>
         <div class="filter-divider"></div>
@@ -629,19 +631,19 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
           class="summary-chip in-progress ${this.statusFilter === 'IN_PROGRESS' ? 'active' : ''}"
           @click="${() => { this.statusFilter = 'IN_PROGRESS' }}"
         >
-          작업중 <span class="chip-count">${inProgress}</span>
+          작업 중 <span class="chip-count">${inProgress}</span>
         </div>
         <div
           class="summary-chip material-ready ${this.statusFilter === 'MATERIAL_READY' ? 'active' : ''}"
           @click="${() => { this.statusFilter = 'MATERIAL_READY' }}"
         >
-          자재준비 <span class="chip-count">${materialReady}</span>
+          자재 준비 중<span class="chip-count">${materialReady}</span>
         </div>
         <div
           class="summary-chip approved ${this.statusFilter === 'APPROVED' ? 'active' : ''}"
           @click="${() => { this.statusFilter = 'APPROVED' }}"
         >
-          승인대기 <span class="chip-count">${approved}</span>
+          주문 확정 <span class="chip-count">${approved}</span>
         </div>
       </div>
     `
@@ -668,7 +670,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
           <div class="card-title">
             <span class="vas-no">${order.vas_no}</span>
             <span class="vas-type-badge">${this._vasTypeLabel(order.vas_type)}</span>
-            <span class="set-sku">${order.set_sku_cd || ''}</span>
+            <span class="set-sku">세트 상품 : ${this.bomMap[order.vas_bom_id]?.set_sku_cd || ''} / ${this.bomMap[order.vas_bom_id]?.set_sku_nm || ''}</span>
             <span class="plan-qty">(${planQty} EA)</span>
           </div>
           <span class="card-status-badge ${order.status}">${this._statusLabel(order.status)}</span>
@@ -832,7 +834,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
    * 데이터 조회
    * ============================================================ */
 
-  /** 모니터링 데이터 새로고침 (주문 목록 + 알림 동시 조회) */
+  /** 모니터링 데이터 새로고침 (주문 목록 + 알림 동시 조회 + BOM 정보 일괄 조회) */
   async _refresh() {
     try {
       this.loading = this.orders.length === 0
@@ -845,11 +847,36 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
       this.orders = ordersData || []
       this.alerts = alertsData || []
 
+      // BOM 정보 일괄 조회
+      await this._fetchBomMap(this.orders)
+
       this.lastRefreshed = this._nowTimeStr()
       this.loading = false
     } catch (err) {
       console.error('모니터링 데이터 조회 실패:', err)
       this.loading = false
+    }
+  }
+
+  /** 주문 목록의 고유 vas_bom_id로 BOM 정보 일괄 조회 */
+  async _fetchBomMap(orders) {
+    const bomIds = [...new Set(orders.map(o => o.vas_bom_id).filter(Boolean))]
+    const newBomIds = bomIds.filter(id => !this.bomMap[id])
+
+    if (newBomIds.length === 0) return
+
+    try {
+      const results = await Promise.all(
+        newBomIds.map(id => ServiceUtil.restGet(`vas_boms/${id}`).catch(() => null))
+      )
+
+      const updated = { ...this.bomMap }
+      results.forEach((bom, i) => {
+        if (bom) updated[newBomIds[i]] = bom
+      })
+      this.bomMap = updated
+    } catch (err) {
+      console.error('BOM 조회 실패:', err)
     }
   }
 
@@ -941,9 +968,9 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
   /** 주문 상태 코드를 한글 라벨로 변환 */
   _statusLabel(status) {
     const map = {
-      PLAN: '계획',
-      APPROVED: '승인',
-      MATERIAL_READY: '자재준비',
+      PLAN: '등록 중',
+      APPROVED: '주문 확정',
+      MATERIAL_READY: '자재 준비 중',
       IN_PROGRESS: '작업중',
       COMPLETED: '완료',
       CLOSED: '마감',

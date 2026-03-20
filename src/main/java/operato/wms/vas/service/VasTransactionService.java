@@ -661,7 +661,7 @@ public class VasTransactionService extends AbstractQueryService {
 				"vo.plan_qty, vo.completed_qty, vo.com_cd, vo.wh_cd, " +
 				"vo.worker_id, vo.priority, vo.work_loc_cd, " +
 				"vo.started_at, vo.approved_at, vo.vas_req_date, " +
-				"vo.attr01 as set_sku_cd, vo.remarks, " +
+				"vo.vas_bom_id, vo.remarks, " +
 				"COALESCE(mi.total_items, 0) as total_items, " +
 				"COALESCE(mi.picked_items, 0) as picked_items, " +
 				"COALESCE(mi.total_req_qty, 0) as total_req_qty, " +
