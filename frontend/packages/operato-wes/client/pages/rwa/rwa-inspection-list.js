@@ -3,19 +3,17 @@ import { css, html } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
-import { OxPrompt } from '@operato/popup/ox-prompt.js'
 
 /**
- * 반품 입고 목록 화면
+ * 반품 검수 목록 화면
  *
  * 기능:
- * - APPROVED/RECEIVING 상태 반품 주문의 입고 관리
+ * - RECEIVING/INSPECTING/INSPECTED 상태 반품 주문의 검수 관리
+ * - 대기시간 표시 및 24시간 이상 경고
  * - 주문별 반품 항목(rwa_order_items) 확장/축소 표시
- * - 개별 항목 입고 (수량 + 로케이션 입력)
- * - 전체 항목 일괄 입고 시작
- * - 입고 진행률 시각화
+ * - 검수 진행률 시각화
  */
-class RwaReceiveList extends localize(i18next)(PageView) {
+class RwaInspectionList extends localize(i18next)(PageView) {
   static get styles() {
     return [
       css`
@@ -85,14 +83,19 @@ class RwaReceiveList extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface, #333);
         }
 
-        .filter-chip.approved {
-          background: #E3F2FD;
-          color: #1565C0;
-        }
-
         .filter-chip.receiving {
           background: #E0F7FA;
           color: #00838F;
+        }
+
+        .filter-chip.inspecting {
+          background: #FFF3E0;
+          color: #E65100;
+        }
+
+        .filter-chip.inspected {
+          background: #F1F8E9;
+          color: #689F38;
         }
 
         .filter-chip.active {
@@ -126,12 +129,16 @@ class RwaReceiveList extends localize(i18next)(PageView) {
           box-shadow: var(--box-shadow-normal, 0 4px 12px rgba(0, 0, 0, 0.12));
         }
 
-        .order-card.APPROVED {
-          border-left: 4px solid #2196F3;
-        }
-
         .order-card.RECEIVING {
           border-left: 4px solid #00BCD4;
+        }
+
+        .order-card.INSPECTING {
+          border-left: 4px solid #FF9800;
+        }
+
+        .order-card.INSPECTED {
+          border-left: 4px solid #CDDC39;
         }
 
         /* 카드 헤더 */
@@ -174,6 +181,25 @@ class RwaReceiveList extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface-variant, #666);
         }
 
+        .wait-time {
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          padding: 3px 8px;
+          border-radius: 8px;
+          background: var(--md-sys-color-surface-variant, #f5f5f5);
+        }
+
+        .wait-time.warning {
+          color: #FF9800;
+          font-weight: 600;
+          background: #FFF3E0;
+        }
+
+        .wait-time.warning::after {
+          content: ' ⚠️';
+        }
+
         .card-status-badge {
           padding: 4px 12px;
           border-radius: 12px;
@@ -181,14 +207,19 @@ class RwaReceiveList extends localize(i18next)(PageView) {
           font-weight: 600;
         }
 
-        .card-status-badge.APPROVED {
-          background: #E3F2FD;
-          color: #1565C0;
-        }
-
         .card-status-badge.RECEIVING {
           background: #E0F7FA;
           color: #00838F;
+        }
+
+        .card-status-badge.INSPECTING {
+          background: #FFF3E0;
+          color: #E65100;
+        }
+
+        .card-status-badge.INSPECTED {
+          background: #F1F8E9;
+          color: #689F38;
         }
 
         /* 카드 요약 */
@@ -237,7 +268,7 @@ class RwaReceiveList extends localize(i18next)(PageView) {
           height: 100%;
           border-radius: 3px;
           transition: width 0.6s ease;
-          background: linear-gradient(90deg, #00BCD4, #00ACC1);
+          background: linear-gradient(90deg, #FF9800, #F57C00);
         }
 
         .progress-bar-fill.complete {
@@ -333,14 +364,19 @@ class RwaReceiveList extends localize(i18next)(PageView) {
           font-weight: 600;
         }
 
-        .item-status-badge.APPROVED {
-          background: #E3F2FD;
-          color: #1565C0;
-        }
-
         .item-status-badge.RECEIVING {
           background: #E0F7FA;
           color: #00838F;
+        }
+
+        .item-status-badge.INSPECTING {
+          background: #FFF3E0;
+          color: #E65100;
+        }
+
+        .item-status-badge.INSPECTED {
+          background: #F1F8E9;
+          color: #689F38;
         }
 
         .item-status-badge.COMPLETED {
@@ -350,17 +386,17 @@ class RwaReceiveList extends localize(i18next)(PageView) {
 
         .item-action-btn {
           padding: 4px 10px;
-          border: 1px solid #80DEEA;
+          border: 1px solid #FFB74D;
           border-radius: 4px;
           background: var(--md-sys-color-surface, #fff);
           font-size: 11px;
           cursor: pointer;
           transition: all 0.2s;
-          color: #00838F;
+          color: #E65100;
         }
 
         .item-action-btn:hover {
-          background: #E0F7FA;
+          background: #FFF3E0;
         }
 
         .item-action-btn:disabled {
@@ -455,7 +491,7 @@ class RwaReceiveList extends localize(i18next)(PageView) {
 
   get context() {
     return {
-      title: TermsUtil.tMenu('RwaReceiveList')
+      title: TermsUtil.tMenu('RwaInspectionList')
     }
   }
 
@@ -466,7 +502,7 @@ class RwaReceiveList extends localize(i18next)(PageView) {
   render() {
     return html`
       <div class="page-header">
-        <h2>반품 입고 관리</h2>
+        <h2>반품 검수 관리</h2>
         <button class="btn-icon" @click="${this._refresh}">새로고침</button>
       </div>
 
@@ -486,8 +522,9 @@ class RwaReceiveList extends localize(i18next)(PageView) {
 
   _renderFilterBar() {
     const all = this.orders.length
-    const approved = this.orders.filter(o => o.status === 'APPROVED').length
     const receiving = this.orders.filter(o => o.status === 'RECEIVING').length
+    const inspecting = this.orders.filter(o => o.status === 'INSPECTING').length
+    const inspected = this.orders.filter(o => o.status === 'INSPECTED').length
 
     return html`
       <div class="filter-bar">
@@ -498,16 +535,22 @@ class RwaReceiveList extends localize(i18next)(PageView) {
           전체 <span class="chip-count">${all}</span>
         </div>
         <div
-          class="filter-chip approved ${this.statusFilter === 'APPROVED' ? 'active' : ''}"
-          @click="${() => { this.statusFilter = 'APPROVED' }}"
-        >
-          승인 <span class="chip-count">${approved}</span>
-        </div>
-        <div
           class="filter-chip receiving ${this.statusFilter === 'RECEIVING' ? 'active' : ''}"
           @click="${() => { this.statusFilter = 'RECEIVING' }}"
         >
-          입고중 <span class="chip-count">${receiving}</span>
+          입고완료 <span class="chip-count">${receiving}</span>
+        </div>
+        <div
+          class="filter-chip inspecting ${this.statusFilter === 'INSPECTING' ? 'active' : ''}"
+          @click="${() => { this.statusFilter = 'INSPECTING' }}"
+        >
+          검수중 <span class="chip-count">${inspecting}</span>
+        </div>
+        <div
+          class="filter-chip inspected ${this.statusFilter === 'INSPECTED' ? 'active' : ''}"
+          @click="${() => { this.statusFilter = 'INSPECTED' }}"
+        >
+          검수완료 <span class="chip-count">${inspected}</span>
         </div>
       </div>
     `
@@ -517,13 +560,16 @@ class RwaReceiveList extends localize(i18next)(PageView) {
     const isExpanded = this.expandedOrderId === order.id
     const items = this.itemsMap[order.id] || []
     const totalItems = items.length
-    const receivedCount = items.filter(i => (i.rwa_qty || 0) > 0).length
-    const totalReqQty = items.reduce((s, i) => s + (i.rwa_req_qty || 0), 0)
+    const inspectedCount = items.filter(i => (i.good_qty || 0) > 0 || (i.defect_qty || 0) > 0).length
     const totalRwaQty = items.reduce((s, i) => s + (i.rwa_qty || 0), 0)
-    const totalBoxQty = items.reduce((s, i) => s + (i.box_qty || 0), 0)
-    const progressPct = totalItems > 0 ? Math.round((receivedCount / totalItems) * 100) : 0
+    const totalGoodQty = items.reduce((s, i) => s + (i.good_qty || 0), 0)
+    const totalDefectQty = items.reduce((s, i) => s + (i.defect_qty || 0), 0)
+    const progressPct = totalItems > 0 ? Math.round((inspectedCount / totalItems) * 100) : 0
 
-    const canStartReceive = order.status === 'APPROVED'
+    const canStartInspection = order.status === 'RECEIVING'
+
+    // 대기시간 계산
+    const waitTime = this._calculateWaitTime(order)
 
     return html`
       <div class="order-card ${order.status}">
@@ -533,6 +579,7 @@ class RwaReceiveList extends localize(i18next)(PageView) {
             <span class="rwa-no">${order.rwa_no}</span>
             <span class="rwa-type-badge">${this._rwaTypeLabel(order.rwa_type)}</span>
             <span class="cust-info">${order.cust_nm || ''}${order.cust_cd ? ` (${order.cust_cd})` : ''}</span>
+            <span class="wait-time ${waitTime.isWarning ? 'warning' : ''}">${waitTime.display}</span>
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
             <span class="card-status-badge ${order.status}">${this._statusLabel(order.status)}</span>
@@ -546,16 +593,14 @@ class RwaReceiveList extends localize(i18next)(PageView) {
             항목: <span class="value">${totalItems}건</span>
           </div>
           <div class="summary-item">
-            요청: <span class="value">${totalReqQty} EA</span>
+            입고: <span class="value">${totalRwaQty} EA</span>
           </div>
           <div class="summary-item">
-            입고: <span class="value ${totalRwaQty >= totalReqQty && totalReqQty > 0 ? 'ok' : 'warn'}">${totalRwaQty}/${totalReqQty} EA</span>
+            양품: <span class="value ${totalGoodQty > 0 ? 'ok' : ''}">${totalGoodQty} EA</span>
           </div>
-          ${totalBoxQty > 0 ? html`
-            <div class="summary-item">
-              박스: <span class="value">${totalBoxQty}</span>
-            </div>
-          ` : ''}
+          <div class="summary-item">
+            불량: <span class="value ${totalDefectQty > 0 ? 'warn' : ''}">${totalDefectQty} EA</span>
+          </div>
         </div>
 
         <!-- 진행률 바 -->
@@ -572,9 +617,9 @@ class RwaReceiveList extends localize(i18next)(PageView) {
         <div class="card-actions">
           <button
             class="card-action-btn primary"
-            ?disabled="${!canStartReceive}"
-            @click="${e => { e.stopPropagation(); this._startReceive(order) }}"
-          >입고 시작</button>
+            ?disabled="${!canStartInspection}"
+            @click="${e => { e.stopPropagation(); this._startInspection(order) }}"
+          >검수 시작</button>
           <button
             class="card-action-btn"
             @click="${e => { e.stopPropagation(); this._viewDetail(order) }}"
@@ -606,9 +651,9 @@ class RwaReceiveList extends localize(i18next)(PageView) {
               <th>순번</th>
               <th>SKU 코드</th>
               <th>상품명</th>
-              <th style="text-align:right">요청수량</th>
-              <th style="text-align:right">입고수량</th>
-              <th>로케이션</th>
+              <th style="text-align:right">입고수</th>
+              <th style="text-align:right">양품</th>
+              <th style="text-align:right">불량</th>
               <th>상태</th>
               <th>액션</th>
             </tr>
@@ -619,20 +664,20 @@ class RwaReceiveList extends localize(i18next)(PageView) {
                 <td>${item.rwa_seq || idx + 1}</td>
                 <td>${item.sku_cd || '-'}</td>
                 <td>${item.sku_nm || '-'}</td>
-                <td class="number">${item.rwa_req_qty || 0}</td>
                 <td class="number">${item.rwa_qty || 0}</td>
-                <td>${item.loc_cd || item.temp_loc_cd || '-'}</td>
+                <td class="number">${item.good_qty || 0}</td>
+                <td class="number">${item.defect_qty || 0}</td>
                 <td>
-                  <span class="item-status-badge ${item.status || 'APPROVED'}">
+                  <span class="item-status-badge ${item.status || 'RECEIVING'}">
                     ${this._itemStatusLabel(item.status)}
                   </span>
                 </td>
                 <td>
                   <button
                     class="item-action-btn"
-                    ?disabled="${(item.rwa_qty || 0) >= (item.rwa_req_qty || 0) && (item.rwa_req_qty || 0) > 0}"
-                    @click="${() => this._receiveItem(order, item)}"
-                  >입고</button>
+                    ?disabled="${(item.good_qty || 0) > 0 || (item.defect_qty || 0) > 0}"
+                    @click="${() => this._inspectItem(order, item)}"
+                  >검수</button>
                 </td>
               </tr>
             `)}
@@ -645,9 +690,9 @@ class RwaReceiveList extends localize(i18next)(PageView) {
   _renderEmptyState() {
     return html`
       <div class="empty-state">
-        <span class="empty-icon">\u{1F4E5}</span>
-        <span class="empty-message">입고 대기 중인 반품이 없습니다</span>
-        <span class="empty-sub">승인 완료된 반품 주문이 이곳에 표시됩니다</span>
+        <span class="empty-icon">🔍</span>
+        <span class="empty-message">검수 대기 중인 반품이 없습니다</span>
+        <span class="empty-sub">입고 완료된 반품 주문이 이곳에 표시됩니다</span>
       </div>
     `
   }
@@ -675,19 +720,20 @@ class RwaReceiveList extends localize(i18next)(PageView) {
     try {
       this.loading = this.orders.length === 0
 
-      // APPROVED + RECEIVING 상태 주문 병렬 조회
-      const [approvedOrders, receivingOrders] = await Promise.all([
-        ServiceUtil.restGet('rwa_trx/rwa_orders?status=APPROVED').catch(() => []),
-        ServiceUtil.restGet('rwa_trx/rwa_orders?status=RECEIVING').catch(() => [])
+      // RECEIVING + INSPECTING + INSPECTED 상태 주문 병렬 조회
+      const [receivingOrders, inspectingOrders, inspectedOrders] = await Promise.all([
+        ServiceUtil.restGet('rwa_trx/rwa_orders?status=RECEIVING').catch(() => []),
+        ServiceUtil.restGet('rwa_trx/rwa_orders?status=INSPECTING').catch(() => []),
+        ServiceUtil.restGet('rwa_trx/rwa_orders?status=INSPECTED').catch(() => [])
       ])
-      this.orders = [...(approvedOrders || []), ...(receivingOrders || [])]
+      this.orders = [...(receivingOrders || []), ...(inspectingOrders || []), ...(inspectedOrders || [])]
 
       // 모든 주문의 항목 일괄 조회
       await this._fetchAllItems(this.orders)
 
       this.loading = false
     } catch (err) {
-      console.error('반품 입고 데이터 조회 실패:', err)
+      console.error('반품 검수 데이터 조회 실패:', err)
       this.loading = false
     }
   }
@@ -720,76 +766,16 @@ class RwaReceiveList extends localize(i18next)(PageView) {
   }
 
   /* ============================================================
-   * 입고 처리
+   * 검수 처리
    * ============================================================ */
 
-  async _startReceive(order) {
-    const items = this.itemsMap[order.id] || []
-    const pendingItems = items.filter(i => !(i.rwa_qty > 0))
-
-    if (pendingItems.length === 0) {
-      UiUtil.showToast('info', '입고할 항목이 없습니다')
-      return
-    }
-
-    const result = await UiUtil.showAlertPopup(
-      'title.confirm',
-      `${order.rwa_no}의 전체 항목(${pendingItems.length}건)을 입고 처리하시겠습니까?\n각 항목의 요청수량으로 입고됩니다.`,
-      'question',
-      'confirm',
-      'cancel'
-    )
-
-    if (!result.confirmButton) return
-
-    try {
-      for (const item of pendingItems) {
-        await ServiceUtil.restPost(
-          `rwa_trx/rwa_orders/${order.id}/items/${item.id}/receive`,
-          {
-            rwaQty: item.rwa_req_qty,
-            locCd: item.temp_loc_cd || item.loc_cd || ''
-          }
-        )
-      }
-
-      UiUtil.showToast('success', `${order.rwa_no} 입고 완료 (${pendingItems.length}건)`)
-      await this._refresh()
-    } catch (err) {
-      UiUtil.showToast('error', err.message || '입고 처리 실패')
-    }
+  async _startInspection(order) {
+    UiUtil.pageNavigate('rwa-inspection-work')
   }
 
-  async _receiveItem(order, item) {
-    const result = await OxPrompt.open({
-      title: `${item.sku_cd} 입고`,
-      text: `요청수량: ${item.rwa_req_qty}\n입고수량과 로케이션을 입력하세요.`,
-      type: 'prompt',
-      fields: [
-        { name: 'rwaQty', label: '입고수량', type: 'number', value: String(item.rwa_req_qty || 0) },
-        { name: 'locCd', label: '로케이션', type: 'text', value: item.temp_loc_cd || item.loc_cd || '' }
-      ],
-      confirmButton: { text: '입고' },
-      cancelButton: { text: '취소' }
-    })
-
-    if (!result.confirmButton) return
-
-    try {
-      await ServiceUtil.restPost(
-        `rwa_trx/rwa_orders/${order.id}/items/${item.id}/receive`,
-        {
-          rwaQty: Number(result.fields?.rwaQty || item.rwa_req_qty),
-          locCd: result.fields?.locCd || ''
-        }
-      )
-
-      UiUtil.showToast('success', `${item.sku_cd} 입고 완료`)
-      await this._fetchItems(order.id)
-      await this._refresh()
-    } catch (err) {
-      UiUtil.showToast('error', err.message || '입고 처리 실패')
-    }
+  async _inspectItem(order, item) {
+    UiUtil.showToast('info', '개별 항목 검수 기능은 추후 구현 예정입니다')
+    // TODO: 검수 팝업 또는 검수 작업 화면으로 이동
   }
 
   /* ============================================================
@@ -823,6 +809,21 @@ class RwaReceiveList extends localize(i18next)(PageView) {
    * 유틸리티
    * ============================================================ */
 
+  _calculateWaitTime(order) {
+    if (!order.rwa_req_date) {
+      return { display: '-', isWarning: false }
+    }
+
+    const waitMs = Date.now() - new Date(order.rwa_req_date).getTime()
+    const waitHours = Math.floor(waitMs / (1000 * 60 * 60))
+    const waitDays = Math.floor(waitHours / 24)
+
+    const display = waitDays > 0 ? `${waitDays}d` : `${waitHours}h`
+    const isWarning = waitHours >= 24
+
+    return { display, isWarning }
+  }
+
   _rwaTypeLabel(type) {
     const map = {
       CUSTOMER_RETURN: '고객 반품',
@@ -836,8 +837,9 @@ class RwaReceiveList extends localize(i18next)(PageView) {
 
   _statusLabel(status) {
     const map = {
-      APPROVED: '승인',
-      RECEIVING: '입고중'
+      RECEIVING: '입고완료',
+      INSPECTING: '검수중',
+      INSPECTED: '검수완료'
     }
     return map[status] || status || '-'
   }
@@ -856,4 +858,4 @@ class RwaReceiveList extends localize(i18next)(PageView) {
   }
 }
 
-window.customElements.define('rwa-receive-list', RwaReceiveList)
+window.customElements.define('rwa-inspection-list', RwaInspectionList)

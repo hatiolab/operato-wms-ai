@@ -458,6 +458,22 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
     return this.vasOrder?.status === 'MATERIAL_READY'
   }
 
+  get context() {
+
+
+    return {
+
+
+      title: TermsUtil.tMenu('VasOrderDetail')
+
+
+    }
+
+
+  }
+
+
+
   render() {
     if (!this.vasOrder) {
       return html`

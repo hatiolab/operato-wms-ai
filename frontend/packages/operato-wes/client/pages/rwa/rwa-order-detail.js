@@ -1,6 +1,6 @@
 import { css, html, LitElement } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
-import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import { OxPrompt } from '@operato/popup/ox-prompt.js'
 
 /**
@@ -423,6 +423,22 @@ class RwaOrderDetail extends localize(i18next)(LitElement) {
       this._fetchOrderData()
     }
   }
+
+  get context() {
+
+
+    return {
+
+
+      title: TermsUtil.tMenu('RwaOrderDetail')
+
+
+    }
+
+
+  }
+
+
 
   render() {
     if (this.loading) {

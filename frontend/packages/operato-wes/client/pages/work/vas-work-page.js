@@ -2,7 +2,7 @@ import { css, html } from 'lit-element'
 
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
-import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 
 /**
  * VAS PDA 작업 화면
@@ -595,7 +595,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
   /** 페이지 컨텍스트 반환 - 브라우저 타이틀 등에 사용 */
   get context() {
     return {
-      title: 'VAS PDA 작업'
+      title: TermsUtil.tMenu('VasWorkPage')
     }
   }
 

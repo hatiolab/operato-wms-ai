@@ -2,7 +2,7 @@ import { css, html } from 'lit-element'
 
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
-import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import Chart from 'chart.js/auto'
 
 class VasResultAnalysis extends localize(i18next)(PageView) {
@@ -318,7 +318,7 @@ class VasResultAnalysis extends localize(i18next)(PageView) {
   }
 
   get context() {
-    return { title: '유통가공 실적 분석' }
+    return { title: TermsUtil.tMenu('VasResultAnalysis') }
   }
 
   render() {

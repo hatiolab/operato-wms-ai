@@ -3,7 +3,7 @@ import { css, html } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
 import { openPopup } from '@operato/layout'
-import { ServiceUtil, UiUtil, ValueUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import Chart from 'chart.js/auto'
 
 import './vas-order-new-popup'
@@ -231,7 +231,7 @@ class VasHome extends localize(i18next)(PageView) {
   /** 페이지 컨텍스트 반환 - 브라우저 타이틀 등에 사용 */
   get context() {
     return {
-      title: `유통가공 대시보드`
+      title: TermsUtil.tMenu('VasHome')
     }
   }
 

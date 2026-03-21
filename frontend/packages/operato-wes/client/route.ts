@@ -5,12 +5,16 @@ import './pages/rwa/rwa-home'
 import './pages/rwa/rwa-order-new'  // 팝업으로 사용
 import './pages/rwa/rwa-order-detail'  // 팝업으로 사용
 import './pages/rwa/rwa-receive-list'
+import './pages/rwa/rwa-inspection-list'
+import './pages/rwa/rwa-disposition-list'
 import './pages/vas/vas-home'
 import './pages/vas/vas-work-monitor'
 import './pages/vas/vas-order-detail'  // 팝업으로 사용
 import './pages/vas/vas-material-preparation'
 import './pages/vas/vas-result-analysis'
 import './pages/work/vas-work-page'
+import './pages/work/rwa-receive-work'
+import './pages/work/rwa-inspection-work'
 
 import './pages/work/rcv-work-page'
 import './pages/work/rcv-work-item-element'

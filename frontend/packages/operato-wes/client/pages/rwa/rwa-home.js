@@ -2,7 +2,7 @@ import { css, html } from 'lit-element'
 
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
-import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import Chart from 'chart.js/auto'
 
 class RwaHome extends localize(i18next)(PageView) {
@@ -224,7 +224,7 @@ class RwaHome extends localize(i18next)(PageView) {
 
   get context() {
     return {
-      title: `반품 대시보드`
+      title: TermsUtil.tMenu('RwaHome')
     }
   }
 
@@ -251,12 +251,12 @@ class RwaHome extends localize(i18next)(PageView) {
                     <div class="count">${this.statusCounts.RECEIVING || 0}</div>
                     <div class="subtitle">입고 진행 중</div>
                   </div>
-                  <div class="status-card inspecting" @click="${() => this._navigateTo('rwa-inspections')}">
+                  <div class="status-card inspecting" @click="${() => this._navigateTo('rwa-inspection-list')}">
                     <div class="label">검수중</div>
                     <div class="count">${this.statusCounts.INSPECTING || 0}</div>
                     <div class="subtitle">검수 진행 중</div>
                   </div>
-                  <div class="status-card disposing" @click="${() => this._navigateTo('rwa-dispositions')}">
+                  <div class="status-card disposing" @click="${() => this._navigateTo('rwa-disposition-list')}">
                     <div class="label">처분중</div>
                     <div class="count">${this.statusCounts.DISPOSED || 0}</div>
                     <div class="subtitle">처분 결정 대기</div>
@@ -299,10 +299,10 @@ class RwaHome extends localize(i18next)(PageView) {
                   <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-receive-list')}">
                     <span class="icon">📥</span>입고 처리
                   </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-inspections')}">
+                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-inspection-list')}">
                     <span class="icon">🔍</span>검수 작업
                   </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-dispositions')}">
+                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-disposition-list')}">
                     <span class="icon">🗂️</span>처분 결정
                   </button>
                 </div>

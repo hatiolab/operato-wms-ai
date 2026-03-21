@@ -1,6 +1,6 @@
 import { css, html, LitElement } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
-import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 
 /**
  * 반품 요청 등록 팝업
@@ -404,6 +404,22 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
     this._fetchWarehouses()
     this._fetchCustomers()
   }
+
+  get context() {
+
+
+    return {
+
+
+      title: TermsUtil.tMenu('RwaOrderNew')
+
+
+    }
+
+
+  }
+
+
 
   render() {
     return html`

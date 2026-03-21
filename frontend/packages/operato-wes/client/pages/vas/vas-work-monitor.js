@@ -2,7 +2,7 @@ import { css, html } from 'lit-element'
 
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
-import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 
 /**
  * VAS 작업 진행 모니터링 화면
@@ -543,7 +543,7 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
   /** 페이지 컨텍스트 반환 - 브라우저 타이틀 등에 사용 */
   get context() {
     return {
-      title: '유통가공 작업 진행 모니터링'
+      title: TermsUtil.tMenu('VasWorkMonitor')
     }
   }
 

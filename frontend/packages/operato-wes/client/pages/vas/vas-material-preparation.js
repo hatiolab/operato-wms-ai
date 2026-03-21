@@ -496,7 +496,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
 
   get context() {
     return {
-      title: '유통 가공 자재 준비 관리'
+      title: TermsUtil.tMenu('VasMaterialPreparation')
     }
   }
 
