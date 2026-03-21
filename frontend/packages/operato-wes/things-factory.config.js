@@ -8,6 +8,7 @@ export default {
     { tagname: 'outbound-home', page: 'outbound-home' },
     { tagname: 'inventory-home', page: 'inventory-home' },
     { tagname: 'rwa-home', page: 'rwa-home' },
+    { tagname: 'rwa-receive-list', page: 'rwa-receive-list' },
     { tagname: 'vas-home', page: 'vas-home' },
     { tagname: 'vas-work-monitor', page: 'vas-work-monitor' },
     { tagname: 'vas-material-preparation', page: 'vas-material-preparation' },

@@ -444,6 +444,18 @@ class RwaHome extends localize(i18next)(PageView) {
     UiUtil.openPopupByElement('반품 요청 등록', 'large', element, true)
   }
 
+  /**
+   * 반품 요청 상세 팝업 열기
+   */
+  _openRwaOrderDetail(orderId) {
+    const element = document.createElement('rwa-order-detail')
+    element.rwaOrderId = orderId
+    element.addEventListener('order-updated', () => {
+      this._fetchDashboardData()
+    })
+    UiUtil.openPopupByElement('반품 상세', 'large', element, true)
+  }
+
   pageDisposed(lifecycle) {
     // Chart 정리
     if (this._chart) {

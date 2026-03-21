@@ -756,30 +756,53 @@ import { openDB } from 'idb'
 
 ## 6. 구현 우선순위
 
+### 구현 현황 요약
+
+| 구분 | 전체 | 완료 | 미구현 | 진행률 |
+|------|------|------|--------|--------|
+| Phase 1 | 4 | 4 | 0 | 100% |
+| Phase 2 | 3 | 3 | 0 | 100% |
+| Phase 3 | 3 | 2 | 1 | 67% |
+| Phase 4 | 3 | 1 | 2 | 33% |
+| Phase 5 | 4 | 1 | 3 | 25% |
+| **합계** | **17** | **11** | **6** | **65%** |
+
 ### Phase 1: 기본 CRUD (1주)
-- ✅ BOM 마스터 관리 (vas-bom-list, vas-bom-detail)
-- ✅ 작업 지시 관리 (vas-order-list, vas-order-new)
+- ✅ BOM 마스터 목록 (`vas-bom-list`) — BOM 목록 조회, 검색, CRUD
+- ✅ BOM 마스터 상세 (`vas-bom-detail`) — BOM 구성 품목 관리
+- ✅ 작업 지시 생성 팝업 (`vas-order-new-popup`) — 2단계 위자드, BOM 선택, 소요자재 확인
+- ✅ 작업 지시 목록 (`vas-order-list`) — 상태 필터, 검색, 일괄 처리
 
 ### Phase 2: 트랜잭션 (1주)
-- ✅ 작업 지시 승인/취소 (vas-order-detail)
-- ✅ 자재 배정/피킹 (API 연동)
-- ✅ 실적 등록 (vas-result-list)
+- ✅ 작업 지시 상세 팝업 (`vas-order-detail`) — 기본정보/BOM/자재/실적 탭
+- ✅ 자재 준비 관리 (`vas-material-preparation`) — 자재 배정/피킹 관리
+- ✅ 실적 등록 (`vas-result-list`) — 작업 실적 등록 및 관리
 
 ### Phase 3: 모니터링 (1주)
-- ✅ 대시보드 (vas-home)
-- ✅ 작업 진행 모니터링 (vas-work-monitor)
-- ✅ 실시간 알림 (WebSocket)
+- ✅ 대시보드 (`vas-home`) — 상태 카드, 유형별 차트, 알림, 바로가기
+- ✅ 작업 진행 모니터링 (`vas-work-monitor`) — 실시간 주문 상태 추적, 상세 팝업
+- ⬜ 실시간 알림 (WebSocket)
 
 ### Phase 4: PDA 작업 화면 (1주)
-- ✅ 자재 피킹 (vas-pda-pick)
-- ✅ 작업 수행 (vas-pda-work)
-- ✅ 실적 등록 (vas-pda-result)
+- ⬜ 자재 피킹 (`vas-pda-pick`) — 모바일 바코드 스캔 피킹
+- ✅ 작업 수행 (`vas-pda-work`) — 모바일 세트 구성 작업
+- ⬜ 실적 등록 (`vas-pda-result`) — 모바일 실적 등록
 
 ### Phase 5: 고도화 (1주)
-- ✅ 실적 분석 차트
-- ✅ 바코드 스캐너 연동
-- ✅ 음성 안내
-- ✅ 오프라인 모드
+- ✅ 실적 분석 차트 (`vas-result-analysis`) — 유형별/일별 추이, 불량 분석, KPI
+- ⬜ 바코드 스캐너 연동
+- ⬜ 음성 안내
+- ⬜ 오프라인 모드
+
+### 추천 구현 순서
+
+```
+Phase 1 잔여 (vas-bom-list → vas-bom-detail → vas-order-list)
+  → Phase 2 잔여 (vas-result-list)
+  → Phase 3 잔여 (WebSocket 알림)
+  → Phase 4 (PDA 피킹 → PDA 작업 → PDA 실적)
+  → Phase 5 잔여 (바코드/음성/오프라인)
+```
 
 ---
 
@@ -793,5 +816,5 @@ import { openDB } from 'idb'
 ---
 
 **작성자**: HatioLab 개발팀
-**문서 버전**: 1.0.0
-**최종 업데이트**: 2026-03-18
+**문서 버전**: 1.1.0
+**최종 업데이트**: 2026-03-20

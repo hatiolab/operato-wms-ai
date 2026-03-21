@@ -3,6 +3,8 @@ import './pages/outbound/outbound-home'
 import './pages/inventory/inventory-home'
 import './pages/rwa/rwa-home'
 import './pages/rwa/rwa-order-new'  // 팝업으로 사용
+import './pages/rwa/rwa-order-detail'  // 팝업으로 사용
+import './pages/rwa/rwa-receive-list'
 import './pages/vas/vas-home'
 import './pages/vas/vas-work-monitor'
 import './pages/vas/vas-order-detail'  // 팝업으로 사용

@@ -683,30 +683,52 @@ import { openDB } from 'idb'
 
 ## 6. 구현 우선순위
 
+### 구현 현황 요약
+
+| 구분 | 전체 | 완료 | 미구현 | 진행률 |
+|------|------|------|--------|--------|
+| Phase 1 | 3 | 3 | 0 | 100% |
+| Phase 2 | 4 | 1 | 3 | 25% |
+| Phase 3 | 3 | 0 | 3 | 0% |
+| Phase 4 | 3 | 1 | 2 | 33% |
+| Phase 5 | 4 | 0 | 4 | 0% |
+| **합계** | **17** | **5** | **12** | **29%** |
+
 ### Phase 1: 기본 CRUD (1주)
-- ✅ 반품 요청 관리 (rwa-order-list, rwa-order-new)
-- ✅ 반품 요청 상세 (rwa-order-detail)
+- ✅ 반품 요청 생성 팝업 (`rwa-order-new`) — 2단계 위자드, 화주사/창고/고객사 select
+- ✅ 반품 요청 목록 (`rwa-order-list`) — 상태 필터, 검색, 일괄 승인, 엑셀 다운로드
+- ✅ 반품 요청 상세 (`rwa-order-detail`) — 기본정보/항목/검수/처분/이력 탭 구성, 상태별 액션 버튼
 
 ### Phase 2: 입고 및 검수 (1주)
-- ✅ 반품 입고 처리 (rwa-receive-work)
-- ✅ 반품 검수 작업 (rwa-inspection-work)
-- ✅ 검수 기록 관리
+- ✅ 반품 입고 목록 (`rwa-receive-list`) — 카드 기반 목록, 필터 칩, 개별/일괄 입고, 진행률 바
+- ⬜ 반품 입고 작업 (`rwa-receive-work`) — 바코드 스캔, 항목별 입고 확인
+- ⬜ 반품 검수 목록 (`rwa-inspection-list`) — 입고 완료 건 검수 대기 목록
+- ⬜ 반품 검수 작업 (`rwa-inspection-work`) — 양품/불량 판정, 사진 첨부
 
 ### Phase 3: 처분 및 완료 (1주)
-- ✅ 처분 결정 (rwa-disposition-work)
-- ✅ 재고 처리 연동
-- ✅ 완료 및 마감
+- ⬜ 처분 대기 목록 (`rwa-disposition-list`) — 검수 완료 건 처분 대기
+- ⬜ 처분 결정 작업 (`rwa-disposition-work`) — 재입고/폐기/반송 결정
+- ⬜ 재고 처리 연동 및 완료/마감
 
 ### Phase 4: 실적 분석 (1주)
-- ✅ 대시보드 (rwa-home)
-- ✅ 실적 대시보드 (rwa-result-dashboard)
-- ✅ 품질 분석 (rwa-quality-analysis)
+- ✅ 대시보드 (`rwa-home`) — 상태 카드, 유형별 차트, 알림, 바로가기
+- ⬜ 실적 대시보드 (`rwa-result-dashboard`) — 유형별/검수/처분 통계 차트
+- ⬜ 품질 분석 (`rwa-quality-analysis`) — 불량 유형별 분석, SKU별 반품률
 
 ### Phase 5: PDA 작업 화면 (1주)
-- ✅ PDA 입고 (rwa-pda-receive)
-- ✅ PDA 검수 (rwa-pda-inspect)
-- ✅ 바코드 스캐너 연동
-- ✅ 카메라 촬영 (불량 사진)
+- ⬜ PDA 입고 (`rwa-pda-receive`) — 모바일 바코드 스캔 입고
+- ⬜ PDA 검수 (`rwa-pda-inspect`) — 모바일 품질 판정 + 카메라
+- ⬜ 바코드 스캐너 연동
+- ⬜ 카메라 촬영 (불량 사진)
+
+### 추천 구현 순서
+
+```
+Phase 2 잔여 (입고 작업 → 검수 목록 → 검수 작업)
+  → Phase 3 (처분 목록 → 처분 작업 → 재고 연동)
+  → Phase 4 잔여 (실적 대시보드 → 품질 분석)
+  → Phase 5 (PDA)
+```
 
 ---
 
@@ -720,5 +742,5 @@ import { openDB } from 'idb'
 ---
 
 **작성자**: HatioLab 개발팀
-**문서 버전**: 1.0.0
-**최종 업데이트**: 2026-03-18
+**문서 버전**: 1.1.0
+**최종 업데이트**: 2026-03-20

@@ -1,12 +1,16 @@
 package operato.wms.rwa.entity;
 
+import java.util.HashMap;
+
 import operato.wms.rwa.WmsRwaConstants;
+import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
 import xyz.elidom.dbist.annotation.Index;
 import xyz.elidom.dbist.annotation.PrimaryKey;
 import xyz.elidom.dbist.annotation.Table;
 import xyz.elidom.sys.entity.Domain;
+import xyz.elidom.util.BeanUtil;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -564,10 +568,8 @@ public class RwaOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 		// 반품 번호 자동 채번 (RWA-YYYYMMDD-XXXXX)
 		if (ValueUtil.isEmpty(this.rwaNo)) {
-			String dateStr = DateUtil.todayStr("yyyyMMdd");
-			// TODO: 일련번호 채번 서비스 구현 필요
-			// this.rwaNo = WmsRwaConstants.RWA_NO_PREFIX + dateStr + "-" + getNextSeq();
-			this.rwaNo = this.rwaReqNo;
+			this.rwaNo = (String) BeanUtil.get(ICustomService.class).doCustomService(Domain.currentDomainId(),
+					"diy-generate-rwa-no", new HashMap<String, Object>());
 		}
 
 		// 반품 요청일이 없는 경우 당일 날짜 설정
