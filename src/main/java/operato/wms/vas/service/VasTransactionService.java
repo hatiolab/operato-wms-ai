@@ -16,6 +16,7 @@ import operato.wms.vas.WmsVasConstants;
 import operato.wms.vas.entity.VasOrder;
 import operato.wms.vas.entity.VasOrderItem;
 import operato.wms.vas.entity.VasResult;
+import operato.wms.vas.service.VasSseService.VasEventData;
 import xyz.anythings.sys.service.AbstractQueryService;
 import xyz.elidom.dbist.dml.Query;
 import xyz.elidom.sys.entity.Domain;
@@ -46,6 +47,12 @@ public class VasTransactionService extends AbstractQueryService {
 	 */
 	@Autowired
 	protected WmsBaseService wmsBaseSvc;
+
+	/**
+	 * SSE 이벤트 서비스
+	 */
+	@Autowired
+	private VasSseService vasSseService;
 
 	/********************************************************************************************************
 	 * 1. 작업 지시 생성 및 승인
@@ -169,6 +176,12 @@ public class VasTransactionService extends AbstractQueryService {
 
 		this.queryManager.update(vasOrder, "status", "approvedBy", "approvedAt");
 
+		// SSE 이벤트 발행
+		vasSseService.publish(vasOrder.getDomainId(), new VasEventData(
+				"ORDER_APPROVED", vasOrder.getVasNo(), vasOrder.getId().toString(),
+				WmsVasConstants.STATUS_PLAN, vasOrder.getStatus(), vasOrder.getVasType(),
+				vasOrder.getVasNo() + " 승인 완료"));
+
 		return vasOrder;
 	}
 
@@ -206,6 +219,12 @@ public class VasTransactionService extends AbstractQueryService {
 		this.queryManager.executeBySql(sql, ValueUtil.newMap(
 				"status,vasOrderId,domainId",
 				WmsVasConstants.ITEM_STATUS_COMPLETED, vasOrderId, vasOrder.getDomainId()));
+
+		// SSE 이벤트 발행
+		vasSseService.publish(vasOrder.getDomainId(), new VasEventData(
+				"ORDER_CANCELLED", vasOrder.getVasNo(), vasOrder.getId().toString(),
+				null, vasOrder.getStatus(), vasOrder.getVasType(),
+				vasOrder.getVasNo() + " 취소"));
 
 		return vasOrder;
 	}
@@ -337,6 +356,12 @@ public class VasTransactionService extends AbstractQueryService {
 				WmsVasConstants.ITEM_STATUS_IN_USE, vasOrderId, vasOrder.getDomainId(),
 				WmsVasConstants.ITEM_STATUS_PICKED));
 
+		// SSE 이벤트 발행
+		vasSseService.publish(vasOrder.getDomainId(), new VasEventData(
+				"WORK_STARTED", vasOrder.getVasNo(), vasOrder.getId().toString(),
+				WmsVasConstants.STATUS_MATERIAL_READY, vasOrder.getStatus(), vasOrder.getVasType(),
+				vasOrder.getVasNo() + " 작업 시작"));
+
 		return vasOrder;
 	}
 
@@ -392,6 +417,12 @@ public class VasTransactionService extends AbstractQueryService {
 		// TODO: 재고 처리 로직 구현
 		// processInventoryByVasType(vasOrder, result);
 
+		// SSE 이벤트 발행
+		vasSseService.publish(vasOrder.getDomainId(), new VasEventData(
+				"RESULTS_REGISTERED", vasOrder.getVasNo(), vasOrder.getId().toString(),
+				vasOrder.getStatus(), vasOrder.getStatus(), vasOrder.getVasType(),
+				vasOrder.getVasNo() + " 실적 등록 (" + result.getResultQty() + " EA)"));
+
 		return result;
 	}
 
@@ -440,6 +471,12 @@ public class VasTransactionService extends AbstractQueryService {
 				"status,vasOrderId,domainId",
 				WmsVasConstants.ITEM_STATUS_COMPLETED, vasOrderId, vasOrder.getDomainId()));
 
+		// SSE 이벤트 발행
+		vasSseService.publish(vasOrder.getDomainId(), new VasEventData(
+				"WORK_COMPLETED", vasOrder.getVasNo(), vasOrder.getId().toString(),
+				WmsVasConstants.STATUS_IN_PROGRESS, vasOrder.getStatus(), vasOrder.getVasType(),
+				vasOrder.getVasNo() + " 작업 완료"));
+
 		return vasOrder;
 	}
 
@@ -466,6 +503,12 @@ public class VasTransactionService extends AbstractQueryService {
 		// 3. 마감 처리
 		vasOrder.setStatus(WmsVasConstants.STATUS_CLOSED);
 		this.queryManager.update(vasOrder, "status");
+
+		// SSE 이벤트 발행
+		vasSseService.publish(vasOrder.getDomainId(), new VasEventData(
+				"ORDER_CLOSED", vasOrder.getVasNo(), vasOrder.getId().toString(),
+				WmsVasConstants.STATUS_COMPLETED, vasOrder.getStatus(), vasOrder.getVasType(),
+				vasOrder.getVasNo() + " 마감"));
 
 		return vasOrder;
 	}
@@ -634,8 +677,17 @@ public class VasTransactionService extends AbstractQueryService {
 
 		// 5. 상태 업데이트
 		if (!newStatus.equals(vasOrder.getStatus())) {
+			String prevStatus = vasOrder.getStatus();
 			vasOrder.setStatus(newStatus);
 			this.queryManager.update(vasOrder, "status");
+
+			// SSE 이벤트 발행 (MATERIAL_READY 전환)
+			if (WmsVasConstants.STATUS_MATERIAL_READY.equals(newStatus)) {
+				vasSseService.publish(vasOrder.getDomainId(), new VasEventData(
+						"MATERIAL_READY", vasOrder.getVasNo(), vasOrder.getId().toString(),
+						prevStatus, newStatus, vasOrder.getVasType(),
+						vasOrder.getVasNo() + " 자재 준비 완료"));
+			}
 		}
 	}
 

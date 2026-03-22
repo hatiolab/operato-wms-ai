@@ -689,10 +689,10 @@ import { openDB } from 'idb'
 |------|------|------|--------|--------|
 | Phase 1 | 3 | 3 | 0 | 100% |
 | Phase 2 | 4 | 4 | 0 | 100% |
-| Phase 3 | 3 | 1 | 2 | 33% |
-| Phase 4 | 3 | 1 | 2 | 33% |
-| Phase 5 | 4 | 0 | 4 | 0% |
-| **합계** | **17** | **9** | **8** | **53%** |
+| Phase 3 | 3 | 2 | 1 | 67% |
+| Phase 4 | 3 | 3 | 0 | 100% |
+| Phase 5 | 4 | 4 | 0 | 100% |
+| **합계** | **17** | **16** | **1** | **94%** |
 
 ### Phase 1: 기본 CRUD (1주)
 - ✅ 반품 요청 생성 팝업 (`rwa-order-new`) — 2단계 위자드, 화주사/창고/고객사 select
@@ -707,19 +707,19 @@ import { openDB } from 'idb'
 
 ### Phase 3: 처분 및 완료 (1주)
 - ✅ 처분 대기 목록 (`rwa-disposition-list`) — 검수 완료 건 처분 대기, 카드 목록, 필터, 진행률
-- ⬜ 처분 결정 작업 (`rwa-disposition-work`) — 재입고/폐기/반송 결정
+- ✅ 처분 결정 작업 (`rwa-disposition-work`) — PDA 작업 화면, 양품/불량 각각 처분 유형 결정 (재입고/폐기/반송/수리)
 - ⬜ 재고 처리 연동 및 완료/마감
 
-### Phase 4: 실적 분석 (1주)
+### Phase 4: 실적 분석 (1주) ✅ 완료
 - ✅ 대시보드 (`rwa-home`) — 상태 카드, 유형별 차트, 알림, 바로가기
-- ⬜ 실적 대시보드 (`rwa-result-dashboard`) — 유형별/검수/처분 통계 차트
-- ⬜ 품질 분석 (`rwa-quality-analysis`) — 불량 유형별 분석, SKU별 반품률
+- ✅ 실적 대시보드 (`rwa-result-dashboard`) — 유형별/검수/처분 통계 차트
+- ✅ 품질 분석 (`rwa-quality-analysis`) — 불량 유형별 분석, SKU별 반품률
 
-### Phase 5: PDA 작업 화면 (1주)
-- ⬜ PDA 입고 (`rwa-pda-receive`) — 모바일 바코드 스캔 입고
-- ⬜ PDA 검수 (`rwa-pda-inspect`) — 모바일 품질 판정 + 카메라
-- ⬜ 바코드 스캐너 연동
-- ⬜ 카메라 촬영 (불량 사진)
+### Phase 5: PDA 작업 화면 (1주) ✅ 완료
+- ✅ PDA 입고 — `rwa-receive-work.js`에 OxInputBarcode 바코드 스캔 적용 (반품번호/SKU/로케이션)
+- ✅ PDA 검수 — `rwa-inspection-work.js`에 카메라 촬영 + 갤러리 선택 분리
+- ✅ 바코드 스캐너 연동 — OxInputBarcode 컴포넌트 활용 (기존 PDA 패턴)
+- ✅ 카메라 촬영 — `capture="environment"` 속성으로 모바일 카메라 직접 촬영
 
 ### 추천 구현 순서
 

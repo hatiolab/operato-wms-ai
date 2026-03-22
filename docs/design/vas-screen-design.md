@@ -762,10 +762,10 @@ import { openDB } from 'idb'
 |------|------|------|--------|--------|
 | Phase 1 | 4 | 4 | 0 | 100% |
 | Phase 2 | 3 | 3 | 0 | 100% |
-| Phase 3 | 3 | 2 | 1 | 67% |
-| Phase 4 | 3 | 1 | 2 | 33% |
+| Phase 3 | 3 | 3 | 0 | 100% |
+| Phase 4 | 3 | 3 | 0 | 100% |
 | Phase 5 | 4 | 1 | 3 | 25% |
-| **합계** | **17** | **11** | **6** | **65%** |
+| **합계** | **17** | **14** | **3** | **82%** |
 
 ### Phase 1: 기본 CRUD (1주)
 - ✅ BOM 마스터 목록 (`vas-bom-list`) — BOM 목록 조회, 검색, CRUD
@@ -778,15 +778,15 @@ import { openDB } from 'idb'
 - ✅ 자재 준비 관리 (`vas-material-preparation`) — 자재 배정/피킹 관리
 - ✅ 실적 등록 (`vas-result-list`) — 작업 실적 등록 및 관리
 
-### Phase 3: 모니터링 (1주)
-- ✅ 대시보드 (`vas-home`) — 상태 카드, 유형별 차트, 알림, 바로가기
-- ✅ 작업 진행 모니터링 (`vas-work-monitor`) — 실시간 주문 상태 추적, 상세 팝업
-- ⬜ 실시간 알림 (WebSocket)
+### Phase 3: 모니터링 (1주) ✅ 완료
+- ✅ 대시보드 (`vas-home`) — 상태 카드, 유형별 차트, 알림, 바로가기, SSE 실시간 갱신
+- ✅ 작업 진행 모니터링 (`vas-work-monitor`) — 실시간 주문 상태 추적, 상세 팝업, SSE 알림 패널
+- ✅ 실시간 알림 (SSE) — Server-Sent Events 기반, 알림 벨/패널, 알림음, 폴링 백업(30초)
 
-### Phase 4: PDA 작업 화면 (1주)
-- ⬜ 자재 피킹 (`vas-pda-pick`) — 모바일 바코드 스캔 피킹
+### Phase 4: PDA 작업 화면 (1주) ✅ 완료
+- ✅ 자재 피킹 (`vas-pda-pick`) — PDA 전용 피킹 화면, OxInputBarcode 바코드 스캔, 로케이션 안내, 순차 피킹
 - ✅ 작업 수행 (`vas-pda-work`) — 모바일 세트 구성 작업
-- ⬜ 실적 등록 (`vas-pda-result`) — 모바일 실적 등록
+- ✅ 실적 등록 (`vas-pda-result`) — PDA 실적 등록, 2단계(수량입력→적치완료), OxInputBarcode 로케이션 스캔
 
 ### Phase 5: 고도화 (1주)
 - ✅ 실적 분석 차트 (`vas-result-analysis`) — 유형별/일별 추이, 불량 분석, KPI

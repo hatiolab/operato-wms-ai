@@ -6,6 +6,7 @@ import { openPopup } from '@operato/layout'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import Chart from 'chart.js/auto'
 
+import { vasEventClient } from './vas-event-client'
 import './vas-order-new-popup'
 
 class VasHome extends localize(i18next)(PageView) {
@@ -226,6 +227,7 @@ class VasHome extends localize(i18next)(PageView) {
       LABELING: 0
     }
     this.alerts = []
+    this._boundOnSseEvent = this._onSseEvent.bind(this)
   }
 
   /** 페이지 컨텍스트 반환 - 브라우저 타이틀 등에 사용 */
@@ -317,10 +319,13 @@ class VasHome extends localize(i18next)(PageView) {
     `
   }
 
-  /** 페이지 활성화 시 대시보드 데이터 조회 */
+  /** 페이지 활성화 시 대시보드 데이터 조회 + SSE 연결 */
   async pageUpdated(changes, lifecycle, before) {
     if (this.active) {
       await this._fetchDashboardData()
+      // SSE 연결
+      vasEventClient.connect()
+      vasEventClient.on('*', this._boundOnSseEvent)
     }
   }
 
@@ -461,8 +466,17 @@ class VasHome extends localize(i18next)(PageView) {
     UiUtil.pageNavigate(page, filter ? filter : {})
   }
 
-  /** 페이지 해제 시 Chart 인스턴스 정리 */
+  /** SSE 이벤트 수신 시 대시보드 데이터 자동 갱신 */
+  _onSseEvent(event) {
+    this._fetchDashboardData()
+  }
+
+  /** 페이지 해제 시 Chart 인스턴스 + SSE 연결 정리 */
   pageDisposed(lifecycle) {
+    // SSE 연결 해제
+    vasEventClient.off('*', this._boundOnSseEvent)
+    vasEventClient.disconnect()
+
     // Chart 정리
     if (this._chart) {
       this._chart.destroy()

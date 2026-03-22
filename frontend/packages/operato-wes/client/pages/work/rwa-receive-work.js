@@ -3,6 +3,7 @@ import { css, html } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
+import { OxInputBarcode } from '@operato/input'
 
 /**
  * RWA 반품 입고 작업 화면 (PDA)
@@ -101,6 +102,21 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
 
         .scan-input input:focus {
           border-color: var(--md-sys-color-primary, #1976D2);
+        }
+
+        /* ox-input-barcode 스타일 */
+        .scan-input ox-input-barcode {
+          flex: 1;
+          --barcodescan-input-font-size: 18px;
+          --barcodescan-input-padding: 14px 16px;
+          --barcodescan-input-border-radius: 8px;
+        }
+
+        .form-group ox-input-barcode {
+          width: 100%;
+          --barcodescan-input-font-size: 16px;
+          --barcodescan-input-padding: 12px;
+          --barcodescan-input-border-radius: 8px;
         }
 
         .scan-btn,
@@ -578,15 +594,10 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
         <div class="scan-input-group">
           <label>반품번호 스캔 또는 검색</label>
           <div class="scan-input">
-            <input
-              type="text"
-              placeholder="바코드 스캔 또는 번호 입력"
-              .value="${this.scanValue}"
-              @input="${e => { this.scanValue = e.target.value }}"
-              @keydown="${this._onScanKeydown}"
-              autofocus
-            />
-            <button class="scan-btn" @click="${this._onScanSearch}" title="검색">🔍</button>
+            <ox-input-barcode
+              placeholder="반품번호 스캔"
+              @change="${e => { this.scanValue = e.target.value; this._onScanSearch() }}"
+            ></ox-input-barcode>
             <button class="refresh-btn" @click="${this._refresh}" title="새로고침">⟳</button>
           </div>
         </div>
@@ -707,14 +718,10 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
 
         <div class="form-group">
           <label>바코드</label>
-          <input
-            type="text"
-            placeholder="스캔 대기중..."
-            .value="${this.scanValue}"
-            @input="${e => { this.scanValue = e.target.value }}"
-            @keydown="${this._onBarcodeScanKeydown}"
-            autofocus
-          />
+          <ox-input-barcode
+            placeholder="SKU 바코드 스캔"
+            @change="${e => { this._onBarcodeScanResult(e.target.value) }}"
+          ></ox-input-barcode>
         </div>
 
         <div class="form-group">
@@ -733,12 +740,11 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
 
         <div class="form-group">
           <label>입고 로케이션</label>
-          <input
-            type="text"
-            placeholder="로케이션 코드"
+          <ox-input-barcode
+            placeholder="로케이션 스캔"
             .value="${this.locCd}"
-            @input="${e => { this.locCd = e.target.value }}"
-          />
+            @change="${e => { this.locCd = e.target.value }}"
+          ></ox-input-barcode>
         </div>
 
         <div class="form-group">
@@ -961,21 +967,18 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     }
   }
 
-  _onBarcodeScanKeydown(e) {
-    if (e.key === 'Enter') {
-      const value = (this.scanValue || '').trim()
-      if (!value) return
+  _onBarcodeScanResult(value) {
+    const trimmed = (value || '').trim()
+    if (!trimmed) return
 
-      const item = this.orderItems[this.currentItemIndex]
+    const item = this.orderItems[this.currentItemIndex]
 
-      if (item.sku_cd === value || item.barcode === value) {
-        this._showFeedback('스캔 완료', 'success')
-        this._speakFeedback('스캔 완료')
-        this.scanValue = ''
-      } else {
-        this._showFeedback('SKU 불일치', 'error')
-        this._speakFeedback('SKU 불일치')
-      }
+    if (item.sku_cd === trimmed || item.barcode === trimmed) {
+      this._showFeedback('스캔 완료', 'success')
+      this._speakFeedback('스캔 완료')
+    } else {
+      this._showFeedback('SKU 불일치', 'error')
+      this._speakFeedback('SKU 불일치')
     }
   }
 

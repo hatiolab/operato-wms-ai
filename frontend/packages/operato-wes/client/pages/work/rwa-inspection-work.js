@@ -348,6 +348,7 @@ class RwaInspectionWork extends localize(i18next)(PageView) {
           border-radius: 8px;
           font-size: 16px;
           outline: none;
+          box-sizing: border-box;
         }
 
         .form-group input:focus,
@@ -371,18 +372,43 @@ class RwaInspectionWork extends localize(i18next)(PageView) {
         }
 
         /* 사진 첨부 */
+        .photo-actions {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+
         .photo-upload {
           border: 2px dashed var(--md-sys-color-outline, #ccc);
           border-radius: 8px;
-          padding: 16px;
+          padding: 16px 12px;
           text-align: center;
           cursor: pointer;
           transition: all 0.2s;
         }
 
-        .photo-upload:hover {
-          border-color: var(--md-sys-color-primary, #1976D2);
-          background: var(--md-sys-color-surface-variant, #f5f5f5);
+        .photo-upload.camera,
+        .photo-upload.gallery {
+          flex: 1;
+          font-size: 14px;
+          font-weight: 600;
+        }
+
+        .photo-upload.camera {
+          background: #E3F2FD;
+          border-color: #90CAF9;
+          color: #1565C0;
+        }
+
+        .photo-upload.gallery {
+          background: #F3E5F5;
+          border-color: #CE93D8;
+          color: #6A1B9A;
+        }
+
+        .photo-upload.camera:active,
+        .photo-upload.gallery:active {
+          transform: scale(0.98);
         }
 
         .photo-upload input[type="file"] {
@@ -806,14 +832,26 @@ class RwaInspectionWork extends localize(i18next)(PageView) {
         <!-- 사진 첨부 -->
         <div class="form-group">
           <label>사진 첨부 (선택)</label>
-          <div class="photo-upload" @click="${this._openPhotoSelector}">
-            <input
-              type="file"
-              accept="image/*"
-              @change="${this._onPhotoSelect}"
-              id="photoInput"
-            />
-            <span>📷 사진 선택 (클릭 또는 탭)</span>
+          <div class="photo-actions">
+            <div class="photo-upload camera" @click="${this._openCamera}">
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                @change="${this._onPhotoSelect}"
+                id="cameraInput"
+              />
+              <span>📷 카메라 촬영</span>
+            </div>
+            <div class="photo-upload gallery" @click="${this._openGallery}">
+              <input
+                type="file"
+                accept="image/*"
+                @change="${this._onPhotoSelect}"
+                id="galleryInput"
+              />
+              <span>🖼️ 갤러리 선택</span>
+            </div>
           </div>
           ${this.photoPreview
             ? html`
@@ -959,11 +997,14 @@ class RwaInspectionWork extends localize(i18next)(PageView) {
     this.remarks = ''
   }
 
-  _openPhotoSelector() {
-    const input = this.shadowRoot.querySelector('#photoInput')
-    if (input) {
-      input.click()
-    }
+  _openCamera() {
+    const input = this.shadowRoot.querySelector('#cameraInput')
+    if (input) input.click()
+  }
+
+  _openGallery() {
+    const input = this.shadowRoot.querySelector('#galleryInput')
+    if (input) input.click()
   }
 
   _onPhotoSelect(e) {
@@ -993,10 +1034,10 @@ class RwaInspectionWork extends localize(i18next)(PageView) {
     this.photoFile = null
     this.photoPreview = null
 
-    const input = this.shadowRoot.querySelector('#photoInput')
-    if (input) {
-      input.value = ''
-    }
+    const cameraInput = this.shadowRoot.querySelector('#cameraInput')
+    if (cameraInput) cameraInput.value = ''
+    const galleryInput = this.shadowRoot.querySelector('#galleryInput')
+    if (galleryInput) galleryInput.value = ''
   }
 
   async _completeInspection() {

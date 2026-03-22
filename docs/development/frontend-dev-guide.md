@@ -793,6 +793,36 @@ this.remove()
 UiUtil.closePopupBy(this)
 ```
 
+### 7.6 페이지 내 자체 헤더/타이틀 표시
+
+프레임워크(Things Factory)가 메뉴 클릭 시 **탭 + 타이틀**을 자동으로 표시합니다.
+개별 페이지 컴포넌트에서 별도 헤더(`.pda-header`, `<h2>` 등)를 렌더링하면 타이틀이 **중복 표시**됩니다.
+
+```javascript
+// X — 프레임워크 타이틀과 중복
+render() {
+  return html`
+    <div class="pda-header">
+      <h2>VAS 자재 피킹</h2>
+    </div>
+    <div class="pda-content">...</div>
+  `
+}
+
+// O — 타이틀은 context getter에 위임, 본문만 렌더링
+get context() {
+  return { title: TermsUtil.tMenu('VasPdaPick') }
+}
+
+render() {
+  return html`
+    <div class="pda-content">...</div>
+  `
+}
+```
+
+> **규칙**: 페이지 타이틀은 `get context()` 에서만 설정하고, `render()` 내에 자체 헤더를 두지 않는다.
+
 ---
 
 ## 부록: ServiceUtil 전체 메소드 목록

@@ -4,12 +4,15 @@ import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 
+import { vasEventClient } from './vas-event-client'
+
 /**
  * VAS 작업 진행 모니터링 화면
  *
  * 기능:
  * - 작업중/승인/자재준비 상태 주문의 실시간 진행 현황
- * - 10초 간격 자동 새로고침 (Polling)
+ * - SSE(Server-Sent Events) 실시간 푸시 알림 + 폴링 백업
+ * - 알림 벨 + 알림 패널 (최근 20건 이벤트 로그)
  * - 프로그레스 바로 진행률 시각화
  * - 자재 준비 상태, 작업 진행률, 경과 시간 표시
  * - 알림 영역 (자재 부족, 작업 지연)
@@ -87,6 +90,163 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
 
         .btn-icon:hover {
           background: var(--md-sys-color-surface-variant, #f5f5f5);
+        }
+
+        /* SSE 연결 상태 표시 */
+        .sse-status {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant, #888);
+          padding: 4px 10px;
+          border-radius: 12px;
+          background: var(--md-sys-color-surface-variant, #f0f0f0);
+        }
+
+        .sse-status .sse-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #9E9E9E;
+        }
+
+        .sse-status .sse-dot.connected {
+          background: #4CAF50;
+          box-shadow: 0 0 4px #4CAF50;
+        }
+
+        /* 알림 벨 */
+        .notif-bell {
+          position: relative;
+          background: var(--md-sys-color-surface, #fff);
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 8px;
+          padding: 8px 12px;
+          cursor: pointer;
+          font-size: 18px;
+          line-height: 1;
+          transition: all 0.2s;
+        }
+
+        .notif-bell:hover {
+          background: var(--md-sys-color-surface-variant, #f5f5f5);
+        }
+
+        .notif-bell .notif-badge {
+          position: absolute;
+          top: -4px;
+          right: -4px;
+          background: #F44336;
+          color: #fff;
+          font-size: 10px;
+          font-weight: 700;
+          min-width: 16px;
+          height: 16px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 4px;
+        }
+
+        /* 알림 패널 */
+        .notif-panel-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 99;
+        }
+
+        .notif-panel {
+          position: absolute;
+          top: 100%;
+          right: 0;
+          width: 360px;
+          max-height: 420px;
+          background: var(--md-sys-color-surface, #fff);
+          border-radius: 12px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+          z-index: 100;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .notif-panel-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 14px 16px;
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #eee);
+          font-size: 14px;
+          font-weight: 600;
+        }
+
+        .notif-panel-header button {
+          background: none;
+          border: none;
+          color: var(--md-sys-color-primary, #1976D2);
+          font-size: 12px;
+          cursor: pointer;
+          padding: 4px 8px;
+          border-radius: 4px;
+        }
+
+        .notif-panel-header button:hover {
+          background: var(--md-sys-color-surface-variant, #f5f5f5);
+        }
+
+        .notif-panel-body {
+          overflow-y: auto;
+          flex: 1;
+        }
+
+        .notif-item {
+          display: flex;
+          gap: 10px;
+          padding: 10px 16px;
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #f0f0f0);
+          font-size: 13px;
+          align-items: flex-start;
+          transition: background 0.15s;
+        }
+
+        .notif-item:hover {
+          background: var(--md-sys-color-surface-variant, #fafafa);
+        }
+
+        .notif-item .notif-icon {
+          font-size: 16px;
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+
+        .notif-item .notif-content {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .notif-item .notif-msg {
+          color: var(--md-sys-color-on-surface, #333);
+          line-height: 1.4;
+        }
+
+        .notif-item .notif-time {
+          font-size: 11px;
+          color: var(--md-sys-color-on-surface-variant, #999);
+          margin-top: 2px;
+        }
+
+        .notif-empty {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 40px 20px;
+          color: var(--md-sys-color-on-surface-variant, #999);
+          font-size: 13px;
         }
 
         /* 필터 바 */
@@ -509,6 +669,10 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
           .filter-divider {
             display: none;
           }
+
+          .notif-panel {
+            width: 300px;
+          }
         }
       `
     ]
@@ -523,7 +687,12 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
       bomMap: Object,
       statusFilter: String,
       autoRefresh: Boolean,
-      lastRefreshed: String
+      lastRefreshed: String,
+      /* SSE 실시간 알림 */
+      notifications: Array,
+      showNotifPanel: Boolean,
+      unreadCount: Number,
+      sseConnected: Boolean
     }
   }
 
@@ -538,6 +707,13 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     this.autoRefresh = true
     this.lastRefreshed = ''
     this._refreshTimer = null
+    /* SSE 실시간 알림 */
+    this.notifications = []
+    this.showNotifPanel = false
+    this.unreadCount = 0
+    this.sseConnected = false
+    this._boundOnSseEvent = this._onSseEvent.bind(this)
+    this._boundOnSseConnection = this._onSseConnection.bind(this)
   }
 
   /** 페이지 컨텍스트 반환 - 브라우저 타이틀 등에 사용 */
@@ -554,9 +730,27 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
       <div class="page-header">
         <h2>유통가공 작업 진행 모니터링</h2>
         <div class="header-actions">
+          <!-- SSE 연결 상태 -->
+          <div class="sse-status">
+            <span class="sse-dot ${this.sseConnected ? 'connected' : ''}"></span>
+            ${this.sseConnected ? '실시간' : '연결 중...'}
+          </div>
+          <!-- 알림 벨 -->
+          <div style="position: relative;">
+            <button class="notif-bell" @click="${this._toggleNotifPanel}">
+              \u{1F514}
+              ${this.unreadCount > 0
+                ? html`<span class="notif-badge">${this.unreadCount > 99 ? '99+' : this.unreadCount}</span>`
+                : ''}
+            </button>
+            ${this.showNotifPanel ? this._renderNotifPanel() : ''}
+          </div>
+          <!-- 자동 새로고침 -->
           <div class="auto-refresh-label">
             <span class="dot ${this.autoRefresh ? '' : 'paused'}"></span>
-            ${this.autoRefresh ? '10초 자동 새로고침' : '자동 새로고침 꺼짐'}
+            ${this.autoRefresh
+              ? (this.sseConnected ? '30초 백업 폴링' : '10초 자동 새로고침')
+              : '자동 새로고침 꺼짐'}
           </div>
           <button class="btn-icon" @click="${this._toggleAutoRefresh}">
             ${this.autoRefresh ? '일시정지' : '재개'}
@@ -586,6 +780,11 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
 
       <!-- 알림 영역 -->
       ${this.alerts && this.alerts.length > 0 ? this._renderAlerts() : ''}
+
+      <!-- 알림 패널 오버레이 (패널 바깥 클릭 시 닫기) -->
+      ${this.showNotifPanel
+        ? html`<div class="notif-panel-overlay" @click="${() => { this.showNotifPanel = false }}"></div>`
+        : ''}
     `
   }
 
@@ -807,6 +1006,31 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     `
   }
 
+  /** 알림 패널 렌더링 (최근 20건 이벤트 로그) */
+  _renderNotifPanel() {
+    return html`
+      <div class="notif-panel">
+        <div class="notif-panel-header">
+          <span>실시간 알림</span>
+          <button @click="${this._clearNotifications}">모두 읽음</button>
+        </div>
+        <div class="notif-panel-body">
+          ${this.notifications.length === 0
+            ? html`<div class="notif-empty">알림이 없습니다</div>`
+            : this.notifications.map(n => html`
+                <div class="notif-item">
+                  <span class="notif-icon">${this._eventIcon(n.eventType)}</span>
+                  <div class="notif-content">
+                    <div class="notif-msg">${n.message}</div>
+                    <div class="notif-time">${n.time}</div>
+                  </div>
+                </div>
+              `)}
+        </div>
+      </div>
+    `
+  }
+
   /* ============================================================
    * 생명주기
    * ============================================================ */
@@ -817,17 +1041,108 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     return this.orders.filter(o => o.status === this.statusFilter)
   }
 
-  /** 페이지 활성화 시 데이터 새로고침 및 자동 갱신 시작 */
+  /** 페이지 활성화 시 데이터 새로고침 + SSE 연결 + 자동 갱신 시작 */
   async pageUpdated(changes, lifecycle, before) {
     if (this.active) {
       await this._refresh()
       this._startAutoRefresh()
+      // SSE 연결
+      vasEventClient.connect()
+      vasEventClient.on('*', this._boundOnSseEvent)
+      vasEventClient.on('_connection', this._boundOnSseConnection)
+      this.sseConnected = vasEventClient.connected
     }
   }
 
-  /** 페이지 해제 시 자동 새로고침 타이머 정리 */
+  /** 페이지 해제 시 자동 새로고침 타이머 + SSE 연결 정리 */
   pageDisposed(lifecycle) {
     this._stopAutoRefresh()
+    // SSE 연결 해제
+    vasEventClient.off('*', this._boundOnSseEvent)
+    vasEventClient.off('_connection', this._boundOnSseConnection)
+    vasEventClient.disconnect()
+    this.sseConnected = false
+  }
+
+  /* ============================================================
+   * SSE 이벤트 처리
+   * ============================================================ */
+
+  /** SSE 이벤트 수신 핸들러 */
+  _onSseEvent(event) {
+    // 1. 데이터 새로고침
+    this._refresh()
+
+    // 2. 알림 추가
+    this._addNotification(event)
+
+    // 3. 알림음
+    this._playNotificationSound()
+  }
+
+  /** SSE 연결 상태 변경 핸들러 */
+  _onSseConnection({ connected }) {
+    this.sseConnected = connected
+    // 연결 상태에 따라 폴링 간격 조정
+    this._restartAutoRefreshWithInterval()
+  }
+
+  /** 알림 추가 (최대 20건 유지) */
+  _addNotification(event) {
+    const notif = {
+      eventType: event.eventType,
+      message: event.message || `${event.vasNo} 상태 변경`,
+      time: this._nowTimeStr(),
+      vasNo: event.vasNo
+    }
+    this.notifications = [notif, ...this.notifications].slice(0, 20)
+    this.unreadCount = this.unreadCount + 1
+  }
+
+  /** 알림 패널 토글 */
+  _toggleNotifPanel() {
+    this.showNotifPanel = !this.showNotifPanel
+    if (this.showNotifPanel) {
+      this.unreadCount = 0
+    }
+  }
+
+  /** 모든 알림 읽음 처리 */
+  _clearNotifications() {
+    this.notifications = []
+    this.unreadCount = 0
+    this.showNotifPanel = false
+  }
+
+  /** 이벤트 타입별 아이콘 */
+  _eventIcon(eventType) {
+    const icons = {
+      ORDER_APPROVED: '\u2705',
+      MATERIAL_READY: '\u{1F4E6}',
+      WORK_STARTED: '\u{1F3ED}',
+      RESULTS_REGISTERED: '\u{1F4CB}',
+      WORK_COMPLETED: '\u{1F3C6}',
+      ORDER_CANCELLED: '\u274C',
+      ORDER_CLOSED: '\u{1F512}'
+    }
+    return icons[eventType] || '\u{1F514}'
+  }
+
+  /** 알림음 재생 (짧은 비프음) */
+  _playNotificationSound() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtx) return
+      const ctx = new AudioCtx()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.value = 800
+      gain.gain.value = 0.1
+      osc.start()
+      osc.stop(ctx.currentTime + 0.15)
+    } catch (e) { /* 무시 */ }
   }
 
   /* ============================================================
@@ -884,13 +1199,14 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
    * 자동 새로고침
    * ============================================================ */
 
-  /** 10초 간격 자동 새로고침 타이머 시작 */
+  /** 자동 새로고침 타이머 시작 (SSE 연결 시 30초, 미연결 시 10초) */
   _startAutoRefresh() {
     this._stopAutoRefresh()
     if (this.autoRefresh) {
+      const interval = this.sseConnected ? 30000 : 10000
       this._refreshTimer = setInterval(() => {
         this._refresh()
-      }, 10000)
+      }, interval)
     }
   }
 
@@ -899,6 +1215,13 @@ class VasWorkMonitor extends localize(i18next)(PageView) {
     if (this._refreshTimer) {
       clearInterval(this._refreshTimer)
       this._refreshTimer = null
+    }
+  }
+
+  /** SSE 연결 상태 변경 시 폴링 간격 재설정 */
+  _restartAutoRefreshWithInterval() {
+    if (this.autoRefresh) {
+      this._startAutoRefresh()
     }
   }
 
