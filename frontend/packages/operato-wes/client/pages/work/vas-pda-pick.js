@@ -5,6 +5,9 @@ import { PageView } from '@operato/shell'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import { OxInputBarcode } from '@operato/input'
 
+import { HardwareScannerService } from './hardware-scanner-service.js'
+import { voiceService } from './voice-service.js'
+
 /**
  * VAS 자재 피킹 PDA 화면
  *
@@ -495,6 +498,32 @@ class VasPdaPick extends localize(i18next)(PageView) {
           font-size: 16px;
         }
 
+        /* 음성 토글 */
+        .voice-toggle {
+          position: fixed;
+          top: 12px;
+          right: 12px;
+          z-index: 20;
+          min-width: 44px;
+          min-height: 44px;
+          border-radius: 50%;
+          border: none;
+          font-size: 20px;
+          cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+          transition: background 0.2s;
+        }
+
+        .voice-toggle.on {
+          background: var(--md-sys-color-primary, #FF9800);
+          color: #fff;
+        }
+
+        .voice-toggle.off {
+          background: var(--md-sys-color-surface-variant, #e0e0e0);
+          color: var(--md-sys-color-on-surface-variant, #666);
+        }
+
         /* 피킹 완료 메시지 */
         .completion-card {
           text-align: center;
@@ -537,7 +566,8 @@ class VasPdaPick extends localize(i18next)(PageView) {
       currentItemIndex: Number,
       pickQty: Number,
       feedbackMsg: String,
-      feedbackType: String
+      feedbackType: String,
+      voiceEnabled: Boolean
     }
   }
 
@@ -554,6 +584,8 @@ class VasPdaPick extends localize(i18next)(PageView) {
     this.pickQty = 0
     this.feedbackMsg = ''
     this.feedbackType = ''
+    this.voiceEnabled = voiceService.enabled
+    this._scannerService = null
   }
 
   get context() {
@@ -568,6 +600,12 @@ class VasPdaPick extends localize(i18next)(PageView) {
 
   render() {
     return html`
+      <button
+        class="voice-toggle ${this.voiceEnabled ? 'on' : 'off'}"
+        @click="${this._toggleVoice}"
+        title="음성 안내 ${this.voiceEnabled ? 'ON' : 'OFF'}"
+      >${this.voiceEnabled ? '\u{1F50A}' : '\u{1F507}'}</button>
+
       ${this.screen === 'order-select'
         ? this._renderOrderSelect()
         : this._renderPickWork()}
@@ -800,8 +838,28 @@ class VasPdaPick extends localize(i18next)(PageView) {
    * ============================================================ */
 
   async pageUpdated(changes, lifecycle, before) {
-    if (this.active && this.screen === 'order-select') {
-      await this._refresh()
+    if (this.active) {
+      // 하드웨어 스캐너 서비스 시작
+      if (!this._scannerService) {
+        this._scannerService = new HardwareScannerService({
+          onScan: barcode => this._handleGlobalScan(barcode)
+        })
+      }
+      this._scannerService.start()
+
+      if (this.screen === 'order-select') {
+        await this._refresh()
+      }
+    } else {
+      this._scannerService?.stop()
+    }
+  }
+
+  /** 페이지 해제 시 스캐너 서비스 정리 */
+  pageDisposed(lifecycle) {
+    if (this._scannerService) {
+      this._scannerService.stop()
+      this._scannerService = null
     }
   }
 
@@ -869,6 +927,14 @@ class VasPdaPick extends localize(i18next)(PageView) {
     this.selectedOrder = order
     this.screen = 'pick-work'
     await this._fetchOrderItems(order.id)
+
+    // 능동적 안내: 주문 선택 후 첫 자재 피킹 안내
+    if (this.currentItemIndex >= 0) {
+      const item = this.orderItems[this.currentItemIndex]
+      voiceService.guide(`주문 ${order.vas_no} 선택. ${item.sku_nm || item.sku_cd} 자재 바코드를 스캔해주세요`)
+    } else {
+      voiceService.guide(`주문 ${order.vas_no} 선택. 모든 자재가 이미 피킹 완료되었습니다`)
+    }
   }
 
   _backToOrderSelect() {
@@ -893,7 +959,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
       this.scanValue = ''
     } else {
       this._showFeedback('주문을 찾을 수 없습니다', 'error')
-      this._speakFeedback('주문을 찾을 수 없습니다')
+      voiceService.error('주문을 찾을 수 없습니다')
     }
   }
 
@@ -908,20 +974,24 @@ class VasPdaPick extends localize(i18next)(PageView) {
     if (matchIdx >= 0) {
       this.currentItemIndex = matchIdx
       this._initPickForm()
-      this._showFeedback(`${this.orderItems[matchIdx].sku_cd} 자재 확인`, 'success')
-      this._speakFeedback('자재 확인')
+      const item = this.orderItems[matchIdx]
+      this._showFeedback(`${item.sku_cd} 자재 확인`, 'success')
+      voiceService.success(`자재 확인. ${item.src_loc_cd || ''} 로케이션에서 ${item.alloc_qty || item.req_qty || 0}개 피킹해주세요`)
     } else {
       const alreadyPicked = this.orderItems.find(
         item => item._picked && (item.sku_cd === trimmed || item.barcode === trimmed)
       )
       if (alreadyPicked) {
         this._showFeedback('이미 피킹 완료된 자재입니다', 'info')
-        this._speakFeedback('이미 피킹 완료')
+        voiceService.warning('이미 피킹 완료된 자재입니다')
       } else {
         this._showFeedback('해당 자재를 찾을 수 없습니다', 'error')
-        this._speakFeedback('자재를 찾을 수 없습니다')
+        voiceService.error('자재를 찾을 수 없습니다')
       }
     }
+
+    // 연속 스캔을 위한 자동 재포커스
+    this._refocusBarcodeInput('.scan-input ox-input-barcode')
   }
 
   /* ============================================================
@@ -936,13 +1006,13 @@ class VasPdaPick extends localize(i18next)(PageView) {
 
     if (!this.pickQty || this.pickQty <= 0) {
       this._showFeedback('수량을 입력해주세요', 'error')
-      this._speakFeedback('수량을 입력해주세요')
+      voiceService.error('수량을 입력해주세요')
       return
     }
 
     if (this.pickQty > reqQty) {
       this._showFeedback('요청 수량을 초과할 수 없습니다', 'error')
-      this._speakFeedback('요청 수량 초과')
+      voiceService.warning('요청 수량을 초과합니다')
       return
     }
 
@@ -961,12 +1031,12 @@ class VasPdaPick extends localize(i18next)(PageView) {
       this.orderItems = items
 
       this._showFeedback('피킹 완료', 'success')
-      this._speakFeedback('피킹 완료')
+      voiceService.success('피킹 완료')
 
       setTimeout(() => this._moveToNextItem(), 500)
     } catch (err) {
       this._showFeedback(err.message || '피킹 실패', 'error')
-      this._speakFeedback('피킹 실패')
+      voiceService.error('피킹 실패')
     }
   }
 
@@ -992,15 +1062,17 @@ class VasPdaPick extends localize(i18next)(PageView) {
     if (nextIndex >= 0) {
       this.currentItemIndex = nextIndex
       this._initPickForm()
+      this._guideNextItem(nextIndex)
     } else {
       const wrapIndex = this.orderItems.findIndex(item => !item._picked)
       if (wrapIndex >= 0) {
         this.currentItemIndex = wrapIndex
         this._initPickForm()
+        this._guideNextItem(wrapIndex)
       } else {
         this.currentItemIndex = -1
         this._showFeedback('모든 자재 피킹 완료!', 'success')
-        this._speakFeedback('모든 자재 피킹 완료')
+        voiceService.success('모든 자재 피킹 완료. 피킹 작업 완료 버튼을 눌러주세요')
       }
     }
   }
@@ -1013,11 +1085,39 @@ class VasPdaPick extends localize(i18next)(PageView) {
 
   _completeAllPick() {
     this._showFeedback('피킹 작업 완료!', 'success')
-    this._speakFeedback('피킹 작업이 완료되었습니다')
+    voiceService.success('피킹 작업이 완료되었습니다')
 
     setTimeout(() => {
       this._backToOrderSelect()
     }, 1500)
+  }
+
+  /* ============================================================
+   * 하드웨어 스캐너 전역 핸들링
+   * ============================================================ */
+
+  /** 전역 스캔 라우팅 — 주문 선택 또는 피킹 작업 컨텍스트에 따라 분기 */
+  _handleGlobalScan(barcode) {
+    if (this.screen === 'order-select') {
+      this.scanValue = barcode
+      this._onScanSearch()
+    } else {
+      this._onSkuBarcodeScan(barcode)
+    }
+  }
+
+  /** 스캔 처리 후 OxInputBarcode 입력에 자동 재포커스 */
+  _refocusBarcodeInput(selector) {
+    requestAnimationFrame(() => {
+      const el = this.renderRoot.querySelector(selector)
+      if (el) {
+        const input = el.renderRoot?.querySelector('input')
+        if (input) {
+          input.value = ''
+          input.focus()
+        }
+      }
+    })
   }
 
   /* ============================================================
@@ -1053,17 +1153,17 @@ class VasPdaPick extends localize(i18next)(PageView) {
     }, 2000)
   }
 
-  _speakFeedback(text) {
-    try {
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(text)
-        utterance.lang = 'ko-KR'
-        utterance.rate = 1.1
-        window.speechSynthesis.speak(utterance)
-      }
-    } catch (e) {
-      // 음성 합성 미지원 환경 무시
-    }
+  /** 음성 안내 ON/OFF 토글 */
+  _toggleVoice() {
+    this.voiceEnabled = voiceService.toggle()
+    this._showFeedback(this.voiceEnabled ? '음성 안내 ON' : '음성 안내 OFF', 'info')
+  }
+
+  /** 다음 자재 능동적 음성 안내 */
+  _guideNextItem(idx) {
+    const item = this.orderItems[idx]
+    if (!item) return
+    voiceService.guide(`다음 자재. ${item.sku_nm || item.sku_cd}. ${item.src_loc_cd || ''} 로케이션`)
   }
 }
 

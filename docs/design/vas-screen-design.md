@@ -764,8 +764,8 @@ import { openDB } from 'idb'
 | Phase 2 | 3 | 3 | 0 | 100% |
 | Phase 3 | 3 | 3 | 0 | 100% |
 | Phase 4 | 3 | 3 | 0 | 100% |
-| Phase 5 | 4 | 1 | 3 | 25% |
-| **합계** | **17** | **14** | **3** | **82%** |
+| Phase 5 | 4 | 3 | 1 | 75% |
+| **합계** | **17** | **16** | **1** | **94%** |
 
 ### Phase 1: 기본 CRUD (1주)
 - ✅ BOM 마스터 목록 (`vas-bom-list`) — BOM 목록 조회, 검색, CRUD
@@ -790,8 +790,8 @@ import { openDB } from 'idb'
 
 ### Phase 5: 고도화 (1주)
 - ✅ 실적 분석 차트 (`vas-result-analysis`) — 유형별/일별 추이, 불량 분석, KPI
-- ⬜ 바코드 스캐너 연동
-- ⬜ 음성 안내
+- ✅ 바코드 스캐너 연동 (`hardware-scanner-service`) — 키보드 웨지 스캐너 전역 감지, 컨텍스트 기반 스캔 라우팅, OxInputBarcode 통합, 자동 포커스
+- ✅ 음성 안내 (`voice-service`) — Web Speech API 기반 공유 싱글톤, 유형별 효과음(성공/실패/경고), ON/OFF 토글(localStorage), 능동적 작업 안내
 - ⬜ 오프라인 모드
 
 ### 추천 구현 순서

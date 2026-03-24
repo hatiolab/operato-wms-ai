@@ -112,6 +112,11 @@ class RwaDispositionList extends localize(i18next)(PageView) {
           color: #6a1b9a;
         }
 
+        .filter-chip.completed {
+          background: #c8e6c9;
+          color: #2e7d32;
+        }
+
         .filter-chip.active {
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
           transform: translateY(-1px);
@@ -151,6 +156,10 @@ class RwaDispositionList extends localize(i18next)(PageView) {
           border-left: 4px solid #9c27b0;
         }
 
+        .order-card.COMPLETED {
+          border-left: 4px solid #4caf50;
+        }
+
         /* 카드 헤더 */
         .card-header {
           display: flex;
@@ -187,6 +196,11 @@ class RwaDispositionList extends localize(i18next)(PageView) {
         .card-status-badge.DISPOSED {
           background: #e1bee7;
           color: #6a1b9a;
+        }
+
+        .card-status-badge.COMPLETED {
+          background: #c8e6c9;
+          color: #2e7d32;
         }
 
         /* 카드 요약 */
@@ -365,6 +379,26 @@ class RwaDispositionList extends localize(i18next)(PageView) {
           background: #1565c0;
         }
 
+        .card-action-btn.complete {
+          background: #4caf50;
+          color: #fff;
+          border-color: transparent;
+        }
+
+        .card-action-btn.complete:hover {
+          background: #388e3c;
+        }
+
+        .card-action-btn.close-btn {
+          background: #616161;
+          color: #fff;
+          border-color: transparent;
+        }
+
+        .card-action-btn.close-btn:hover {
+          background: #424242;
+        }
+
         /* 빈 상태 */
         .empty-state {
           text-align: center;
@@ -419,7 +453,7 @@ class RwaDispositionList extends localize(i18next)(PageView) {
     this.filterDispositionType = 'ALL'
     this.filterDefectType = 'ALL'
     this.searchKeyword = ''
-    this.stats = { total: 0, inspected: 0, disposed: 0 }
+    this.stats = { total: 0, inspected: 0, disposed: 0, completed: 0 }
   }
 
   get context() {
@@ -437,15 +471,16 @@ class RwaDispositionList extends localize(i18next)(PageView) {
   async _refresh() {
     this.loading = true
     try {
-      // INSPECTED + DISPOSED 상태 주문 조회
-      const [inspected, disposed] = await Promise.all([
+      // INSPECTED + DISPOSED + COMPLETED 상태 주문 조회
+      const [inspected, disposed, completed] = await Promise.all([
         ServiceUtil.restGet('rwa_trx/rwa_orders?status=INSPECTED'),
-        ServiceUtil.restGet('rwa_trx/rwa_orders?status=DISPOSED')
+        ServiceUtil.restGet('rwa_trx/rwa_orders?status=DISPOSED'),
+        ServiceUtil.restGet('rwa_trx/rwa_orders?status=COMPLETED')
       ])
 
       // 각 주문별 항목 조회 (검수 결과 포함)
       const ordersWithItems = await Promise.all(
-        [...(inspected || []), ...(disposed || [])].map(async order => {
+        [...(inspected || []), ...(disposed || []), ...(completed || [])].map(async order => {
           const items = await ServiceUtil.restGet(`rwa_trx/rwa_orders/${order.id}/items`)
           return {
             ...order,
@@ -472,7 +507,8 @@ class RwaDispositionList extends localize(i18next)(PageView) {
     this.stats = {
       total: this.orders.length,
       inspected: this.orders.filter(o => o.status === 'INSPECTED').length,
-      disposed: this.orders.filter(o => o.status === 'DISPOSED').length
+      disposed: this.orders.filter(o => o.status === 'DISPOSED').length,
+      completed: this.orders.filter(o => o.status === 'COMPLETED').length
     }
   }
 
@@ -531,6 +567,48 @@ class RwaDispositionList extends localize(i18next)(PageView) {
       this._refresh()
     })
     UiUtil.openPopupByElement('반품 상세', 'large', element, true)
+  }
+
+  async _completeOrder(order) {
+    const result = await UiUtil.showAlertPopup(
+      'title.confirm',
+      `${order.rwaNo} 주문을 완료 처리하시겠습니까?\n재고 처리가 진행됩니다.`,
+      'question',
+      'confirm',
+      'cancel'
+    )
+
+    if (result.confirmButton) {
+      try {
+        await ServiceUtil.restPost(`rwa_trx/rwa_orders/${order.id}/complete`)
+        UiUtil.showToast('success', `${order.rwaNo} 완료 처리되었습니다`)
+        await this._refresh()
+      } catch (err) {
+        console.error('주문 완료 실패:', err)
+        UiUtil.showToast('error', err.message || '완료 처리 실패')
+      }
+    }
+  }
+
+  async _closeOrder(order) {
+    const result = await UiUtil.showAlertPopup(
+      'title.confirm',
+      `${order.rwaNo} 주문을 마감 처리하시겠습니까?\n마감 후에는 변경할 수 없습니다.`,
+      'question',
+      'confirm',
+      'cancel'
+    )
+
+    if (result.confirmButton) {
+      try {
+        await ServiceUtil.restPost(`rwa_trx/rwa_orders/${order.id}/close`)
+        UiUtil.showToast('success', `${order.rwaNo} 마감 처리되었습니다`)
+        await this._refresh()
+      } catch (err) {
+        console.error('주문 마감 실패:', err)
+        UiUtil.showToast('error', err.message || '마감 처리 실패')
+      }
+    }
   }
 
   _getWaitingTime(order) {
@@ -650,6 +728,13 @@ class RwaDispositionList extends localize(i18next)(PageView) {
           처분완료
           <span class="chip-count">${this.stats?.disposed || 0}</span>
         </div>
+        <div
+          class="filter-chip completed ${this.filterStatus === 'COMPLETED' ? 'active' : ''}"
+          @click="${() => this._onFilterChange('filterStatus', 'COMPLETED')}"
+        >
+          완료
+          <span class="chip-count">${this.stats?.completed || 0}</span>
+        </div>
       </div>
 
       <!-- 주문 카드 목록 -->
@@ -686,7 +771,7 @@ class RwaDispositionList extends localize(i18next)(PageView) {
           <div class="card-title-area">
             <span class="rwa-no">${order.rwaNo}</span>
             <span class="card-status-badge ${order.status}">
-              ${order.status === 'INSPECTED' ? '검수완료' : '처분완료'}
+              ${order.status === 'INSPECTED' ? '검수완료' : order.status === 'DISPOSED' ? '처분완료' : '완료'}
             </span>
           </div>
           <div style="text-align: right; font-size: 13px;">
@@ -713,7 +798,9 @@ class RwaDispositionList extends localize(i18next)(PageView) {
         </div>
 
         <!-- 검수 결과 또는 처분 결과 -->
-        ${order.status === 'INSPECTED' ? this._renderInspectionResults(order) : this._renderDispositionResults(order)}
+        ${order.status === 'INSPECTED'
+          ? this._renderInspectionResults(order)
+          : this._renderDispositionResults(order)}
 
         <!-- 진행 바 -->
         <div class="progress-bar-container">
@@ -734,7 +821,15 @@ class RwaDispositionList extends localize(i18next)(PageView) {
                 </button>
                 <button class="card-action-btn" @click="${() => this._openDetail(order)}">상세 조회</button>
               `
-            : html`<button class="card-action-btn" @click="${() => this._openDetail(order)}">처분 조회</button>`}
+            : order.status === 'DISPOSED'
+            ? html`
+                <button class="card-action-btn complete" @click="${() => this._completeOrder(order)}">완료</button>
+                <button class="card-action-btn" @click="${() => this._openDetail(order)}">처분 조회</button>
+              `
+            : html`
+                <button class="card-action-btn close-btn" @click="${() => this._closeOrder(order)}">마감</button>
+                <button class="card-action-btn" @click="${() => this._openDetail(order)}">상세 조회</button>
+              `}
         </div>
       </div>
     `

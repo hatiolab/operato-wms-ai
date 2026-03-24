@@ -430,8 +430,6 @@ public class RwaDisposition extends xyz.elidom.orm.entity.basic.ElidomStampHook 
 			}
 		}
 
-		// TODO: 처분 유형별 재고 처리 로직 구현 필요
-		// processStockByDispositionType();
 	}
 
 	@Override
@@ -453,14 +451,4 @@ public class RwaDisposition extends xyz.elidom.orm.entity.basic.ElidomStampHook 
 		}
 	}
 
-	/**
-	 * 처분 유형별 재고 처리 (TODO: 구현 필요)
-	 */
-	private void processStockByDispositionType() {
-		// RESTOCK: 재고 증가 처리
-		// SCRAP: 폐기 처리 (재고 영향 없음)
-		// REPAIR: 수리 후 재입고 처리
-		// RETURN_VENDOR: 공급업체 반송 처리
-		// DONATION: 기부 처리 (재고 차감)
-	}
 }

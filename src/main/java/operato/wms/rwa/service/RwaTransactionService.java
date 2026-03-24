@@ -17,6 +17,7 @@ import operato.wms.rwa.entity.RwaDisposition;
 import operato.wms.rwa.entity.RwaInspection;
 import operato.wms.rwa.entity.RwaOrder;
 import operato.wms.rwa.entity.RwaOrderItem;
+import operato.wms.stock.entity.Inventory;
 import xyz.anythings.sys.service.AbstractQueryService;
 import xyz.elidom.dbist.dml.Query;
 import xyz.elidom.exception.server.ElidomValidationException;
@@ -352,7 +353,23 @@ public class RwaTransactionService extends AbstractQueryService {
 
 		// 5. Entity의 afterCreate()에서 자동으로 rwa_order_items 업데이트 수행
 
-		// 6. 헤더 상태 업데이트
+		// 6. 처분 시점 자동 재고 처리 (설정에 따라)
+		RwaOrder orderForStock = this.queryManager.select(RwaOrder.class, item.getRwaOrderId());
+		if (orderForStock != null) {
+			String autoFlag = this.runtimeConfSvc.getRuntimeConfigValue(
+					orderForStock.getComCd(), orderForStock.getWhCd(),
+					WmsRwaConfigConstants.RWA_DISPOSITION_AUTO_STOCK_FLAG);
+			if (ValueUtil.toBoolean(autoFlag, false)
+					&& Boolean.TRUE.equals(disposition.getStockImpactFlag())) {
+				String txnId = this.processStockForDisposition(disposition, item, orderForStock);
+				if (ValueUtil.isNotEmpty(txnId)) {
+					disposition.setStockTxnId(txnId);
+					this.queryManager.update(disposition, "stockTxnId");
+				}
+			}
+		}
+
+		// 7. 헤더 상태 업데이트
 		this.updateRwaOrderStatus(item.getRwaOrderId());
 
 		return disposition;
@@ -389,7 +406,32 @@ public class RwaTransactionService extends AbstractQueryService {
 					"모든 상세 항목이 처분 완료되지 않았습니다. 미완료 항목: " + incompleteCount);
 		}
 
-		// 3. 완료 처리
+		// 3. 재고 처리 (auto stock flag=false → 완료 시점에 일괄 처리)
+		String autoFlag = this.runtimeConfSvc.getRuntimeConfigValue(
+				rwaOrder.getComCd(), rwaOrder.getWhCd(),
+				WmsRwaConfigConstants.RWA_DISPOSITION_AUTO_STOCK_FLAG);
+		boolean autoAtDisposition = ValueUtil.toBoolean(autoFlag, false);
+
+		if (!autoAtDisposition) {
+			List<RwaOrderItem> items = this.listRwaOrderItems(rwaOrderId);
+			for (RwaOrderItem item : items) {
+				RwaDisposition dispCond = new RwaDisposition();
+				dispCond.setDomainId(rwaOrder.getDomainId());
+				dispCond.setRwaOrderItemId(item.getId());
+				RwaDisposition disp = this.queryManager.selectByCondition(RwaDisposition.class, dispCond);
+
+				if (disp != null && Boolean.TRUE.equals(disp.getStockImpactFlag())
+						&& ValueUtil.isEmpty(disp.getStockTxnId())) {
+					String txnId = this.processStockForDisposition(disp, item, rwaOrder);
+					if (ValueUtil.isNotEmpty(txnId)) {
+						disp.setStockTxnId(txnId);
+						this.queryManager.update(disp, "stockTxnId");
+					}
+				}
+			}
+		}
+
+		// 4. 완료 처리
 		rwaOrder.setStatus(WmsRwaConstants.STATUS_COMPLETED);
 		rwaOrder.setRwaEndDate(DateUtil.todayStr());
 		this.queryManager.update(rwaOrder, "status", "rwaEndDate");
@@ -422,6 +464,45 @@ public class RwaTransactionService extends AbstractQueryService {
 		this.queryManager.update(rwaOrder, "status");
 
 		return rwaOrder;
+	}
+
+	/**
+	 * 처분 유형별 재고 처리
+	 *
+	 * RESTOCK: Inventory 생성 (invQty=dispositionQty, locCd=restockLocCd, status=STORED)
+	 * DONATION: 기록만 (실제 재고 차감은 미구현)
+	 * SCRAP/REPAIR/RETURN_VENDOR: 재고 영향 없음
+	 *
+	 * @param disposition 처분 정보
+	 * @param item        반품 상세
+	 * @param order       반품 지시
+	 * @return 생성된 Inventory ID (재고 생성 시), null (재고 미영향 시)
+	 */
+	private String processStockForDisposition(RwaDisposition disposition, RwaOrderItem item, RwaOrder order) {
+		if (disposition.getStockImpactFlag() == null || !disposition.getStockImpactFlag()) {
+			return null;
+		}
+
+		if (WmsRwaConstants.DISPOSITION_TYPE_RESTOCK.equals(disposition.getDispositionType())) {
+			Inventory inv = new Inventory();
+			inv.setDomainId(order.getDomainId());
+			inv.setWhCd(order.getWhCd());
+			inv.setComCd(order.getComCd());
+			inv.setSkuCd(item.getSkuCd());
+			inv.setSkuNm(item.getSkuNm());
+			inv.setLocCd(disposition.getRestockLocCd());
+			inv.setInvQty(disposition.getDispositionQty());
+			inv.setStatus(Inventory.STATUS_STORED);
+			inv.setLastTranCd(Inventory.TRANSACTION_RWA_RESTOCK);
+			inv.setLotNo(item.getLotNo());
+			inv.setExpiredDate(item.getExpiredDate());
+			inv.setProdDate(item.getPrdDate());
+			inv.setRemarks("RWA 반품 재입고 - " + order.getRwaNo());
+			this.queryManager.insert(inv);
+			return inv.getId();
+		}
+
+		return null;
 	}
 
 	/********************************************************************************************************

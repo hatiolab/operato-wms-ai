@@ -453,13 +453,13 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
       <div class="popup-footer">
         <div class="footer-left">
           ${this.currentStep === 2
-            ? html`<button class="btn secondary" @click="${this._prevStep}">← 이전</button>`
-            : html`<button class="btn danger" @click="${this._close}">취소</button>`}
+        ? html`<button class="btn secondary" @click="${this._prevStep}">← 이전</button>`
+        : html`<button class="btn danger" @click="${this._close}">취소</button>`}
         </div>
         <div class="footer-right">
           ${this.currentStep === 1
-            ? html`<button class="btn primary" @click="${this._nextStep}">다음 →</button>`
-            : html`<button class="btn primary" ?disabled="${this.saving}" @click="${this._save}">
+        ? html`<button class="btn primary" @click="${this._nextStep}">다음 →</button>`
+        : html`<button class="btn primary" ?disabled="${this.saving}" @click="${this._save}">
                 ${this.saving ? '저장 중...' : '저장'}
               </button>`}
         </div>
@@ -494,12 +494,12 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
           <select @change="${e => this._updateOrder('comCd', e.target.value)}">
             <option value="">-- 화주사 선택 --</option>
             ${this.companies.map(
-              c => html`
+      c => html`
                 <option value="${c.com_cd}" ?selected="${this.rwaOrder.comCd === c.com_cd}">
                   ${c.com_cd} - ${c.com_nm || c.name || c.com_cd}
                 </option>
               `
-            )}
+    )}
           </select>
         </div>
 
@@ -508,26 +508,26 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
           <select @change="${e => this._updateOrder('whCd', e.target.value)}">
             <option value="">-- 창고 선택 --</option>
             ${this.warehouses.map(
-              w => html`
+      w => html`
                 <option value="${w.wh_cd}" ?selected="${this.rwaOrder.whCd === w.wh_cd}">
                   ${w.wh_cd} - ${w.wh_nm || w.name || w.wh_cd}
                 </option>
               `
-            )}
+    )}
           </select>
         </div>
 
         <div class="form-field">
-          <label>고객사</label>
+          <label>거래처</label>
           <select @change="${e => this._onCustomerSelect(e.target.value)}">
-            <option value="">-- 고객사 선택 --</option>
+            <option value="">-- 거래처 선택 --</option>
             ${this.customers.map(
-              c => html`
+      c => html`
                 <option value="${c.cust_cd}" ?selected="${this.rwaOrder.custCd === c.cust_cd}">
                   ${c.cust_cd} - ${c.cust_nm || c.name || c.cust_cd}
                 </option>
               `
-            )}
+    )}
           </select>
         </div>
 
@@ -604,7 +604,7 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
               </thead>
               <tbody>
                 ${this.items.map(
-                  (item, idx) => html`
+          (item, idx) => html`
                     <tr>
                       <td style="text-align:center">${idx + 1}</td>
                       <td>
@@ -655,7 +655,7 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
                       </td>
                     </tr>
                   `
-                )}
+        )}
               </tbody>
             </table>
 
@@ -685,7 +685,7 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
   }
 
   /**
-   * 고객사 선택 시 코드 + 고객명 자동 설정
+   * 거래처 선택 시 코드 + 고객명 자동 설정
    */
   _onCustomerSelect(custCd) {
     if (custCd) {
@@ -722,13 +722,13 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
     }
   }
 
-  /** 고객사 목록 조회 */
+  /** 거래처 목록 조회 */
   async _fetchCustomers() {
     try {
       const data = await ServiceUtil.searchByPagination('customers', [], null, 1, 100)
       this.customers = data?.items || []
     } catch (err) {
-      console.error('고객사 목록 조회 실패:', err)
+      console.error('거래처 목록 조회 실패:', err)
       this.customers = []
     }
   }

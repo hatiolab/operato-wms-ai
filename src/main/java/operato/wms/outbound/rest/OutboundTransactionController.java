@@ -212,6 +212,32 @@ public class OutboundTransactionController extends AbstractRestService {
     }
 
     /**
+     * 출고 주문을 묶어서 수동으로 웨이브 생성
+     * 
+     * @param list
+     * @return
+     */
+    @RequestMapping(value = "release_orders/create_wave", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Create Wave By Outbound Orders")
+    public List<ReleaseOrder> createWaveByManual(@RequestBody List<ReleaseOrder> list) {
+        Long domainId = Domain.currentDomainId();
+
+        // 1. 커스텀 서비스 호출 - 전 처리
+        Map<String, Object> customParams = ValueUtil.newMap("orders", list);
+        this.customSvc.doCustomService(domainId, "diy-outb-pre-create-wave", customParams);
+
+        // 2. 임포트 처리
+        List<ReleaseOrder> roList = null; // this.outbTrxService.createWaveByManual(list, true);
+
+        // 3. 커스텀 서비스 호출 - 후 처리
+        this.customSvc.doCustomService(domainId, "diy-outb-post-create-wave",
+                ValueUtil.newMap("releaseOrders", roList));
+
+        // 4. 리턴
+        return list;
+    }
+
+    /**
      * 출고 리스트 요청 처리 (상태 : REG -> REQ)
      * 
      * @param data
@@ -947,7 +973,7 @@ public class OutboundTransactionController extends AbstractRestService {
     }
 
     /********************************************************************************************************
-     * 대 시 보 드   A P I
+     * 대 시 보 드 A P I
      ********************************************************************************************************/
 
     /**

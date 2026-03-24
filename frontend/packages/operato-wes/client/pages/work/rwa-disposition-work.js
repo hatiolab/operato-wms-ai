@@ -4,6 +4,8 @@ import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 
+import { voiceService } from './voice-service.js'
+
 /**
  * RWA 반품 처분 결정 작업 화면 (PDA)
  *
@@ -810,7 +812,8 @@ class RwaDispositionWork extends localize(i18next)(PageView) {
             `
           : html`
               <div class="action-buttons">
-                <button class="action-btn success" @click="${this._finishWork}">작업 종료</button>
+                <button class="action-btn secondary" @click="${this._finishWork}">작업 종료</button>
+                <button class="action-btn success" @click="${this._completeAndFinish}">주문 완료</button>
               </div>
             `}
       </div>
@@ -1043,7 +1046,7 @@ class RwaDispositionWork extends localize(i18next)(PageView) {
         <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
         <div style="font-size: 18px; font-weight: 700; color: #2E7D32;">모든 항목 처분 완료!</div>
         <div style="font-size: 14px; color: #666; margin-top: 8px;">
-          작업 종료 버튼을 눌러 주문 선택 화면으로 돌아가세요.
+          주문 완료 버튼을 눌러 재고 처리를 진행하거나, 작업 종료 버튼으로 나중에 처리할 수 있습니다.
         </div>
       </div>
     `
@@ -1133,7 +1136,7 @@ class RwaDispositionWork extends localize(i18next)(PageView) {
       this.scanValue = ''
     } else {
       this._showFeedback('error', '해당 반품 주문을 찾을 수 없습니다')
-      this._speak('해당 반품 주문을 찾을 수 없습니다')
+      voiceService.error('해당 반품 주문을 찾을 수 없습니다')
     }
   }
 
@@ -1205,7 +1208,7 @@ class RwaDispositionWork extends localize(i18next)(PageView) {
       }
 
       // 음성 피드백
-      this._speak(`${item.sku_cd} 처분 완료`)
+      voiceService.success(`${item.sku_cd} 처분 완료`)
 
       // 완료 표시
       this.orderItems[this.currentItemIndex]._completed = true
@@ -1302,7 +1305,8 @@ class RwaDispositionWork extends localize(i18next)(PageView) {
       this._initCurrentItemForm()
     } else {
       // 모든 항목 완료
-      this._showFeedback('success', '모든 항목 처분 완료! 작업 종료 버튼을 눌러주세요')
+      voiceService.success('모든 항목 처분 완료')
+      this._showFeedback('success', '모든 항목 처분 완료! 주문 완료 또는 작업 종료를 선택하세요')
     }
 
     // 강제 리렌더링
@@ -1324,18 +1328,32 @@ class RwaDispositionWork extends localize(i18next)(PageView) {
     }
   }
 
+  async _completeAndFinish() {
+    const result = await UiUtil.showAlertPopup(
+      'title.confirm',
+      `${this.selectedOrder.rwa_no} 주문을 완료 처리하시겠습니까?\n재고 처리가 진행됩니다.`,
+      'question',
+      'confirm',
+      'cancel'
+    )
+
+    if (result.confirmButton) {
+      try {
+        await ServiceUtil.restPost(`rwa_trx/rwa_orders/${this.selectedOrder.id}/complete`)
+        voiceService.success('주문 완료 처리되었습니다')
+        UiUtil.showToast('success', `${this.selectedOrder.rwa_no} 주문 완료`)
+        this._backToOrderSelect()
+      } catch (err) {
+        console.error('주문 완료 실패:', err)
+        voiceService.error('주문 완료 처리에 실패했습니다')
+        UiUtil.showToast('error', err.message || '주문 완료 실패')
+      }
+    }
+  }
+
   /* ============================================================
    * 유틸리티
    * ============================================================ */
-
-  _speak(message) {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(message)
-      utterance.lang = 'ko-KR'
-      utterance.rate = 1.1
-      window.speechSynthesis.speak(utterance)
-    }
-  }
 
   _showFeedback(type, message) {
     this.feedbackType = type

@@ -5,6 +5,9 @@ import { PageView } from '@operato/shell'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import { OxInputBarcode } from '@operato/input'
 
+import { HardwareScannerService } from './hardware-scanner-service.js'
+import { voiceService } from './voice-service.js'
+
 /**
  * VAS PDA 실적 등록 화면
  *
@@ -462,6 +465,32 @@ class VasPdaResult extends localize(i18next)(PageView) {
         .empty-state .empty-text {
           font-size: 16px;
         }
+
+        /* 음성 토글 */
+        .voice-toggle {
+          position: fixed;
+          top: 12px;
+          right: 12px;
+          z-index: 20;
+          min-width: 44px;
+          min-height: 44px;
+          border-radius: 50%;
+          border: none;
+          font-size: 20px;
+          cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+          transition: background 0.2s;
+        }
+
+        .voice-toggle.on {
+          background: var(--md-sys-color-primary, #FF9800);
+          color: #fff;
+        }
+
+        .voice-toggle.off {
+          background: var(--md-sys-color-surface-variant, #e0e0e0);
+          color: var(--md-sys-color-on-surface-variant, #666);
+        }
       `
     ]
   }
@@ -479,7 +508,8 @@ class VasPdaResult extends localize(i18next)(PageView) {
       defectQty: Number,
       destLocCd: String,
       feedbackMsg: String,
-      feedbackType: String
+      feedbackType: String,
+      voiceEnabled: Boolean
     }
   }
 
@@ -497,6 +527,8 @@ class VasPdaResult extends localize(i18next)(PageView) {
     this.destLocCd = ''
     this.feedbackMsg = ''
     this.feedbackType = ''
+    this.voiceEnabled = voiceService.enabled
+    this._scannerService = null
   }
 
   get context() {
@@ -511,6 +543,12 @@ class VasPdaResult extends localize(i18next)(PageView) {
 
   render() {
     return html`
+      <button
+        class="voice-toggle ${this.voiceEnabled ? 'on' : 'off'}"
+        @click="${this._toggleVoice}"
+        title="음성 안내 ${this.voiceEnabled ? 'ON' : 'OFF'}"
+      >${this.voiceEnabled ? '\u{1F50A}' : '\u{1F507}'}</button>
+
       ${this.screen === 'order-select'
         ? this._renderOrderSelect()
         : this._renderResultWork()}
@@ -726,10 +764,30 @@ class VasPdaResult extends localize(i18next)(PageView) {
    * 생명주기
    * ============================================================ */
 
-  /** 페이지 활성화 시 주문 목록 자동 조회 */
+  /** 페이지 활성화 시 주문 목록 자동 조회 + 스캐너 서비스 시작 */
   async pageUpdated(changes, lifecycle, before) {
-    if (this.active && this.screen === 'order-select') {
-      await this._refresh()
+    if (this.active) {
+      // 하드웨어 스캐너 서비스 시작
+      if (!this._scannerService) {
+        this._scannerService = new HardwareScannerService({
+          onScan: barcode => this._handleGlobalScan(barcode)
+        })
+      }
+      this._scannerService.start()
+
+      if (this.screen === 'order-select') {
+        await this._refresh()
+      }
+    } else {
+      this._scannerService?.stop()
+    }
+  }
+
+  /** 페이지 해제 시 스캐너 서비스 정리 */
+  pageDisposed(lifecycle) {
+    if (this._scannerService) {
+      this._scannerService.stop()
+      this._scannerService = null
     }
   }
 
@@ -784,6 +842,9 @@ class VasPdaResult extends localize(i18next)(PageView) {
     this.resultQty = 0
     this.defectQty = 0
     this.destLocCd = ''
+
+    // 능동적 안내: 주문 선택 후 실적 입력 안내
+    voiceService.guide(`주문 ${order.vas_no} 선택. 완성 수량과 불량 수량을 입력해주세요`)
   }
 
   /** 주문 선택 화면으로 복귀 */
@@ -812,7 +873,7 @@ class VasPdaResult extends localize(i18next)(PageView) {
       this.scanValue = ''
     } else {
       this._showFeedback('주문을 찾을 수 없습니다', 'error')
-      this._speakFeedback('주문을 찾을 수 없습니다')
+      voiceService.error('주문을 찾을 수 없습니다')
     }
   }
 
@@ -823,7 +884,10 @@ class VasPdaResult extends localize(i18next)(PageView) {
 
     this.destLocCd = trimmed
     this._showFeedback(`로케이션: ${trimmed}`, 'success')
-    this._speakFeedback(`로케이션 ${trimmed} 스캔 완료`)
+    voiceService.success(`로케이션 ${trimmed} 확인. 작업 완료 버튼을 눌러주세요`)
+
+    // 연속 스캔을 위한 자동 재포커스
+    this._refocusBarcodeInput('.location-section ox-input-barcode')
   }
 
   /* ============================================================
@@ -834,7 +898,7 @@ class VasPdaResult extends localize(i18next)(PageView) {
   async _registerResult() {
     if (!this.resultQty || this.resultQty <= 0) {
       this._showFeedback('완성 수량을 입력해주세요', 'error')
-      this._speakFeedback('완성 수량을 입력해주세요')
+      voiceService.error('완성 수량을 입력해주세요')
       return
     }
 
@@ -845,11 +909,11 @@ class VasPdaResult extends localize(i18next)(PageView) {
       })
 
       this._showFeedback('실적 등록 완료', 'success')
-      this._speakFeedback('실적 등록 완료')
+      voiceService.success('실적 등록 완료. 적치 로케이션을 스캔해주세요')
       this.step = 2
     } catch (err) {
       this._showFeedback(err.message || '실적 등록 실패', 'error')
-      this._speakFeedback('실적 등록 실패')
+      voiceService.error('실적 등록 실패')
     }
   }
 
@@ -857,7 +921,7 @@ class VasPdaResult extends localize(i18next)(PageView) {
   async _completeWork() {
     if (!this.destLocCd) {
       this._showFeedback('적치 로케이션을 스캔해주세요', 'error')
-      this._speakFeedback('로케이션을 스캔해주세요')
+      voiceService.error('로케이션을 스캔해주세요')
       return
     }
 
@@ -865,15 +929,43 @@ class VasPdaResult extends localize(i18next)(PageView) {
       await ServiceUtil.restPost(`vas_trx/vas_orders/${this.selectedOrder.id}/complete`)
 
       this._showFeedback('작업 완료!', 'success')
-      this._speakFeedback('작업이 완료되었습니다')
+      voiceService.success('작업이 완료되었습니다')
 
       setTimeout(() => {
         this._backToOrderSelect()
       }, 1500)
     } catch (err) {
       this._showFeedback(err.message || '작업 완료 실패', 'error')
-      this._speakFeedback('작업 완료 실패')
+      voiceService.error('작업 완료 실패')
     }
+  }
+
+  /* ============================================================
+   * 하드웨어 스캐너 전역 핸들링
+   * ============================================================ */
+
+  /** 전역 스캔 라우팅 — 주문 선택 또는 적치 로케이션 컨텍스트에 따라 분기 */
+  _handleGlobalScan(barcode) {
+    if (this.screen === 'order-select') {
+      this.scanValue = barcode
+      this._onScanSearch()
+    } else if (this.screen === 'result-work' && this.step === 2) {
+      this._onLocBarcodeScan(barcode)
+    }
+  }
+
+  /** 스캔 처리 후 OxInputBarcode 입력에 자동 재포커스 */
+  _refocusBarcodeInput(selector) {
+    requestAnimationFrame(() => {
+      const el = this.renderRoot.querySelector(selector)
+      if (el) {
+        const input = el.renderRoot?.querySelector('input')
+        if (input) {
+          input.value = ''
+          input.focus()
+        }
+      }
+    })
   }
 
   /* ============================================================
@@ -912,18 +1004,10 @@ class VasPdaResult extends localize(i18next)(PageView) {
     }, 2000)
   }
 
-  /** 음성 피드백 (Web Speech API) */
-  _speakFeedback(text) {
-    try {
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(text)
-        utterance.lang = 'ko-KR'
-        utterance.rate = 1.1
-        window.speechSynthesis.speak(utterance)
-      }
-    } catch (e) {
-      // 음성 합성 미지원 환경 무시
-    }
+  /** 음성 안내 ON/OFF 토글 */
+  _toggleVoice() {
+    this.voiceEnabled = voiceService.toggle()
+    this._showFeedback(this.voiceEnabled ? '음성 안내 ON' : '음성 안내 OFF', 'info')
   }
 }
 

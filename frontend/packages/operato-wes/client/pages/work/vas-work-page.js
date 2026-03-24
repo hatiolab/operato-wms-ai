@@ -2,7 +2,11 @@ import { css, html } from 'lit-element'
 
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
+import { OxInputBarcode } from '@operato/input'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
+
+import { HardwareScannerService } from './hardware-scanner-service.js'
+import { voiceService } from './voice-service.js'
 
 /**
  * VAS PDA 작업 화면
@@ -93,17 +97,11 @@ class VasWorkPage extends localize(i18next)(PageView) {
           gap: 8px;
         }
 
-        .scan-input input {
+        .scan-input ox-input-barcode {
           flex: 1;
-          padding: 14px 16px;
-          border: 2px solid var(--md-sys-color-outline, #ccc);
-          border-radius: 8px;
-          font-size: 18px;
-          outline: none;
-        }
-
-        .scan-input input:focus {
-          border-color: var(--md-sys-color-primary, #1976D2);
+          --barcodescan-input-font-size: 18px;
+          --barcodescan-input-padding: 14px 16px;
+          --barcodescan-input-border-radius: 8px;
         }
 
         .scan-input .scan-btn {
@@ -551,6 +549,35 @@ class VasWorkPage extends localize(i18next)(PageView) {
         .empty-state .empty-text {
           font-size: 16px;
         }
+
+        /* 음성 안내 토글 */
+        .voice-toggle {
+          position: fixed;
+          top: 12px;
+          right: 12px;
+          z-index: 20;
+          min-width: 44px;
+          min-height: 44px;
+          border-radius: 50%;
+          border: none;
+          font-size: 20px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+          transition: all 0.2s ease;
+        }
+
+        .voice-toggle.on {
+          background: var(--md-sys-color-primary, #1976D2);
+          color: #fff;
+        }
+
+        .voice-toggle.off {
+          background: var(--md-sys-color-surface-variant, #e0e0e0);
+          color: var(--md-sys-color-on-surface-variant, #666);
+        }
       `
     ]
   }
@@ -570,7 +597,8 @@ class VasWorkPage extends localize(i18next)(PageView) {
       defectQty: Number,
       putawayLoc: String,
       feedbackMsg: String,
-      feedbackType: String
+      feedbackType: String,
+      voiceEnabled: Boolean
     }
   }
 
@@ -590,6 +618,8 @@ class VasWorkPage extends localize(i18next)(PageView) {
     this.putawayLoc = ''
     this.feedbackMsg = ''
     this.feedbackType = ''
+    this.voiceEnabled = voiceService.enabled
+    this._scannerService = null
   }
 
   /** 페이지 컨텍스트 반환 - 브라우저 타이틀 등에 사용 */
@@ -602,6 +632,11 @@ class VasWorkPage extends localize(i18next)(PageView) {
   /** 화면 렌더링 - 주문 선택 또는 3단계 작업 화면 분기 */
   render() {
     return html`
+      <button
+        class="voice-toggle ${this.voiceEnabled ? 'on' : 'off'}"
+        @click="${this._toggleVoice}"
+        title="${this.voiceEnabled ? '음성 안내 ON' : '음성 안내 OFF'}"
+      >${this.voiceEnabled ? '\u{1F50A}' : '\u{1F507}'}</button>
       ${this.screen === 'order-select' ? this._renderOrderSelect() : this._renderWorkScreen()}
       ${this.feedbackMsg
         ? html`<div class="feedback-toast ${this.feedbackType}">${this.feedbackMsg}</div>`
@@ -622,15 +657,10 @@ class VasWorkPage extends localize(i18next)(PageView) {
           <div class="scan-input-group">
             <label>작업번호 스캔/입력</label>
             <div class="scan-input">
-              <input
-                type="text"
+              <ox-input-barcode
                 placeholder="바코드 스캔 또는 번호 입력"
-                .value="${this.scanValue}"
-                @input="${e => { this.scanValue = e.target.value }}"
-                @keydown="${this._onScanKeydown}"
-                autofocus
-              />
-              <button class="scan-btn" @click="${this._onScanSearch}" title="검색">&#x1F50D;</button>
+                @change="${e => { this.scanValue = e.target.value; this._onScanSearch() }}"
+              ></ox-input-barcode>
               <button class="scan-btn" @click="${this._refresh}" title="새로고침">&#x21bb;</button>
             </div>
           </div>
@@ -847,15 +877,10 @@ class VasWorkPage extends localize(i18next)(PageView) {
         <div class="scan-input-group">
           <label>로케이션 바코드 스캔</label>
           <div class="scan-input">
-            <input
-              type="text"
+            <ox-input-barcode
               placeholder="로케이션 바코드 스캔"
-              .value="${this.putawayLoc}"
-              @input="${e => { this.putawayLoc = e.target.value }}"
-              @keydown="${this._onLocScanKeydown}"
-              autofocus
-            />
-            <button class="scan-btn" title="스캔">&#x1F4F7;</button>
+              @change="${e => { this.putawayLoc = e.target.value; this._onLocScanConfirm() }}"
+            ></ox-input-barcode>
           </div>
         </div>
       </div>
@@ -881,10 +906,28 @@ class VasWorkPage extends localize(i18next)(PageView) {
    * 생명주기
    * ============================================================ */
 
-  /** 페이지 활성화 시 작업 주문 목록 조회 */
+  /** 페이지 활성화 시 작업 주문 목록 조회 + 스캐너 서비스 시작 */
   async pageUpdated(changes, lifecycle, before) {
     if (this.active) {
+      // 하드웨어 스캐너 서비스 시작
+      if (!this._scannerService) {
+        this._scannerService = new HardwareScannerService({
+          onScan: barcode => this._handleGlobalScan(barcode)
+        })
+      }
+      this._scannerService.start()
+
       await this._fetchOrders()
+    } else {
+      this._scannerService?.stop()
+    }
+  }
+
+  /** 페이지 해제 시 스캐너 서비스 정리 */
+  pageDisposed(lifecycle) {
+    if (this._scannerService) {
+      this._scannerService.stop()
+      this._scannerService = null
     }
   }
 
@@ -975,6 +1018,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
     this.defectQty = 0
     this.putawayLoc = ''
     await this._fetchOrderItems(order.id)
+    voiceService.guide(`주문 ${order.vas_no} 선택. 자재를 피킹해주세요`)
   }
 
   /** 주문 선택 화면으로 돌아가기 */
@@ -984,13 +1028,6 @@ class VasWorkPage extends localize(i18next)(PageView) {
     this.orderItems = []
     this.step = 1
     this._fetchOrders()
-  }
-
-  /** 바코드 스캔 입력에서 Enter 키 처리 */
-  _onScanKeydown(e) {
-    if (e.key === 'Enter') {
-      this._onScanSearch()
-    }
   }
 
   /** 바코드/번호로 주문 검색 후 매칭 주문 자동 선택 */
@@ -1007,7 +1044,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
       this.scanValue = ''
     } else {
       this._showFeedback('주문을 찾을 수 없습니다', 'error')
-      this._speakFeedback('주문을 찾을 수 없습니다')
+      voiceService.error('주문을 찾을 수 없습니다')
     }
   }
 
@@ -1055,10 +1092,10 @@ class VasWorkPage extends localize(i18next)(PageView) {
 
       this.orderItems = items
       this._showFeedback('피킹 확인', 'success')
-      this._speakFeedback('피킹 완료')
+      voiceService.success('피킹 완료')
     } catch (err) {
       this._showFeedback(err.message || '피킹 실패', 'error')
-      this._speakFeedback('피킹 실패')
+      voiceService.error('피킹 실패')
     }
   }
 
@@ -1101,7 +1138,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
           defect_qty: this.defectQty
         })
         this._showFeedback('실적 등록 완료', 'success')
-        this._speakFeedback('실적 등록 완료')
+        voiceService.success('실적 등록 완료. 적치 로케이션을 스캔해주세요')
       } catch (err) {
         this._showFeedback(err.message || '실적 등록 실패', 'error')
         return
@@ -1109,6 +1146,11 @@ class VasWorkPage extends localize(i18next)(PageView) {
     }
 
     this.step = Math.min(this.step + 1, 3)
+
+    // 능동적 단계 안내
+    if (this.step === 2) {
+      voiceService.guide('완성 수량과 불량 수량을 입력해주세요')
+    }
   }
 
   /** 이전 단계로 돌아가기 */
@@ -1120,14 +1162,12 @@ class VasWorkPage extends localize(i18next)(PageView) {
    * Step 3: 적치 및 작업 완료
    * ============================================================ */
 
-  /** 적치 로케이션 스캔 입력에서 Enter 키 처리 */
-  _onLocScanKeydown(e) {
-    if (e.key === 'Enter') {
-      const value = (this.putawayLoc || '').trim()
-      if (value) {
-        this._showFeedback(`로케이션: ${value}`, 'success')
-        this._speakFeedback(`로케이션 ${value} 스캔 완료`)
-      }
+  /** 로케이션 바코드 스캔 확인 피드백 */
+  _onLocScanConfirm() {
+    const value = (this.putawayLoc || '').trim()
+    if (value) {
+      this._showFeedback(`로케이션: ${value}`, 'success')
+      voiceService.success(`로케이션 ${value} 스캔 완료`)
     }
   }
 
@@ -1141,7 +1181,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
     try {
       await ServiceUtil.restPost(`vas_trx/vas_orders/${this.selectedOrder.id}/complete`)
       this._showFeedback('작업 완료!', 'success')
-      this._speakFeedback('작업이 완료되었습니다')
+      voiceService.success('작업이 완료되었습니다')
 
       // 2초 후 주문 선택 화면으로 복귀
       setTimeout(() => {
@@ -1149,7 +1189,49 @@ class VasWorkPage extends localize(i18next)(PageView) {
       }, 2000)
     } catch (err) {
       this._showFeedback(err.message || '작업 완료 실패', 'error')
-      this._speakFeedback('작업 완료 실패')
+      voiceService.error('작업 완료 실패')
+    }
+  }
+
+  /* ============================================================
+   * 하드웨어 스캐너 전역 핸들링
+   * ============================================================ */
+
+  /** 전역 스캔 라우팅 — 화면/단계 컨텍스트에 따라 적절한 핸들러로 전달 */
+  _handleGlobalScan(barcode) {
+    if (this.screen === 'order-select') {
+      this.scanValue = barcode
+      this._onScanSearch()
+    } else if (this.screen === 'work') {
+      if (this.step === 1) {
+        this._onSkuBarcodeScan(barcode)
+      } else if (this.step === 3) {
+        this.putawayLoc = barcode
+        this._onLocScanConfirm()
+      }
+    }
+  }
+
+  /** Step 1 피킹 중 SKU 바코드 스캔 — 자재 매칭 및 활성화 */
+  _onSkuBarcodeScan(barcode) {
+    const trimmed = (barcode || '').trim()
+    if (!trimmed) return
+
+    const matchIdx = this.orderItems.findIndex(
+      item => !item._picked && (item.sku_cd === trimmed || item.barcode === trimmed)
+    )
+
+    if (matchIdx >= 0) {
+      const items = this.orderItems.map((item, idx) => ({
+        ...item,
+        _active: idx === matchIdx
+      }))
+      this.orderItems = items
+      this._showFeedback(`${this.orderItems[matchIdx].sku_cd} 자재 확인`, 'success')
+      voiceService.success('자재 확인')
+    } else {
+      this._showFeedback('해당 자재를 찾을 수 없습니다', 'error')
+      voiceService.error('자재를 찾을 수 없습니다')
     }
   }
 
@@ -1193,18 +1275,10 @@ class VasWorkPage extends localize(i18next)(PageView) {
     }, 2000)
   }
 
-  /** 음성 피드백 (Web Speech API) */
-  _speakFeedback(text) {
-    try {
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(text)
-        utterance.lang = 'ko-KR'
-        utterance.rate = 1.1
-        window.speechSynthesis.speak(utterance)
-      }
-    } catch (e) {
-      // 음성 합성 미지원 환경 무시
-    }
+  /** 음성 안내 ON/OFF 토글 */
+  _toggleVoice() {
+    this.voiceEnabled = voiceService.toggle()
+    this._showFeedback(this.voiceEnabled ? '음성 안내 ON' : '음성 안내 OFF', 'info')
   }
 }
 
