@@ -1,5 +1,6 @@
 import './pages/inbound/inbound-home'
 import './pages/outbound/outbound-home'
+import './pages/outbound/outbound-inspection'
 import './pages/inventory/inventory-home'
 import './pages/rwa/rwa-home'
 import './pages/rwa/rwa-order-new'  // 팝업으로 사용
@@ -20,6 +21,9 @@ import './pages/work/vas-pda-result'
 import './pages/work/rwa-receive-work'
 import './pages/work/rwa-inspection-work'
 import './pages/work/rwa-disposition-work'
+import './pages/outbound/outbound-picking-pc'
+import './pages/work/outbound-picking-work'
+import './pages/work/outbound-release-work'
 
 import './pages/work/rcv-work-page'
 import './pages/work/rcv-work-item-element'

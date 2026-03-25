@@ -6,6 +6,7 @@ export default {
   routes: [
     { tagname: 'inbound-home', page: 'inbound-home' },
     { tagname: 'outbound-home', page: 'outbound-home' },
+    { tagname: 'outbound-inspection', page: 'outbound-inspection' },
     { tagname: 'inventory-home', page: 'inventory-home' },
     { tagname: 'rwa-home', page: 'rwa-home' },
     { tagname: 'rwa-receive-list', page: 'rwa-receive-list' },
@@ -23,6 +24,9 @@ export default {
     { tagname: 'vas-work-page', page: 'vas-work' },
     { tagname: 'vas-pda-pick', page: 'vas-pda-pick' },
     { tagname: 'vas-pda-result', page: 'vas-pda-result' },
+    { tagname: 'outbound-picking-pc', page: 'outbound-picking-pc' },
+    { tagname: 'outbound-picking-work', page: 'outbound-picking-work' },
+    { tagname: 'outbound-release-work', page: 'outbound-release-work' },
     { tagname: 'pda-wms-shipment-barcode', page: 'pda-wms-shipment-barcode' },
     { tagname: 'pda-wms-shipment-quantity', page: 'pda-wms-shipment-quantity' },
     { tagname: 'pda-wms-transfer-out-barcode', page: 'pda-wms-transfer-out-barcode' },
