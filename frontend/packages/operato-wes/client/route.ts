@@ -1,3 +1,4 @@
+import './pages/oms/oms-home'
 import './pages/inbound/inbound-home'
 import './pages/outbound/outbound-home'
 import './pages/outbound/outbound-inspection'

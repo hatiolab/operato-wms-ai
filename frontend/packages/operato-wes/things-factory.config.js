@@ -4,6 +4,7 @@ import bootstrap from './dist-client/bootstrap'
 export default {
   route,
   routes: [
+    { tagname: 'oms-home', page: 'oms-home' },
     { tagname: 'inbound-home', page: 'inbound-home' },
     { tagname: 'outbound-home', page: 'outbound-home' },
     { tagname: 'outbound-inspection', page: 'outbound-inspection' },
