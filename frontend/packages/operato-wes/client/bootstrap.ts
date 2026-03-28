@@ -2,6 +2,8 @@ import '@material/web/icon/icon.js'
 import '@things-factory/auth-ui/dist-client' /* for domain-switch */
 import '@things-factory/setting-ui/dist-client' /* theme-mode-setting-let */
 
+import './pages/oms/auto-wave-create-popup.js'
+
 import { html } from 'lit-html'
 
 import { navigate, store } from '@operato/shell'
@@ -13,6 +15,8 @@ import { setupAppToolPart } from '@things-factory/apptool-ui/dist-client'
 import { setupMenuPart } from '@things-factory/lite-menu/dist-client'
 import { setupContextUIPart } from '@things-factory/context-ui/dist-client'
 import { VIEWPART_POSITION } from '@operato/layout'
+
+
 
 export default async function bootstrap(module) {
   /* set board-modeller group and default templates */

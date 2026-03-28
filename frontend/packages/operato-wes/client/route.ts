@@ -1,4 +1,7 @@
 import './pages/oms/oms-home'
+import './pages/oms/shipment-order-import'
+import './pages/oms/shipment-wave-list'
+import './pages/oms/shipment-order-detail'  // 팝업으로 사용
 import './pages/inbound/inbound-home'
 import './pages/outbound/outbound-home'
 import './pages/outbound/outbound-inspection'

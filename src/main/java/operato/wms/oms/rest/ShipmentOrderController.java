@@ -12,14 +12,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import operato.wms.oms.entity.ShipmentOrder;
 import operato.wms.oms.entity.ShipmentOrderItem;
-import operato.wms.outbound.entity.PickingOrderItem;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.sys.system.service.AbstractRestService;
@@ -89,7 +87,7 @@ public class ShipmentOrderController extends AbstractRestService {
 		return this.cudMultipleData(this.entityClass(), list);
 	}
 
-	@RequestMapping(value = "/{id}/items", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@GetMapping(value = "/{id}/items", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Find Shipment Order Items By Shipment Order ID")
 	public List<ShipmentOrderItem> findShipmentOrderItems(@PathVariable("id") String id,
 			@RequestParam(name = "sort", required = false) String sort) {
@@ -104,7 +102,7 @@ public class ShipmentOrderController extends AbstractRestService {
 		return this.queryManager.selectList(ShipmentOrderItem.class, query);
 	}
 
-	@RequestMapping(value = "/{id}/update_multiple", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "/{id}/update_multiple", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Update Multiple Shipment Order Items")
 	public Boolean updateMultipleShipmentOrderItems(@PathVariable("id") String id,
 			@RequestBody List<ShipmentOrderItem> shipmentOrderItems) {

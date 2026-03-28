@@ -5,6 +5,8 @@ export default {
   route,
   routes: [
     { tagname: 'oms-home', page: 'oms-home' },
+    { tagname: 'shipment-order-import', page: 'shipment-order-import' },
+    { tagname: 'shipment-wave-list', page: 'shipment-wave-list' },
     { tagname: 'inbound-home', page: 'inbound-home' },
     { tagname: 'outbound-home', page: 'outbound-home' },
     { tagname: 'outbound-inspection', page: 'outbound-inspection' },

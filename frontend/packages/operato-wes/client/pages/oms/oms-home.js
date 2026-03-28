@@ -2,8 +2,10 @@ import { css, html } from 'lit-element'
 
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
+import { openPopup } from '@operato/layout'
 import { ServiceUtil, UiUtil, ValueUtil } from '@operato-app/metapage/dist-client'
 import Chart from 'chart.js/auto'
+import './auto-wave-create-popup'
 
 class OmsHome extends localize(i18next)(PageView) {
   /** 컴포넌트 스타일 정의 */
@@ -456,7 +458,7 @@ class OmsHome extends localize(i18next)(PageView) {
                   <button class="quick-action-btn" @click="${() => this._navigateTo('shipment-orders')}">
                     <span class="icon">📋</span>주문 목록
                   </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('shipment-waves')}">
+                  <button class="quick-action-btn" @click="${() => this._openWaveNewPopup()}">
                     <span class="icon">🌊</span>웨이브 생성
                   </button>
                   <button class="quick-action-btn" @click="${() => this._navigateTo('shipment-order-import')}">
@@ -507,6 +509,7 @@ class OmsHome extends localize(i18next)(PageView) {
             : ''}
             </div>
           `}
+
     `
   }
 
@@ -605,7 +608,8 @@ class OmsHome extends localize(i18next)(PageView) {
   /** 최근 주문 조회 (기존 CRUD API 활용) */
   async _fetchRecentOrders() {
     try {
-      const data = await ServiceUtil.restGet('shipment_orders?page=1&limit=5&sort=' + encodeURIComponent('[{"field":"created_at","ascending":false}]'))
+      let today = ValueUtil.todayFormatted();
+      const data = await ServiceUtil.restGet('shipment_orders?page=1&limit=5&query=' + encodeURIComponent('[{"name":"order_date","operator":"eq","value":"' + today + '"}]') + '&sort=' + encodeURIComponent('[{"field":"created_at","ascending":false}]'))
       return (data && data.items) ? data.items : []
     } catch (error) {
       console.error('최근 주문 조회 실패:', error)
@@ -750,6 +754,22 @@ class OmsHome extends localize(i18next)(PageView) {
         }
       }
     })
+  }
+
+  /** 웨이브 생성 팝업 열기 */
+  _openWaveNewPopup() {
+    openPopup(
+      html`<auto-wave-create-popup
+        @wave-created="${() => {
+          this._fetchDashboardData()
+        }}"
+      ></auto-wave-create-popup>`,
+      {
+        backdrop: true,
+        size: 'medium',
+        title: i18next.t('title.auto_wave_create', { defaultValue: '자동 웨이브 생성' })
+      }
+    )
   }
 
   /** 지정된 페이지로 이동 */

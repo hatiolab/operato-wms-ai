@@ -1336,3 +1336,70 @@ async confirmOrders(selectedIds) {
 |------|------|------|------|
 | 7 | 보충 지시 목록 | `replenish-order-list.js` | 보충 관리 |
 | 8 | 재고 할당 현황 | `stock-allocation-list.js` | 할당 모니터링 |
+
+---
+
+## 7. 구현 현황
+
+> 최종 업데이트: 2026-03-27
+
+### 프론트엔드 화면
+
+| # | 화면 | 파일 | 상태 | 구현일 | 비고 |
+|---|------|------|------|--------|------|
+| 1 | OMS 대시보드 | `oms-home.js` | ✅ 완료 | 2026-03-26 | 7개 섹션, Chart.js 3개, 6개 API 연동 |
+| 2 | 출하 주문 목록 | `shipment-order-list.js` | ✅ 완료 | 2026-03-27 | MetaGrist CRUD + 일괄 액션 |
+| 3 | 출하 주문 상세 | `shipment-order-detail.js` | ⬜ 미구현 | | 4탭 (기본/상세/배송/할당) |
+| 4 | 주문 임포트 | `shipment-order-import.js` | ✅ 완료 | 2026-03-27 | 3단계 마법사, Excel 파싱 |
+| 5 | 웨이브 목록 | `shipment-wave-list.js` | ✅ 완료 | 2026-03-27 | 검색/그리드/자동웨이브 생성 |
+| 6 | 웨이브 상세 | `shipment-wave-detail.js` | ⬜ 미구현 | | 3탭 (주문/SKU합산/보충) |
+| 7 | 보충 지시 목록 | `replenish-order-list.js` | ⬜ 미구현 | | 아코디언 상세 |
+| 8 | 재고 할당 현황 | `stock-allocation-list.js` | ⬜ 미구현 | | 요약 카드 + SOFT 만료 강조 |
+
+### 백엔드 컨트롤러
+
+| # | 컨트롤러 | 경로 | 상태 | 비고 |
+|---|---------|------|------|------|
+| 1 | `OmsDashboardController` | `/rest/oms_dashboard` | ✅ 완료 | 6개 GET API |
+| 2 | `OmsTransactionController` | `/rest/oms_trx` | ✅ 완료 | 임포트 3개 API + 자동웨이브 생성 |
+| 3 | `ShipmentOrderController` | `/rest/shipment_orders` | ✅ 완료 | CRUD + items |
+| 4 | `ShipmentWaveController` | `/rest/shipment_waves` | ✅ 완료 | CRUD |
+| 5 | `ShipmentDeliveryController` | `/rest/shipment_deliveries` | ✅ 완료 | CRUD |
+| 6 | `StockAllocationController` | `/rest/stock_allocations` | ✅ 완료 | CRUD |
+| 7 | `ReplenishOrderController` | `/rest/replenish_orders` | ✅ 완료 | CRUD + items |
+
+### 백엔드 서비스
+
+| # | 서비스 | 상태 | 비고 |
+|---|--------|------|------|
+| 1 | `OmsDashboardService` | ✅ 완료 | 6개 대시보드 쿼리 |
+| 2 | `OmsTransactionService` | ✅ 완료 | 임포트 검증/확정 + 자동웨이브 생성 |
+
+### 엔티티 (모두 완료)
+
+| # | 엔티티 | 테이블 | 비고 |
+|---|--------|--------|------|
+| 1 | `ShipmentOrder` | `shipment_orders` | 11개 상태 상수 |
+| 2 | `ShipmentOrderItem` | `shipment_order_items` | |
+| 3 | `ShipmentDelivery` | `shipment_deliveries` | |
+| 4 | `ShipmentWave` | `shipment_waves` | 4개 상태 상수 |
+| 5 | `StockAllocation` | `stock_allocations` | 5개 상태 상수 |
+| 6 | `ReplenishOrder` | `replenish_orders` | |
+| 7 | `ReplenishOrderItem` | `replenish_order_items` | |
+| 8 | `ImportShipmentOrder` | `import_shipment_orders` | 임포트 스테이징 |
+
+### 라우트 등록
+
+| # | 페이지 | tagname | 상태 |
+|---|--------|---------|------|
+| 1 | OMS 대시보드 | `oms-home` | ✅ 등록 |
+| 2 | 주문 임포트 | `shipment-order-import` | ✅ 등록 |
+| 3 | 웨이브 목록 | `shipment-wave-list` | ✅ 등록 |
+
+### 용어 등록 (terminologies)
+
+| # | category | name | ko | 상태 |
+|---|----------|------|----|------|
+| 1 | menu | OmsDashboard | 주문 관리 대시보드 | ✅ 등록 |
+| 2 | menu | ShipmentOrderImport | 주문 임포트 | ✅ 등록 |
+| 3 | menu | ShipmentWaveList | 웨이브 관리 | ✅ 등록 |
