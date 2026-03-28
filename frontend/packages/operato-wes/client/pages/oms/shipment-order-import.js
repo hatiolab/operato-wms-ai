@@ -400,9 +400,13 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
     this.processing = false
   }
 
+  get context() {
+    return { title: i18next.t('menu.ImportShipmentOrder', { defaultValue: '주문 임포트' }) }
+  }
+
   render() {
     return html`
-      <h2>${i18next.t('title.ShipmentOrderImport', { defaultValue: '주문 임포트' })}</h2>
+      <h2>${i18next.t('menu.ImportShipmentOrder', { defaultValue: '주문 임포트' })}</h2>
 
       <div class="wizard-container">
         <!-- 스텝 인디케이터 -->
@@ -411,17 +415,17 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
         <!-- 스텝 내용 -->
         <div class="card">
           ${this.processing
-            ? html`
+        ? html`
                 <div class="loading-overlay">
                   <div class="spinner"></div>
                   <span>처리 중...</span>
                 </div>
               `
-            : this.currentStep === 1
-              ? this._renderStep1()
-              : this.currentStep === 2
-                ? this._renderStep2()
-                : this._renderStep3()}
+        : this.currentStep === 1
+          ? this._renderStep1()
+          : this.currentStep === 2
+            ? this._renderStep2()
+            : this._renderStep3()}
         </div>
       </div>
     `
@@ -437,14 +441,14 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
     return html`
       <div class="step-indicator">
         ${steps.map(
-          (step, idx) => html`
+      (step, idx) => html`
             ${idx > 0 ? html`<div class="line ${this.currentStep > step.no ? 'completed' : ''}"></div>` : ''}
             <div class="step ${this.currentStep === step.no ? 'active' : this.currentStep > step.no ? 'completed' : ''}">
               <div class="dot">${this.currentStep > step.no ? '✓' : step.no}</div>
               <div class="step-label">${step.label}</div>
             </div>
           `
-        )}
+    )}
       </div>
     `
   }
@@ -525,7 +529,7 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
           </thead>
           <tbody>
             ${rows.map(
-              row => html`
+      row => html`
                 <tr class="${row.valid ? '' : 'error-row'}">
                   <td class="center">${row.rowNo}</td>
                   <td>${row.refOrderNo || ''}</td>
@@ -536,7 +540,7 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
                   <td class="error-text">${row.errorMessages ? row.errorMessages.join(', ') : ''}</td>
                 </tr>
               `
-            )}
+    )}
           </tbody>
         </table>
       </div>
@@ -586,13 +590,13 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
             <span class="value">${result.deliveryCount}건</span>
           </div>
           ${this.validationResult && this.validationResult.error > 0
-            ? html`
+        ? html`
                 <div class="stat-row">
                   <span class="label">건너뛴 행 (오류)</span>
                   <span class="value">${this.validationResult.error}건</span>
                 </div>
               `
-            : ''}
+        : ''}
         </div>
 
         <div style="display:flex; gap:12px; justify-content:center;">

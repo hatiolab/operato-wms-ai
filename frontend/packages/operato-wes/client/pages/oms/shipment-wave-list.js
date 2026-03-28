@@ -6,6 +6,7 @@ import { PageView } from '@operato/shell'
 import { ServiceUtil, UiUtil, ValueUtil } from '@operato-app/metapage/dist-client'
 
 import './auto-wave-create-popup'
+import './shipment-wave-detail'
 
 /**
  * 웨이브 관리 화면
@@ -707,7 +708,17 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
   }
 
   _navigateToDetail(id) {
-    UiUtil.pageNavigate('shipment-wave-detail', { id })
+    openPopup(
+      html`<shipment-wave-detail
+        .waveId="${id}"
+        @wave-updated="${() => this._fetchData()}"
+      ></shipment-wave-detail>`,
+      {
+        backdrop: true,
+        size: 'large',
+        title: i18next.t('title.wave_detail', { defaultValue: '웨이브 상세' })
+      }
+    )
   }
 
   _calcProgress(wave) {

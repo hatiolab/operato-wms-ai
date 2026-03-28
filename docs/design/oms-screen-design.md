@@ -1349,12 +1349,12 @@ async confirmOrders(selectedIds) {
 |---|------|------|------|--------|------|
 | 1 | OMS 대시보드 | `oms-home.js` | ✅ 완료 | 2026-03-26 | 7개 섹션, Chart.js 3개, 6개 API 연동 |
 | 2 | 출하 주문 목록 | `shipment-order-list.js` | ✅ 완료 | 2026-03-27 | MetaGrist CRUD + 일괄 액션 |
-| 3 | 출하 주문 상세 | `shipment-order-detail.js` | ⬜ 미구현 | | 4탭 (기본/상세/배송/할당) |
+| 3 | 출하 주문 상세 | `shipment-order-detail.js` | ✅ 완료 | 2026-03-28 | 4탭 팝업 (기본/상세/배송/할당), 타임라인 |
 | 4 | 주문 임포트 | `shipment-order-import.js` | ✅ 완료 | 2026-03-27 | 3단계 마법사, Excel 파싱 |
 | 5 | 웨이브 목록 | `shipment-wave-list.js` | ✅ 완료 | 2026-03-27 | 검색/그리드/자동웨이브 생성 |
-| 6 | 웨이브 상세 | `shipment-wave-detail.js` | ⬜ 미구현 | | 3탭 (주문/SKU합산/보충) |
-| 7 | 보충 지시 목록 | `replenish-order-list.js` | ⬜ 미구현 | | 아코디언 상세 |
-| 8 | 재고 할당 현황 | `stock-allocation-list.js` | ⬜ 미구현 | | 요약 카드 + SOFT 만료 강조 |
+| 6 | 웨이브 상세 | `shipment-wave-detail.js` | ✅ 완료 | 2026-03-28 | 3탭 팝업 (주문/SKU합산/보충), 진행률 |
+| 7 | 보충 지시 목록 | 메타 화면 | ✅ 완료 | 2026-03-28 | 메타 화면으로 구현 |
+| 8 | 재고 할당 현황 | `stock-allocation-list.js` | ✅ 완료 | 2026-03-27 | 요약 카드 + SOFT 만료 강조 |
 
 ### 백엔드 컨트롤러
 
@@ -1373,7 +1373,7 @@ async confirmOrders(selectedIds) {
 | # | 서비스 | 상태 | 비고 |
 |---|--------|------|------|
 | 1 | `OmsDashboardService` | ✅ 완료 | 6개 대시보드 쿼리 |
-| 2 | `OmsTransactionService` | ✅ 완료 | 임포트 검증/확정 + 자동웨이브 생성 |
+| 2 | `OmsTransactionService` | ✅ 완료 | 임포트 검증/확정 + 자동웨이브 생성 + 주문 확정/할당/해제/취소/마감 + 웨이브 릴리스/취소 |
 
 ### 엔티티 (모두 완료)
 
