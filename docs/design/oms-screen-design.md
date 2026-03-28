@@ -301,7 +301,7 @@ REGISTERED → CONFIRMED → ALLOCATED → WAVED → RELEASED → PICKING → PA
 | 출하번호 | `shipment_no` | 160px | 클릭 시 상세 이동 |
 | 고객 | `cust_nm` | 100px | |
 | 업무유형 | `biz_type` | 80px | 배지 렌더링 |
-| 수량 | `total_order_qty` | 60px | 우측 정렬 |
+| 수량 | `total_order` | 60px | 우측 정렬 |
 | 상태 | `status` | 80px | 상태 배지 |
 | 주문일 | `order_date` | 80px | |
 
@@ -521,8 +521,8 @@ Response:
     { name: 'shipType', width: 80, align: 'center', renderer: 'badge' },
     { name: 'priorityCd', width: 70, align: 'center', renderer: 'priority-badge' },
     { name: 'waveNo', width: 130, renderer: 'link', linkPage: 'shipment-wave-detail' },
-    { name: 'totalOrderQty', width: 80, align: 'right', renderer: 'number' },
-    { name: 'totalAllocQty', width: 80, align: 'right', renderer: 'number' },
+    { name: 'totalOrder', width: 80, align: 'right', renderer: 'number' },
+    { name: 'totalAlloc', width: 80, align: 'right', renderer: 'number' },
     { name: 'status', width: 90, align: 'center', renderer: 'status-badge' }
   ]
 }
@@ -582,13 +582,13 @@ Response:
 **탭 2: 주문상세 (Items)**
 
 ```
-┌────┬──────┬────────┬──────┬──────┬──────┬──────┬──────┬──────┐
-│라인│ SKU  │ 상품명  │주문수량│박스수│낱개수│할당수량│부족수량│ 상태 │
-├────┼──────┼────────┼──────┼──────┼──────┼──────┼──────┼──────┤
-│ 1  │SKU-A │ 상품A  │    2 │    0 │    2 │    2 │    0 │ 할당 │
-│ 2  │SKU-B │ 상품B  │    1 │    0 │    1 │    1 │    0 │ 할당 │
-│ 3  │SKU-C │ 상품C  │    2 │    0 │    2 │    0 │    2 │ 부족 │
-└────┴──────┴────────┴──────┴──────┴──────┴──────┴──────┴──────┘
+┌────┬──────┬────────┬──────┬──────┬──────┬──────┐
+│라인│ SKU  │ 상품명  │주문수량│할당수량│부족수량│ 상태 │
+├────┼──────┼────────┼──────┼──────┼──────┼──────┤
+│ 1  │SKU-A │ 상품A  │    2 │    2 │    0 │ 할당 │
+│ 2  │SKU-B │ 상품B  │    1 │    1 │    0 │ 할당 │
+│ 3  │SKU-C │ 상품C  │    2 │    0 │    2 │ 부족 │
+└────┴──────┴────────┴──────┴──────┴──────┴──────┘
 ```
 
 | 컬럼 | 필드 | 설명 |
@@ -597,8 +597,6 @@ Response:
 | SKU | `skuCd` | 상품 코드 |
 | 상품명 | `skuNm` | |
 | 주문수량 | `orderQty` | |
-| 박스수 | `orderBoxQty` | |
-| 낱개수 | `orderEaQty` | |
 | 할당수량 | `allocQty` | |
 | 부족수량 | `shortQty` | 0보다 크면 빨간색 강조 |
 | 취소수량 | `cancelQty` | |
@@ -614,11 +612,6 @@ Response:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  📮 배송 정보                                            │
-│                                                          │
-│  ─── 배송 ──────────────────────────────────────────    │
-│  배송유형: PARCEL (택배)     택배사: CJ대한통운          │
-│  서비스: NEXT_DAY (익일배송)  송장번호: 6001234567890    │
-│  배송비: 3,000원                                         │
 │                                                          │
 │  ─── 발송인 ────────────────────────────────────────    │
 │  이름: 하티오랩 물류센터     전화: 02-1234-5678          │
@@ -840,14 +833,14 @@ Excel 파일 또는 API를 통해 외부 주문 데이터를 일괄 수신
 | 일자 | `waveDate` | 90px | | |
 | 순번 | `waveSeq` | 50px | | 일자 내 순번 |
 | 피킹유형 | `pickType` | 90px | badge | INDIVIDUAL/TOTAL/ZONE |
+| 피킹방식 | `pickMethod` | 80px | badge | WCS/PAPER/INSPECT/PICK |
 | 출하유형 | `shipType` | 80px | badge | |
-| 실행유형 | `exeType` | 80px | badge | INDIVIDUAL/BATCH/WCS |
 | 택배사 | `carrierCd` | 100px | | |
-| 계획주문수 | `planOrderCount` | 80px | number | |
-| 계획SKU수 | `planSkuCount` | 80px | number | |
-| 계획수량 | `planTotalQty` | 80px | number | |
-| 실적주문수 | `resultOrderCount` | 80px | number | |
-| 실적수량 | `resultTotalQty` | 80px | number | |
+| 총 품목수 | `planItem` | 80px | number | |
+| 총 주문수 | `planOrder` | 80px | number | |
+| 총 수량 | `planTotal` | 80px | number | |
+| 실적주문수 | `resultOrder` | 80px | number | |
+| 실적수량 | `resultTotal` | 80px | number | |
 | 진행률 | (계산) | 100px | progress-bar | result/plan 비율 |
 | 상태 | `status` | 80px | status-badge | |
 
@@ -891,7 +884,7 @@ Excel 파일 또는 API를 통해 외부 주문 데이터를 일괄 수신
 │    ☐ 업무유형별 (biz_type)                 │
 │                                            │
 │  피킹 유형: [TOTAL ▼]                      │
-│  실행 유형: [BATCH ▼]                      │
+│  피킹 방식: [PICK ▼]                       │
 │  웨이브당 최대 주문수: [200]               │
 │                                            │
 │  ※ 대상: 128건 (ALLOCATED)                 │
@@ -908,7 +901,7 @@ Request:
 {
   "groupBy": ["carrier_cd"],
   "pickType": "TOTAL",
-  "exeType": "BATCH",
+  "pickMethod": "PICK",
   "maxOrderCount": 200,
   "orderDate": "2026-03-26"
 }
@@ -928,7 +921,7 @@ Request:
 │  🌊 웨이브 상세                             WAVE-20260326-001       │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  상태: [🟣 생성(CREATED)]  피킹유형: TOTAL  실행유형: BATCH          │
+│  상태: [🟣 생성(CREATED)]  피킹유형: TOTAL  피킹방식: PICK  실행유형: BATCH  │
 │  웨이브일: 2026-03-26  순번: 1  택배사: CJ대한통운                   │
 │                                                                      │
 │  ┌─── 계획 ───────┐    ┌─── 실적 ───────┐    ┌─── 진행률 ──────┐  │

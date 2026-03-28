@@ -94,10 +94,10 @@ public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String shipType;
 
 	/**
-	 * 실행 유형 (INDIVIDUAL/BATCH/WCS)
+	 * 피킹 방식 (WCS/PAPER/INSPECT/PICK)
 	 */
-	@Column(name = "exe_type", length = 20)
-	private String exeType;
+	@Column(name = "pick_method", length = 20)
+	private String pickMethod;
 
 	/**
 	 * 택배사 코드
@@ -120,38 +120,38 @@ public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	/**
 	 * 계획 주문 건수
 	 */
-	@Column(name = "plan_order_count")
-	private Integer planOrderCount;
+	@Column(name = "plan_order")
+	private Integer planOrder;
 
 	/**
-	 * 계획 SKU 수
+	 * 계획 품목 수
 	 */
-	@Column(name = "plan_sku_count")
-	private Integer planSkuCount;
+	@Column(name = "plan_item")
+	private Integer planItem;
 
 	/**
 	 * 계획 총 수량
 	 */
-	@Column(name = "plan_total_qty")
-	private Double planTotalQty;
+	@Column(name = "plan_total")
+	private Double planTotal;
 
 	/**
 	 * 실적 주문 건수
 	 */
-	@Column(name = "result_order_count")
-	private Integer resultOrderCount;
+	@Column(name = "result_order")
+	private Integer resultOrder;
 
 	/**
-	 * 실적 SKU 수
+	 * 실적 품목 수
 	 */
-	@Column(name = "result_sku_count")
-	private Integer resultSkuCount;
+	@Column(name = "result_item")
+	private Integer resultItem;
 
 	/**
 	 * 실적 총 수량
 	 */
-	@Column(name = "result_total_qty")
-	private Double resultTotalQty;
+	@Column(name = "result_total")
+	private Double resultTotal;
 
 	/**
 	 * 투입 피커 수
@@ -292,12 +292,12 @@ public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.shipType = shipType;
 	}
 
-	public String getExeType() {
-		return exeType;
+	public String getPickMethod() {
+		return pickMethod;
 	}
 
-	public void setExeType(String exeType) {
-		this.exeType = exeType;
+	public void setPickMethod(String pickMethod) {
+		this.pickMethod = pickMethod;
 	}
 
 	public String getCarrierCd() {
@@ -324,52 +324,52 @@ public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.labelTemplateCd = labelTemplateCd;
 	}
 
-	public Integer getPlanOrderCount() {
-		return planOrderCount;
+	public Integer getPlanOrder() {
+		return planOrder;
 	}
 
-	public void setPlanOrderCount(Integer planOrderCount) {
-		this.planOrderCount = planOrderCount;
+	public void setPlanOrder(Integer planOrder) {
+		this.planOrder = planOrder;
 	}
 
-	public Integer getPlanSkuCount() {
-		return planSkuCount;
+	public Integer getPlanItem() {
+		return planItem;
 	}
 
-	public void setPlanSkuCount(Integer planSkuCount) {
-		this.planSkuCount = planSkuCount;
+	public void setPlanItem(Integer planItem) {
+		this.planItem = planItem;
 	}
 
-	public Double getPlanTotalQty() {
-		return planTotalQty;
+	public Double getPlanTotal() {
+		return planTotal;
 	}
 
-	public void setPlanTotalQty(Double planTotalQty) {
-		this.planTotalQty = planTotalQty;
+	public void setPlanTotal(Double planTotal) {
+		this.planTotal = planTotal;
 	}
 
-	public Integer getResultOrderCount() {
-		return resultOrderCount;
+	public Integer getResultOrder() {
+		return resultOrder;
 	}
 
-	public void setResultOrderCount(Integer resultOrderCount) {
-		this.resultOrderCount = resultOrderCount;
+	public void setResultOrder(Integer resultOrder) {
+		this.resultOrder = resultOrder;
 	}
 
-	public Integer getResultSkuCount() {
-		return resultSkuCount;
+	public Integer getResultItem() {
+		return resultItem;
 	}
 
-	public void setResultSkuCount(Integer resultSkuCount) {
-		this.resultSkuCount = resultSkuCount;
+	public void setResultItem(Integer resultItem) {
+		this.resultItem = resultItem;
 	}
 
-	public Double getResultTotalQty() {
-		return resultTotalQty;
+	public Double getResultTotal() {
+		return resultTotal;
 	}
 
-	public void setResultTotalQty(Double resultTotalQty) {
-		this.resultTotalQty = resultTotalQty;
+	public void setResultTotal(Double resultTotal) {
+		this.resultTotal = resultTotal;
 	}
 
 	public Integer getInputPickers() {

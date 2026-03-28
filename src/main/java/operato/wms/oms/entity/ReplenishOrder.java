@@ -80,22 +80,22 @@ public class ReplenishOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook 
 	private String whCd;
 
 	/**
-	 * 계획 SKU 수
+	 * 계획 품목 수
 	 */
-	@Column(name = "plan_sku_count")
-	private Integer planSkuCount;
+	@Column(name = "plan_item")
+	private Integer planItem;
 
 	/**
 	 * 계획 총 수량
 	 */
-	@Column(name = "plan_total_qty")
-	private Double planTotalQty;
+	@Column(name = "plan_total")
+	private Double planTotal;
 
 	/**
 	 * 실적 총 수량
 	 */
-	@Column(name = "result_total_qty")
-	private Double resultTotalQty;
+	@Column(name = "result_total")
+	private Double resultTotal;
 
 	/**
 	 * 상태 (CREATED/IN_PROGRESS/COMPLETED/CANCELLED)
@@ -169,28 +169,28 @@ public class ReplenishOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook 
 		this.whCd = whCd;
 	}
 
-	public Integer getPlanSkuCount() {
-		return planSkuCount;
+	public Integer getPlanItem() {
+		return planItem;
 	}
 
-	public void setPlanSkuCount(Integer planSkuCount) {
-		this.planSkuCount = planSkuCount;
+	public void setPlanItem(Integer planItem) {
+		this.planItem = planItem;
 	}
 
-	public Double getPlanTotalQty() {
-		return planTotalQty;
+	public Double getPlanTotal() {
+		return planTotal;
 	}
 
-	public void setPlanTotalQty(Double planTotalQty) {
-		this.planTotalQty = planTotalQty;
+	public void setPlanTotal(Double planTotal) {
+		this.planTotal = planTotal;
 	}
 
-	public Double getResultTotalQty() {
-		return resultTotalQty;
+	public Double getResultTotal() {
+		return resultTotal;
 	}
 
-	public void setResultTotalQty(Double resultTotalQty) {
-		this.resultTotalQty = resultTotalQty;
+	public void setResultTotal(Double resultTotal) {
+		this.resultTotal = resultTotal;
 	}
 
 	public String getStatus() {

@@ -71,18 +71,6 @@ public class ShipmentOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampHo
     private Double orderQty;
 
     /**
-     * 주문 박스 수량
-     */
-    @Column(name = "order_box_qty")
-    private Double orderBoxQty;
-
-    /**
-     * 주문 낱개 수량
-     */
-    @Column(name = "order_ea_qty")
-    private Double orderEaQty;
-
-    /**
      * 할당 수량
      */
     @Column(name = "alloc_qty")
@@ -232,22 +220,6 @@ public class ShipmentOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampHo
         this.orderQty = orderQty;
     }
 
-    public Double getOrderBoxQty() {
-        return orderBoxQty;
-    }
-
-    public void setOrderBoxQty(Double orderBoxQty) {
-        this.orderBoxQty = orderBoxQty;
-    }
-
-    public Double getOrderEaQty() {
-        return orderEaQty;
-    }
-
-    public void setOrderEaQty(Double orderEaQty) {
-        this.orderEaQty = orderEaQty;
-    }
-
     public Double getAllocQty() {
         return allocQty;
     }
@@ -388,12 +360,6 @@ public class ShipmentOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampHo
         }
 
         // 수량 기본값 초기화
-        if (this.orderBoxQty == null) {
-            this.orderBoxQty = 0.0;
-        }
-        if (this.orderEaQty == null) {
-            this.orderEaQty = 0.0;
-        }
         if (this.allocQty == null) {
             this.allocQty = 0.0;
         }

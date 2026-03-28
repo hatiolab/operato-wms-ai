@@ -22,7 +22,7 @@ import xyz.elidom.util.ValueUtil;
 	@Index(name = "ix_shipment_orders_2", columnList = "domain_id,order_date,status"),
 	@Index(name = "ix_shipment_orders_3", columnList = "domain_id,wave_no"),
 	@Index(name = "ix_shipment_orders_4", columnList = "domain_id,com_cd,wh_cd"),
-	@Index(name = "ix_shipment_orders_5", columnList = "domain_id,biz_type,ship_type,exe_type"),
+	@Index(name = "ix_shipment_orders_5", columnList = "domain_id,biz_type,ship_type,pick_method"),
 	@Index(name = "ix_shipment_orders_6", columnList = "domain_id,cust_cd,order_date"),
 	@Index(name = "ix_shipment_orders_7", columnList = "domain_id,priority_cd,ship_by_date")
 })
@@ -163,10 +163,10 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String shipType;
 
 	/**
-	 * 실행 유형 (INDIVIDUAL/BATCH/WCS)
+	 * 피킹 방식 (WCS/PAPER/INSPECT/PICK)
 	 */
-	@Column (name = "exe_type", length = 20)
-	private String exeType;
+	@Column (name = "pick_method", length = 20)
+	private String pickMethod;
 
 	/**
 	 * 배송 유형 (STANDARD/EXPRESS/SAME_DAY/DAWN)
@@ -189,26 +189,26 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	/**
 	 * 총 품목 수
 	 */
-	@Column (name = "total_item_count")
-	private Integer totalItemCount;
+	@Column (name = "total_item")
+	private Integer totalItem;
 
 	/**
 	 * 총 주문 수량
 	 */
-	@Column (name = "total_order_qty")
-	private Double totalOrderQty;
+	@Column (name = "total_order")
+	private Double totalOrder;
 
 	/**
 	 * 총 할당 수량
 	 */
-	@Column (name = "total_alloc_qty")
-	private Double totalAllocQty;
+	@Column (name = "total_alloc")
+	private Double totalAlloc;
 
 	/**
 	 * 총 출하 수량
 	 */
-	@Column (name = "total_shipped_qty")
-	private Double totalShippedQty;
+	@Column (name = "total_shipped")
+	private Double totalShipped;
 
 	/**
 	 * 라벨 템플릿 코드
@@ -418,12 +418,12 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.shipType = shipType;
 	}
 
-	public String getExeType() {
-		return exeType;
+	public String getPickMethod() {
+		return pickMethod;
 	}
 
-	public void setExeType(String exeType) {
-		this.exeType = exeType;
+	public void setPickMethod(String pickMethod) {
+		this.pickMethod = pickMethod;
 	}
 
 	public String getDlvType() {
@@ -450,36 +450,36 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.toWhCd = toWhCd;
 	}
 
-	public Integer getTotalItemCount() {
-		return totalItemCount;
+	public Integer getTotalItem() {
+		return totalItem;
 	}
 
-	public void setTotalItemCount(Integer totalItemCount) {
-		this.totalItemCount = totalItemCount;
+	public void setTotalItem(Integer totalItem) {
+		this.totalItem = totalItem;
 	}
 
-	public Double getTotalOrderQty() {
-		return totalOrderQty;
+	public Double getTotalOrder() {
+		return totalOrder;
 	}
 
-	public void setTotalOrderQty(Double totalOrderQty) {
-		this.totalOrderQty = totalOrderQty;
+	public void setTotalOrder(Double totalOrder) {
+		this.totalOrder = totalOrder;
 	}
 
-	public Double getTotalAllocQty() {
-		return totalAllocQty;
+	public Double getTotalAlloc() {
+		return totalAlloc;
 	}
 
-	public void setTotalAllocQty(Double totalAllocQty) {
-		this.totalAllocQty = totalAllocQty;
+	public void setTotalAlloc(Double totalAlloc) {
+		this.totalAlloc = totalAlloc;
 	}
 
-	public Double getTotalShippedQty() {
-		return totalShippedQty;
+	public Double getTotalShipped() {
+		return totalShipped;
 	}
 
-	public void setTotalShippedQty(Double totalShippedQty) {
-		this.totalShippedQty = totalShippedQty;
+	public void setTotalShipped(Double totalShipped) {
+		this.totalShipped = totalShipped;
 	}
 
 	public String getLabelTemplateCd() {

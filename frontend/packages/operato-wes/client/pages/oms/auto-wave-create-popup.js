@@ -196,7 +196,7 @@ class AutoWaveCreatePopup extends localize(i18next)(LitElement) {
       groupByCust: Boolean,
       groupByBizType: Boolean,
       pickType: String,
-      exeType: String,
+      pickMethod: String,
       maxOrderCount: Number,
       previewCount: Number,
       creating: Boolean
@@ -209,7 +209,7 @@ class AutoWaveCreatePopup extends localize(i18next)(LitElement) {
     this.groupByCust = false
     this.groupByBizType = false
     this.pickType = 'TOTAL'
-    this.exeType = 'BATCH'
+    this.pickMethod = 'PICK'
     this.maxOrderCount = 200
     this.previewCount = 0
     this.creating = false
@@ -261,16 +261,19 @@ class AutoWaveCreatePopup extends localize(i18next)(LitElement) {
               <select .value="${this.pickType}"
                 @change="${e => { this.pickType = e.target.value }}">
                 <option value="TOTAL">토털 피킹</option>
+                <option value="ZONE">존별 피킹</option>
                 <option value="INDIVIDUAL">개별 피킹</option>
               </select>
             </div>
 
             <div class="form-group">
-              <label>${i18next.t('label.exe_type', { defaultValue: '실행 유형' })}</label>
-              <select .value="${this.exeType}"
-                @change="${e => { this.exeType = e.target.value }}">
-                <option value="BATCH">WMS에서 피킹</option>
-                <option value="WCS">WCS에 위임</option>
+              <label>${i18next.t('label.pick_method', { defaultValue: '피킹 방식' })}</label>
+              <select .value="${this.pickMethod}"
+                @change="${e => { this.pickMethod = e.target.value }}">
+                <option value="PICK">${i18next.t('label.pick_method_pick', { defaultValue: '피킹' })}</option>
+                <option value="INSPECT">${i18next.t('label.pick_method_inspect', { defaultValue: '검수와 함께 피킹' })}</option>
+                <option value="PAPER">${i18next.t('label.pick_method_paper', { defaultValue: '페이퍼 처리' })}</option>
+                <option value="WCS">${i18next.t('label.pick_method_wcs', { defaultValue: 'WCS 위임' })}</option>
               </select>
             </div>
 
@@ -321,7 +324,7 @@ class AutoWaveCreatePopup extends localize(i18next)(LitElement) {
       const params = {
         groupBy,
         pickType: this.pickType,
-        exeType: this.exeType,
+        pickMethod: this.pickMethod,
         maxOrderCount: this.maxOrderCount,
         orderDate: this._todayStr()
       }

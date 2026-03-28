@@ -21,241 +21,229 @@ public class ImportShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStamp
 	 * PK
 	 */
 	@PrimaryKey
-	@Column (name = "id", nullable = false, length = 40)
+	@Column(name = "id", nullable = false, length = 40)
 	private String id;
 
 	/**
 	 * 출하 번호
 	 */
-	@Column (name = "shipment_no", length = 30)
+	@Column(name = "shipment_no", length = 30)
 	private String shipmentNo;
 
 	/**
 	 * 참조 주문 번호 (채널 주문 번호)
 	 */
-	@Column (name = "ref_order_no", length = 50)
+	@Column(name = "ref_order_no", length = 50)
 	private String refOrderNo;
 
 	/**
 	 * 주문일자 (YYYY-MM-DD)
 	 */
-	@Column (name = "order_date", length = 10)
+	@Column(name = "order_date", length = 10)
 	private String orderDate;
 
 	/**
 	 * 출하 기한일 (YYYY-MM-DD)
 	 */
-	@Column (name = "ship_by_date", length = 10)
+	@Column(name = "ship_by_date", length = 10)
 	private String shipByDate;
 
 	/**
 	 * 회사 코드
 	 */
-	@Column (name = "com_cd", length = 30)
+	@Column(name = "com_cd", length = 30)
 	private String comCd;
 
 	/**
 	 * 고객 코드
 	 */
-	@Column (name = "cust_cd", length = 30)
+	@Column(name = "cust_cd", length = 30)
 	private String custCd;
 
 	/**
 	 * 고객명
 	 */
-	@Column (name = "cust_nm", length = 100)
+	@Column(name = "cust_nm", length = 100)
 	private String custNm;
 
 	/**
 	 * 창고 코드
 	 */
-	@Column (name = "wh_cd", length = 30)
+	@Column(name = "wh_cd", length = 30)
 	private String whCd;
 
 	/**
 	 * 업무 유형 (B2C_OUT/B2B_OUT/B2C_RTN/B2B_RTN)
 	 */
-	@Column (name = "biz_type", length = 10)
+	@Column(name = "biz_type", length = 10)
 	private String bizType;
 
 	/**
 	 * 출하 유형 (PARCEL/FREIGHT/DIRECT/STORE_PICKUP)
 	 */
-	@Column (name = "ship_type", length = 20)
+	@Column(name = "ship_type", length = 20)
 	private String shipType;
 
 	/**
 	 * 배송 유형 (STANDARD/EXPRESS/SAME_DAY/DAWN)
 	 */
-	@Column (name = "dlv_type", length = 20)
+	@Column(name = "dlv_type", length = 20)
 	private String dlvType;
 
 	/**
 	 * 우선순위 코드 (URGENT/HIGH/NORMAL/LOW)
 	 */
-	@Column (name = "priority_cd", length = 10)
+	@Column(name = "priority_cd", length = 10)
 	private String priorityCd;
 
 	/**
 	 * 라인 번호
 	 */
-	@Column (name = "line_no", length = 5)
+	@Column(name = "line_no", length = 5)
 	private String lineNo;
 
 	/**
 	 * 상품 코드
 	 */
-	@Column (name = "sku_cd", length = 30)
+	@Column(name = "sku_cd", length = 30)
 	private String skuCd;
 
 	/**
 	 * 상품명
 	 */
-	@Column (name = "sku_nm", length = 100)
+	@Column(name = "sku_nm", length = 100)
 	private String skuNm;
 
 	/**
 	 * 주문 수량
 	 */
-	@Column (name = "order_qty")
+	@Column(name = "order_qty")
 	private Double orderQty;
 
 	/**
 	 * 단가
 	 */
-	@Column (name = "unit_price")
+	@Column(name = "unit_price")
 	private Double unitPrice;
 
 	/**
 	 * 유통기한 (YYYY-MM-DD)
 	 */
-	@Column (name = "expired_date", length = 10)
+	@Column(name = "expired_date", length = 10)
 	private String expiredDate;
 
 	/**
 	 * 로트 번호
 	 */
-	@Column (name = "lot_no", length = 50)
+	@Column(name = "lot_no", length = 50)
 	private String lotNo;
 
 	/**
 	 * 바코드
 	 */
-	@Column (name = "barcode", length = 50)
+	@Column(name = "barcode", length = 50)
 	private String barcode;
-
-	/**
-	 * 택배사 코드
-	 */
-	@Column (name = "carrier_cd", length = 30)
-	private String carrierCd;
-
-	/**
-	 * 택배 서비스 유형 (STANDARD/EXPRESS/COLD_CHAIN/BULKY)
-	 */
-	@Column (name = "carrier_service_type", length = 20)
-	private String carrierServiceType;
 
 	/**
 	 * 발송인명
 	 */
-	@Column (name = "sender_nm", length = 100)
+	@Column(name = "sender_nm", length = 100)
 	private String senderNm;
 
 	/**
 	 * 발송인 전화번호
 	 */
-	@Column (name = "sender_phone", length = 20)
+	@Column(name = "sender_phone", length = 20)
 	private String senderPhone;
 
 	/**
 	 * 발송인 우편번호
 	 */
-	@Column (name = "sender_zip_cd", length = 20)
+	@Column(name = "sender_zip_cd", length = 20)
 	private String senderZipCd;
 
 	/**
 	 * 발송인 주소
 	 */
-	@Column (name = "sender_addr", length = 200)
+	@Column(name = "sender_addr", length = 200)
 	private String senderAddr;
 
 	/**
 	 * 주문자명
 	 */
-	@Column (name = "orderer_nm", length = 100)
+	@Column(name = "orderer_nm", length = 100)
 	private String ordererNm;
 
 	/**
 	 * 수취인명
 	 */
-	@Column (name = "receiver_nm", length = 100)
+	@Column(name = "receiver_nm", length = 100)
 	private String receiverNm;
 
 	/**
 	 * 수취인 전화번호
 	 */
-	@Column (name = "receiver_phone", length = 20)
+	@Column(name = "receiver_phone", length = 20)
 	private String receiverPhone;
 
 	/**
 	 * 수취인 우편번호
 	 */
-	@Column (name = "receiver_zip_cd", length = 20)
+	@Column(name = "receiver_zip_cd", length = 20)
 	private String receiverZipCd;
 
 	/**
 	 * 수취인 주소
 	 */
-	@Column (name = "receiver_addr", length = 200)
+	@Column(name = "receiver_addr", length = 200)
 	private String receiverAddr;
 
 	/**
 	 * 수취인 상세주소
 	 */
-	@Column (name = "receiver_addr2", length = 200)
+	@Column(name = "receiver_addr2", length = 200)
 	private String receiverAddr2;
 
 	/**
 	 * 배송 메모
 	 */
-	@Column (name = "delivery_memo", length = 500)
+	@Column(name = "delivery_memo", length = 500)
 	private String deliveryMemo;
 
 	/**
 	 * 비고
 	 */
-	@Column (name = "remarks", length = 1000)
+	@Column(name = "remarks", length = 1000)
 	private String remarks;
 
 	/**
 	 * 확장 필드 1
 	 */
-	@Column (name = "attr01", length = 100)
+	@Column(name = "attr01", length = 100)
 	private String attr01;
 
 	/**
 	 * 확장 필드 2
 	 */
-	@Column (name = "attr02", length = 100)
+	@Column(name = "attr02", length = 100)
 	private String attr02;
 
 	/**
 	 * 확장 필드 3
 	 */
-	@Column (name = "attr03", length = 100)
+	@Column(name = "attr03", length = 100)
 	private String attr03;
 
 	/**
 	 * 확장 필드 4
 	 */
-	@Column (name = "attr04", length = 100)
+	@Column(name = "attr04", length = 100)
 	private String attr04;
 
 	/**
 	 * 확장 필드 5
 	 */
-	@Column (name = "attr05", length = 100)
+	@Column(name = "attr05", length = 100)
 	private String attr05;
 
 	public String getId() {
@@ -424,22 +412,6 @@ public class ImportShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStamp
 
 	public void setBarcode(String barcode) {
 		this.barcode = barcode;
-	}
-
-	public String getCarrierCd() {
-		return carrierCd;
-	}
-
-	public void setCarrierCd(String carrierCd) {
-		this.carrierCd = carrierCd;
-	}
-
-	public String getCarrierServiceType() {
-		return carrierServiceType;
-	}
-
-	public void setCarrierServiceType(String carrierServiceType) {
-		this.carrierServiceType = carrierServiceType;
 	}
 
 	public String getSenderNm() {

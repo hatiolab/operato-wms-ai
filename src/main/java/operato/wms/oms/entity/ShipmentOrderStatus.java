@@ -12,14 +12,13 @@ SELECT
     so.shipment_no, so.ref_order_no,
     so.order_date, so.ship_by_date, so.cutoff_time, so.priority_cd,
     so.wave_no, so.wh_cd, so.com_cd, so.cust_cd, so.cust_nm,
-    so.biz_type, so.ship_type, so.exe_type, so.dlv_type,
+    so.biz_type, so.ship_type, so.pick_method, so.dlv_type,
     so.status,
-    so.total_item_count, so.total_order_qty, so.total_alloc_qty, so.total_shipped_qty,
+    so.total_item, so.total_order, so.total_alloc, so.total_shipped,
     so.confirmed_at, so.allocated_at, so.released_at, so.shipped_at,
     si.line_no, si.sku_cd, si.sku_nm,
     si.order_qty, si.alloc_qty, si.shipped_qty, si.short_qty, si.cancel_qty,
     si.barcode, si.expired_date, si.lot_no,
-    sd.carrier_cd, sd.carrier_service_type, sd.invoice_no as tracking_no,
     sd.receiver_nm, sd.receiver_phone, sd.receiver_zip_cd,
     sd.receiver_addr, sd.receiver_addr2, sd.delivery_memo,
     so.remarks,
@@ -127,10 +126,10 @@ public class ShipmentOrderStatus extends xyz.elidom.orm.entity.basic.DomainTimeS
 	private String shipType;
 
 	/**
-	 * 실행 유형
+	 * 피킹 방식
 	 */
-	@Column (name = "exe_type", length = 20)
-	private String exeType;
+	@Column (name = "pick_method", length = 20)
+	private String pickMethod;
 
 	/**
 	 * 배송 유형
@@ -147,26 +146,26 @@ public class ShipmentOrderStatus extends xyz.elidom.orm.entity.basic.DomainTimeS
 	/**
 	 * 총 품목 수
 	 */
-	@Column (name = "total_item_count")
-	private Integer totalItemCount;
+	@Column (name = "total_item")
+	private Integer totalItem;
 
 	/**
 	 * 총 주문 수량
 	 */
-	@Column (name = "total_order_qty")
-	private Double totalOrderQty;
+	@Column (name = "total_order")
+	private Double totalOrder;
 
 	/**
 	 * 총 할당 수량
 	 */
-	@Column (name = "total_alloc_qty")
-	private Double totalAllocQty;
+	@Column (name = "total_alloc")
+	private Double totalAlloc;
 
 	/**
 	 * 총 출하 수량
 	 */
-	@Column (name = "total_shipped_qty")
-	private Double totalShippedQty;
+	@Column (name = "total_shipped")
+	private Double totalShipped;
 
 	/**
 	 * 확정 일시
@@ -257,24 +256,6 @@ public class ShipmentOrderStatus extends xyz.elidom.orm.entity.basic.DomainTimeS
 	 */
 	@Column (name = "lot_no", length = 50)
 	private String lotNo;
-
-	/**
-	 * 택배사 코드
-	 */
-	@Column (name = "carrier_cd", length = 30)
-	private String carrierCd;
-
-	/**
-	 * 택배 서비스 유형
-	 */
-	@Column (name = "carrier_service_type", length = 20)
-	private String carrierServiceType;
-
-	/**
-	 * 송장 번호 (운송장 번호)
-	 */
-	@Column (name = "tracking_no", length = 50)
-	private String trackingNo;
 
 	/**
 	 * 수취인명
@@ -430,12 +411,12 @@ public class ShipmentOrderStatus extends xyz.elidom.orm.entity.basic.DomainTimeS
 		this.shipType = shipType;
 	}
 
-	public String getExeType() {
-		return exeType;
+	public String getPickMethod() {
+		return pickMethod;
 	}
 
-	public void setExeType(String exeType) {
-		this.exeType = exeType;
+	public void setPickMethod(String pickMethod) {
+		this.pickMethod = pickMethod;
 	}
 
 	public String getDlvType() {
@@ -454,36 +435,36 @@ public class ShipmentOrderStatus extends xyz.elidom.orm.entity.basic.DomainTimeS
 		this.status = status;
 	}
 
-	public Integer getTotalItemCount() {
-		return totalItemCount;
+	public Integer getTotalItem() {
+		return totalItem;
 	}
 
-	public void setTotalItemCount(Integer totalItemCount) {
-		this.totalItemCount = totalItemCount;
+	public void setTotalItem(Integer totalItem) {
+		this.totalItem = totalItem;
 	}
 
-	public Double getTotalOrderQty() {
-		return totalOrderQty;
+	public Double getTotalOrder() {
+		return totalOrder;
 	}
 
-	public void setTotalOrderQty(Double totalOrderQty) {
-		this.totalOrderQty = totalOrderQty;
+	public void setTotalOrder(Double totalOrder) {
+		this.totalOrder = totalOrder;
 	}
 
-	public Double getTotalAllocQty() {
-		return totalAllocQty;
+	public Double getTotalAlloc() {
+		return totalAlloc;
 	}
 
-	public void setTotalAllocQty(Double totalAllocQty) {
-		this.totalAllocQty = totalAllocQty;
+	public void setTotalAlloc(Double totalAlloc) {
+		this.totalAlloc = totalAlloc;
 	}
 
-	public Double getTotalShippedQty() {
-		return totalShippedQty;
+	public Double getTotalShipped() {
+		return totalShipped;
 	}
 
-	public void setTotalShippedQty(Double totalShippedQty) {
-		this.totalShippedQty = totalShippedQty;
+	public void setTotalShipped(Double totalShipped) {
+		this.totalShipped = totalShipped;
 	}
 
 	public String getConfirmedAt() {
@@ -604,30 +585,6 @@ public class ShipmentOrderStatus extends xyz.elidom.orm.entity.basic.DomainTimeS
 
 	public void setLotNo(String lotNo) {
 		this.lotNo = lotNo;
-	}
-
-	public String getCarrierCd() {
-		return carrierCd;
-	}
-
-	public void setCarrierCd(String carrierCd) {
-		this.carrierCd = carrierCd;
-	}
-
-	public String getCarrierServiceType() {
-		return carrierServiceType;
-	}
-
-	public void setCarrierServiceType(String carrierServiceType) {
-		this.carrierServiceType = carrierServiceType;
-	}
-
-	public String getTrackingNo() {
-		return trackingNo;
-	}
-
-	public void setTrackingNo(String trackingNo) {
-		this.trackingNo = trackingNo;
 	}
 
 	public String getReceiverNm() {

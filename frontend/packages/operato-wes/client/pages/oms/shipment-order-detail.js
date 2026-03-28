@@ -671,8 +671,8 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
           <span class="info-value">${this._shipTypeLabel(o.ship_type)}</span>
         </div>
         <div class="info-item">
-          <span class="info-label">실행유형</span>
-          <span class="info-value">${this._exeTypeLabel(o.exe_type)}</span>
+          <span class="info-label">피킹방식</span>
+          <span class="info-value">${this._pickMethodLabel(o.pick_method)}</span>
         </div>
         <div class="info-item">
           <span class="info-label">배송유형</span>
@@ -688,19 +688,19 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
       <div class="info-grid">
         <div class="info-item">
           <span class="info-label">총 품목수</span>
-          <span class="info-value">${o.total_item_count ?? '-'}</span>
+          <span class="info-value">${o.total_item ?? '-'}</span>
         </div>
         <div class="info-item">
           <span class="info-label">총 주문수량</span>
-          <span class="info-value">${o.total_order_qty ?? '-'}</span>
+          <span class="info-value">${o.total_order ?? '-'}</span>
         </div>
         <div class="info-item">
           <span class="info-label">총 할당수량</span>
-          <span class="info-value">${o.total_alloc_qty ?? '-'}</span>
+          <span class="info-value">${o.total_alloc ?? '-'}</span>
         </div>
         <div class="info-item">
           <span class="info-label">총 출하수량</span>
-          <span class="info-value">${o.total_shipped_qty ?? '-'}</span>
+          <span class="info-value">${o.total_shipped ?? '-'}</span>
         </div>
       </div>
 
@@ -753,8 +753,6 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
             <th>SKU</th>
             <th>상품명</th>
             <th class="text-right">주문수량</th>
-            <th class="text-right">박스수</th>
-            <th class="text-right">낱개수</th>
             <th class="text-right">할당수량</th>
             <th class="text-right">부족수량</th>
             <th class="text-right">출하수량</th>
@@ -768,8 +766,6 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
               <td>${item.sku_cd || '-'}</td>
               <td>${item.sku_nm || '-'}</td>
               <td class="text-right">${item.order_qty ?? 0}</td>
-              <td class="text-right">${item.order_box_qty ?? 0}</td>
-              <td class="text-right">${item.order_ea_qty ?? 0}</td>
               <td class="text-right">${item.alloc_qty ?? 0}</td>
               <td class="text-right ${(item.short_qty || 0) > 0 ? 'qty-short' : ''}">${item.short_qty ?? 0}</td>
               <td class="text-right">${item.shipped_qty ?? 0}</td>
@@ -821,22 +817,6 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
 
     const d = this.delivery
     return html`
-      <div class="info-section-title">배송 정보</div>
-      <div class="info-grid">
-        <div class="info-item">
-          <span class="info-label">배송유형</span>
-          <span class="info-value">${this._dlvTypeLabel(d.dlv_type)}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">택배사</span>
-          <span class="info-value">${d.carrier_cd || '-'}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">송장번호</span>
-          <span class="info-value">${d.invoice_no || '-'}</span>
-        </div>
-      </div>
-
       <div class="info-section-title">발송인</div>
       <div class="info-grid">
         <div class="info-item">
@@ -1174,11 +1154,12 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     return labels[type] || type || '-'
   }
 
-  _exeTypeLabel(type) {
+  _pickMethodLabel(type) {
     const labels = {
-      INDIVIDUAL: '개별 피킹',
-      BATCH: '배치 피킹',
-      WCS: 'WCS 위임'
+      WCS: 'WCS 위임',
+      PAPER: '페이퍼 처리',
+      INSPECT: '검수와 함께 피킹',
+      PICK: '피킹'
     }
     return labels[type] || type || '-'
   }

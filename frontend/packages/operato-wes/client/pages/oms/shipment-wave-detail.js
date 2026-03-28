@@ -480,8 +480,8 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
             <span class="value">${w.wave_seq || '-'}</span>
           </div>
           <div class="wave-info-item">
-            <span class="label">${i18next.t('label.exe_type', { defaultValue: '실행유형' })}:</span>
-            <span class="value">${this._exeTypeLabel(w.exe_type)}</span>
+            <span class="label">${i18next.t('label.pick_method', { defaultValue: '피킹방식' })}:</span>
+            <span class="value">${this._pickMethodLabel(w.pick_method)}</span>
           </div>
           <div class="wave-info-item">
             <span class="label">${i18next.t('label.carrier', { defaultValue: '택배사' })}:</span>
@@ -510,15 +510,15 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
           <div class="stat-title">${i18next.t('label.plan', { defaultValue: '계획' })}</div>
           <div class="stat-item">
             <span class="label">${i18next.t('label.order_count', { defaultValue: '주문수' })}</span>
-            <span class="value">${w.plan_order_count ?? 0}</span>
+            <span class="value">${w.plan_order ?? 0}</span>
           </div>
           <div class="stat-item">
-            <span class="label">${i18next.t('label.sku_count', { defaultValue: 'SKU종수' })}</span>
-            <span class="value">${w.plan_sku_count ?? 0}</span>
+            <span class="label">${i18next.t('label.item_count', { defaultValue: '품목수' })}</span>
+            <span class="value">${w.plan_item ?? 0}</span>
           </div>
           <div class="stat-item">
             <span class="label">${i18next.t('label.total_qty', { defaultValue: '총수량' })}</span>
-            <span class="value">${w.plan_total_qty ?? 0}</span>
+            <span class="value">${w.plan_total ?? 0}</span>
           </div>
         </div>
 
@@ -526,15 +526,15 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
           <div class="stat-title">${i18next.t('label.result', { defaultValue: '실적' })}</div>
           <div class="stat-item">
             <span class="label">${i18next.t('label.order_count', { defaultValue: '주문수' })}</span>
-            <span class="value">${w.result_order_count ?? 0}</span>
+            <span class="value">${w.result_order ?? 0}</span>
           </div>
           <div class="stat-item">
-            <span class="label">${i18next.t('label.sku_count', { defaultValue: 'SKU종수' })}</span>
-            <span class="value">${w.result_sku_count ?? 0}</span>
+            <span class="label">${i18next.t('label.item_count', { defaultValue: '품목수' })}</span>
+            <span class="value">${w.result_item ?? 0}</span>
           </div>
           <div class="stat-item">
             <span class="label">${i18next.t('label.total_qty', { defaultValue: '총수량' })}</span>
-            <span class="value">${w.result_total_qty ?? 0}</span>
+            <span class="value">${w.result_total ?? 0}</span>
           </div>
         </div>
 
@@ -628,7 +628,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
               <td>${o.cust_nm || o.cust_cd || '-'}</td>
               <td>${this._bizTypeLabel(o.biz_type)}</td>
               <td>${this._shipTypeLabel(o.ship_type)}</td>
-              <td class="text-right">${o.total_order_qty ?? 0}</td>
+              <td class="text-right">${o.total_order ?? 0}</td>
               <td><span class="item-status ${o.status}">${this._orderStatusLabel(o.status)}</span></td>
             </tr>
           `)}
@@ -642,7 +642,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
         </div>
         <div class="summary-item">
           <span class="label">${i18next.t('label.total_qty', { defaultValue: '총 수량' })}:</span>
-          <span class="value">${this.orders.reduce((s, o) => s + (o.total_order_qty || 0), 0)} EA</span>
+          <span class="value">${this.orders.reduce((s, o) => s + (o.total_order || 0), 0)} EA</span>
         </div>
       </div>
     `
@@ -725,9 +725,9 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
           <tr>
             <th>${i18next.t('label.replenish_no', { defaultValue: '보충번호' })}</th>
             <th>${i18next.t('label.order_date', { defaultValue: '지시일' })}</th>
-            <th class="text-right">${i18next.t('label.plan_sku_count', { defaultValue: '계획SKU수' })}</th>
-            <th class="text-right">${i18next.t('label.plan_total_qty', { defaultValue: '계획수량' })}</th>
-            <th class="text-right">${i18next.t('label.result_total_qty', { defaultValue: '실적수량' })}</th>
+            <th class="text-right">${i18next.t('label.plan_item', { defaultValue: '계획품목수' })}</th>
+            <th class="text-right">${i18next.t('label.plan_total', { defaultValue: '계획수량' })}</th>
+            <th class="text-right">${i18next.t('label.result_total', { defaultValue: '실적수량' })}</th>
             <th>${i18next.t('label.status', { defaultValue: '상태' })}</th>
           </tr>
         </thead>
@@ -736,9 +736,9 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
             <tr>
               <td>${r.replenish_no || '-'}</td>
               <td>${r.order_date || '-'}</td>
-              <td class="text-right">${r.plan_sku_count ?? 0}</td>
-              <td class="text-right">${r.plan_total_qty ?? 0}</td>
-              <td class="text-right">${r.result_total_qty ?? 0}</td>
+              <td class="text-right">${r.plan_item ?? 0}</td>
+              <td class="text-right">${r.plan_total ?? 0}</td>
+              <td class="text-right">${r.result_total ?? 0}</td>
               <td><span class="replenish-status ${r.status}">${this._replenishStatusLabel(r.status)}</span></td>
             </tr>
           `)}
@@ -825,8 +825,8 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
       'title.confirm',
       `${i18next.t('message.wave_release_confirm', { defaultValue: '웨이브를 확정(릴리스)하시겠습니까?' })}\n\n` +
       `${i18next.t('label.wave', { defaultValue: '웨이브' })}: ${w.wave_no}\n` +
-      `${i18next.t('label.target_orders', { defaultValue: '대상 주문' })}: ${w.plan_order_count || 0}${i18next.t('label.count_unit', { defaultValue: '건' })}\n` +
-      `${i18next.t('label.total_qty', { defaultValue: '총 수량' })}: ${w.plan_total_qty || 0} EA`,
+      `${i18next.t('label.target_orders', { defaultValue: '대상 주문' })}: ${w.plan_order || 0}${i18next.t('label.count_unit', { defaultValue: '건' })}\n` +
+      `${i18next.t('label.total_qty', { defaultValue: '총 수량' })}: ${w.plan_total || 0} EA`,
       'question',
       'confirm',
       'cancel'
@@ -937,11 +937,12 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     return labels[type] || type || '-'
   }
 
-  _exeTypeLabel(type) {
+  _pickMethodLabel(type) {
     const labels = {
-      INDIVIDUAL: i18next.t('label.exe_individual', { defaultValue: '개별 실행' }),
-      BATCH: i18next.t('label.exe_batch', { defaultValue: 'WMS 실행' }),
-      WCS: i18next.t('label.exe_wcs', { defaultValue: 'WCS 위임' })
+      WCS: i18next.t('label.pick_method_wcs', { defaultValue: 'WCS 위임' }),
+      PAPER: i18next.t('label.pick_method_paper', { defaultValue: '페이퍼 처리' }),
+      INSPECT: i18next.t('label.pick_method_inspect', { defaultValue: '검수와 함께 피킹' }),
+      PICK: i18next.t('label.pick_method_pick', { defaultValue: '피킹' })
     }
     return labels[type] || type || '-'
   }
@@ -970,8 +971,8 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
   }
 
   _calcProgress() {
-    const plan = this.wave?.plan_order_count || 0
-    const result = this.wave?.result_order_count || 0
+    const plan = this.wave?.plan_order || 0
+    const result = this.wave?.result_order || 0
     if (plan === 0) return 0
     return Math.min(100, Math.round((result / plan) * 100))
   }

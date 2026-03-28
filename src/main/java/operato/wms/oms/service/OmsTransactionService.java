@@ -8,8 +8,6 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.annotation.JacksonInject.Value;
-
 import operato.wms.base.entity.SKU;
 import operato.wms.oms.entity.ImportShipmentOrder;
 import operato.wms.oms.entity.ShipmentDelivery;
@@ -106,7 +104,6 @@ public class OmsTransactionService extends AbstractQueryService {
 			resultRow.put("shipByDate", row.getShipByDate());
 			resultRow.put("custCd", row.getCustCd());
 			resultRow.put("custNm", row.getCustNm());
-			resultRow.put("carrierCd", row.getCarrierCd());
 			resultRow.put("receiverNm", row.getReceiverNm());
 			resultRow.put("bizType", ValueUtil.isNotEmpty(row.getBizType()) ? row.getBizType() : bizType);
 
@@ -177,7 +174,6 @@ public class OmsTransactionService extends AbstractQueryService {
 			order.setShipType(firstRow.getShipType());
 			order.setDlvType(firstRow.getDlvType());
 			order.setPriorityCd(ValueUtil.isNotEmpty(firstRow.getPriorityCd()) ? firstRow.getPriorityCd() : "NORMAL");
-			order.setCarrierCd(firstRow.getCarrierCd());
 			order.setRemarks(firstRow.getRemarks());
 			order.setAttr01(firstRow.getAttr01());
 			order.setAttr02(firstRow.getAttr02());
@@ -191,10 +187,10 @@ public class OmsTransactionService extends AbstractQueryService {
 			for (ImportShipmentOrder row : rows) {
 				totalQty += (row.getOrderQty() != null ? row.getOrderQty() : 0);
 			}
-			order.setTotalItemCount(rows.size());
-			order.setTotalOrderQty(totalQty);
-			order.setTotalAllocQty(0.0);
-			order.setTotalShippedQty(0.0);
+			order.setTotalItem(rows.size());
+			order.setTotalOrder(totalQty);
+			order.setTotalAlloc(0.0);
+			order.setTotalShipped(0.0);
 
 			// shipmentNo는 beforeCreate()에서 자동 생성
 			this.queryManager.insert(order);
@@ -222,14 +218,11 @@ public class OmsTransactionService extends AbstractQueryService {
 			}
 
 			// 3. ShipmentDelivery 배송정보 생성 (배송정보가 있는 경우)
-			if (ValueUtil.isNotEmpty(firstRow.getReceiverNm()) || ValueUtil.isNotEmpty(firstRow.getCarrierCd())) {
+			if (ValueUtil.isNotEmpty(firstRow.getReceiverNm())) {
 				ShipmentDelivery delivery = new ShipmentDelivery();
 				delivery.setDomainId(domainId);
 				delivery.setShipmentOrderId(order.getId());
 				delivery.setShipmentNo(order.getShipmentNo());
-				delivery.setDlvType(firstRow.getDlvType());
-				delivery.setCarrierCd(firstRow.getCarrierCd());
-				delivery.setCarrierServiceType(firstRow.getCarrierServiceType());
 				delivery.setSenderNm(firstRow.getSenderNm());
 				delivery.setSenderPhone(firstRow.getSenderPhone());
 				delivery.setSenderZipCd(firstRow.getSenderZipCd());
@@ -267,7 +260,7 @@ public class OmsTransactionService extends AbstractQueryService {
 	 *
 	 * ALLOCATED 상태 주문을 그룹핑 기준에 따라 웨이브로 묶는다.
 	 *
-	 * @param params { groupBy: ["carrier_cd", ...], pickType, exeType,
+	 * @param params { groupBy: ["carrier_cd", ...], pickType, pickMethod,
 	 *               maxOrderCount, orderDate }
 	 * @return 처리 결과 { waveCount, totalOrders, waves: [...] }
 	 */
@@ -278,7 +271,8 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		List<String> groupBy = params.get("groupBy") != null ? (List<String>) params.get("groupBy") : new ArrayList<>();
 		String pickType = ValueUtil.isNotEmpty(params.get("pickType")) ? params.get("pickType").toString() : "TOTAL";
-		String exeType = ValueUtil.isNotEmpty(params.get("exeType")) ? params.get("exeType").toString() : "BATCH";
+		String pickMethod = ValueUtil.isNotEmpty(params.get("pickMethod")) ? params.get("pickMethod").toString()
+				: "PICK";
 		int maxOrderCount = params.get("maxOrderCount") != null
 				? Integer.parseInt(params.get("maxOrderCount").toString())
 				: 200;
@@ -330,11 +324,11 @@ public class OmsTransactionService extends AbstractQueryService {
 				// 계획 수량 집계
 				int planOrderCnt = chunk.size();
 				double planTotalQty = 0;
-				int planSkuCnt = 0;
+				int planItemCnt = 0;
 
 				List<String> orderIds = new ArrayList<>();
 				for (ShipmentOrder ord : chunk) {
-					planTotalQty += (ord.getTotalOrderQty() != null ? ord.getTotalOrderQty() : 0);
+					planTotalQty += (ord.getTotalOrder() != null ? ord.getTotalOrder() : 0);
 					orderIds.add(ord.getId());
 				}
 
@@ -342,7 +336,7 @@ public class OmsTransactionService extends AbstractQueryService {
 				String skuCountSql = "SELECT COUNT(DISTINCT sku_cd) FROM shipment_order_items WHERE domain_id = :domainId AND shipment_order_id IN (:orderIds)";
 				Map<String, Object> skuCountParams = ValueUtil.newMap("domainId,orderIds", domainId, orderIds);
 				Integer skuCnt = this.queryManager.selectBySql(skuCountSql, skuCountParams, Integer.class);
-				planSkuCnt = skuCnt != null ? skuCnt : 0;
+				planItemCnt = skuCnt != null ? skuCnt : 0;
 
 				// 대표 택배사 (첫 번째 주문 기준)
 				String carrierCd = chunk.get(0).getCarrierCd();
@@ -354,14 +348,14 @@ public class OmsTransactionService extends AbstractQueryService {
 				wave.setWaveDate(today);
 				wave.setWaveSeq(nextSeq);
 				wave.setPickType(pickType);
-				wave.setExeType(exeType);
+				wave.setPickMethod(pickMethod);
 				wave.setCarrierCd(carrierCd);
-				wave.setPlanOrderCount(planOrderCnt);
-				wave.setPlanSkuCount(planSkuCnt);
-				wave.setPlanTotalQty(planTotalQty);
-				wave.setResultOrderCount(0);
-				wave.setResultSkuCount(0);
-				wave.setResultTotalQty(0.0);
+				wave.setPlanOrder(planOrderCnt);
+				wave.setPlanItem(planItemCnt);
+				wave.setPlanTotal(planTotalQty);
+				wave.setResultOrder(0);
+				wave.setResultItem(0);
+				wave.setResultTotal(0.0);
 				wave.setStatus(ShipmentWave.STATUS_CREATED);
 				this.queryManager.insert(wave);
 
@@ -378,7 +372,7 @@ public class OmsTransactionService extends AbstractQueryService {
 				waveInfo.put("waveNo", waveNo);
 				waveInfo.put("waveSeq", nextSeq);
 				waveInfo.put("orderCount", planOrderCnt);
-				waveInfo.put("skuCount", planSkuCnt);
+				waveInfo.put("skuCount", planItemCnt);
 				waveInfo.put("totalQty", planTotalQty);
 				waveInfo.put("carrierCd", carrierCd);
 				waveResults.add(waveInfo);
@@ -449,9 +443,11 @@ public class OmsTransactionService extends AbstractQueryService {
 		return result;
 	}
 
-	/* ============================================================
+	/*
+	 * ============================================================
 	 * 출하 주문 상태 변경
-	 * ============================================================ */
+	 * ============================================================
+	 */
 
 	/**
 	 * 출하 주문 확정 (REGISTERED → CONFIRMED)
@@ -527,7 +523,8 @@ public class OmsTransactionService extends AbstractQueryService {
 			// 주문 상세 조회
 			String itemSql = "SELECT * FROM shipment_order_items WHERE domain_id = :domainId AND shipment_order_id = :orderId ORDER BY line_no";
 			Map<String, Object> itemParams = ValueUtil.newMap("domainId,orderId", domainId, orderId);
-			List<ShipmentOrderItem> items = this.queryManager.selectListBySql(itemSql, itemParams, ShipmentOrderItem.class, 0, 0);
+			List<ShipmentOrderItem> items = this.queryManager.selectListBySql(itemSql, itemParams,
+					ShipmentOrderItem.class, 0, 0);
 
 			if (items.isEmpty()) {
 				errors.add("주문 [" + order.getShipmentNo() + "]에 상세 항목이 없습니다");
@@ -556,18 +553,21 @@ public class OmsTransactionService extends AbstractQueryService {
 						+ " ORDER BY expired_date ASC NULLS LAST, created_at ASC";
 				Map<String, Object> invParams = ValueUtil.newMap("domainId,skuCd,status",
 						domainId, item.getSkuCd(), Inventory.STATUS_STORED);
-				List<Inventory> inventories = this.queryManager.selectListBySql(invSql, invParams, Inventory.class, 0, 0);
+				List<Inventory> inventories = this.queryManager.selectListBySql(invSql, invParams, Inventory.class, 0,
+						0);
 
 				double itemAllocQty = existingAllocQty;
 
 				for (Inventory inv : inventories) {
-					if (needQty <= 0) break;
+					if (needQty <= 0)
+						break;
 
 					double invQty = inv.getInvQty() != null ? inv.getInvQty() : 0;
 					double reservedQty = inv.getReservedQty() != null ? inv.getReservedQty() : 0;
 					double availQty = invQty - reservedQty;
 
-					if (availQty <= 0) continue;
+					if (availQty <= 0)
+						continue;
 
 					double allocQty = Math.min(needQty, availQty);
 
@@ -590,7 +590,8 @@ public class OmsTransactionService extends AbstractQueryService {
 
 					// Inventory reserved_qty 증가
 					String updInvSql = "UPDATE inventories SET reserved_qty = COALESCE(reserved_qty, 0) + :allocQty, updated_at = now() WHERE domain_id = :domainId AND id = :invId";
-					Map<String, Object> updInvParams = ValueUtil.newMap("allocQty,domainId,invId", allocQty, domainId, inv.getId());
+					Map<String, Object> updInvParams = ValueUtil.newMap("allocQty,domainId,invId", allocQty, domainId,
+							inv.getId());
 					this.queryManager.executeBySql(updInvSql, updInvParams);
 
 					itemAllocQty += allocQty;
@@ -600,17 +601,19 @@ public class OmsTransactionService extends AbstractQueryService {
 				// ShipmentOrderItem 업데이트
 				double shortQty = orderQty - itemAllocQty;
 				String updItemSql = "UPDATE shipment_order_items SET alloc_qty = :allocQty, short_qty = :shortQty, updated_at = now() WHERE domain_id = :domainId AND id = :itemId";
-				Map<String, Object> updItemParams = ValueUtil.newMap("allocQty,shortQty,domainId,itemId", itemAllocQty, shortQty, domainId, item.getId());
+				Map<String, Object> updItemParams = ValueUtil.newMap("allocQty,shortQty,domainId,itemId", itemAllocQty,
+						shortQty, domainId, item.getId());
 				this.queryManager.executeBySql(updItemSql, updItemParams);
 
 				totalAllocQty += itemAllocQty;
-				if (shortQty > 0) hasShort = true;
+				if (shortQty > 0)
+					hasShort = true;
 			}
 
 			// 주문 헤더 상태 업데이트
 			String newStatus = hasShort ? ShipmentOrder.STATUS_BACK_ORDER : ShipmentOrder.STATUS_ALLOCATED;
-			String updOrderSql = "UPDATE shipment_orders SET status = :status, total_alloc_qty = :totalAllocQty, allocated_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-			Map<String, Object> updOrderParams = ValueUtil.newMap("status,totalAllocQty,now,domainId,id",
+			String updOrderSql = "UPDATE shipment_orders SET status = :status, total_alloc = :totalAlloc, allocated_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+			Map<String, Object> updOrderParams = ValueUtil.newMap("status,totalAlloc,now,domainId,id",
 					newStatus, totalAllocQty, now, domainId, orderId);
 			this.queryManager.executeBySql(updOrderSql, updOrderParams);
 
@@ -653,7 +656,8 @@ public class OmsTransactionService extends AbstractQueryService {
 		String allocSql = "SELECT * FROM stock_allocations WHERE domain_id = :domainId AND shipment_order_id = :orderId AND status IN (:s1, :s2)";
 		Map<String, Object> allocParams = ValueUtil.newMap("domainId,orderId,s1,s2",
 				domainId, id, StockAllocation.STATUS_SOFT, StockAllocation.STATUS_HARD);
-		List<StockAllocation> allocations = this.queryManager.selectListBySql(allocSql, allocParams, StockAllocation.class, 0, 0);
+		List<StockAllocation> allocations = this.queryManager.selectListBySql(allocSql, allocParams,
+				StockAllocation.class, 0, 0);
 
 		// 각 할당 해제
 		for (StockAllocation alloc : allocations) {
@@ -676,7 +680,7 @@ public class OmsTransactionService extends AbstractQueryService {
 		this.queryManager.executeBySql(updItemsSql, updItemsParams);
 
 		// 주문 헤더 상태 복원
-		String updOrderSql = "UPDATE shipment_orders SET status = :status, total_alloc_qty = 0, allocated_at = null, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+		String updOrderSql = "UPDATE shipment_orders SET status = :status, total_alloc = 0, allocated_at = null, updated_at = now() WHERE domain_id = :domainId AND id = :id";
 		Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id",
 				ShipmentOrder.STATUS_CONFIRMED, domainId, id);
 		this.queryManager.executeBySql(updOrderSql, updOrderParams);
@@ -723,7 +727,8 @@ public class OmsTransactionService extends AbstractQueryService {
 				String allocSql = "SELECT * FROM stock_allocations WHERE domain_id = :domainId AND shipment_order_id = :orderId AND status IN (:s1, :s2)";
 				Map<String, Object> allocParams = ValueUtil.newMap("domainId,orderId,s1,s2",
 						domainId, id, StockAllocation.STATUS_SOFT, StockAllocation.STATUS_HARD);
-				List<StockAllocation> allocations = this.queryManager.selectListBySql(allocSql, allocParams, StockAllocation.class, 0, 0);
+				List<StockAllocation> allocations = this.queryManager.selectListBySql(allocSql, allocParams,
+						StockAllocation.class, 0, 0);
 
 				for (StockAllocation alloc : allocations) {
 					// Inventory reserved_qty 복원
@@ -784,9 +789,11 @@ public class OmsTransactionService extends AbstractQueryService {
 		return result;
 	}
 
-	/* ============================================================
+	/*
+	 * ============================================================
 	 * 웨이브 상태 변경
-	 * ============================================================ */
+	 * ============================================================
+	 */
 
 	/**
 	 * 웨이브 확정/릴리스 (CREATED → RELEASED)
@@ -863,7 +870,7 @@ public class OmsTransactionService extends AbstractQueryService {
 		String countSql = "SELECT COUNT(*) FROM shipment_orders WHERE domain_id = :domainId AND status = :status AND allocated_at IS NOT NULL AND wave_no IS NULL";
 		Map<String, Object> countParams = ValueUtil.newMap("domainId,status", domainId, ShipmentOrder.STATUS_ALLOCATED);
 		// 웨이브 취소 시점에서 복원된 건수는 웨이브의 계획 주문수로 대체
-		int restoredCount = wave.getPlanOrderCount() != null ? wave.getPlanOrderCount() : 0;
+		int restoredCount = wave.getPlanOrder() != null ? wave.getPlanOrder() : 0;
 
 		// 웨이브 상태 변경
 		String updWaveSql = "UPDATE shipment_waves SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
@@ -877,9 +884,11 @@ public class OmsTransactionService extends AbstractQueryService {
 		return result;
 	}
 
-	/* ============================================================
+	/*
+	 * ============================================================
 	 * 내부 유틸리티
-	 * ============================================================ */
+	 * ============================================================
+	 */
 
 	/**
 	 * 주문 단건 조회

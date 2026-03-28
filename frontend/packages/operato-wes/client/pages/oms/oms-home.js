@@ -496,7 +496,7 @@ class OmsHome extends localize(i18next)(PageView) {
                                 <td><span class="link" @click="${() => this._navigateToDetail(order)}">${order.shipmentNo}</span></td>
                                 <td>${order.custNm || ''}</td>
                                 <td class="center"><span class="biz-badge">${order.bizType || ''}</span></td>
-                                <td class="right">${order.totalOrderQty || 0}</td>
+                                <td class="right">${order.totalOrder || 0}</td>
                                 <td class="center"><span class="status-badge ${order.status}">${this._statusLabel(order.status)}</span></td>
                                 <td>${order.orderDate || ''}</td>
                               </tr>

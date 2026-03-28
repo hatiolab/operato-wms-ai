@@ -14,9 +14,7 @@ import xyz.elidom.dbist.annotation.Table;
 @Table(name = "shipment_deliveries", idStrategy = GenerationRule.UUID, uniqueFields="domainId,shipmentOrderId", indexes = {
 	@Index(name = "ix_shipment_deliveries_0", columnList = "domain_id,shipment_order_id", unique = true),
 	@Index(name = "ix_shipment_deliveries_1", columnList = "domain_id,shipment_no", unique = true),
-	@Index(name = "ix_shipment_deliveries_2", columnList = "domain_id,carrier_cd"),
-	@Index(name = "ix_shipment_deliveries_3", columnList = "domain_id,invoice_no"),
-	@Index(name = "ix_shipment_deliveries_4", columnList = "domain_id,receiver_phone")
+	@Index(name = "ix_shipment_deliveries_2", columnList = "domain_id,receiver_phone")
 })
 public class ShipmentDelivery extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	/**
@@ -42,42 +40,6 @@ public class ShipmentDelivery extends xyz.elidom.orm.entity.basic.ElidomStampHoo
 	 */
 	@Column (name = "shipment_no", nullable = false, length = 30)
 	private String shipmentNo;
-
-	/**
-	 * 배송 유형 (STANDARD/EXPRESS/SAME_DAY/DAWN)
-	 */
-	@Column (name = "dlv_type", length = 20)
-	private String dlvType;
-
-	/**
-	 * 택배사 코드
-	 */
-	@Column (name = "carrier_cd", length = 30)
-	private String carrierCd;
-
-	/**
-	 * 택배 서비스 유형 (STANDARD/EXPRESS/COLD_CHAIN/BULKY)
-	 */
-	@Column (name = "carrier_service_type", length = 20)
-	private String carrierServiceType;
-
-	/**
-	 * 차량 번호
-	 */
-	@Column (name = "vehicle_no", length = 30)
-	private String vehicleNo;
-
-	/**
-	 * 송장 번호
-	 */
-	@Column (name = "invoice_no", length = 30)
-	private String invoiceNo;
-
-	/**
-	 * 배송비
-	 */
-	@Column (name = "shipping_fee")
-	private Double shippingFee;
 
 	/**
 	 * 발송인 코드
@@ -251,54 +213,6 @@ public class ShipmentDelivery extends xyz.elidom.orm.entity.basic.ElidomStampHoo
 
 	public void setShipmentNo(String shipmentNo) {
 		this.shipmentNo = shipmentNo;
-	}
-
-	public String getDlvType() {
-		return dlvType;
-	}
-
-	public void setDlvType(String dlvType) {
-		this.dlvType = dlvType;
-	}
-
-	public String getCarrierCd() {
-		return carrierCd;
-	}
-
-	public void setCarrierCd(String carrierCd) {
-		this.carrierCd = carrierCd;
-	}
-
-	public String getCarrierServiceType() {
-		return carrierServiceType;
-	}
-
-	public void setCarrierServiceType(String carrierServiceType) {
-		this.carrierServiceType = carrierServiceType;
-	}
-
-	public String getVehicleNo() {
-		return vehicleNo;
-	}
-
-	public void setVehicleNo(String vehicleNo) {
-		this.vehicleNo = vehicleNo;
-	}
-
-	public String getInvoiceNo() {
-		return invoiceNo;
-	}
-
-	public void setInvoiceNo(String invoiceNo) {
-		this.invoiceNo = invoiceNo;
-	}
-
-	public Double getShippingFee() {
-		return shippingFee;
-	}
-
-	public void setShippingFee(Double shippingFee) {
-		this.shippingFee = shippingFee;
 	}
 
 	public String getSenderCd() {

@@ -91,7 +91,7 @@ public class OmsTransactionController extends AbstractRestService {
 	 *
 	 * POST /rest/oms_trx/waves/create
 	 *
-	 * @param params { groupBy, pickType, exeType, maxOrderCount, orderDate }
+	 * @param params { groupBy, pickType, pickMethod, maxOrderCount, orderDate }
 	 * @return 처리 결과 { waveCount, totalOrders, waves }
 	 */
 	@RequestMapping(value = "waves/create", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)

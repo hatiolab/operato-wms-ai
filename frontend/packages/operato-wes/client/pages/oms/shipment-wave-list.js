@@ -509,13 +509,13 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
                         <th class="center">${i18next.t('label.wave_date', { defaultValue: '일자' })}</th>
                         <th class="center">${i18next.t('label.wave_seq', { defaultValue: '순번' })}</th>
                         <th class="center">${i18next.t('label.pick_type', { defaultValue: '피킹유형' })}</th>
-                        <th class="center">${i18next.t('label.exe_type', { defaultValue: '실행유형' })}</th>
+                        <th class="center">${i18next.t('label.pick_method', { defaultValue: '피킹방식' })}</th>
                         <th>${i18next.t('label.carrier_cd', { defaultValue: '택배사' })}</th>
-                        <th class="right">${i18next.t('label.plan_order_count', { defaultValue: '계획주문수' })}</th>
-                        <th class="right">${i18next.t('label.plan_sku_count', { defaultValue: '계획SKU수' })}</th>
-                        <th class="right">${i18next.t('label.plan_total_qty', { defaultValue: '계획수량' })}</th>
-                        <th class="right">${i18next.t('label.result_order_count', { defaultValue: '실적주문수' })}</th>
-                        <th class="right">${i18next.t('label.result_total_qty', { defaultValue: '실적수량' })}</th>
+                        <th class="right">${i18next.t('label.plan_order', { defaultValue: '계획주문수' })}</th>
+                        <th class="right">${i18next.t('label.plan_item', { defaultValue: '계획품목수' })}</th>
+                        <th class="right">${i18next.t('label.plan_total', { defaultValue: '계획수량' })}</th>
+                        <th class="right">${i18next.t('label.result_order', { defaultValue: '실적주문수' })}</th>
+                        <th class="right">${i18next.t('label.result_total', { defaultValue: '실적수량' })}</th>
                         <th>${i18next.t('label.progress', { defaultValue: '진행률' })}</th>
                         <th class="center">${i18next.t('label.status', { defaultValue: '상태' })}</th>
                       </tr>
@@ -534,14 +534,14 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
                               <span class="badge ${(wave.pickType || '').toLowerCase()}">${wave.pickType || '-'}</span>
                             </td>
                             <td class="center">
-                              <span class="badge">${wave.exeType || '-'}</span>
+                              <span class="badge">${wave.pickMethod || '-'}</span>
                             </td>
                             <td>${wave.carrierCd || '-'}</td>
-                            <td class="right">${this._formatNumber(wave.planOrderCount)}</td>
-                            <td class="right">${this._formatNumber(wave.planSkuCount)}</td>
-                            <td class="right">${this._formatNumber(wave.planTotalQty)}</td>
-                            <td class="right">${this._formatNumber(wave.resultOrderCount)}</td>
-                            <td class="right">${this._formatNumber(wave.resultTotalQty)}</td>
+                            <td class="right">${this._formatNumber(wave.planOrder)}</td>
+                            <td class="right">${this._formatNumber(wave.planItem)}</td>
+                            <td class="right">${this._formatNumber(wave.planTotal)}</td>
+                            <td class="right">${this._formatNumber(wave.resultOrder)}</td>
+                            <td class="right">${this._formatNumber(wave.resultTotal)}</td>
                             <td>
                               <div class="progress-bar-container">
                                 <div class="progress-bar">
@@ -722,8 +722,8 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
   }
 
   _calcProgress(wave) {
-    const plan = wave.planOrderCount || 0
-    const result = wave.resultOrderCount || 0
+    const plan = wave.planOrder || 0
+    const result = wave.resultOrder || 0
     if (plan === 0) return 0
     return Math.min(100, Math.round((result / plan) * 100))
   }

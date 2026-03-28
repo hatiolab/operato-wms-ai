@@ -35,8 +35,8 @@ OMS(Order Management System) 모듈은 출고 주문의 **수신·확인·할당
 
 ```
 oms (주문 수신 → 확인 → 할당 → 웨이브 → 보충 지시)
-  ↓ 웨이브 확정 (exe_type별 분기)
-  ├─ fulfillment (피킹 → 패킹 → 검수 → 라벨 → 분류 → 적재 → 출하)  ← INDIVIDUAL/BATCH
+  ↓ 웨이브 확정 (pick_method별 분기)
+  ├─ fulfillment (피킹 → 패킹 → 검수 → 라벨 → 분류 → 적재 → 출하)  ← PICK/PAPER/INSPECT
   └─ WCS API (DPS/DAS/소터 → 피킹/분류 → 출하)                      ← WCS
 ```
 
@@ -104,10 +104,10 @@ oms (주문 수신 → 확인 → 할당 → 웨이브 → 보충 지시)
 │  ShipmentOrder, ShipmentWave, ShipmentDelivery,       │            │
 │  ReplenishOrder, StockAllocation                      │            │
 └───────────────────────────────────────────────────────┼────────────┘
-                          웨이브 확정 → exe_type별 분기   │
+                          웨이브 확정 → pick_method별 분기  │
                      ┌──────────────────┬────────────────┘
                      │                  │
-          exe_type=INDIVIDUAL/BATCH     │  exe_type=WCS
+          pick_method=PICK/PAPER/INSPECT│  pick_method=WCS
                      │                  │
 ┌────────────────────▼───────────┐  ┌───▼──────────────────────────────┐
 │       Fulfillment 모듈          │  │         WCS (외부 시스템)         │
@@ -174,13 +174,13 @@ operato.wms.oms/
     ├─ 토탈 피킹 / 개별 피킹 결정
     └─ 보충 지시 생성 (선택)
     ↓
-[웨이브 확정 → exe_type별 분기]                  ← releaseWave()
+[웨이브 확정 → pick_method별 분기]                ← releaseWave()
     ├─ ShipmentOrder 상태: WAVED → RELEASED
     │
-    ├─ [A] exe_type = INDIVIDUAL/BATCH (Fulfillment 모듈)
+    ├─ [A] pick_method = PICK/PAPER/INSPECT (Fulfillment 모듈)
     │      Fulfillment 모듈에 피킹 지시 생성 요청
     │
-    └─ [B] exe_type = WCS (WCS API 호출)
+    └─ [B] pick_method = WCS (WCS API 호출)
            WCS에 피킹/분류 지시 전송 (REST API)
     ↓
     ═══════════════════════════════════════
@@ -342,14 +342,14 @@ SOFT ─→ HARD ─→ RELEASED
 | `wh_cd` | VARCHAR | N | 30 | 창고 코드 |
 | `biz_type` | VARCHAR | Y | 10 | 업무 유형 (B2C_OUT/B2B_OUT/B2C_RTN/B2B_RTN) |
 | `ship_type` | VARCHAR | Y | 20 | 출하 유형 (NORMAL/RETURN/TRANSFER/SCRAP/EXPORT/ETC) |
-| `exe_type` | VARCHAR | Y | 20 | 실행 유형 (INDIVIDUAL/BATCH/WCS) |
+| `pick_method` | VARCHAR | Y | 20 | 피킹 방식 (WCS/PAPER/INSPECT/PICK) |
 | `dlv_type` | VARCHAR | Y | 20 | 배송 유형 (PARCEL/CHARTER/QUICK/PICKUP/DIRECT) |
 | `carrier_cd` | VARCHAR | Y | 30 | 택배사 코드 |
 | `to_wh_cd` | VARCHAR | Y | 30 | 목적 창고 코드 (이동 출고 시) |
-| `total_item_count` | INTEGER | Y | - | 총 품목 수 |
-| `total_order_qty` | DOUBLE | Y | - | 총 주문 수량 |
-| `total_alloc_qty` | DOUBLE | Y | - | 총 할당 수량 |
-| `total_shipped_qty` | DOUBLE | Y | - | 총 출하 수량 |
+| `total_item` | INTEGER | Y | - | 총 품목 수 |
+| `total_order` | DOUBLE | Y | - | 총 주문 수량 |
+| `total_alloc` | DOUBLE | Y | - | 총 할당 수량 |
+| `total_shipped` | DOUBLE | Y | - | 총 출하 수량 |
 | `label_template_cd` | VARCHAR | Y | 36 | 라벨 템플릿 코드 |
 | `status` | VARCHAR | N | 20 | 상태 |
 | `if_status` | VARCHAR | Y | 20 | 외부 시스템 연동 상태 (NONE/PENDING/SENT/CONFIRMED/FAILED) |
@@ -370,7 +370,7 @@ SOFT ─→ HARD ─→ RELEASED
 | `ix_shipment_orders_2` | `domain_id, order_date, status` | N |
 | `ix_shipment_orders_3` | `domain_id, wave_no` | N |
 | `ix_shipment_orders_4` | `domain_id, com_cd, wh_cd` | N |
-| `ix_shipment_orders_5` | `domain_id, biz_type, ship_type, exe_type` | N |
+| `ix_shipment_orders_5` | `domain_id, biz_type, ship_type, pick_method` | N |
 | `ix_shipment_orders_6` | `domain_id, cust_cd, order_date` | N |
 | `ix_shipment_orders_7` | `domain_id, priority_cd, ship_by_date` | N |
 
@@ -391,8 +391,6 @@ SOFT ─→ HARD ─→ RELEASED
 | `sku_cd` | VARCHAR | N | 30 | 상품 코드 |
 | `sku_nm` | VARCHAR | Y | 100 | 상품명 |
 | `order_qty` | DOUBLE | N | - | 주문 수량 |
-| `order_box_qty` | DOUBLE | Y | - | 주문 박스 수 |
-| `order_ea_qty` | DOUBLE | Y | - | 주문 낱개 수 |
 | `alloc_qty` | DOUBLE | Y | - | 할당 수량 |
 | `short_qty` | DOUBLE | Y | - | 부족 수량 |
 | `cancel_qty` | DOUBLE | Y | - | 취소 수량 |
@@ -430,17 +428,17 @@ SOFT ─→ HARD ─→ RELEASED
 | `com_cd` | VARCHAR | Y | 30 | 화주사 코드 |
 | `wh_cd` | VARCHAR | Y | 30 | 창고 코드 |
 | `pick_type` | VARCHAR | Y | 20 | 피킹 유형 (INDIVIDUAL/TOTAL/ZONE) |
+| `pick_method` | VARCHAR | Y | 20 | 피킹 방식 (WCS/PAPER/INSPECT/PICK) |
 | `ship_type` | VARCHAR | Y | 20 | 출하 유형 |
-| `exe_type` | VARCHAR | Y | 20 | 실행 유형 |
 | `carrier_cd` | VARCHAR | Y | 30 | 택배사 코드 (택배사별 웨이브 시) |
 | `insp_flag` | BOOLEAN | Y | - | 검수 여부 |
 | `label_template_cd` | VARCHAR | Y | 36 | 라벨 템플릿 코드 |
-| `plan_order_count` | INTEGER | Y | - | 계획 주문 수 |
-| `plan_sku_count` | INTEGER | Y | - | 계획 SKU 종 수 |
-| `plan_total_qty` | DOUBLE | Y | - | 계획 총 수량 |
-| `result_order_count` | INTEGER | Y | - | 실적 주문 수 |
-| `result_sku_count` | INTEGER | Y | - | 실적 SKU 종 수 |
-| `result_total_qty` | DOUBLE | Y | - | 실적 총 수량 |
+| `plan_order` | INTEGER | Y | - | 계획 주문 수 |
+| `plan_item` | INTEGER | Y | - | 계획 SKU 종 수 |
+| `plan_total` | DOUBLE | Y | - | 계획 총 수량 |
+| `result_order` | INTEGER | Y | - | 실적 주문 수 |
+| `result_item` | INTEGER | Y | - | 실적 SKU 종 수 |
+| `result_total` | DOUBLE | Y | - | 실적 총 수량 |
 | `input_pickers` | INTEGER | Y | - | 투입 작업자 수 |
 | `status` | VARCHAR | N | 20 | 상태 (CREATED/RELEASED/COMPLETED/CANCELLED) |
 | `released_at` | VARCHAR | Y | 20 | 확정 일시 |
@@ -470,12 +468,6 @@ SOFT ─→ HARD ─→ RELEASED
 | `id` | VARCHAR | N | 40 | PK (UUID) |
 | `shipment_order_id` | VARCHAR | N | 40 | FK → shipment_orders (UNIQUE) |
 | `shipment_no` | VARCHAR | N | 30 | 출하 주문 번호 |
-| `dlv_type` | VARCHAR | Y | 20 | 배송 유형 (PARCEL/CHARTER/QUICK/PICKUP/DIRECT) |
-| `carrier_cd` | VARCHAR | Y | 30 | 택배사 코드 |
-| `carrier_service_type` | VARCHAR | Y | 20 | 서비스 유형 (NEXT_DAY/SAME_DAY/DAWN) |
-| `vehicle_no` | VARCHAR | Y | 30 | 차량 번호 |
-| `invoice_no` | VARCHAR | Y | 30 | 송장 번호 |
-| `shipping_fee` | DOUBLE | Y | - | 배송비 |
 | **발송인** | | | | |
 | `sender_cd` | VARCHAR | Y | 30 | 발송인 코드 |
 | `sender_nm` | VARCHAR | Y | 100 | 발송인 명 |
@@ -508,9 +500,7 @@ SOFT ─→ HARD ─→ RELEASED
 |----------|------|--------|
 | `ix_shipment_deliveries_0` | `domain_id, shipment_order_id` | Y |
 | `ix_shipment_deliveries_1` | `domain_id, shipment_no` | Y |
-| `ix_shipment_deliveries_2` | `domain_id, carrier_cd` | N |
-| `ix_shipment_deliveries_3` | `domain_id, invoice_no` | N |
-| `ix_shipment_deliveries_4` | `domain_id, receiver_phone` | N |
+| `ix_shipment_deliveries_2` | `domain_id, receiver_phone` | N |
 
 ---
 
@@ -526,9 +516,9 @@ SOFT ─→ HARD ─→ RELEASED
 | `order_date` | VARCHAR | N | 10 | 지시 일자 |
 | `com_cd` | VARCHAR | N | 30 | 화주사 코드 |
 | `wh_cd` | VARCHAR | N | 30 | 창고 코드 |
-| `plan_sku_count` | INTEGER | Y | - | 계획 SKU 수 |
-| `plan_total_qty` | DOUBLE | Y | - | 계획 총 수량 |
-| `result_total_qty` | DOUBLE | Y | - | 실적 총 수량 |
+| `plan_item` | INTEGER | Y | - | 계획 SKU 수 |
+| `plan_total` | DOUBLE | Y | - | 계획 총 수량 |
+| `result_total` | DOUBLE | Y | - | 실적 총 수량 |
 | `status` | VARCHAR | N | 20 | 상태 (CREATED/IN_PROGRESS/COMPLETED/CANCELLED) |
 | `started_at` | VARCHAR | Y | 20 | 시작 일시 |
 | `completed_at` | VARCHAR | Y | 20 | 완료 일시 |
@@ -559,11 +549,7 @@ SOFT ─→ HARD ─→ RELEASED
 | `from_loc_cd` | VARCHAR | N | 30 | 출발 로케이션 (보관존) |
 | `to_loc_cd` | VARCHAR | N | 30 | 목적 로케이션 (피킹존) |
 | `order_qty` | DOUBLE | N | - | 지시 수량 |
-| `order_box` | INTEGER | Y | - | 지시 박스 수 |
-| `order_ea` | DOUBLE | Y | - | 지시 낱개 수 |
 | `result_qty` | DOUBLE | Y | - | 실적 수량 |
-| `result_box` | INTEGER | Y | - | 실적 박스 수 |
-| `result_ea` | DOUBLE | Y | - | 실적 낱개 수 |
 | `status` | VARCHAR | Y | 20 | 상태 |
 | `remarks` | VARCHAR | Y | 1000 | 비고 |
 
@@ -761,14 +747,13 @@ SELECT
     so.shipment_no, so.ref_order_no,
     so.order_date, so.ship_by_date, so.cutoff_time, so.priority_cd,
     so.wave_no, so.wh_cd, so.com_cd, so.cust_cd, so.cust_nm,
-    so.biz_type, so.ship_type, so.exe_type, so.dlv_type,
+    so.biz_type, so.ship_type, so.pick_method, so.dlv_type,
     so.status,
-    so.total_item_count, so.total_order_qty, so.total_alloc_qty, so.total_shipped_qty,
+    so.total_item, so.total_order, so.total_alloc, so.total_shipped,
     so.confirmed_at, so.allocated_at, so.released_at, so.shipped_at,
     si.line_no, si.sku_cd, si.sku_nm,
     si.order_qty, si.alloc_qty, si.shipped_qty, si.short_qty, si.cancel_qty,
     si.barcode, si.expired_date, si.lot_no,
-    sd.carrier_cd, sd.carrier_service_type, sd.invoice_no as tracking_no,
     sd.receiver_nm, sd.receiver_phone, sd.receiver_zip_cd,
     sd.receiver_addr, sd.receiver_addr2, sd.delivery_memo,
     so.remarks,
@@ -798,14 +783,13 @@ FROM
 ┌─────────▼───────────┐      ┌──────────────────────┐
 │   shipment_orders   │──1:1─│ shipment_deliveries  │
 │                     │      │                      │
-│ shipment_no (UNIQUE)│      │ carrier_cd           │
-│ ref_order_no        │      │ carrier_service_type │
-│ cust_cd / cust_nm   │      │ invoice_no           │
-│ order_date          │      │ sender_*             │
-│ ship_by_date        │      │ orderer_*            │
-│ priority_cd         │      │ receiver_*           │
-│ status              │      │ delivery_memo        │
-│                     │      └──────────────────────┘
+│ shipment_no (UNIQUE)│      │ sender_*             │
+│ ref_order_no        │      │ orderer_*            │
+│ cust_cd / cust_nm   │      │ receiver_*           │
+│ order_date          │      │ delivery_memo        │
+│ ship_by_date        │      │                      │
+│ priority_cd         │      │                      │
+│ status              │      └──────────────────────┘
 │                     │
 │                     │──1:1─┌──────────────────────┐
 │                     │      │ shipment_export_     │
@@ -885,15 +869,7 @@ FROM
 | `SHIP_TYPE_EXPORT` | `EXPORT` | 수출 출고 |
 | `SHIP_TYPE_ETC` | `ETC` | 기타 출고 |
 
-### 7.3 실행 유형 (exeType)
-
-| 코드 | 값 | 설명 |
-|------|-----|------|
-| `EXE_TYPE_INDIVIDUAL` | `INDIVIDUAL` | 개별 출고 (주문별 피킹, Fulfillment 모듈) |
-| `EXE_TYPE_BATCH` | `BATCH` | 일괄 출고 (토탈 피킹, Fulfillment 모듈) |
-| `EXE_TYPE_WCS` | `WCS` | WCS 연계 출고 (DPS/DAS/소터 등 설비 제어, WCS API 호출) |
-
-### 7.4 피킹 유형 (pickType)
+### 7.3 피킹 유형 (pickType)
 
 | 코드 | 값 | 설명 |
 |------|-----|------|
@@ -901,7 +877,7 @@ FROM
 | `PICK_TYPE_TOTAL` | `TOTAL` | 토탈 피킹 (합산 후 분배) |
 | `PICK_TYPE_ZONE` | `ZONE` | 존 피킹 (릴레이 피킹) |
 
-### 7.5 우선순위 (priorityCd)
+### 7.4 우선순위 (priorityCd)
 
 | 코드 | 값 | 설명 |
 |------|-----|------|
@@ -909,7 +885,7 @@ FROM
 | `PRIORITY_NORMAL` | `NORMAL` | 일반 |
 | `PRIORITY_LOW` | `LOW` | 후순위 |
 
-### 7.6 할당 전략 (allocStrategy)
+### 7.5 할당 전략 (allocStrategy)
 
 | 코드 | 값 | 설명 |
 |------|-----|------|
@@ -917,7 +893,7 @@ FROM
 | `ALLOC_STRATEGY_FIFO` | `FIFO` | 입고 시간 선입선출 |
 | `ALLOC_STRATEGY_MANUAL` | `MANUAL` | 작업자 수동 선택 |
 
-### 7.7 배송 유형 (dlvType)
+### 7.6 배송 유형 (dlvType)
 
 | 코드 | 값 | 설명 |
 |------|-----|------|
@@ -927,7 +903,7 @@ FROM
 | `DLV_TYPE_PICKUP` | `PICKUP` | 직접 인수 (고객/거래처 방문 수령) |
 | `DLV_TYPE_DIRECT` | `DIRECT` | 직접 배송 (자사 차량) |
 
-### 7.8 배송 서비스 유형 (carrierServiceType)
+### 7.7 배송 서비스 유형 (carrierServiceType)
 
 | 코드 | 값 | 설명 |
 |------|-----|------|
@@ -936,7 +912,7 @@ FROM
 | `SERVICE_DAWN` | `DAWN` | 새벽 배송 |
 | `SERVICE_STANDARD` | `STANDARD` | 일반 배송 (2~3일) |
 
-### 7.9 인코텀즈 (incoterms)
+### 7.8 인코텀즈 (incoterms)
 
 | 코드 | 값 | 설명 |
 |------|-----|------|
@@ -948,7 +924,7 @@ FROM
 | `INCOTERMS_FCA` | `FCA` | 운송인 인도 (Free Carrier) |
 | `INCOTERMS_CFR` | `CFR` | 운임 포함 (Cost and Freight) |
 
-### 7.10 통관 상태 (customsStatus)
+### 7.9 통관 상태 (customsStatus)
 
 | 코드 | 값 | 설명 |
 |------|-----|------|
@@ -957,7 +933,7 @@ FROM
 | `CUSTOMS_APPROVED` | `APPROVED` | 통관 승인 |
 | `CUSTOMS_REJECTED` | `REJECTED` | 통관 반려 |
 
-### 7.11 운송 수단 (transportMode)
+### 7.10 운송 수단 (transportMode)
 
 | 코드 | 값 | 설명 |
 |------|-----|------|
@@ -966,7 +942,7 @@ FROM
 | `TRANSPORT_TRUCK` | `TRUCK` | 육상 운송 |
 | `TRANSPORT_RAIL` | `RAIL` | 철도 운송 |
 
-### 7.12 컨테이너 유형 (containerType)
+### 7.11 컨테이너 유형 (containerType)
 
 | 코드 | 값 | 설명 |
 |------|-----|------|
@@ -1170,11 +1146,11 @@ Base URL: `/rest/oms_trx`
 
 ### 11.1 인계 분기 로직
 
-웨이브 확정(`releaseWave()`) 시 `exe_type`에 따라 인계 대상이 분기됩니다:
+웨이브 확정(`releaseWave()`) 시 `pick_method`에 따라 인계 대상이 분기됩니다:
 
 ```java
 /**
- * 웨이브 확정 → exe_type별 분기
+ * 웨이브 확정 → pick_method별 분기
  */
 public void releaseWave(String waveId) {
     ShipmentWave wave = findWave(waveId);
@@ -1184,11 +1160,12 @@ public void releaseWave(String waveId) {
     orders.forEach(o -> o.setStatus("RELEASED"));
     wave.setStatus("RELEASED");
 
-    // exe_type별 분기
-    String exeType = wave.getExeType();  // 웨이브 또는 주문의 exe_type
-    switch (exeType) {
-        case "INDIVIDUAL":
-        case "BATCH":
+    // pick_method별 분기
+    String pickMethod = wave.getPickMethod();  // 웨이브의 pick_method
+    switch (pickMethod) {
+        case "PICK":
+        case "PAPER":
+        case "INSPECT":
             // Fulfillment 모듈에 인계 (내부 서비스 호출)
             fulfillmentService.createPickingOrders(buildReleaseRequest(wave, orders));
             break;
@@ -1202,7 +1179,7 @@ public void releaseWave(String waveId) {
 
 ### 11.2 Fulfillment 인계 인터페이스
 
-OMS → Fulfillment 인계 시 전달하는 데이터 (exe_type = INDIVIDUAL/BATCH):
+OMS → Fulfillment 인계 시 전달하는 데이터 (pick_method = PICK/PAPER/INSPECT):
 
 ```java
 /**
@@ -1211,6 +1188,7 @@ OMS → Fulfillment 인계 시 전달하는 데이터 (exe_type = INDIVIDUAL/BAT
 public class FulfillmentReleaseRequest {
     private String waveNo;                   // 웨이브 번호
     private String pickType;                 // 피킹 유형 (INDIVIDUAL/TOTAL/ZONE)
+    private String pickMethod;               // 피킹 방식 (WCS/PAPER/INSPECT/PICK)
     private Boolean inspFlag;                // 검수 여부
     private List<ShipmentOrder> orders;      // 출하 주문 목록
     private List<StockAllocation> allocations; // 할당 내역
@@ -1220,7 +1198,7 @@ public class FulfillmentReleaseRequest {
 
 ### 11.3 WCS 연동 인터페이스
 
-OMS → WCS 전송 시 사용하는 데이터 (exe_type = WCS):
+OMS → WCS 전송 시 사용하는 데이터 (pick_method = WCS):
 
 ```java
 /**
@@ -1316,7 +1294,7 @@ OMS 모듈이 이를 **구독(EventListener)**하여 ShipmentOrder 상태를 업
 |--------------|----------|----------|
 | `PickingStartedEvent` | 피킹 지시 첫 스캔 시 | shipmentOrderId, waveNo, pickerId, startedAt |
 | `PackingStartedEvent` | 패킹/검수 작업 시작 시 | shipmentOrderId, waveNo, packerId, startedAt |
-| `ShipmentCompletedEvent` | 출하 확정 (운송장 부착 완료) | shipmentOrderId, invoiceNo, carrierCd, shippedAt |
+| `ShipmentCompletedEvent` | 출하 확정 (운송장 부착 완료) | shipmentOrderId, carrierCd, shippedAt |
 | `ShipmentFailedEvent` | 출하 실패 (피킹 불가 등) | shipmentOrderId, reason, failedAt |
 | `PartialShipmentEvent` | 부분 출하 | shipmentOrderId, shippedQty, shortQty |
 
@@ -1515,8 +1493,8 @@ this.customSvc.doCustomService(domainId, TRX_OMS_POST_IMPORT_SHIPMENT, preParams
 
 | 상수명 | 서비스명 | 시점 | 파라미터 |
 |--------|---------|------|----------|
-| `TRX_OMS_PRE_RELEASE_WAVE` | `diy-oms-pre-release-wave` | 전 | `{wave, orders, exeType}` |
-| `TRX_OMS_POST_RELEASE_WAVE` | `diy-oms-post-release-wave` | 후 | `{wave, orders, exeType, result}` |
+| `TRX_OMS_PRE_RELEASE_WAVE` | `diy-oms-pre-release-wave` | 전 | `{wave, orders, pickMethod}` |
+| `TRX_OMS_POST_RELEASE_WAVE` | `diy-oms-post-release-wave` | 후 | `{wave, orders, pickMethod, result}` |
 
 #### 12.4.8 주문 취소
 
@@ -1677,11 +1655,11 @@ public class OmsTransactionController extends AbstractRestService {
 
         // 2. 커스텀 서비스 - 전 처리
         Map<String, Object> params = ValueUtil.newMap(
-            "wave,orders,exeType", wave, orders, wave.getExeType());
+            "wave,orders,pickMethod", wave, orders, wave.getPickMethod());
         this.customSvc.doCustomService(domainId,
             WmsOmsConstants.TRX_OMS_PRE_RELEASE_WAVE, params);
 
-        // 3. 본 로직 실행 (exe_type별 Fulfillment/WCS 분기)
+        // 3. 본 로직 실행 (pick_method별 Fulfillment/WCS 분기)
         Object result = this.omsTrxService.releaseWave(wave, orders);
 
         // 4. 커스텀 서비스 - 후 처리
