@@ -531,13 +531,13 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
             ${rows.map(
       row => html`
                 <tr class="${row.valid ? '' : 'error-row'}">
-                  <td class="center">${row.rowNo}</td>
-                  <td>${row.refOrderNo || ''}</td>
-                  <td>${row.skuCd || ''}</td>
-                  <td>${row.skuNm || ''}</td>
-                  <td class="right">${row.orderQty || 0}</td>
+                  <td class="center">${row.row_no}</td>
+                  <td>${row.ref_order_no || ''}</td>
+                  <td>${row.sku_cd || ''}</td>
+                  <td>${row.sku_nm || ''}</td>
+                  <td class="right">${row.order_qty || 0}</td>
                   <td class="center"><span class="status-icon">${row.valid ? '✅' : '❌'}</span></td>
-                  <td class="error-text">${row.errorMessages ? row.errorMessages.join(', ') : ''}</td>
+                  <td class="error-text">${row.error_messages ? row.error_messages.join(', ') : ''}</td>
                 </tr>
               `
     )}
@@ -575,19 +575,19 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
         <div class="result-stats">
           <div class="stat-row">
             <span class="label">총 처리 행</span>
-            <span class="value">${result.totalRows}건</span>
+            <span class="value">${result.total_rows}건</span>
           </div>
           <div class="stat-row">
             <span class="label">신규 주문 생성</span>
-            <span class="value">${result.orderCount}건 (헤더)</span>
+            <span class="value">${result.order_count}건 (헤더)</span>
           </div>
           <div class="stat-row">
             <span class="label">신규 주문 상세</span>
-            <span class="value">${result.itemCount}건 (라인)</span>
+            <span class="value">${result.item_count}건 (라인)</span>
           </div>
           <div class="stat-row">
             <span class="label">배송 정보 생성</span>
-            <span class="value">${result.deliveryCount}건</span>
+            <span class="value">${result.delivery_count}건</span>
           </div>
           ${this.validationResult && this.validationResult.error > 0
         ? html`
@@ -735,7 +735,7 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
       // 유효한 행만 필터링하여 원본 데이터에서 추출
       let dataToImport = this.parsedData
       if (this.excludeErrors && this.validationResult.error > 0) {
-        const validRowNos = this.validationResult.rows.filter(r => r.valid).map(r => r.rowNo)
+        const validRowNos = this.validationResult.rows.filter(r => r.valid).map(r => r.row_no)
         dataToImport = this.parsedData.filter((_, idx) => validRowNos.includes(idx + 1))
       }
 

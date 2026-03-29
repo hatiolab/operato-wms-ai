@@ -392,11 +392,11 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
     this.waves = []
     this.statusSummary = { CREATED: 0, RELEASED: 0, COMPLETED: 0, CANCELLED: 0 }
     this.searchParams = {
-      waveDateFrom: this._todayStr(),
-      waveDateTo: this._todayStr(),
+      wave_date_from: this._todayStr(),
+      wave_date_to: this._todayStr(),
       status: '',
-      pickType: '',
-      carrierCd: ''
+      pick_type: '',
+      carrier_cd: ''
     }
     this.currentPage = 1
     this.totalCount = 0
@@ -417,13 +417,13 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
           <div class="search-form">
             <div class="form-group">
               <label>${i18next.t('label.wave_date_from', { defaultValue: '웨이브일(시작)' })}</label>
-              <input type="date" .value="${this.searchParams.waveDateFrom}"
-                @change="${e => this._updateSearch('waveDateFrom', e.target.value)}" />
+              <input type="date" .value="${this.searchParams.wave_date_from}"
+                @change="${e => this._updateSearch('wave_date_from', e.target.value)}" />
             </div>
             <div class="form-group">
               <label>${i18next.t('label.wave_date_to', { defaultValue: '웨이브일(종료)' })}</label>
-              <input type="date" .value="${this.searchParams.waveDateTo}"
-                @change="${e => this._updateSearch('waveDateTo', e.target.value)}" />
+              <input type="date" .value="${this.searchParams.wave_date_to}"
+                @change="${e => this._updateSearch('wave_date_to', e.target.value)}" />
             </div>
             <div class="form-group">
               <label>${i18next.t('label.status', { defaultValue: '상태' })}</label>
@@ -438,8 +438,8 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
             </div>
             <div class="form-group">
               <label>${i18next.t('label.pick_type', { defaultValue: '피킹유형' })}</label>
-              <select .value="${this.searchParams.pickType}"
-                @change="${e => this._updateSearch('pickType', e.target.value)}">
+              <select .value="${this.searchParams.pick_type}"
+                @change="${e => this._updateSearch('pick_type', e.target.value)}">
                 <option value="">${i18next.t('label.all', { defaultValue: '전체' })}</option>
                 <option value="TOTAL">TOTAL</option>
                 <option value="INDIVIDUAL">INDIVIDUAL</option>
@@ -449,8 +449,8 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
             <div class="form-group">
               <label>${i18next.t('label.carrier_cd', { defaultValue: '택배사' })}</label>
               <input type="text" placeholder="${i18next.t('label.carrier_cd', { defaultValue: '택배사 코드' })}"
-                .value="${this.searchParams.carrierCd}"
-                @change="${e => this._updateSearch('carrierCd', e.target.value)}" />
+                .value="${this.searchParams.carrier_cd}"
+                @change="${e => this._updateSearch('carrier_cd', e.target.value)}" />
             </div>
             <div class="search-actions">
               <button class="btn btn-secondary" @click="${this._resetSearch}">
@@ -526,22 +526,22 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
             return html`
                           <tr>
                             <td>
-                              <span class="link" @click="${() => this._navigateToDetail(wave.id)}">${wave.waveNo}</span>
+                              <span class="link" @click="${() => this._navigateToDetail(wave.id)}">${wave.wave_no}</span>
                             </td>
-                            <td class="center">${wave.waveDate}</td>
-                            <td class="center">${wave.waveSeq}</td>
+                            <td class="center">${wave.wave_date}</td>
+                            <td class="center">${wave.wave_seq}</td>
                             <td class="center">
-                              <span class="badge ${(wave.pickType || '').toLowerCase()}">${wave.pickType || '-'}</span>
+                              <span class="badge ${(wave.pick_type || '').toLowerCase()}">${wave.pick_type || '-'}</span>
                             </td>
                             <td class="center">
-                              <span class="badge">${wave.pickMethod || '-'}</span>
+                              <span class="badge">${wave.pick_method || '-'}</span>
                             </td>
-                            <td>${wave.carrierCd || '-'}</td>
-                            <td class="right">${this._formatNumber(wave.planOrder)}</td>
-                            <td class="right">${this._formatNumber(wave.planItem)}</td>
-                            <td class="right">${this._formatNumber(wave.planTotal)}</td>
-                            <td class="right">${this._formatNumber(wave.resultOrder)}</td>
-                            <td class="right">${this._formatNumber(wave.resultTotal)}</td>
+                            <td>${wave.carrier_cd || '-'}</td>
+                            <td class="right">${this._formatNumber(wave.plan_order)}</td>
+                            <td class="right">${this._formatNumber(wave.plan_item)}</td>
+                            <td class="right">${this._formatNumber(wave.plan_total)}</td>
+                            <td class="right">${this._formatNumber(wave.result_order)}</td>
+                            <td class="right">${this._formatNumber(wave.result_total)}</td>
                             <td>
                               <div class="progress-bar-container">
                                 <div class="progress-bar">
@@ -620,27 +620,27 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
   async _fetchWaves() {
     try {
       let queryParts = []
-      queryParts.push(`[{"name":"waveDate","operator":"gte","value":"${this.searchParams.waveDateFrom}"}]`)
+      queryParts.push(`[{"name":"wave_date","operator":"gte","value":"${this.searchParams.wave_date_from}"}]`)
 
       let filters = []
-      if (this.searchParams.waveDateFrom) {
-        filters.push({ name: 'waveDate', operator: 'gte', value: this.searchParams.waveDateFrom })
+      if (this.searchParams.wave_date_from) {
+        filters.push({ name: 'wave_date', operator: 'gte', value: this.searchParams.wave_date_from })
       }
-      if (this.searchParams.waveDateTo) {
-        filters.push({ name: 'waveDate', operator: 'lte', value: this.searchParams.waveDateTo })
+      if (this.searchParams.wave_date_to) {
+        filters.push({ name: 'wave_date', operator: 'lte', value: this.searchParams.wave_date_to })
       }
       if (this.searchParams.status) {
         filters.push({ name: 'status', value: this.searchParams.status })
       }
-      if (this.searchParams.pickType) {
-        filters.push({ name: 'pickType', value: this.searchParams.pickType })
+      if (this.searchParams.pick_type) {
+        filters.push({ name: 'pick_type', value: this.searchParams.pick_type })
       }
-      if (this.searchParams.carrierCd) {
-        filters.push({ name: 'carrierCd', operator: 'like', value: this.searchParams.carrierCd })
+      if (this.searchParams.carrier_cd) {
+        filters.push({ name: 'carrier_cd', operator: 'like', value: this.searchParams.carrier_cd })
       }
 
       const queryStr = encodeURIComponent(JSON.stringify(filters))
-      const sortStr = encodeURIComponent(JSON.stringify([{ name: 'waveDate', desc: true }, { name: 'waveSeq', desc: true }]))
+      const sortStr = encodeURIComponent(JSON.stringify([{ name: 'wave_date', desc: true }, { name: 'wave_seq', desc: true }]))
       const url = `shipment_waves?page=${this.currentPage}&limit=${this.pageSize}&query=${queryStr}&sort=${sortStr}`
 
       const response = await ServiceUtil.restGet(url)
@@ -657,7 +657,7 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
 
   async _fetchStatusSummary() {
     try {
-      const waveDate = this.searchParams.waveDateFrom || this._todayStr()
+      const waveDate = this.searchParams.wave_date_from || this._todayStr()
       const data = await ServiceUtil.restGet(`oms_dashboard/wave_stats?wave_date=${waveDate}`)
       if (data) {
         this.statusSummary = {
@@ -678,11 +678,11 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
 
   _resetSearch() {
     this.searchParams = {
-      waveDateFrom: this._todayStr(),
-      waveDateTo: this._todayStr(),
+      wave_date_from: this._todayStr(),
+      wave_date_to: this._todayStr(),
       status: '',
-      pickType: '',
-      carrierCd: ''
+      pick_type: '',
+      carrier_cd: ''
     }
     this.currentPage = 1
     this._fetchData()
@@ -722,8 +722,8 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
   }
 
   _calcProgress(wave) {
-    const plan = wave.planOrder || 0
-    const result = wave.resultOrder || 0
+    const plan = wave.plan_order || 0
+    const result = wave.result_order || 0
     if (plan === 0) return 0
     return Math.min(100, Math.round((result / plan) * 100))
   }

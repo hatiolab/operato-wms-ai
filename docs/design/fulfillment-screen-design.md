@@ -98,7 +98,7 @@ CREATED ─→ IN_PROGRESS ─→ COMPLETED
 | 라벨 출력 | `LABEL_PRINTED` | 남색 | `#1565C0` | 운송장/라벨 출력 완료 |
 | 적하 목록 | `MANIFESTED` | 인디고 | `#303F9F` | 적하 목록(매니페스트) 전송 완료 |
 | 출하 완료 | `SHIPPED` | 녹색 | `#4CAF50` | 최종 출하 확정 (차량 상차 완료) |
-| 취소 | `CANCELLED` | 빨간색 | `#D32F2F` | 취소 |
+| 취소 | `CANCELLED` | 빨간색 | `#D32F2F` | 취소 (포장 전 취소 또는 출하 후 취소) |
 
 ```
 CREATED → IN_PROGRESS → COMPLETED → LABEL_PRINTED → MANIFESTED → SHIPPED
@@ -273,10 +273,10 @@ CANCELLED (어느 상태에서든)
 {
   type: 'bar',
   data: {
-    labels: workerStats.map(w => w.workerNm),
+    labels: workerStats.map(w => w.worker_nm),
     datasets: [{
       label: '완료 건수',
-      data: workerStats.map(w => w.completedCount),
+      data: workerStats.map(w => w.completed_count),
       backgroundColor: '#42A5F5',
       borderRadius: 6
     }]
@@ -366,11 +366,11 @@ Query: order_date (optional, default: today)
 Response:
 ```json
 {
-  "totalShipped": 30,
-  "totalBox": 42,
-  "totalWt": 186.5,
-  "pendingShipment": 23,
-  "hourlyStats": [
+  "total_shipped": 30,
+  "total_box": 42,
+  "total_wt": 186.5,
+  "pending_shipment": 23,
+  "hourly_stats": [
     { "hour": 9, "count": 15 },
     { "hour": 10, "count": 22 }
   ]
@@ -386,27 +386,27 @@ Query: order_date (optional, default: today)
 Response:
 ```json
 [
-  { "workerId": "W001", "workerNm": "김작업", "pickCount": 45, "pickQty": 320, "packCount": 12 },
-  { "workerId": "W002", "workerNm": "이피킹", "pickCount": 38, "pickQty": 280, "packCount": 8 }
+  { "worker_id": "W001", "worker_nm": "김작업", "pick_count": 45, "pick_qty": 320, "pack_count": 12 },
+  { "worker_id": "W002", "worker_nm": "이피킹", "pick_count": 38, "pick_qty": 280, "pack_count": 8 }
 ]
 ```
 
 **5. 웨이브별 풀필먼트 진행률**
 ```
-GET /rest/ful_trx/dashboard/wave_progress/{waveNo}
+GET /rest/ful_trx/dashboard/wave_progress/{wave_no}
 ```
 
 Response:
 ```json
 {
-  "waveNo": "WAVE-20260328-001",
-  "totalOrders": 50,
-  "pickCompleted": 35,
-  "packCompleted": 20,
+  "wave_no": "WAVE-20260328-001",
+  "total_orders": 50,
+  "pick_completed": 35,
+  "pack_completed": 20,
   "shipped": 15,
-  "pickRate": 70.0,
-  "packRate": 40.0,
-  "shipRate": 30.0
+  "pick_rate": 70.0,
+  "pack_rate": 40.0,
+  "ship_rate": 30.0
 }
 ```
 
@@ -419,8 +419,8 @@ Query: order_date (optional, default: today)
 Response:
 ```json
 [
-  { "dockCd": "DOCK-01", "carrierCd": "CJ", "waitingCount": 5, "shippedCount": 12 },
-  { "dockCd": "DOCK-02", "carrierCd": "HANJIN", "waitingCount": 3, "shippedCount": 8 }
+  { "dock_cd": "DOCK-01", "carrier_cd": "CJ", "waiting_count": 5, "shipped_count": 12 },
+  { "dock_cd": "DOCK-02", "carrier_cd": "HANJIN", "waiting_count": 3, "shipped_count": 8 }
 ]
 ```
 
@@ -853,7 +853,7 @@ Response:
 
 | 컬럼 | 필드 | 너비 | 설명 |
 |------|------|------|------|
-| 박스순번 | `boxNo` | 60px | |
+| 박스순번 | `boxSeq` | 60px | |
 | 유형 | `boxTypeCd` | 80px | 배지 (BOX/BAG/ENVELOPE/PALLET) |
 | 중량 | `boxWt` | 70px | kg 표시 |
 | 아이템 | `totalItem` | 60px | 종 수 |
@@ -867,15 +867,15 @@ Response:
 
 #### 상태별 버튼 활성화
 
-| 현재 상태 | 시작 | 완료 | 라벨출력 | 매니페스트 | 출하확정 | 취소 |
-|----------|------|------|---------|-----------|---------|------|
-| CREATED | ✅ | - | - | - | - | ✅ |
-| IN_PROGRESS | - | ✅ | - | - | - | ✅ |
-| COMPLETED | - | - | ✅ | - | ✅* | ✅ |
-| LABEL_PRINTED | - | - | - | ✅ | ✅* | ✅ |
-| MANIFESTED | - | - | - | - | ✅ | ✅ |
-| SHIPPED | - | - | - | - | - | - |
-| CANCELLED | - | - | - | - | - | - |
+| 현재 상태 | 시작 | 완료 | 라벨출력 | 매니페스트 | 출하확정 | 취소 | 출하취소 |
+|----------|------|------|---------|-----------|---------|------|---------|
+| CREATED | ✅ | - | - | - | - | ✅ | - |
+| IN_PROGRESS | - | ✅ | - | - | - | ✅ | - |
+| COMPLETED | - | - | ✅ | - | ✅* | ✅ | - |
+| LABEL_PRINTED | - | - | - | ✅ | ✅* | ✅ | - |
+| MANIFESTED | - | - | - | - | ✅ | ✅ | - |
+| SHIPPED | - | - | - | - | - | - | ✅ |
+| CANCELLED | - | - | - | - | - | - | - |
 
 > *출하확정: 매니페스트 설정(`ful.shipping.manifest.enabled`)이 비활성이면 COMPLETED/LABEL_PRINTED에서 바로 가능
 
@@ -888,7 +888,8 @@ Response:
 | 라벨출력 | `POST /rest/ful_trx/packing_orders/{id}/print_label` | COMPLETED → LABEL_PRINTED |
 | 매니페스트 | `POST /rest/ful_trx/packing_orders/{id}/manifest` | LABEL_PRINTED → MANIFESTED |
 | 출하확정 | `POST /rest/ful_trx/packing_orders/{id}/confirm_shipping` | → SHIPPED |
-| 취소 | `POST /rest/ful_trx/packing_orders/{id}/cancel` | → CANCELLED |
+| 취소 | `POST /rest/ful_trx/packing_orders/{id}/cancel` | → CANCELLED (SHIPPED 제외) |
+| 출하 취소 | `POST /rest/ful_trx/packing_orders/{id}/cancel_shipping` | SHIPPED → CANCELLED (재고 복원 포함) |
 | 포장 항목 조회 | `GET /rest/ful_trx/packing_orders/{id}/items` | Lazy Loading |
 | 포장 박스 조회 | `GET /rest/ful_trx/packing_orders/{id}/boxes` | Lazy Loading |
 

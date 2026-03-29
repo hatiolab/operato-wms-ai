@@ -9,7 +9,7 @@ import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
  * ALLOCATED 상태 주문을 그룹핑 기준에 따라 웨이브로 자동 생성한다.
  * openPopup()으로 열리며, 생성 완료 시 'wave-created' 커스텀 이벤트를 발생시킨다.
  *
- * @fires wave-created - 웨이브 생성 완료 시 발생. detail: { waveCount, totalOrders, waves }
+ * @fires wave-created - 웨이브 생성 완료 시 발생. detail: { wave_count, total_orders, waves }
  *
  * @example
  * openPopup(
@@ -304,7 +304,7 @@ class AutoWaveCreatePopup extends localize(i18next)(LitElement) {
   async _fetchPreviewCount() {
     try {
       const data = await ServiceUtil.restGet(`oms_trx/waves/preview?order_date=${this._todayStr()}`)
-      this.previewCount = data?.totalOrders || 0
+      this.previewCount = data?.total_orders || 0
     } catch (error) {
       console.error('대상 건수 조회 실패:', error)
       this.previewCount = 0
@@ -322,17 +322,17 @@ class AutoWaveCreatePopup extends localize(i18next)(LitElement) {
       if (this.groupByBizType) groupBy.push('biz_type')
 
       const params = {
-        groupBy,
-        pickType: this.pickType,
-        pickMethod: this.pickMethod,
-        maxOrderCount: this.maxOrderCount,
-        orderDate: this._todayStr()
+        group_by: groupBy,
+        pick_type: this.pickType,
+        pick_method: this.pickMethod,
+        max_order_count: this.maxOrderCount,
+        order_date: this._todayStr()
       }
 
       const result = await ServiceUtil.restPost('oms_trx/waves/create', params)
 
       if (result) {
-        const msg = `${result.waveCount || 0}개 웨이브 생성 완료 (주문 ${result.totalOrders || 0}건)`
+        const msg = `${result.wave_count || 0}개 웨이브 생성 완료 (주문 ${result.total_orders || 0}건)`
         document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'info', message: msg } }))
 
         this.dispatchEvent(new CustomEvent('wave-created', {

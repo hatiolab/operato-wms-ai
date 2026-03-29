@@ -118,7 +118,7 @@ public class OmsDashboardService extends AbstractQueryService {
 	 * 채널(고객)별 통계 조회
 	 *
 	 * @param orderDate 기준일 (optional, 기본값: 오늘)
-	 * @return 채널별 건수 리스트 [{ custCd, custNm, count }]
+	 * @return 채널별 건수 리스트 [{ cust_cd, cust_nm, count }]
 	 */
 	public List<Map<String, Object>> getChannelStats(String orderDate) {
 		String date = ValueUtil.isNotEmpty(orderDate) ? orderDate : DateUtil.todayStr();
@@ -143,8 +143,8 @@ public class OmsDashboardService extends AbstractQueryService {
 		List<Map<String, Object>> channelStats = new ArrayList<>();
 		for (Map<String, Object> row : results) {
 			Map<String, Object> channel = new HashMap<>();
-			channel.put("custCd", row.get("cust_cd"));
-			channel.put("custNm", row.get("cust_nm"));
+			channel.put("cust_cd", row.get("cust_cd"));
+			channel.put("cust_nm", row.get("cust_nm"));
 			Object countObj = row.get("count");
 			int count = countObj instanceof Long ? ((Long) countObj).intValue() : ((Number) countObj).intValue();
 			channel.put("count", count);
@@ -195,7 +195,7 @@ public class OmsDashboardService extends AbstractQueryService {
 	/**
 	 * 할당 현황 통계 조회
 	 *
-	 * @return 할당 현황 Map (totalOrders, allocatedOrders, backOrders, allocRate, softAllocExpiringSoon)
+	 * @return 할당 현황 Map (total_orders, allocated_orders, back_orders, alloc_rate, soft_alloc_expiring_soon)
 	 */
 	public Map<String, Object> getAllocationStats() {
 		Long domainId = Domain.currentDomainId();
@@ -213,7 +213,7 @@ public class OmsDashboardService extends AbstractQueryService {
 		paramsTotal.put("excludeStatuses", Arrays.asList(
 				ShipmentOrder.STATUS_CANCELLED, ShipmentOrder.STATUS_CLOSED));
 		Integer totalOrders = this.queryManager.selectBySql(sqlTotal, paramsTotal, Integer.class);
-		stats.put("totalOrders", totalOrders != null ? totalOrders : 0);
+		stats.put("total_orders", totalOrders != null ? totalOrders : 0);
 
 		// 2. 할당 완료 건수
 		String sqlAllocated = "SELECT COUNT(*) as count FROM shipment_orders " +
@@ -227,7 +227,7 @@ public class OmsDashboardService extends AbstractQueryService {
 				ShipmentOrder.STATUS_RELEASED, ShipmentOrder.STATUS_PICKING,
 				ShipmentOrder.STATUS_PACKING, ShipmentOrder.STATUS_SHIPPED));
 		Integer allocatedOrders = this.queryManager.selectBySql(sqlAllocated, paramsAllocated, Integer.class);
-		stats.put("allocatedOrders", allocatedOrders != null ? allocatedOrders : 0);
+		stats.put("allocated_orders", allocatedOrders != null ? allocatedOrders : 0);
 
 		// 3. 백오더 건수
 		String sqlBackOrder = "SELECT COUNT(*) as count FROM shipment_orders " +
@@ -236,13 +236,13 @@ public class OmsDashboardService extends AbstractQueryService {
 		Map<String, Object> paramsBackOrder = ValueUtil.newMap("domainId,today,backOrderStatus",
 				domainId, today, ShipmentOrder.STATUS_BACK_ORDER);
 		Integer backOrders = this.queryManager.selectBySql(sqlBackOrder, paramsBackOrder, Integer.class);
-		stats.put("backOrders", backOrders != null ? backOrders : 0);
+		stats.put("back_orders", backOrders != null ? backOrders : 0);
 
 		// 4. 할당율
-		int total = (int) stats.get("totalOrders");
-		int allocated = (int) stats.get("allocatedOrders");
+		int total = (int) stats.get("total_orders");
+		int allocated = (int) stats.get("allocated_orders");
 		double allocRate = total > 0 ? Math.round((double) allocated / total * 1000.0) / 10.0 : 0.0;
-		stats.put("allocRate", allocRate);
+		stats.put("alloc_rate", allocRate);
 
 		// 5. SOFT 할당 만료 임박 건수 (30분 이내)
 		String sqlSoftExpiring = "SELECT COUNT(*) as count FROM stock_allocations " +
@@ -253,7 +253,7 @@ public class OmsDashboardService extends AbstractQueryService {
 		Map<String, Object> paramsSoft = ValueUtil.newMap("domainId,softStatus,expireThreshold",
 				domainId, StockAllocation.STATUS_SOFT, new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date(System.currentTimeMillis() + 30 * 60 * 1000L)));
 		Integer softExpiring = this.queryManager.selectBySql(sqlSoftExpiring, paramsSoft, Integer.class);
-		stats.put("softAllocExpiringSoon", softExpiring != null ? softExpiring : 0);
+		stats.put("soft_alloc_expiring_soon", softExpiring != null ? softExpiring : 0);
 
 		return stats;
 	}

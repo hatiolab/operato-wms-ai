@@ -336,7 +336,7 @@ class OmsHome extends localize(i18next)(PageView) {
     this.bizTypeStats = { B2C_OUT: 0, B2B_OUT: 0, B2C_RTN: 0, B2B_RTN: 0 }
     this.channelStats = []
     this.waveStats = { CREATED: 0, RELEASED: 0, COMPLETED: 0, CANCELLED: 0 }
-    this.allocationStats = { totalOrders: 0, allocatedOrders: 0, backOrders: 0, allocRate: 0, softAllocExpiringSoon: 0 }
+    this.allocationStats = { total_orders: 0, allocated_orders: 0, back_orders: 0, alloc_rate: 0, soft_alloc_expiring_soon: 0 }
     this.cutoffAlerts = []
     this.recentOrders = []
   }
@@ -493,12 +493,12 @@ class OmsHome extends localize(i18next)(PageView) {
                           ${this.recentOrders.map(
               order => html`
                               <tr>
-                                <td><span class="link" @click="${() => this._navigateToDetail(order)}">${order.shipmentNo}</span></td>
-                                <td>${order.custNm || ''}</td>
-                                <td class="center"><span class="biz-badge">${order.bizType || ''}</span></td>
-                                <td class="right">${order.totalOrder || 0}</td>
+                                <td><span class="link" @click="${() => this._navigateToDetail(order)}">${order.shipment_no}</span></td>
+                                <td>${order.cust_nm || ''}</td>
+                                <td class="center"><span class="biz-badge">${order.biz_type || ''}</span></td>
+                                <td class="right">${order.total_order || 0}</td>
                                 <td class="center"><span class="status-badge ${order.status}">${this._statusLabel(order.status)}</span></td>
-                                <td>${order.orderDate || ''}</td>
+                                <td>${order.order_date || ''}</td>
                               </tr>
                             `
             )}
@@ -672,7 +672,7 @@ class OmsHome extends localize(i18next)(PageView) {
       this._channelChart.destroy()
     }
 
-    const labels = this.channelStats.map(c => c.custNm || c.custCd || '미지정')
+    const labels = this.channelStats.map(c => c.cust_nm || c.cust_cd || '미지정')
     const data = this.channelStats.map(c => c.count || 0)
 
     const ctx = canvas.getContext('2d')

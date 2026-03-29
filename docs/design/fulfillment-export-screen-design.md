@@ -256,7 +256,7 @@ PENDING ──→ DECLARED ──→ APPROVED
 {
   type: 'bar',
   data: {
-    labels: destStats.map(d => d.countryNm),
+    labels: destStats.map(d => d.country_nm),
     datasets: [{
       label: '주문 건수',
       data: destStats.map(d => d.count),
@@ -353,9 +353,9 @@ Query: order_date (optional, default: today), limit (optional, default: 10)
 Response:
 ```json
 [
-  { "destCountryCd": "US", "countryNm": "미국", "count": 45 },
-  { "destCountryCd": "CN", "countryNm": "중국", "count": 35 },
-  { "destCountryCd": "JP", "countryNm": "일본", "count": 28 }
+  { "dest_country_cd": "US", "country_nm": "미국", "count": 45 },
+  { "dest_country_cd": "CN", "country_nm": "중국", "count": 35 },
+  { "dest_country_cd": "JP", "country_nm": "일본", "count": 28 }
 ]
 ```
 
@@ -368,9 +368,9 @@ Query: week_start (optional, default: 이번 주 월요일)
 Response:
 ```json
 [
-  { "date": "2026-03-30", "etdCount": 3, "etaCount": 1 },
-  { "date": "2026-03-31", "etdCount": 2, "etaCount": 0 },
-  { "date": "2026-04-01", "etdCount": 0, "etaCount": 2 }
+  { "date": "2026-03-30", "etd_count": 3, "eta_count": 1 },
+  { "date": "2026-03-31", "etd_count": 2, "eta_count": 0 },
+  { "date": "2026-04-01", "etd_count": 0, "eta_count": 2 }
 ]
 ```
 
@@ -398,12 +398,12 @@ Response:
 ```json
 [
   {
-    "shipmentNo": "SHP20260328-E01",
-    "destCountryCd": "US",
+    "shipment_no": "SHP20260328-E01",
+    "dest_country_cd": "US",
     "incoterms": "FOB",
-    "transportMode": "SEA",
-    "blNo": "BL-2026-001",
-    "customsStatus": "APPROVED",
+    "transport_mode": "SEA",
+    "bl_no": "BL-2026-001",
+    "customs_status": "APPROVED",
     "status": "ALLOCATED"
   }
 ]
@@ -913,13 +913,13 @@ Response:
   view: 'dayGridMonth',
   events: scheduleData.map(item => ([
     {
-      title: `🚢 ${item.shipmentNo}`,
+      title: `🚢 ${item.shipment_no}`,
       date: item.etd,
       color: '#1565C0',
       extendedProps: { type: 'etd', ...item }
     },
     {
-      title: `📦 ${item.shipmentNo}`,
+      title: `📦 ${item.shipment_no}`,
       date: item.eta,
       color: '#4CAF50',
       extendedProps: { type: 'eta', ...item }

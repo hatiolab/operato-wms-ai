@@ -231,7 +231,7 @@ REGISTERED → CONFIRMED → ALLOCATED → WAVED → RELEASED → PICKING → PA
 {
   type: 'bar',
   data: {
-    labels: channelStats.map(c => c.custNm),
+    labels: channelStats.map(c => c.cust_nm),
     datasets: [{
       label: '주문 건수',
       data: channelStats.map(c => c.count),
@@ -355,9 +355,9 @@ Query: order_date (optional, default: today)
 Response:
 ```json
 [
-  { "custCd": "COUPANG", "custNm": "쿠팡", "count": 120 },
-  { "custCd": "NAVER", "custNm": "네이버", "count": 95 },
-  { "custCd": "OWN_MALL", "custNm": "자사몰", "count": 78 }
+  { "cust_cd": "COUPANG", "cust_nm": "쿠팡", "count": 120 },
+  { "cust_cd": "NAVER", "cust_nm": "네이버", "count": 95 },
+  { "cust_cd": "OWN_MALL", "cust_nm": "자사몰", "count": 78 }
 ]
 ```
 
@@ -385,11 +385,11 @@ GET /rest/oms_dashboard/allocation_stats
 Response:
 ```json
 {
-  "totalOrders": 358,
-  "allocatedOrders": 295,
-  "backOrders": 8,
-  "allocRate": 82.4,
-  "softAllocExpiringSoon": 5
+  "total_orders": 358,
+  "allocated_orders": 295,
+  "back_orders": 8,
+  "alloc_rate": 82.4,
+  "soft_alloc_expiring_soon": 5
 }
 ```
 
@@ -471,16 +471,16 @@ Response:
 | 컬럼 | 필드 | 너비 | 정렬 | 렌더러 |
 |------|------|------|------|--------|
 | 선택 | - | 40px | 중앙 | checkbox |
-| 출하번호 | `shipmentNo` | 160px | 좌 | link (상세 이동) |
-| 참조번호 | `refOrderNo` | 140px | 좌 | |
-| 주문일 | `orderDate` | 90px | 중앙 | |
-| 고객 | `custNm` | 100px | 좌 | |
-| 업무유형 | `bizType` | 80px | 중앙 | badge |
-| 출하유형 | `shipType` | 80px | 중앙 | badge |
-| 우선순위 | `priorityCd` | 70px | 중앙 | priority-badge |
-| 웨이브 | `waveNo` | 130px | 좌 | link (웨이브 상세) |
-| 주문수량 | `totalOrder` | 80px | 우 | number |
-| 할당수량 | `totalAlloc` | 80px | 우 | number |
+| 출하번호 | `shipment_no` | 160px | 좌 | link (상세 이동) |
+| 참조번호 | `ref_order_no` | 140px | 좌 | |
+| 주문일 | `order_date` | 90px | 중앙 | |
+| 고객 | `cust_nm` | 100px | 좌 | |
+| 업무유형 | `biz_type` | 80px | 중앙 | badge |
+| 출하유형 | `ship_type` | 80px | 중앙 | badge |
+| 우선순위 | `priority_cd` | 70px | 중앙 | priority-badge |
+| 웨이브 | `wave_no` | 130px | 좌 | link (웨이브 상세) |
+| 주문수량 | `total_order` | 80px | 우 | number |
+| 할당수량 | `total_alloc` | 80px | 우 | number |
 | 상태 | `status` | 90px | 중앙 | status-badge |
 
 #### 우선순위 배지 색상
@@ -513,16 +513,16 @@ Response:
   searchUrl: 'shipment_orders',
   multiSaveUrl: 'shipment_orders',
   columns: [
-    { name: 'shipmentNo', width: 160, renderer: 'link', linkField: 'id', linkPage: 'shipment-order-detail' },
-    { name: 'refOrderNo', width: 140 },
-    { name: 'orderDate', width: 90, align: 'center' },
-    { name: 'custNm', width: 100 },
-    { name: 'bizType', width: 80, align: 'center', renderer: 'badge' },
-    { name: 'shipType', width: 80, align: 'center', renderer: 'badge' },
-    { name: 'priorityCd', width: 70, align: 'center', renderer: 'priority-badge' },
-    { name: 'waveNo', width: 130, renderer: 'link', linkPage: 'shipment-wave-detail' },
-    { name: 'totalOrder', width: 80, align: 'right', renderer: 'number' },
-    { name: 'totalAlloc', width: 80, align: 'right', renderer: 'number' },
+    { name: 'shipment_no', width: 160, renderer: 'link', linkField: 'id', linkPage: 'shipment-order-detail' },
+    { name: 'ref_order_no', width: 140 },
+    { name: 'order_date', width: 90, align: 'center' },
+    { name: 'cust_nm', width: 100 },
+    { name: 'biz_type', width: 80, align: 'center', renderer: 'badge' },
+    { name: 'ship_type', width: 80, align: 'center', renderer: 'badge' },
+    { name: 'priority_cd', width: 70, align: 'center', renderer: 'priority-badge' },
+    { name: 'wave_no', width: 130, renderer: 'link', linkPage: 'shipment-wave-detail' },
+    { name: 'total_order', width: 80, align: 'right', renderer: 'number' },
+    { name: 'total_alloc', width: 80, align: 'right', renderer: 'number' },
     { name: 'status', width: 90, align: 'center', renderer: 'status-badge' }
   ]
 }
@@ -593,18 +593,18 @@ Response:
 
 | 컬럼 | 필드 | 설명 |
 |------|------|------|
-| 라인 | `lineNo` | 자동 채번 |
-| SKU | `skuCd` | 상품 코드 |
-| 상품명 | `skuNm` | |
-| 주문수량 | `orderQty` | |
-| 할당수량 | `allocQty` | |
-| 부족수량 | `shortQty` | 0보다 크면 빨간색 강조 |
-| 취소수량 | `cancelQty` | |
-| 출하수량 | `shippedQty` | |
-| 단가 | `unitPrice` | |
+| 라인 | `line_no` | 자동 채번 |
+| SKU | `sku_cd` | 상품 코드 |
+| 상품명 | `sku_nm` | |
+| 주문수량 | `order_qty` | |
+| 할당수량 | `alloc_qty` | |
+| 부족수량 | `short_qty` | 0보다 크면 빨간색 강조 |
+| 취소수량 | `cancel_qty` | |
+| 출하수량 | `shipped_qty` | |
+| 단가 | `unit_price` | |
 | 바코드(요청) | `barcode` | |
-| 유통기한(요청) | `expiredDate` | |
-| 로트(요청) | `lotNo` | |
+| 유통기한(요청) | `expired_date` | |
+| 로트(요청) | `lot_no` | |
 
 **탭 3: 배송정보 (Delivery)**
 
@@ -774,9 +774,9 @@ Excel 파일 또는 API를 통해 외부 주문 데이터를 일괄 수신
 | 검증 항목 | 조건 | 오류 메시지 |
 |----------|------|-----------|
 | 필수 필드 | ref_order_no, sku_cd, order_qty 비어있음 | "필수 항목이 누락되었습니다" |
-| SKU 존재 | SKU 마스터에 미존재 | "SKU {skuCd}가 존재하지 않습니다" |
+| SKU 존재 | SKU 마스터에 미존재 | "SKU {sku_cd}가 존재하지 않습니다" |
 | 수량 양수 | order_qty <= 0 | "주문 수량은 양수여야 합니다" |
-| 중복 체크 | ref_order_no 중복 | "참조 주문번호 {refOrderNo}가 이미 존재합니다" |
+| 중복 체크 | ref_order_no 중복 | "참조 주문번호 {ref_order_no}가 이미 존재합니다" |
 | 날짜 형식 | YYYY-MM-DD 아님 | "날짜 형식이 올바르지 않습니다" |
 
 #### API
@@ -828,18 +828,18 @@ Excel 파일 또는 API를 통해 외부 주문 데이터를 일괄 수신
 
 | 컬럼 | 필드 | 너비 | 렌더러 | 설명 |
 |------|------|------|--------|------|
-| 웨이브번호 | `waveNo` | 160px | link | 클릭 시 상세 이동 |
-| 일자 | `waveDate` | 90px | | |
-| 순번 | `waveSeq` | 50px | | 일자 내 순번 |
-| 피킹유형 | `pickType` | 90px | badge | INDIVIDUAL/TOTAL/ZONE |
-| 피킹방식 | `pickMethod` | 80px | badge | WCS/PAPER/INSPECT/PICK |
-| 출하유형 | `shipType` | 80px | badge | |
-| 택배사 | `carrierCd` | 100px | | |
-| 총 품목수 | `planItem` | 80px | number | |
-| 총 주문수 | `planOrder` | 80px | number | |
-| 총 수량 | `planTotal` | 80px | number | |
-| 실적주문수 | `resultOrder` | 80px | number | |
-| 실적수량 | `resultTotal` | 80px | number | |
+| 웨이브번호 | `wave_no` | 160px | link | 클릭 시 상세 이동 |
+| 일자 | `wave_date` | 90px | | |
+| 순번 | `wave_seq` | 50px | | 일자 내 순번 |
+| 피킹유형 | `pick_type` | 90px | badge | INDIVIDUAL/TOTAL/ZONE |
+| 피킹방식 | `pick_method` | 80px | badge | WCS/PAPER/INSPECT/PICK |
+| 출하유형 | `ship_type` | 80px | badge | |
+| 택배사 | `carrier_cd` | 100px | | |
+| 총 품목수 | `plan_item` | 80px | number | |
+| 총 주문수 | `plan_order` | 80px | number | |
+| 총 수량 | `plan_total` | 80px | number | |
+| 실적주문수 | `result_order` | 80px | number | |
+| 실적수량 | `result_total` | 80px | number | |
 | 진행률 | (계산) | 100px | progress-bar | result/plan 비율 |
 | 상태 | `status` | 80px | status-badge | |
 
@@ -897,7 +897,7 @@ Excel 파일 또는 API를 통해 외부 주문 데이터를 일괄 수신
 
 Response:
 ```json
-{ "totalOrders": 128 }
+{ "total_orders": 128 }
 ```
 
 팝업 열릴 때 자동 호출하여 "※ 대상: 128건 (ALLOCATED)" 영역에 표시한다.
@@ -909,11 +909,11 @@ Response:
 Request:
 ```json
 {
-  "groupBy": ["carrier_cd"],
-  "pickType": "TOTAL",
-  "pickMethod": "PICK",
-  "maxOrderCount": 200,
-  "orderDate": "2026-03-26"
+  "group_by": ["carrier_cd"],
+  "pick_type": "TOTAL",
+  "pick_method": "PICK",
+  "max_order_count": 200,
+  "order_date": "2026-03-26"
 }
 ```
 
@@ -1130,17 +1130,17 @@ API: `POST /rest/oms_trx/waves/{id}/release`
 
 | 컬럼 | 필드 | 너비 | 설명 |
 |------|------|------|------|
-| 출하번호 | (조인) `shipmentNo` | 140px | 주문 상세 링크 |
-| SKU | `skuCd` | 100px | |
+| 출하번호 | (조인) `shipment_no` | 140px | 주문 상세 링크 |
+| SKU | `sku_cd` | 100px | |
 | 바코드 | `barcode` | 120px | |
-| 로케이션 | `locCd` | 80px | |
-| 로트 | `lotNo` | 80px | |
-| 유통기한 | `expiredDate` | 90px | |
-| 할당수량 | `allocQty` | 80px | 우측 정렬 |
-| 전략 | `allocStrategy` | 70px | FEFO/FIFO/MANUAL |
+| 로케이션 | `loc_cd` | 80px | |
+| 로트 | `lot_no` | 80px | |
+| 유통기한 | `expired_date` | 90px | |
+| 할당수량 | `alloc_qty` | 80px | 우측 정렬 |
+| 전략 | `alloc_strategy` | 70px | FEFO/FIFO/MANUAL |
 | 상태 | `status` | 80px | 상태 배지 |
-| 할당일시 | `allocatedAt` | 140px | |
-| 만료일시 | `expiredAt` | 140px | SOFT만 표시, 30분 이내 빨간 강조 |
+| 할당일시 | `allocated_at` | 140px | |
+| 만료일시 | `expired_at` | 140px | SOFT만 표시, 30분 이내 빨간 강조 |
 
 #### SOFT 할당 만료 임박 강조
 

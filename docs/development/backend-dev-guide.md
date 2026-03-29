@@ -15,7 +15,8 @@
    - [2.4 공통코드 등록](#24-공통코드-등록)
    - [2.5 마스터-디테일 화면](#25-마스터-디테일-화면)
 3. [메타데이터 테이블 구조](#3-메타데이터-테이블-구조)
-4. [자동화 참조 정보](#4-자동화-참조-정보)
+4. [API 응답 네이밍 컨벤션](#4-api-응답-네이밍-컨벤션-중요)
+5. [자동화 참조 정보](#5-자동화-참조-정보)
 
 ---
 
@@ -578,9 +579,92 @@ RwaOrder (마스터)
 
 ---
 
-## 4. 자동화 참조 정보
+## 4. API 응답 네이밍 컨벤션 (중요)
 
-### 4.1 Entity Java 클래스 → 메타데이터 매핑 규칙
+### 4.1 Jackson SNAKE_CASE 자동 변환
+
+`application.properties`에 다음 설정이 되어 있다:
+
+```properties
+spring.jackson.property-naming-strategy=SNAKE_CASE
+```
+
+이 설정에 의해 **Spring이 JSON으로 직렬화할 때 Java 필드명(camelCase)을 자동으로 snake_case로 변환**한다.
+
+#### Entity 객체 응답 — 자동 변환됨 (별도 처리 불필요)
+
+```java
+// Java Entity 필드: camelCase
+private String shipmentNo;
+private String custNm;
+private Integer totalOrder;
+
+// JSON 응답: Jackson이 자동으로 snake_case로 변환
+// { "shipment_no": "...", "cust_nm": "...", "total_order": 0 }
+```
+
+CRUD API에서 Entity 객체를 그대로 반환하면 Jackson이 알아서 변환해주므로 **신경 쓸 것이 없다.**
+
+#### Map 응답 — 자동 변환 안 됨 (반드시 snake_case로 키 작성)
+
+```java
+// ❌ 잘못된 예: Map 키를 camelCase로 작성하면 그대로 camelCase로 응답됨
+Map<String, Object> result = new HashMap<>();
+result.put("totalOrders", 100);     // → { "totalOrders": 100 }  ← camelCase 그대로!
+result.put("successCount", 5);      // → { "successCount": 5 }   ← camelCase 그대로!
+
+// ✅ 올바른 예: Map 키는 반드시 snake_case로 작성
+Map<String, Object> result = new HashMap<>();
+result.put("total_orders", 100);    // → { "total_orders": 100 }
+result.put("success_count", 5);     // → { "success_count": 5 }
+```
+
+> **핵심 원칙**: Jackson의 `SNAKE_CASE` 전략은 **Java 객체의 getter/setter 이름**을 변환하는 것이므로,
+> `Map<String, Object>`의 **문자열 키는 변환 대상이 아니다.**
+> Map 기반 응답을 구성할 때는 반드시 snake_case로 키를 작성해야 한다.
+
+### 4.2 Jackson 전체 설정 참고
+
+```properties
+# JSON 직렬화 설정 (application.properties)
+spring.jackson.date-format=yyyy-MM-dd HH:mm:ss
+spring.jackson.property-naming-strategy=SNAKE_CASE
+spring.jackson.serialization.INDENT_OUTPUT=true
+spring.jackson.serialization.FAIL_ON_EMPTY_BEANS=false
+spring.jackson.default-property-inclusion=non-null
+spring.jackson.time-zone=Asia/Seoul
+```
+
+| 설정 | 효과 |
+|------|------|
+| `property-naming-strategy=SNAKE_CASE` | Entity 필드 camelCase → snake_case 자동 변환 |
+| `date-format` | 날짜를 `yyyy-MM-dd HH:mm:ss` 형식으로 직렬화 |
+| `INDENT_OUTPUT=true` | JSON 응답을 들여쓰기하여 가독성 향상 |
+| `FAIL_ON_EMPTY_BEANS=false` | 빈 객체도 직렬화 허용 |
+| `default-property-inclusion=non-null` | null 값 필드는 JSON에서 제외 |
+| `time-zone=Asia/Seoul` | 날짜 시간대를 한국 시간으로 설정 |
+
+### 4.3 프론트엔드 데이터 바인딩 규칙
+
+프론트엔드에서 API 응답 데이터를 바인딩할 때 **항상 snake_case 키**를 사용한다:
+
+```javascript
+// ✅ 올바른 예
+${order.shipment_no}
+${order.cust_nm}
+${alloc.alloc_qty}
+
+// ❌ 잘못된 예 (camelCase — 서버에서 snake_case로 오므로 매칭 실패)
+${order.shipmentNo}
+${order.custNm}
+${alloc.allocQty}
+```
+
+---
+
+## 5. 자동화 참조 정보
+
+### 5.1 Entity Java 클래스 → 메타데이터 매핑 규칙
 
 Entity Java 클래스 정보로부터 메타데이터를 자동 생성하기 위한 매핑 규칙:
 
@@ -616,7 +700,7 @@ Entity Java 클래스 정보로부터 메타데이터를 자동 생성하기 위
 | 나머지 String | `text` |
 | 나머지 Number | `number` |
 
-### 4.2 자동화 대상 테이블 목록
+### 5.2 자동화 대상 테이블 목록
 
 Entity 정보를 기반으로 자동 생성해야 하는 데이터:
 
@@ -628,7 +712,7 @@ Entity 정보를 기반으로 자동 생성해야 하는 데이터:
 | 4 | `common_codes` | 코드형 필드 1개당 1행 | 모든 도메인에 등록 |
 | 5 | `common_code_details` | 코드 값 1개당 1행 | 모든 도메인에 등록 |
 
-### 4.3 도메인 정보
+### 5.3 도메인 정보
 
 모든 메타데이터는 각 도메인별로 별도 등록해야 한다.
 
@@ -641,12 +725,12 @@ SELECT id, name FROM domains;
 -- 15, cdc
 ```
 
-### 4.4 DB 접속 정보
+### 5.4 DB 접속 정보
 
 - 접속 정보는 `frontend/packages/operato-wes/config/config.development.js` 파일에서 확인
 - Python/psycopg2를 사용하여 접속 (psql CLI 미설치 환경 대응)
 
-### 4.5 시스템 자동 추가 필드
+### 5.5 시스템 자동 추가 필드
 
 Entity를 등록할 때 시스템이 자동으로 추가하는 필드 (entity_columns 등록 불필요):
 
@@ -658,7 +742,7 @@ Entity를 등록할 때 시스템이 자동으로 추가하는 필드 (entity_co
 | `updated_at` | 수정일시 |
 | `updater_id` | 수정자 ID |
 
-### 4.6 Seed SQL 참고
+### 5.6 Seed SQL 참고
 
 > Seed SQL은 초기 개발 시 참고용으로 생성되었으며, `/entity_meta_by_entity` skill이 이를 대체한다.
 > Entity 클래스 분석으로 entities, entity_columns, terminologies, common_codes, common_code_details를 자동 등록하므로 별도 Seed SQL 작성이 불필요하다.

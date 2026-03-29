@@ -385,10 +385,10 @@ class StockAllocationList extends localize(i18next)(PageView) {
     this.statusSummary = { SOFT: 0, HARD: 0, RELEASED: 0, EXPIRED: 0, CANCELLED: 0 }
     this.searchParams = {
       status: '',
-      skuCd: '',
-      shipmentNo: '',
-      allocStrategy: '',
-      locCd: ''
+      sku_cd: '',
+      shipment_no: '',
+      alloc_strategy: '',
+      loc_cd: ''
     }
     this.currentPage = 1
     this.totalCount = 0
@@ -452,19 +452,19 @@ class StockAllocationList extends localize(i18next)(PageView) {
             <div class="form-group">
               <label>${i18next.t('label.sku_cd', { defaultValue: 'SKU' })}</label>
               <input type="text" placeholder="${i18next.t('label.sku_cd', { defaultValue: 'SKU 코드' })}"
-                .value="${this.searchParams.skuCd}"
-                @change="${e => this._updateSearch('skuCd', e.target.value)}" />
+                .value="${this.searchParams.sku_cd}"
+                @change="${e => this._updateSearch('sku_cd', e.target.value)}" />
             </div>
             <div class="form-group">
               <label>${i18next.t('label.shipment_no', { defaultValue: '출하번호' })}</label>
               <input type="text" placeholder="${i18next.t('label.shipment_no', { defaultValue: '출하번호' })}"
-                .value="${this.searchParams.shipmentNo}"
-                @change="${e => this._updateSearch('shipmentNo', e.target.value)}" />
+                .value="${this.searchParams.shipment_no}"
+                @change="${e => this._updateSearch('shipment_no', e.target.value)}" />
             </div>
             <div class="form-group">
               <label>${i18next.t('label.alloc_strategy', { defaultValue: '할당 전략' })}</label>
-              <select .value="${this.searchParams.allocStrategy}"
-                @change="${e => this._updateSearch('allocStrategy', e.target.value)}">
+              <select .value="${this.searchParams.alloc_strategy}"
+                @change="${e => this._updateSearch('alloc_strategy', e.target.value)}">
                 <option value="">${i18next.t('label.all', { defaultValue: '전체' })}</option>
                 <option value="FEFO">FEFO</option>
                 <option value="FIFO">FIFO</option>
@@ -475,8 +475,8 @@ class StockAllocationList extends localize(i18next)(PageView) {
             <div class="form-group">
               <label>${i18next.t('label.loc_cd', { defaultValue: '로케이션' })}</label>
               <input type="text" placeholder="${i18next.t('label.loc_cd', { defaultValue: '로케이션 코드' })}"
-                .value="${this.searchParams.locCd}"
-                @change="${e => this._updateSearch('locCd', e.target.value)}" />
+                .value="${this.searchParams.loc_cd}"
+                @change="${e => this._updateSearch('loc_cd', e.target.value)}" />
             </div>
             <div class="search-actions">
               <button class="btn btn-secondary" @click="${this._resetSearch}">
@@ -521,26 +521,26 @@ class StockAllocationList extends localize(i18next)(PageView) {
                       ${this.allocations.map(alloc => html`
                         <tr class="${this._isSoftExpiringSoon(alloc) ? 'expiring-soon' : ''}">
                           <td>
-                            <span class="link" @click="${() => this._openOrderDetail(alloc.shipmentOrderId)}">${alloc.shipmentOrderId || '-'}</span>
+                            <span class="link" @click="${() => this._openOrderDetail(alloc.shipment_order_id)}">${alloc.shipment_order_id || '-'}</span>
                           </td>
-                          <td>${alloc.skuCd || '-'}</td>
+                          <td>${alloc.sku_cd || '-'}</td>
                           <td>${alloc.barcode || '-'}</td>
-                          <td>${alloc.locCd || '-'}</td>
-                          <td>${alloc.lotNo || '-'}</td>
-                          <td class="center">${alloc.expiredDate || '-'}</td>
-                          <td class="right">${this._formatNumber(alloc.allocQty)}</td>
+                          <td>${alloc.loc_cd || '-'}</td>
+                          <td>${alloc.lot_no || '-'}</td>
+                          <td class="center">${alloc.expired_date || '-'}</td>
+                          <td class="right">${this._formatNumber(alloc.alloc_qty)}</td>
                           <td class="center">
-                            ${alloc.allocStrategy
-                              ? html`<span class="strategy-badge">${alloc.allocStrategy}</span>`
+                            ${alloc.alloc_strategy
+                              ? html`<span class="strategy-badge">${alloc.alloc_strategy}</span>`
                               : '-'}
                           </td>
                           <td class="center">
                             <span class="badge ${(alloc.status || '').toLowerCase()}">${this._statusLabel(alloc.status)}</span>
                           </td>
-                          <td class="center">${this._formatDateTime(alloc.allocatedAt)}</td>
+                          <td class="center">${this._formatDateTime(alloc.allocated_at)}</td>
                           <td class="center">
-                            ${alloc.status === 'SOFT' && alloc.expiredAt
-                              ? html`<span class="${this._isSoftExpiringSoon(alloc) ? 'expiring-text' : ''}">${this._formatDateTime(alloc.expiredAt)}</span>`
+                            ${alloc.status === 'SOFT' && alloc.expired_at
+                              ? html`<span class="${this._isSoftExpiringSoon(alloc) ? 'expiring-text' : ''}">${this._formatDateTime(alloc.expired_at)}</span>`
                               : '-'}
                           </td>
                         </tr>
@@ -595,21 +595,21 @@ class StockAllocationList extends localize(i18next)(PageView) {
       if (this.searchParams.status) {
         filters.push({ name: 'status', value: this.searchParams.status })
       }
-      if (this.searchParams.skuCd) {
-        filters.push({ name: 'skuCd', operator: 'like', value: this.searchParams.skuCd })
+      if (this.searchParams.sku_cd) {
+        filters.push({ name: 'sku_cd', operator: 'like', value: this.searchParams.sku_cd })
       }
-      if (this.searchParams.shipmentNo) {
-        filters.push({ name: 'shipmentOrderId', operator: 'like', value: this.searchParams.shipmentNo })
+      if (this.searchParams.shipment_no) {
+        filters.push({ name: 'shipment_order_id', operator: 'like', value: this.searchParams.shipment_no })
       }
-      if (this.searchParams.allocStrategy) {
-        filters.push({ name: 'allocStrategy', value: this.searchParams.allocStrategy })
+      if (this.searchParams.alloc_strategy) {
+        filters.push({ name: 'alloc_strategy', value: this.searchParams.alloc_strategy })
       }
-      if (this.searchParams.locCd) {
-        filters.push({ name: 'locCd', operator: 'like', value: this.searchParams.locCd })
+      if (this.searchParams.loc_cd) {
+        filters.push({ name: 'loc_cd', operator: 'like', value: this.searchParams.loc_cd })
       }
 
       const queryStr = encodeURIComponent(JSON.stringify(filters))
-      const sortStr = encodeURIComponent(JSON.stringify([{ name: 'createdAt', desc: true }]))
+      const sortStr = encodeURIComponent(JSON.stringify([{ name: 'created_at', desc: true }]))
       const url = `stock_allocations?page=${this.currentPage}&limit=${this.pageSize}&query=${queryStr}&sort=${sortStr}`
 
       const response = await ServiceUtil.restGet(url)
@@ -658,10 +658,10 @@ class StockAllocationList extends localize(i18next)(PageView) {
   _resetSearch() {
     this.searchParams = {
       status: '',
-      skuCd: '',
-      shipmentNo: '',
-      allocStrategy: '',
-      locCd: ''
+      sku_cd: '',
+      shipment_no: '',
+      alloc_strategy: '',
+      loc_cd: ''
     }
     this.currentPage = 1
     this._fetchData()
@@ -715,9 +715,9 @@ class StockAllocationList extends localize(i18next)(PageView) {
   }
 
   _isSoftExpiringSoon(alloc) {
-    if (alloc.status !== 'SOFT' || !alloc.expiredAt) return false
+    if (alloc.status !== 'SOFT' || !alloc.expired_at) return false
     try {
-      const expiredTime = new Date(alloc.expiredAt).getTime()
+      const expiredTime = new Date(alloc.expired_at).getTime()
       const now = Date.now()
       const thirtyMinutes = 30 * 60 * 1000
       return expiredTime > now && (expiredTime - now) < thirtyMinutes

@@ -70,7 +70,7 @@ public class OmsDashboardController {
 	 * GET /rest/oms_dashboard/channel_stats
 	 *
 	 * @param orderDate 기준일 (optional, 기본값: 오늘)
-	 * @return 채널별 건수 리스트 [{ custCd, custNm, count }]
+	 * @return 채널별 건수 리스트 [{ cust_cd, cust_nm, count }]
 	 */
 	@GetMapping(value = "/channel_stats", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Get Channel Statistics")
@@ -99,7 +99,7 @@ public class OmsDashboardController {
 	 *
 	 * GET /rest/oms_dashboard/allocation_stats
 	 *
-	 * @return 할당 현황 Map (totalOrders, allocatedOrders, backOrders, allocRate, softAllocExpiringSoon)
+	 * @return 할당 현황 Map (total_orders, allocated_orders, back_orders, alloc_rate, soft_alloc_expiring_soon)
 	 */
 	@GetMapping(value = "/allocation_stats", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Get Allocation Statistics")
