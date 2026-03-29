@@ -181,6 +181,12 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String carrierCd;
 
 	/**
+	 * 택배 서비스 유형 (STANDARD/EXPRESS/SAME_DAY/NEXT_DAY/ECONOMY)
+	 */
+	@Column (name = "carrier_service_type", length = 20)
+	private String carrierServiceType;
+
+	/**
 	 * 이동 대상 창고 코드
 	 */
 	@Column (name = "to_wh_cd", length = 30)
@@ -440,6 +446,14 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setCarrierCd(String carrierCd) {
 		this.carrierCd = carrierCd;
+	}
+
+	public String getCarrierServiceType() {
+		return carrierServiceType;
+	}
+
+	public void setCarrierServiceType(String carrierServiceType) {
+		this.carrierServiceType = carrierServiceType;
 	}
 
 	public String getToWhCd() {

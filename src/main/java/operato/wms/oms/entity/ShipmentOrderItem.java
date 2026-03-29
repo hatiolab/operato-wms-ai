@@ -18,8 +18,7 @@ import xyz.elidom.util.ValueUtil;
     @Index(name = "ix_shipment_order_items_0", columnList = "domain_id,shipment_order_id"),
     @Index(name = "ix_shipment_order_items_1", columnList = "domain_id,shipment_order_id,sku_cd"),
     @Index(name = "ix_shipment_order_items_2", columnList = "domain_id,shipment_order_id,line_no"),
-    @Index(name = "ix_shipment_order_items_3", columnList = "domain_id,shipment_order_id,barcode"),
-    @Index(name = "ix_shipment_order_items_4", columnList = "domain_id,shipment_order_id,status")
+    @Index(name = "ix_shipment_order_items_3", columnList = "domain_id,shipment_order_id,barcode")
 })
 public class ShipmentOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
@@ -27,11 +26,6 @@ public class ShipmentOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampHo
      * SerialVersion UID
      */
     private static final long serialVersionUID = 1L;
-
-    /**
-     * 상태 - REGISTERED (등록)
-     */
-    public static final String STATUS_REGISTERED = "REGISTERED";
 
     /**
      * PK (UUID)
@@ -117,12 +111,6 @@ public class ShipmentOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampHo
      */
     @Column(name = "lot_no", length = 50)
     private String lotNo;
-
-    /**
-     * 상태
-     */
-    @Column(name = "status", length = 20)
-    private String status;
 
     /**
      * 비고
@@ -284,14 +272,6 @@ public class ShipmentOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampHo
         this.lotNo = lotNo;
     }
 
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
     public String getRemarks() {
         return remarks;
     }
@@ -352,11 +332,6 @@ public class ShipmentOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampHo
                 ValueUtil.newMap("domainId,shipmentOrderId", this.domainId, this.shipmentOrderId),
                 Integer.class);
             this.lineNo = ValueUtil.toString(nextLineNo);
-        }
-
-        // Status 기본값 설정
-        if (ValueUtil.isEmpty(this.status)) {
-            this.status = STATUS_REGISTERED;
         }
 
         // 수량 기본값 초기화

@@ -110,13 +110,32 @@ public class OmsTransactionController extends AbstractRestService {
 	 */
 	@RequestMapping(value = "waves/preview", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Preview auto wave target order count")
-	public Map<String, Object> previewAutoWaveTargets(@RequestParam(name = "order_date", required = false) String orderDate) {
+	public Map<String, Object> previewAutoWaveTargets(
+			@RequestParam(name = "order_date", required = false) String orderDate) {
 		return this.omsTrxService.previewAutoWaveTargets(orderDate);
 	}
 
-	/* ============================================================
+	/*
+	 * ============================================================
 	 * 출하 주문 상태 변경 API
-	 * ============================================================ */
+	 * ============================================================
+	 */
+
+	/**
+	 * 출하 주문 확정 + 재고 할당 (단건)
+	 *
+	 * POST /rest/oms_trx/shipment_orders/{id}/confirm_and_allocate
+	 *
+	 * REGISTERED → CONFIRMED → ALLOCATED (또는 BACK_ORDER)를 한 번에 수행한다.
+	 *
+	 * @param id 주문 ID
+	 * @return { success, status, allocatedQty, backOrder }
+	 */
+	@RequestMapping(value = "shipment_orders/{id}/confirm_and_allocate", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Confirm and allocate shipment order (REGISTERED → CONFIRMED → ALLOCATED)")
+	public Map<String, Object> confirmAndAllocateOrder(@PathVariable("id") String id) {
+		return this.omsTrxService.confirmAndAllocateShipmentOrder(id);
+	}
 
 	/**
 	 * 출하 주문 확정
@@ -191,9 +210,78 @@ public class OmsTransactionController extends AbstractRestService {
 		return this.omsTrxService.closeShipmentOrder(id);
 	}
 
-	/* ============================================================
+	/*
+	 * ============================================================
+	 * 웨이브 상세 조회 API
+	 * ============================================================
+	 */
+
+	/**
+	 * 웨이브 포함 주문 목록 조회
+	 *
+	 * GET /rest/oms_trx/waves/{id}/orders
+	 *
+	 * @param id 웨이브 ID
+	 * @return 주문 목록
+	 */
+	@RequestMapping(value = "waves/{id}/orders", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get orders in wave")
+	public List<Map> getWaveOrders(@PathVariable("id") String id) {
+		return this.omsTrxService.getWaveOrders(id);
+	}
+
+	/**
+	 * 웨이브 SKU 합산 요약 조회
+	 *
+	 * GET /rest/oms_trx/waves/{id}/summary
+	 *
+	 * @param id 웨이브 ID
+	 * @return SKU 합산 목록
+	 */
+	@RequestMapping(value = "waves/{id}/summary", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get wave SKU summary")
+	public List<Map> getWaveSummary(@PathVariable("id") String id) {
+		return this.omsTrxService.getWaveSummary(id);
+	}
+
+	/**
+	 * 웨이브에 주문 추가
+	 *
+	 * POST /rest/oms_trx/waves/{id}/add_orders
+	 *
+	 * @param id     웨이브 ID
+	 * @param params { ids: ["orderId1", "orderId2", ...] }
+	 * @return { addedCount, waveNo }
+	 */
+	@SuppressWarnings("unchecked")
+	@RequestMapping(value = "waves/{id}/add_orders", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Add orders to wave")
+	public Map<String, Object> addOrdersToWave(@PathVariable("id") String id, @RequestBody Map<String, Object> params) {
+		return this.omsTrxService.addOrdersToWave(id, (List<String>) params.get("ids"));
+	}
+
+	/**
+	 * 웨이브에서 주문 제거
+	 *
+	 * POST /rest/oms_trx/waves/{id}/remove_orders
+	 *
+	 * @param id     웨이브 ID
+	 * @param params { ids: ["orderId1", "orderId2", ...] }
+	 * @return { removedCount, waveNo }
+	 */
+	@SuppressWarnings("unchecked")
+	@RequestMapping(value = "waves/{id}/remove_orders", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Remove orders from wave")
+	public Map<String, Object> removeOrdersFromWave(@PathVariable("id") String id,
+			@RequestBody Map<String, Object> params) {
+		return this.omsTrxService.removeOrdersFromWave(id, (List<String>) params.get("ids"));
+	}
+
+	/*
+	 * ============================================================
 	 * 웨이브 상태 변경 API
-	 * ============================================================ */
+	 * ============================================================
+	 */
 
 	/**
 	 * 웨이브 확정 (릴리스)
@@ -221,5 +309,53 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Cancel wave (CREATED → CANCELLED)")
 	public Map<String, Object> cancelWave(@PathVariable("id") String id) {
 		return this.omsTrxService.cancelWave(id);
+	}
+
+	/*
+	 * ============================================================
+	 * 보충 지시 트랜잭션 API
+	 * ============================================================
+	 */
+
+	/**
+	 * 보충 지시 시작
+	 *
+	 * POST /rest/oms_trx/replenish_orders/{id}/start
+	 *
+	 * @param id 보충 지시 ID
+	 * @return { success }
+	 */
+	@RequestMapping(value = "replenish_orders/{id}/start", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Start replenish order (CREATED → IN_PROGRESS)")
+	public Map<String, Object> startReplenishOrder(@PathVariable("id") String id) {
+		return this.omsTrxService.startReplenishOrder(id);
+	}
+
+	/**
+	 * 보충 지시 완료
+	 *
+	 * POST /rest/oms_trx/replenish_orders/{id}/complete
+	 *
+	 * @param id 보충 지시 ID
+	 * @return { success, resultTotal }
+	 */
+	@RequestMapping(value = "replenish_orders/{id}/complete", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Complete replenish order (IN_PROGRESS → COMPLETED)")
+	public Map<String, Object> completeReplenishOrder(@PathVariable("id") String id) {
+		return this.omsTrxService.completeReplenishOrder(id);
+	}
+
+	/**
+	 * 보충 지시 취소
+	 *
+	 * POST /rest/oms_trx/replenish_orders/{id}/cancel
+	 *
+	 * @param id 보충 지시 ID
+	 * @return { success }
+	 */
+	@RequestMapping(value = "replenish_orders/{id}/cancel", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Cancel replenish order (→ CANCELLED)")
+	public Map<String, Object> cancelReplenishOrder(@PathVariable("id") String id) {
+		return this.omsTrxService.cancelReplenishOrder(id);
 	}
 }

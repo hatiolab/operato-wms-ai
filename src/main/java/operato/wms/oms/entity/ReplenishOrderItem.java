@@ -79,12 +79,6 @@ public class ReplenishOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampH
 	private Double resultQty;
 
 	/**
-	 * 상태
-	 */
-	@Column(name = "status", length = 20)
-	private String status;
-
-	/**
 	 * 비고
 	 */
 	@Column(name = "remarks", length = 1000)
@@ -160,14 +154,6 @@ public class ReplenishOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampH
 
 	public void setResultQty(Double resultQty) {
 		this.resultQty = resultQty;
-	}
-
-	public String getStatus() {
-		return status;
-	}
-
-	public void setStatus(String status) {
-		this.status = status;
 	}
 
 	public String getRemarks() {

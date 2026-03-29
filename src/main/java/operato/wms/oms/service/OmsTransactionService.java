@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import operato.wms.base.entity.SKU;
 import operato.wms.oms.entity.ImportShipmentOrder;
+import operato.wms.oms.entity.ReplenishOrder;
 import operato.wms.oms.entity.ShipmentDelivery;
 import operato.wms.oms.entity.ShipmentOrder;
 import operato.wms.oms.entity.ShipmentOrderItem;
@@ -211,7 +212,6 @@ public class OmsTransactionService extends AbstractQueryService {
 				item.setExpiredDate(row.getExpiredDate());
 				item.setLotNo(row.getLotNo());
 				item.setUnitPrice(row.getUnitPrice());
-				item.setStatus(ShipmentOrderItem.STATUS_REGISTERED);
 				newItems.add(item);
 				lineSeq++;
 				itemCount++;
@@ -448,6 +448,57 @@ public class OmsTransactionService extends AbstractQueryService {
 	 * 출하 주문 상태 변경
 	 * ============================================================
 	 */
+
+	/**
+	 * 출하 주문 확정 + 재고 할당 (단건)
+	 *
+	 * REGISTERED 상태 주문을 CONFIRMED로 확정한 뒤, 바로 재고 할당까지 수행한다.
+	 * 전체 할당 시 ALLOCATED, 부분 할당 시 BACK_ORDER 상태가 된다.
+	 *
+	 * @param id 주문 ID
+	 * @return { success, status, allocatedQty, backOrder }
+	 */
+	public Map<String, Object> confirmAndAllocateShipmentOrder(String id) {
+		Long domainId = Domain.currentDomainId();
+
+		ShipmentOrder order = this.findOrder(domainId, id);
+		if (order == null) {
+			throw new RuntimeException("주문을 찾을 수 없습니다: " + id);
+		}
+
+		if (!ShipmentOrder.STATUS_REGISTERED.equals(order.getStatus())) {
+			throw new RuntimeException("주문 상태가 [" + order.getStatus() + "]이므로 확정+할당할 수 없습니다 (REGISTERED 상태만 가능)");
+		}
+
+		// 1. 확정 처리
+		List<String> ids = new ArrayList<>();
+		ids.add(id);
+		Map<String, Object> confirmResult = this.confirmShipmentOrders(ids);
+
+		int confirmSuccess = (int) confirmResult.getOrDefault("successCount", 0);
+		if (confirmSuccess == 0) {
+			@SuppressWarnings("unchecked")
+			List<String> confirmErrors = (List<String>) confirmResult.getOrDefault("errors", new ArrayList<>());
+			String errorMsg = confirmErrors.isEmpty() ? "확정 처리 실패" : confirmErrors.get(0);
+			throw new RuntimeException(errorMsg);
+		}
+
+		// 2. 재고 할당 처리
+		Map<String, Object> allocResult = this.allocateShipmentOrders(ids);
+
+		int allocSuccess = (int) allocResult.getOrDefault("successCount", 0);
+		int backOrderCount = (int) allocResult.getOrDefault("backOrderCount", 0);
+
+		// 최종 주문 상태 조회
+		ShipmentOrder updatedOrder = this.findOrder(domainId, id);
+
+		Map<String, Object> result = new HashMap<>();
+		result.put("success", allocSuccess > 0);
+		result.put("status", updatedOrder != null ? updatedOrder.getStatus() : null);
+		result.put("allocatedQty", updatedOrder != null ? updatedOrder.getTotalAlloc() : 0);
+		result.put("backOrder", backOrderCount > 0);
+		return result;
+	}
 
 	/**
 	 * 출하 주문 확정 (REGISTERED → CONFIRMED)
@@ -886,6 +937,290 @@ public class OmsTransactionService extends AbstractQueryService {
 
 	/*
 	 * ============================================================
+	 * 웨이브 상세 조회
+	 * ============================================================
+	 */
+
+	/**
+	 * 웨이브 포함 주문 목록 조회
+	 *
+	 * @param id 웨이브 ID
+	 * @return 주문 목록
+	 */
+	public List<Map> getWaveOrders(String id) {
+		Long domainId = Domain.currentDomainId();
+
+		ShipmentWave wave = this.findWave(domainId, id);
+		if (wave == null) {
+			throw new RuntimeException("웨이브를 찾을 수 없습니다: " + id);
+		}
+
+		String sql = "SELECT id, shipment_no, ref_order_no AS ref_no, cust_cd, cust_nm, biz_type, ship_type, total_item, total_order, status"
+				+ " FROM shipment_orders"
+				+ " WHERE domain_id = :domainId AND wave_no = :waveNo"
+				+ " ORDER BY shipment_no";
+		Map<String, Object> params = ValueUtil.newMap("domainId,waveNo", domainId, wave.getWaveNo());
+		return this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+	}
+
+	/**
+	 * 웨이브 SKU 합산 요약 조회
+	 *
+	 * 웨이브에 포함된 전체 주문의 품목을 SKU 기준으로 합산하여 반환한다.
+	 *
+	 * @param id 웨이브 ID
+	 * @return SKU 합산 목록 [ { skuCd, skuNm, totalQty, orderCount, locCd, availableQty
+	 *         } ]
+	 */
+	public List<Map> getWaveSummary(String id) {
+		Long domainId = Domain.currentDomainId();
+
+		ShipmentWave wave = this.findWave(domainId, id);
+		if (wave == null) {
+			throw new RuntimeException("웨이브를 찾을 수 없습니다: " + id);
+		}
+
+		String sql = "SELECT soi.sku_cd, soi.sku_nm,"
+				+ " SUM(soi.order_qty) AS total_qty,"
+				+ " COUNT(DISTINCT soi.shipment_order_id) AS order_count,"
+				+ " MIN(sa.loc_cd) AS loc_cd,"
+				+ " COALESCE(("
+				+ "   SELECT SUM(i.inv_qty - COALESCE(i.reserved_qty, 0))"
+				+ "   FROM inventories i"
+				+ "   WHERE i.domain_id = :domainId AND i.sku_cd = soi.sku_cd"
+				+ "     AND i.status = 'STORED' AND (i.del_flag IS NULL OR i.del_flag = false)"
+				+ " ), 0) AS available_qty"
+				+ " FROM shipment_order_items soi"
+				+ " INNER JOIN shipment_orders so ON so.domain_id = soi.domain_id AND so.id = soi.shipment_order_id"
+				+ " LEFT JOIN stock_allocations sa ON sa.domain_id = soi.domain_id AND sa.shipment_order_item_id = soi.id AND sa.status IN ('SOFT','HARD')"
+				+ " WHERE soi.domain_id = :domainId AND so.wave_no = :waveNo"
+				+ " GROUP BY soi.sku_cd, soi.sku_nm"
+				+ " ORDER BY soi.sku_cd";
+		Map<String, Object> params = ValueUtil.newMap("domainId,waveNo", domainId, wave.getWaveNo());
+		return this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+	}
+
+	/**
+	 * 웨이브에 주문 추가
+	 *
+	 * ALLOCATED 상태의 주문을 지정 웨이브에 추가하고 WAVED 상태로 변경한다.
+	 * 웨이브 헤더의 계획 수량도 갱신한다.
+	 *
+	 * @param waveId   웨이브 ID
+	 * @param orderIds 추가할 주문 ID 리스트
+	 * @return { addedCount, waveNo }
+	 */
+	public Map<String, Object> addOrdersToWave(String waveId, List<String> orderIds) {
+		Long domainId = Domain.currentDomainId();
+
+		ShipmentWave wave = this.findWave(domainId, waveId);
+		if (wave == null) {
+			throw new RuntimeException("웨이브를 찾을 수 없습니다: " + waveId);
+		}
+		if (!ShipmentWave.STATUS_CREATED.equals(wave.getStatus())) {
+			throw new RuntimeException("웨이브 상태가 [" + wave.getStatus() + "]이므로 주문을 추가할 수 없습니다 (CREATED 상태만 가능)");
+		}
+
+		int addedCount = 0;
+		for (String orderId : orderIds) {
+			ShipmentOrder order = this.findOrder(domainId, orderId);
+			if (order == null)
+				continue;
+			if (!ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus()))
+				continue;
+
+			String sql = "UPDATE shipment_orders SET wave_no = :waveNo, status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+			Map<String, Object> params = ValueUtil.newMap("waveNo,status,domainId,id",
+					wave.getWaveNo(), ShipmentOrder.STATUS_WAVED, domainId, orderId);
+			this.queryManager.executeBySql(sql, params);
+			addedCount++;
+		}
+
+		// 웨이브 헤더 계획 수량 재집계
+		this.recalcWavePlanStats(domainId, waveId, wave.getWaveNo());
+
+		Map<String, Object> result = new HashMap<>();
+		result.put("addedCount", addedCount);
+		result.put("waveNo", wave.getWaveNo());
+		return result;
+	}
+
+	/**
+	 * 웨이브에서 주문 제거
+	 *
+	 * 웨이브에 포함된 주문을 제거하고 ALLOCATED 상태로 복원한다.
+	 * 웨이브 헤더의 계획 수량도 갱신한다.
+	 *
+	 * @param waveId   웨이브 ID
+	 * @param orderIds 제거할 주문 ID 리스트
+	 * @return { removedCount, waveNo }
+	 */
+	public Map<String, Object> removeOrdersFromWave(String waveId, List<String> orderIds) {
+		Long domainId = Domain.currentDomainId();
+
+		ShipmentWave wave = this.findWave(domainId, waveId);
+		if (wave == null) {
+			throw new RuntimeException("웨이브를 찾을 수 없습니다: " + waveId);
+		}
+		if (!ShipmentWave.STATUS_CREATED.equals(wave.getStatus())) {
+			throw new RuntimeException("웨이브 상태가 [" + wave.getStatus() + "]이므로 주문을 제거할 수 없습니다 (CREATED 상태만 가능)");
+		}
+
+		int removedCount = 0;
+		for (String orderId : orderIds) {
+			ShipmentOrder order = this.findOrder(domainId, orderId);
+			if (order == null)
+				continue;
+			if (!ShipmentOrder.STATUS_WAVED.equals(order.getStatus()))
+				continue;
+			if (!wave.getWaveNo().equals(order.getWaveNo()))
+				continue;
+
+			String sql = "UPDATE shipment_orders SET wave_no = null, status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+			Map<String, Object> params = ValueUtil.newMap("status,domainId,id",
+					ShipmentOrder.STATUS_ALLOCATED, domainId, orderId);
+			this.queryManager.executeBySql(sql, params);
+			removedCount++;
+		}
+
+		// 웨이브 헤더 계획 수량 재집계
+		this.recalcWavePlanStats(domainId, waveId, wave.getWaveNo());
+
+		Map<String, Object> result = new HashMap<>();
+		result.put("removedCount", removedCount);
+		result.put("waveNo", wave.getWaveNo());
+		return result;
+	}
+
+	/**
+	 * 웨이브 헤더 계획 수량 재집계
+	 */
+	private void recalcWavePlanStats(Long domainId, String waveId, String waveNo) {
+		Map<String, Object> countParams = ValueUtil.newMap("domainId,waveNo", domainId, waveNo);
+
+		String countSql = "SELECT COUNT(*) FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo";
+		Integer planOrder = this.queryManager.selectBySql(countSql, countParams, Integer.class);
+
+		String qtySql = "SELECT COALESCE(SUM(total_order), 0) FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo";
+		Double planTotal = this.queryManager.selectBySql(qtySql, countParams, Double.class);
+
+		String skuSql = "SELECT COUNT(DISTINCT soi.sku_cd) FROM shipment_order_items soi"
+				+ " INNER JOIN shipment_orders so ON so.domain_id = soi.domain_id AND so.id = soi.shipment_order_id"
+				+ " WHERE soi.domain_id = :domainId AND so.wave_no = :waveNo";
+		Integer planItem = this.queryManager.selectBySql(skuSql, countParams, Integer.class);
+
+		String updSql = "UPDATE shipment_waves SET plan_order = :planOrder, plan_item = :planItem, plan_total = :planTotal, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+		Map<String, Object> updParams = ValueUtil.newMap("planOrder,planItem,planTotal,domainId,id",
+				planOrder != null ? planOrder : 0,
+				planItem != null ? planItem : 0,
+				planTotal != null ? planTotal : 0.0,
+				domainId, waveId);
+		this.queryManager.executeBySql(updSql, updParams);
+	}
+
+	/*
+	 * ============================================================
+	 * 보충 지시 상태 변경
+	 * ============================================================
+	 */
+
+	/**
+	 * 보충 지시 시작 (CREATED → IN_PROGRESS)
+	 *
+	 * @param id 보충 지시 ID
+	 * @return { success }
+	 */
+	public Map<String, Object> startReplenishOrder(String id) {
+		Long domainId = Domain.currentDomainId();
+		String now = DateUtil.currentTimeStr();
+
+		ReplenishOrder order = this.findReplenishOrder(domainId, id);
+		if (order == null) {
+			throw new RuntimeException("보충 지시를 찾을 수 없습니다: " + id);
+		}
+
+		if (!ReplenishOrder.STATUS_CREATED.equals(order.getStatus())) {
+			throw new RuntimeException("보충 지시 상태가 [" + order.getStatus() + "]이므로 시작할 수 없습니다 (CREATED 상태만 가능)");
+		}
+
+		String sql = "UPDATE replenish_orders SET status = :status, started_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+		Map<String, Object> params = ValueUtil.newMap("status,now,domainId,id",
+				ReplenishOrder.STATUS_IN_PROGRESS, now, domainId, id);
+		this.queryManager.executeBySql(sql, params);
+
+		Map<String, Object> result = new HashMap<>();
+		result.put("success", true);
+		return result;
+	}
+
+	/**
+	 * 보충 지시 완료 (IN_PROGRESS → COMPLETED)
+	 *
+	 * 상세 항목의 실적 수량을 합산하여 헤더의 resultTotal을 갱신한다.
+	 *
+	 * @param id 보충 지시 ID
+	 * @return { success, resultTotal }
+	 */
+	public Map<String, Object> completeReplenishOrder(String id) {
+		Long domainId = Domain.currentDomainId();
+		String now = DateUtil.currentTimeStr();
+
+		ReplenishOrder order = this.findReplenishOrder(domainId, id);
+		if (order == null) {
+			throw new RuntimeException("보충 지시를 찾을 수 없습니다: " + id);
+		}
+
+		if (!ReplenishOrder.STATUS_IN_PROGRESS.equals(order.getStatus())) {
+			throw new RuntimeException("보충 지시 상태가 [" + order.getStatus() + "]이므로 완료할 수 없습니다 (IN_PROGRESS 상태만 가능)");
+		}
+
+		// 상세 항목의 실적 수량 합산
+		String sumSql = "SELECT COALESCE(SUM(result_qty), 0) FROM replenish_order_items WHERE domain_id = :domainId AND replenish_order_id = :orderId";
+		Map<String, Object> sumParams = ValueUtil.newMap("domainId,orderId", domainId, id);
+		Double resultTotal = this.queryManager.selectBySql(sumSql, sumParams, Double.class);
+
+		String sql = "UPDATE replenish_orders SET status = :status, result_total = :resultTotal, completed_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+		Map<String, Object> params = ValueUtil.newMap("status,resultTotal,now,domainId,id",
+				ReplenishOrder.STATUS_COMPLETED, resultTotal, now, domainId, id);
+		this.queryManager.executeBySql(sql, params);
+
+		Map<String, Object> result = new HashMap<>();
+		result.put("success", true);
+		result.put("resultTotal", resultTotal);
+		return result;
+	}
+
+	/**
+	 * 보충 지시 취소 (CREATED/IN_PROGRESS → CANCELLED)
+	 *
+	 * @param id 보충 지시 ID
+	 * @return { success }
+	 */
+	public Map<String, Object> cancelReplenishOrder(String id) {
+		Long domainId = Domain.currentDomainId();
+
+		ReplenishOrder order = this.findReplenishOrder(domainId, id);
+		if (order == null) {
+			throw new RuntimeException("보충 지시를 찾을 수 없습니다: " + id);
+		}
+
+		String status = order.getStatus();
+		if (ReplenishOrder.STATUS_COMPLETED.equals(status) || ReplenishOrder.STATUS_CANCELLED.equals(status)) {
+			throw new RuntimeException("보충 지시 상태가 [" + status + "]이므로 취소할 수 없습니다");
+		}
+
+		String sql = "UPDATE replenish_orders SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+		Map<String, Object> params = ValueUtil.newMap("status,domainId,id",
+				ReplenishOrder.STATUS_CANCELLED, domainId, id);
+		this.queryManager.executeBySql(sql, params);
+
+		Map<String, Object> result = new HashMap<>();
+		result.put("success", true);
+		return result;
+	}
+
+	/*
+	 * ============================================================
 	 * 내부 유틸리티
 	 * ============================================================
 	 */
@@ -907,6 +1242,16 @@ public class OmsTransactionService extends AbstractQueryService {
 		String sql = "SELECT * FROM shipment_waves WHERE domain_id = :domainId AND id = :id";
 		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
 		List<ShipmentWave> list = this.queryManager.selectListBySql(sql, params, ShipmentWave.class, 0, 1);
+		return list.isEmpty() ? null : list.get(0);
+	}
+
+	/**
+	 * 보충 지시 단건 조회
+	 */
+	private ReplenishOrder findReplenishOrder(Long domainId, String id) {
+		String sql = "SELECT * FROM replenish_orders WHERE domain_id = :domainId AND id = :id";
+		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
+		List<ReplenishOrder> list = this.queryManager.selectListBySql(sql, params, ReplenishOrder.class, 0, 1);
 		return list.isEmpty() ? null : list.get(0);
 	}
 }

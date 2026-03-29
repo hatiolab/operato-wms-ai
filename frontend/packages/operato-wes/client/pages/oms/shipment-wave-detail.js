@@ -119,6 +119,16 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
           background: #FFEBEE;
         }
 
+        .action-btn.secondary {
+          background: transparent;
+          color: var(--md-sys-color-primary);
+          border: 1px solid var(--md-sys-color-outline);
+        }
+
+        .action-btn.secondary:hover:not(:disabled) {
+          background: var(--md-sys-color-surface-container-highest);
+        }
+
         /* 웨이브 기본정보 한 줄 */
         .wave-info {
           display: flex;
@@ -383,6 +393,61 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
           color: var(--md-sys-color-on-surface-variant);
         }
 
+        /* 주문 추가 팝업 오버레이 */
+        .popup-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.5);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 1000;
+        }
+
+        .popup-container {
+          background: var(--md-sys-color-surface);
+          border-radius: 16px;
+          width: 700px;
+          max-height: 80vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+        }
+
+        .popup-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px 24px;
+          border-bottom: 1px solid var(--md-sys-color-outline-variant);
+        }
+
+        .popup-header h3 {
+          margin: 0;
+          font-size: 18px;
+          font-weight: 600;
+        }
+
+        .popup-body {
+          flex: 1;
+          overflow: auto;
+          padding: 16px 24px;
+        }
+
+        .popup-footer {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          padding: 12px 24px;
+          border-top: 1px solid var(--md-sys-color-outline-variant);
+        }
+
+        .popup-info {
+          font-size: 13px;
+          color: var(--md-sys-color-on-surface-variant);
+          margin-bottom: 12px;
+        }
+
         /* 반응형 */
         @media screen and (max-width: 800px) {
           .stats-row {
@@ -407,7 +472,11 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
       replenishes: Array,
       activeTab: Number,
       loading: Boolean,
-      actionLoading: Boolean
+      actionLoading: Boolean,
+      selectedOrderIds: Array,
+      showAddOrderPopup: Boolean,
+      allocatedOrders: Array,
+      selectedAddOrderIds: Array
     }
   }
 
@@ -421,6 +490,10 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     this.activeTab = 0
     this.loading = true
     this.actionLoading = false
+    this.selectedOrderIds = []
+    this.showAddOrderPopup = false
+    this.allocatedOrders = []
+    this.selectedAddOrderIds = []
   }
 
   connectedCallback() {
@@ -447,6 +520,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
         <div class="tab-panel ${this.activeTab === 1 ? 'active' : ''}">${this._renderSkuSummaryTab()}</div>
         <div class="tab-panel ${this.activeTab === 2 ? 'active' : ''}">${this._renderReplenishTab()}</div>
       </div>
+      ${this.showAddOrderPopup ? this._renderAddOrderPopup() : ''}
     `
   }
 
@@ -556,6 +630,12 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
 
     return html`
       ${s === 'CREATED' ? html`
+        <button class="action-btn secondary" ?disabled="${this.actionLoading}" @click="${this._openAddOrderPopup}">
+          ${i18next.t('button.add_orders', { defaultValue: '주문 추가' })}
+        </button>
+        <button class="action-btn secondary" ?disabled="${this.actionLoading || this.selectedOrderIds.length === 0}" @click="${this._removeSelectedOrders}">
+          ${i18next.t('button.remove_orders', { defaultValue: '주문 제거' })}${this.selectedOrderIds.length > 0 ? ` (${this.selectedOrderIds.length})` : ''}
+        </button>
         <button class="action-btn primary" ?disabled="${this.actionLoading}" @click="${this._releaseWave}">
           ${i18next.t('button.wave_release', { defaultValue: '웨이브 확정' })}
         </button>
@@ -607,10 +687,13 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
       `
     }
 
+    const isCreated = this.wave?.status === 'CREATED'
+
     return html`
       <table>
         <thead>
           <tr>
+            ${isCreated ? html`<th style="width:40px"><input type="checkbox" @change="${this._toggleAllOrders}" .checked="${this.selectedOrderIds.length > 0 && this.selectedOrderIds.length === this.orders.length}"></th>` : ''}
             <th>${i18next.t('label.shipment_no', { defaultValue: '출하번호' })}</th>
             <th>${i18next.t('label.ref_no', { defaultValue: '참조번호' })}</th>
             <th>${i18next.t('label.customer', { defaultValue: '고객' })}</th>
@@ -623,6 +706,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
         <tbody>
           ${this.orders.map(o => html`
             <tr>
+              ${isCreated ? html`<td><input type="checkbox" .checked="${this.selectedOrderIds.includes(o.id)}" @change="${e => this._toggleOrderSelection(o.id, e)}"></td>` : ''}
               <td>${o.shipment_no || '-'}</td>
               <td>${o.ref_no || '-'}</td>
               <td>${o.cust_nm || o.cust_cd || '-'}</td>
@@ -679,10 +763,10 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
         <tbody>
           ${this.skuSummary.map(s => html`
             <tr>
-              <td>${s.skuCd || '-'}</td>
-              <td>${s.skuNm || '-'}</td>
-              <td class="text-right">${s.totalQty ?? 0}</td>
-              <td class="text-right">${s.orderCount ?? 0}</td>
+              <td>${s.sku_cd || s.skuCd || '-'}</td>
+              <td>${s.sku_nm || s.skuNm || '-'}</td>
+              <td class="text-right">${s.total_qty ?? s.totalQty ?? 0}</td>
+              <td class="text-right">${s.order_count ?? s.orderCount ?? 0}</td>
             </tr>
           `)}
         </tbody>
@@ -695,7 +779,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
         </div>
         <div class="summary-item">
           <span class="label">${i18next.t('label.total_qty', { defaultValue: '총 수량' })}:</span>
-          <span class="value">${this.skuSummary.reduce((s, r) => s + (r.totalQty || 0), 0)} EA</span>
+          <span class="value">${this.skuSummary.reduce((s, r) => s + (r.total_qty ?? r.totalQty ?? 0), 0)} EA</span>
         </div>
       </div>
     `
@@ -758,33 +842,19 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
       const wave = await ServiceUtil.restGet(`shipment_waves/${this.waveId}`)
       this.wave = wave
 
-      // 2) 웨이브 번호로 주문 목록 조회
-      if (wave?.wave_no) {
-        const query = JSON.stringify([{ name: 'waveNo', value: wave.wave_no }])
-        const result = await ServiceUtil.restGet(`shipment_orders?query=${encodeURIComponent(query)}`)
-        this.orders = result?.items || []
-      } else {
-        this.orders = []
-      }
+      // 2) 주문 목록 조회 (트랜잭션 API)
+      const orders = await ServiceUtil.restGet(`oms_trx/waves/${this.waveId}/orders`)
+      this.orders = orders || []
 
-      this._buildSkuSummary()
+      // 3) SKU 합산 조회 (트랜잭션 API)
+      const skuSummary = await ServiceUtil.restGet(`oms_trx/waves/${this.waveId}/summary`)
+      this.skuSummary = skuSummary || []
     } catch (error) {
       console.error('웨이브 상세 조회 실패:', error)
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'error', message: i18next.t('message.wave_fetch_failed', { defaultValue: '웨이브 상세 조회에 실패했습니다' }) } }))
     } finally {
       this.loading = false
     }
-  }
-
-  _buildSkuSummary() {
-    if (!this.orders || this.orders.length === 0) {
-      this.skuSummary = []
-      return
-    }
-
-    // 주문 헤더 레벨에서 가능한 요약만 제공 (개별 items API는 미호출)
-    // 실제 SKU 합산은 summary API 구현 후 대체 예정
-    this.skuSummary = []
   }
 
   async _fetchReplenishes() {
@@ -873,8 +943,180 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     this.orders = null
     this.skuSummary = null
     this.replenishes = null
+    this.selectedOrderIds = []
     await this._fetchWaveData()
     this._dispatchWaveUpdated()
+  }
+
+  /* ============================================================
+   * 주문 체크박스 선택
+   * ============================================================ */
+
+  _toggleOrderSelection(orderId, e) {
+    if (e.target.checked) {
+      this.selectedOrderIds = [...this.selectedOrderIds, orderId]
+    } else {
+      this.selectedOrderIds = this.selectedOrderIds.filter(id => id !== orderId)
+    }
+  }
+
+  _toggleAllOrders(e) {
+    if (e.target.checked) {
+      this.selectedOrderIds = this.orders.map(o => o.id)
+    } else {
+      this.selectedOrderIds = []
+    }
+  }
+
+  /* ============================================================
+   * 주문 제거
+   * ============================================================ */
+
+  async _removeSelectedOrders() {
+    if (this.selectedOrderIds.length === 0) return
+
+    const result = await UiUtil.showAlertPopup(
+      'title.confirm',
+      `${i18next.t('message.remove_orders_confirm', { defaultValue: '선택된 주문을 웨이브에서 제거하시겠습니까?' })}\n\n` +
+      `${i18next.t('label.selected', { defaultValue: '선택' })}: ${this.selectedOrderIds.length}${i18next.t('label.count_unit', { defaultValue: '건' })}`,
+      'question',
+      'confirm',
+      'cancel'
+    )
+    if (!result.confirmButton) return
+
+    this.actionLoading = true
+    try {
+      const res = await ServiceUtil.restPost(`oms_trx/waves/${this.waveId}/remove_orders`, { ids: this.selectedOrderIds })
+      document.dispatchEvent(new CustomEvent('notify', {
+        detail: { level: 'info', message: `${res.removedCount || 0}${i18next.t('label.count_unit', { defaultValue: '건' })} ${i18next.t('message.orders_removed', { defaultValue: '주문이 제거되었습니다' })}` }
+      }))
+      this.selectedOrderIds = []
+      await this._refreshAfterAction()
+    } catch (error) {
+      console.error('주문 제거 실패:', error)
+      document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'error', message: error.message || i18next.t('message.remove_orders_failed', { defaultValue: '주문 제거에 실패했습니다' }) } }))
+    } finally {
+      this.actionLoading = false
+    }
+  }
+
+  /* ============================================================
+   * 주문 추가 팝업
+   * ============================================================ */
+
+  async _openAddOrderPopup() {
+    this.actionLoading = true
+    try {
+      const query = JSON.stringify([{ name: 'status', value: 'ALLOCATED' }])
+      const result = await ServiceUtil.restGet(`shipment_orders?query=${encodeURIComponent(query)}&limit=500`)
+      this.allocatedOrders = (result?.items || []).filter(o => !o.wave_no)
+      this.selectedAddOrderIds = []
+      this.showAddOrderPopup = true
+    } catch (error) {
+      console.error('ALLOCATED 주문 조회 실패:', error)
+      document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'error', message: i18next.t('message.fetch_allocated_failed', { defaultValue: 'ALLOCATED 주문 조회에 실패했습니다' }) } }))
+    } finally {
+      this.actionLoading = false
+    }
+  }
+
+  _closeAddOrderPopup() {
+    this.showAddOrderPopup = false
+    this.allocatedOrders = []
+    this.selectedAddOrderIds = []
+  }
+
+  _toggleAddOrderSelection(orderId, e) {
+    if (e.target.checked) {
+      this.selectedAddOrderIds = [...this.selectedAddOrderIds, orderId]
+    } else {
+      this.selectedAddOrderIds = this.selectedAddOrderIds.filter(id => id !== orderId)
+    }
+  }
+
+  _toggleAllAddOrders(e) {
+    if (e.target.checked) {
+      this.selectedAddOrderIds = this.allocatedOrders.map(o => o.id)
+    } else {
+      this.selectedAddOrderIds = []
+    }
+  }
+
+  async _confirmAddOrders() {
+    if (this.selectedAddOrderIds.length === 0) return
+
+    this.actionLoading = true
+    try {
+      const res = await ServiceUtil.restPost(`oms_trx/waves/${this.waveId}/add_orders`, { ids: this.selectedAddOrderIds })
+      document.dispatchEvent(new CustomEvent('notify', {
+        detail: { level: 'info', message: `${res.addedCount || 0}${i18next.t('label.count_unit', { defaultValue: '건' })} ${i18next.t('message.orders_added', { defaultValue: '주문이 추가되었습니다' })}` }
+      }))
+      this._closeAddOrderPopup()
+      await this._refreshAfterAction()
+    } catch (error) {
+      console.error('주문 추가 실패:', error)
+      document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'error', message: error.message || i18next.t('message.add_orders_failed', { defaultValue: '주문 추가에 실패했습니다' }) } }))
+    } finally {
+      this.actionLoading = false
+    }
+  }
+
+  _renderAddOrderPopup() {
+    return html`
+      <div class="popup-overlay" @click="${e => { if (e.target === e.currentTarget) this._closeAddOrderPopup() }}">
+        <div class="popup-container">
+          <div class="popup-header">
+            <h3>${i18next.t('title.add_orders_to_wave', { defaultValue: '웨이브에 주문 추가' })}</h3>
+            <button class="action-btn secondary" @click="${this._closeAddOrderPopup}">✕</button>
+          </div>
+          <div class="popup-body">
+            <div class="popup-info">
+              ${i18next.t('label.allocated_orders_available', { defaultValue: 'ALLOCATED 상태의 미배정 주문 목록입니다. 추가할 주문을 선택하세요.' })}
+            </div>
+            ${this.allocatedOrders.length === 0
+              ? html`<div class="empty-state"><div class="text">${i18next.t('label.no_allocated_orders', { defaultValue: '추가 가능한 주문이 없습니다' })}</div></div>`
+              : html`
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width:40px"><input type="checkbox" @change="${this._toggleAllAddOrders}" .checked="${this.selectedAddOrderIds.length > 0 && this.selectedAddOrderIds.length === this.allocatedOrders.length}"></th>
+                      <th>${i18next.t('label.shipment_no', { defaultValue: '출하번호' })}</th>
+                      <th>${i18next.t('label.ref_no', { defaultValue: '참조번호' })}</th>
+                      <th>${i18next.t('label.customer', { defaultValue: '고객' })}</th>
+                      <th>${i18next.t('label.biz_type', { defaultValue: '업무유형' })}</th>
+                      <th class="text-right">${i18next.t('label.order_qty', { defaultValue: '주문수량' })}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${this.allocatedOrders.map(o => html`
+                      <tr>
+                        <td><input type="checkbox" .checked="${this.selectedAddOrderIds.includes(o.id)}" @change="${e => this._toggleAddOrderSelection(o.id, e)}"></td>
+                        <td>${o.shipment_no || '-'}</td>
+                        <td>${o.ref_order_no || '-'}</td>
+                        <td>${o.cust_nm || o.cust_cd || '-'}</td>
+                        <td>${this._bizTypeLabel(o.biz_type)}</td>
+                        <td class="text-right">${o.total_order ?? 0}</td>
+                      </tr>
+                    `)}
+                  </tbody>
+                </table>
+              `}
+          </div>
+          <div class="popup-footer">
+            <span style="flex:1;font-size:13px;color:var(--md-sys-color-on-surface-variant);align-self:center">
+              ${this.selectedAddOrderIds.length > 0 ? `${this.selectedAddOrderIds.length}${i18next.t('label.count_unit', { defaultValue: '건' })} ${i18next.t('label.selected', { defaultValue: '선택됨' })}` : ''}
+            </span>
+            <button class="action-btn secondary" @click="${this._closeAddOrderPopup}">
+              ${i18next.t('button.cancel', { defaultValue: '취소' })}
+            </button>
+            <button class="action-btn primary" ?disabled="${this.selectedAddOrderIds.length === 0 || this.actionLoading}" @click="${this._confirmAddOrders}">
+              ${i18next.t('button.add', { defaultValue: '추가' })} (${this.selectedAddOrderIds.length})
+            </button>
+          </div>
+        </div>
+      </div>
+    `
   }
 
   _dispatchWaveUpdated() {
@@ -932,7 +1174,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     const labels = {
       TOTAL: i18next.t('label.total_picking', { defaultValue: '토털 피킹' }),
       INDIVIDUAL: i18next.t('label.individual_picking', { defaultValue: '개별 피킹' }),
-      BATCH: i18next.t('label.batch_picking', { defaultValue: '배치 피킹' })
+      ZONE: i18next.t('label.zone_picking', { defaultValue: '존 피킹' })
     }
     return labels[type] || type || '-'
   }

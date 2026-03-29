@@ -82,7 +82,7 @@ public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String whCd;
 
 	/**
-	 * 피킹 유형 (TOTAL/INDIVIDUAL/BATCH)
+	 * 피킹 유형 (INDIVIDUAL/TOTAL/ZONE)
 	 */
 	@Column(name = "pick_type", length = 20)
 	private String pickType;

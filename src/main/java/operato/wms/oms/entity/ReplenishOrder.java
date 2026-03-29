@@ -121,6 +121,36 @@ public class ReplenishOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook 
 	@Column(name = "remarks", length = 1000)
 	private String remarks;
 
+	/**
+	 * 확장 필드 1
+	 */
+	@Column(name = "attr01", length = 100)
+	private String attr01;
+
+	/**
+	 * 확장 필드 2
+	 */
+	@Column(name = "attr02", length = 100)
+	private String attr02;
+
+	/**
+	 * 확장 필드 3
+	 */
+	@Column(name = "attr03", length = 100)
+	private String attr03;
+
+	/**
+	 * 확장 필드 4
+	 */
+	@Column(name = "attr04", length = 100)
+	private String attr04;
+
+	/**
+	 * 확장 필드 5
+	 */
+	@Column(name = "attr05", length = 100)
+	private String attr05;
+
 	public String getId() {
 		return id;
 	}
@@ -223,6 +253,46 @@ public class ReplenishOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook 
 
 	public void setRemarks(String remarks) {
 		this.remarks = remarks;
+	}
+
+	public String getAttr01() {
+		return attr01;
+	}
+
+	public void setAttr01(String attr01) {
+		this.attr01 = attr01;
+	}
+
+	public String getAttr02() {
+		return attr02;
+	}
+
+	public void setAttr02(String attr02) {
+		this.attr02 = attr02;
+	}
+
+	public String getAttr03() {
+		return attr03;
+	}
+
+	public void setAttr03(String attr03) {
+		this.attr03 = attr03;
+	}
+
+	public String getAttr04() {
+		return attr04;
+	}
+
+	public void setAttr04(String attr04) {
+		this.attr04 = attr04;
+	}
+
+	public String getAttr05() {
+		return attr05;
+	}
+
+	public void setAttr05(String attr05) {
+		this.attr05 = attr05;
 	}
 
 	@Override
