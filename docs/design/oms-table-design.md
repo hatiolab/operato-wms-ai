@@ -1008,74 +1008,79 @@ Base URL: `/rest/oms_trx`
 
 ### 9.1 주문 수신/임포트
 
-| Method | URL | 설명 |
-|--------|-----|------|
-| POST | `shipment_orders/import/excel/b2c` | B2C 주문 엑셀 임포트 |
-| POST | `shipment_orders/import/excel/b2b` | B2B 주문 엑셀 임포트 |
-| POST | `shipment_orders/import/api` | 외부 API 주문 수신 |
-| POST | `shipment_orders/import/channel/{channelCd}` | 채널별 주문 동기화 |
+| Method | URL | 설명 | 구현 |
+|--------|-----|------|:----:|
+| POST | `shipment_orders/import/excel/b2c` | B2C 주문 엑셀 임포트 | ✅ |
+| POST | `shipment_orders/import/excel/b2b` | B2B 주문 엑셀 임포트 | ✅ |
+| POST | `shipment_orders/import/confirm` | 주문 임포트 확정 (검증 후 등록) | ✅ |
+| POST | `shipment_orders/import/api` | 외부 API 주문 수신 | |
+| POST | `shipment_orders/import/channel/{channelCd}` | 채널별 주문 동기화 | |
 
 ### 9.2 주문 확정
 
-| Method | URL | 설명 |
-|--------|-----|------|
-| POST | `shipment_orders/{id}/confirm` | 개별 주문 확정 (REGISTERED→CONFIRMED) |
-| POST | `shipment_orders/confirm` | 복수 주문 일괄 확정 |
-| POST | `shipment_orders/{id}/cancel_confirm` | 확정 취소 (CONFIRMED→REGISTERED) |
+| Method | URL | 설명 | 구현 |
+|--------|-----|------|:----:|
+| POST | `shipment_orders/{id}/confirm` | 개별 주문 확정 (REGISTERED→CONFIRMED) | |
+| POST | `shipment_orders/confirm` | 복수 주문 일괄 확정 | ✅ |
+| POST | `shipment_orders/{id}/cancel_confirm` | 확정 취소 (CONFIRMED→REGISTERED) | |
 
 ### 9.3 재고 할당
 
-| Method | URL | 설명 |
-|--------|-----|------|
-| POST | `shipment_orders/{id}/allocate` | 개별 주문 재고 할당 (CONFIRMED→ALLOCATED) |
-| POST | `shipment_orders/allocate` | 복수 주문 일괄 할당 |
-| POST | `shipment_orders/{id}/deallocate` | 할당 해제 (ALLOCATED→CONFIRMED) |
-| POST | `shipment_orders/{id}/confirm_and_allocate` | 확정+할당 원클릭 |
-| GET | `shipment_orders/{id}/allocations` | 할당 내역 조회 |
-| GET | `shipment_orders/{id}/available_inventories` | 가용 재고 조회 |
+| Method | URL | 설명 | 구현 |
+|--------|-----|------|:----:|
+| POST | `shipment_orders/{id}/allocate` | 개별 주문 재고 할당 (CONFIRMED→ALLOCATED) | |
+| POST | `shipment_orders/allocate` | 복수 주문 일괄 할당 | ✅ |
+| POST | `shipment_orders/deallocate` | 할당 해제 (ALLOCATED→CONFIRMED) | ✅ |
+| POST | `shipment_orders/{id}/confirm_and_allocate` | 확정+할당 원클릭 | ✅ |
+| GET | `shipment_orders/{id}/allocations` | 할당 내역 조회 | |
+| GET | `shipment_orders/{id}/available_inventories` | 가용 재고 조회 | |
 
 ### 9.4 웨이브 관리
 
-| Method | URL | 설명 |
-|--------|-----|------|
-| POST | `waves/create` | 웨이브 생성 (주문 자동 그룹핑) |
-| POST | `waves/create_manual` | 수동 웨이브 생성 (주문 직접 선택) |
-| POST | `waves/{id}/add_orders` | 웨이브에 주문 추가 |
-| POST | `waves/{id}/remove_orders` | 웨이브에서 주문 제거 |
-| POST | `waves/{id}/release` | 웨이브 확정 → Fulfillment 인계 |
-| POST | `waves/{id}/cancel` | 웨이브 취소 |
-| GET | `waves/{id}/orders` | 웨이브 내 주문 목록 |
-| GET | `waves/{id}/summary` | 웨이브 요약 (SKU 합산, 수량 등) |
+| Method | URL | 설명 | 구현 |
+|--------|-----|------|:----:|
+| POST | `waves/create` | 웨이브 생성 (주문 자동 그룹핑) | ✅ |
+| POST | `waves/create_manual` | 수동 웨이브 생성 (주문 직접 선택) | ✅ |
+| GET | `waves/preview` | 자동 웨이브 대상 건수 미리보기 | ✅ |
+| POST | `waves/{id}/add_orders` | 웨이브에 주문 추가 | ✅ |
+| POST | `waves/{id}/remove_orders` | 웨이브에서 주문 제거 | ✅ |
+| POST | `waves/{id}/release` | 웨이브 확정 → Fulfillment 인계 | ✅ |
+| POST | `waves/{id}/cancel` | 웨이브 취소 | ✅ |
+| GET | `waves/{id}/orders` | 웨이브 내 주문 목록 | ✅ |
+| GET | `waves/{id}/summary` | 웨이브 요약 (SKU 합산, 수량 등) | ✅ |
 
 ### 9.5 보충 지시
 
-| Method | URL | 설명 |
-|--------|-----|------|
-| POST | `replenish_orders/create` | 보충 지시 생성 |
-| POST | `replenish_orders/{id}/start` | 보충 작업 시작 |
-| POST | `replenish_orders/{id}/complete` | 보충 완료 |
-| POST | `replenish_orders/{id}/cancel` | 보충 취소 |
-| GET | `replenish_orders/{id}/items` | 보충 상세 조회 |
+| Method | URL | 설명 | 구현 |
+|--------|-----|------|:----:|
+| POST | `replenish_orders/create` | 보충 지시 생성 | |
+| POST | `replenish_orders/{id}/start` | 보충 작업 시작 | ✅ |
+| POST | `replenish_orders/{id}/complete` | 보충 완료 | ✅ |
+| POST | `replenish_orders/{id}/cancel` | 보충 취소 | ✅ |
+| GET | `replenish_orders/{id}/items` | 보충 상세 조회 | |
 
 ### 9.6 주문 취소/마감
 
-| Method | URL | 설명 |
-|--------|-----|------|
-| POST | `shipment_orders/{id}/cancel` | 주문 취소 (→CANCELLED) |
-| POST | `shipment_orders/cancel` | 복수 주문 일괄 취소 |
-| POST | `shipment_orders/{id}/close` | 주문 마감 (SHIPPED→CLOSED) |
-| POST | `shipment_orders/close` | 복수 주문 일괄 마감 |
+| Method | URL | 설명 | 구현 |
+|--------|-----|------|:----:|
+| POST | `shipment_orders/{id}/cancel` | 주문 취소 (→CANCELLED) | |
+| POST | `shipment_orders/cancel` | 복수 주문 일괄 취소 | ✅ |
+| POST | `shipment_orders/{id}/close` | 주문 마감 (SHIPPED→CLOSED) | ✅ |
+| POST | `shipment_orders/close` | 복수 주문 일괄 마감 | |
 
 ### 9.7 조회/대시보드
 
-| Method | URL | 설명 |
-|--------|-----|------|
-| GET | `dashboard/status_counts` | 상태별 주문 건수 |
-| GET | `dashboard/channel_stats` | 채널별 통계 |
-| GET | `dashboard/wave_stats` | 웨이브별 진행 현황 |
-| GET | `dashboard/allocation_stats` | 할당 현황 (할당율/부족율) |
-| GET | `dashboard/back_orders` | 재고 부족 주문 목록 |
-| GET | `dashboard/cutoff_alerts` | 마감 임박 주문 알림 |
+Base URL: `/rest/oms_dashboard`
+
+| Method | URL | 설명 | 구현 |
+|--------|-----|------|:----:|
+| GET | `status_counts` | 상태별 주문 건수 | ✅ |
+| GET | `biz_type_stats` | 업무 유형별 통계 | ✅ |
+| GET | `channel_stats` | 채널별 통계 | ✅ |
+| GET | `wave_stats` | 웨이브별 진행 현황 | ✅ |
+| GET | `allocation_stats` | 할당 현황 (할당율/부족율) | ✅ |
+| GET | `back_orders` | 재고 부족 주문 목록 | |
+| GET | `cutoff_alerts` | 마감 임박 주문 알림 | ✅ |
 
 ### 9.8 CRUD API
 

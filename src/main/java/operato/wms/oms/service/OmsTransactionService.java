@@ -40,8 +40,8 @@ public class OmsTransactionService extends AbstractQueryService {
 	 *
 	 * @param list    임포트 대상 데이터
 	 * @param bizType 업무유형 (B2C_OUT / B2B_OUT)
-	 * @return 검증 결과 { total, valid, error, rows: [ { ...fields, rowNo, valid,
-	 *         errorMessages } ] }
+	 * @return 검증 결과 { total, valid, error, rows: [ { ...fields, row_no, valid,
+	 *         error_messages } ] }
 	 */
 	public Map<String, Object> validateImportData(List<ImportShipmentOrder> list, String bizType) {
 		Long domainId = Domain.currentDomainId();
@@ -73,6 +73,8 @@ public class OmsTransactionService extends AbstractQueryService {
 				SKU sku = this.queryManager.selectByCondition(SKU.class, skuQuery);
 				if (sku == null) {
 					errors.add("SKU [" + row.getSkuCd() + "]가 존재하지 않습니다");
+				} else {
+					row.setSkuNm(sku.getSkuNm());
 				}
 			}
 
@@ -96,25 +98,25 @@ public class OmsTransactionService extends AbstractQueryService {
 
 			// 결과 행 구성
 			Map<String, Object> resultRow = new HashMap<>();
-			resultRow.put("rowNo", i + 1);
-			resultRow.put("refOrderNo", row.getRefOrderNo());
-			resultRow.put("skuCd", row.getSkuCd());
-			resultRow.put("skuNm", row.getSkuNm());
-			resultRow.put("orderQty", row.getOrderQty());
-			resultRow.put("orderDate", row.getOrderDate());
-			resultRow.put("shipByDate", row.getShipByDate());
-			resultRow.put("custCd", row.getCustCd());
-			resultRow.put("custNm", row.getCustNm());
-			resultRow.put("receiverNm", row.getReceiverNm());
-			resultRow.put("bizType", ValueUtil.isNotEmpty(row.getBizType()) ? row.getBizType() : bizType);
+			resultRow.put("row_no", i + 1);
+			resultRow.put("ref_order_no", row.getRefOrderNo());
+			resultRow.put("sku_cd", row.getSkuCd());
+			resultRow.put("sku_nm", row.getSkuNm());
+			resultRow.put("order_qty", row.getOrderQty());
+			resultRow.put("order_date", row.getOrderDate());
+			resultRow.put("ship_by_date", row.getShipByDate());
+			resultRow.put("cust_cd", row.getCustCd());
+			resultRow.put("cust_nm", row.getCustNm());
+			resultRow.put("receiver_nm", row.getReceiverNm());
+			resultRow.put("biz_type", ValueUtil.isNotEmpty(row.getBizType()) ? row.getBizType() : bizType);
 
 			if (errors.isEmpty()) {
 				resultRow.put("valid", true);
-				resultRow.put("errorMessages", new ArrayList<>());
+				resultRow.put("error_messages", new ArrayList<>());
 				validCount++;
 			} else {
 				resultRow.put("valid", false);
-				resultRow.put("errorMessages", errors);
+				resultRow.put("error_messages", errors);
 				errorCount++;
 			}
 			rows.add(resultRow);
@@ -135,7 +137,8 @@ public class OmsTransactionService extends AbstractQueryService {
 	 * ShipmentOrder(헤더) + ShipmentOrderItem(상세) + ShipmentDelivery(배송) 생성
 	 *
 	 * @param list 임포트 확정 대상 데이터
-	 * @return 처리 결과 { totalRows, orderCount, itemCount, deliveryCount, skippedRows
+	 * @return 처리 결과 { total_rows, order_count, item_count, delivery_count,
+	 *         skippedRows
 	 *         }
 	 */
 	public Map<String, Object> importShipmentOrders(List<ImportShipmentOrder> list) {
@@ -248,10 +251,10 @@ public class OmsTransactionService extends AbstractQueryService {
 		}
 
 		Map<String, Object> result = new HashMap<>();
-		result.put("totalRows", list.size());
-		result.put("orderCount", orderCount);
-		result.put("itemCount", itemCount);
-		result.put("deliveryCount", deliveryCount);
+		result.put("total_rows", list.size());
+		result.put("order_count", orderCount);
+		result.put("item_count", itemCount);
+		result.put("delivery_count", deliveryCount);
 		return result;
 	}
 
@@ -260,23 +263,24 @@ public class OmsTransactionService extends AbstractQueryService {
 	 *
 	 * ALLOCATED 상태 주문을 그룹핑 기준에 따라 웨이브로 묶는다.
 	 *
-	 * @param params { groupBy: ["carrier_cd", ...], pickType, pickMethod,
-	 *               maxOrderCount, orderDate }
-	 * @return 처리 결과 { waveCount, totalOrders, waves: [...] }
+	 * @param params { group_by: ["carrier_cd", ...], pick_type, pick_method,
+	 *               max_order_count, order_date }
+	 * @return 처리 결과 { wave_count, total_orders, waves: [...] }
 	 */
 	@SuppressWarnings("unchecked")
 	public Map<String, Object> createAutoWaves(Map<String, Object> params) {
 		Long domainId = Domain.currentDomainId();
 		String today = DateUtil.todayStr();
 
-		List<String> groupBy = params.get("groupBy") != null ? (List<String>) params.get("groupBy") : new ArrayList<>();
-		String pickType = ValueUtil.isNotEmpty(params.get("pickType")) ? params.get("pickType").toString() : "TOTAL";
-		String pickMethod = ValueUtil.isNotEmpty(params.get("pickMethod")) ? params.get("pickMethod").toString()
+		List<String> groupBy = params.get("group_by") != null ? (List<String>) params.get("group_by")
+				: new ArrayList<>();
+		String pickType = ValueUtil.isNotEmpty(params.get("pick_type")) ? params.get("pick_type").toString() : "TOTAL";
+		String pickMethod = ValueUtil.isNotEmpty(params.get("pick_method")) ? params.get("pick_method").toString()
 				: "PICK";
-		int maxOrderCount = params.get("maxOrderCount") != null
-				? Integer.parseInt(params.get("maxOrderCount").toString())
+		int maxOrderCount = params.get("max_order_count") != null
+				? Integer.parseInt(params.get("max_order_count").toString())
 				: 200;
-		String orderDate = ValueUtil.isNotEmpty(params.get("orderDate")) ? params.get("orderDate").toString() : today;
+		String orderDate = ValueUtil.isNotEmpty(params.get("order_date")) ? params.get("order_date").toString() : today;
 
 		// 1. ALLOCATED 상태 주문 조회
 		String orderSql = "SELECT * FROM shipment_orders WHERE domain_id = :domainId AND status = :status AND order_date = :orderDate ORDER BY priority_cd, created_at";
@@ -287,8 +291,8 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		if (orders.isEmpty()) {
 			Map<String, Object> emptyResult = new HashMap<>();
-			emptyResult.put("waveCount", 0);
-			emptyResult.put("totalOrders", 0);
+			emptyResult.put("wave_count", 0);
+			emptyResult.put("total_orders", 0);
 			emptyResult.put("waves", new ArrayList<>());
 			return emptyResult;
 		}
@@ -369,12 +373,12 @@ public class OmsTransactionService extends AbstractQueryService {
 
 				// 결과 수집
 				Map<String, Object> waveInfo = new HashMap<>();
-				waveInfo.put("waveNo", waveNo);
-				waveInfo.put("waveSeq", nextSeq);
-				waveInfo.put("orderCount", planOrderCnt);
-				waveInfo.put("skuCount", planItemCnt);
-				waveInfo.put("totalQty", planTotalQty);
-				waveInfo.put("carrierCd", carrierCd);
+				waveInfo.put("wave_no", waveNo);
+				waveInfo.put("wave_seq", nextSeq);
+				waveInfo.put("order_count", planOrderCnt);
+				waveInfo.put("sku_count", planItemCnt);
+				waveInfo.put("total_qty", planTotalQty);
+				waveInfo.put("carrier_cd", carrierCd);
 				waveResults.add(waveInfo);
 
 				waveCount++;
@@ -384,9 +388,132 @@ public class OmsTransactionService extends AbstractQueryService {
 		}
 
 		Map<String, Object> result = new HashMap<>();
-		result.put("waveCount", waveCount);
-		result.put("totalOrders", totalOrderCount);
+		result.put("wave_count", waveCount);
+		result.put("total_orders", totalOrderCount);
 		result.put("waves", waveResults);
+		return result;
+	}
+
+	/**
+	 * 수동 웨이브 생성
+	 *
+	 * 화면에서 직접 선택한 주문 리스트를 하나의 웨이브로 묶는다.
+	 * ALLOCATED 상태의 주문만 웨이브에 포함할 수 있다.
+	 *
+	 * @param params { orders: [{ id, ... }], pick_type, pick_method }
+	 * @return { wave_no, wave_seq, order_count, sku_count, total_qty, skipped_count, errors }
+	 */
+	@SuppressWarnings("unchecked")
+	public Map<String, Object> createManualWave(Map<String, Object> params) {
+		Long domainId = Domain.currentDomainId();
+		String today = DateUtil.todayStr();
+
+		// 파라미터 추출
+		List<Map<String, Object>> orders = params.get("orders") != null
+				? (List<Map<String, Object>>) params.get("orders")
+				: new ArrayList<>();
+		String pickType = ValueUtil.isNotEmpty(params.get("pick_type")) ? params.get("pick_type").toString() : "TOTAL";
+		String pickMethod = ValueUtil.isNotEmpty(params.get("pick_method")) ? params.get("pick_method").toString()
+				: "PICK";
+
+		if (orders.isEmpty()) {
+			throw new RuntimeException("웨이브에 포함할 주문을 선택해 주세요");
+		}
+
+		// 주문 ID 추출
+		List<String> orderIds = new ArrayList<>();
+		for (Map<String, Object> orderMap : orders) {
+			String orderId = orderMap.get("id") != null ? orderMap.get("id").toString() : null;
+			if (ValueUtil.isNotEmpty(orderId)) {
+				orderIds.add(orderId);
+			}
+		}
+
+		if (orderIds.isEmpty()) {
+			throw new RuntimeException("유효한 주문 ID가 없습니다");
+		}
+
+		// ALLOCATED 상태 주문만 필터링
+		List<ShipmentOrder> validOrders = new ArrayList<>();
+		List<String> errors = new ArrayList<>();
+		for (String orderId : orderIds) {
+			ShipmentOrder order = this.findOrder(domainId, orderId);
+			if (order == null) {
+				errors.add("주문을 찾을 수 없습니다: " + orderId);
+				continue;
+			}
+			if (!ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus())) {
+				errors.add("주문 [" + order.getShipmentNo() + "] 상태가 [" + order.getStatus() + "]이므로 웨이브에 포함할 수 없습니다 (ALLOCATED 상태만 가능)");
+				continue;
+			}
+			validOrders.add(order);
+		}
+
+		if (validOrders.isEmpty()) {
+			throw new RuntimeException("웨이브에 포함할 수 있는 주문이 없습니다 (ALLOCATED 상태의 주문만 가능)");
+		}
+
+		// 당일 최대 wave_seq 조회
+		String seqSql = "SELECT COALESCE(MAX(wave_seq), 0) FROM shipment_waves WHERE domain_id = :domainId AND wave_date = :waveDate";
+		Map<String, Object> seqParams = ValueUtil.newMap("domainId,waveDate", domainId, today);
+		Integer maxSeq = this.queryManager.selectBySql(seqSql, seqParams, Integer.class);
+		int nextSeq = (maxSeq != null ? maxSeq : 0) + 1;
+
+		// 웨이브 번호 생성
+		String waveNo = "WAVE-" + today.replace("-", "") + "-" + String.format("%03d", nextSeq);
+
+		// 계획 수량 집계
+		int planOrderCnt = validOrders.size();
+		double planTotalQty = 0;
+		List<String> validOrderIds = new ArrayList<>();
+		for (ShipmentOrder ord : validOrders) {
+			planTotalQty += (ord.getTotalOrder() != null ? ord.getTotalOrder() : 0);
+			validOrderIds.add(ord.getId());
+		}
+
+		// SKU 종류 집계
+		String skuCountSql = "SELECT COUNT(DISTINCT sku_cd) FROM shipment_order_items WHERE domain_id = :domainId AND shipment_order_id IN (:orderIds)";
+		Map<String, Object> skuCountParams = ValueUtil.newMap("domainId,orderIds", domainId, validOrderIds);
+		Integer skuCnt = this.queryManager.selectBySql(skuCountSql, skuCountParams, Integer.class);
+		int planItemCnt = skuCnt != null ? skuCnt : 0;
+
+		// 대표 택배사 (첫 번째 주문 기준)
+		String carrierCd = validOrders.get(0).getCarrierCd();
+
+		// ShipmentWave 생성
+		ShipmentWave wave = new ShipmentWave();
+		wave.setDomainId(domainId);
+		wave.setWaveNo(waveNo);
+		wave.setWaveDate(today);
+		wave.setWaveSeq(nextSeq);
+		wave.setPickType(pickType);
+		wave.setPickMethod(pickMethod);
+		wave.setCarrierCd(carrierCd);
+		wave.setPlanOrder(planOrderCnt);
+		wave.setPlanItem(planItemCnt);
+		wave.setPlanTotal(planTotalQty);
+		wave.setResultOrder(0);
+		wave.setResultItem(0);
+		wave.setResultTotal(0.0);
+		wave.setStatus(ShipmentWave.STATUS_CREATED);
+		this.queryManager.insert(wave);
+
+		// 주문에 wave_no 업데이트 및 상태 변경
+		for (ShipmentOrder ord : validOrders) {
+			String updateSql = "UPDATE shipment_orders SET wave_no = :waveNo, status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+			Map<String, Object> updateParams = ValueUtil.newMap("waveNo,status,domainId,id", waveNo,
+					ShipmentOrder.STATUS_WAVED, domainId, ord.getId());
+			this.queryManager.executeBySql(updateSql, updateParams);
+		}
+
+		Map<String, Object> result = new HashMap<>();
+		result.put("wave_no", waveNo);
+		result.put("wave_seq", nextSeq);
+		result.put("order_count", planOrderCnt);
+		result.put("sku_count", planItemCnt);
+		result.put("total_qty", planTotalQty);
+		result.put("skipped_count", orderIds.size() - validOrders.size());
+		result.put("errors", errors);
 		return result;
 	}
 
@@ -427,7 +554,7 @@ public class OmsTransactionService extends AbstractQueryService {
 	 * 자동 웨이브 대상 건수 미리보기
 	 *
 	 * @param orderDate 주문일자
-	 * @return { totalOrders }
+	 * @return { total_orders }
 	 */
 	public Map<String, Object> previewAutoWaveTargets(String orderDate) {
 		Long domainId = Domain.currentDomainId();
@@ -439,7 +566,7 @@ public class OmsTransactionService extends AbstractQueryService {
 		Integer count = this.queryManager.selectBySql(sql, params, Integer.class);
 
 		Map<String, Object> result = new HashMap<>();
-		result.put("totalOrders", count != null ? count : 0);
+		result.put("total_orders", count != null ? count : 0);
 		return result;
 	}
 
@@ -456,7 +583,7 @@ public class OmsTransactionService extends AbstractQueryService {
 	 * 전체 할당 시 ALLOCATED, 부분 할당 시 BACK_ORDER 상태가 된다.
 	 *
 	 * @param id 주문 ID
-	 * @return { success, status, allocatedQty, backOrder }
+	 * @return { success, status, allocated_qty, back_order }
 	 */
 	public Map<String, Object> confirmAndAllocateShipmentOrder(String id) {
 		Long domainId = Domain.currentDomainId();
@@ -495,8 +622,8 @@ public class OmsTransactionService extends AbstractQueryService {
 		Map<String, Object> result = new HashMap<>();
 		result.put("success", allocSuccess > 0);
 		result.put("status", updatedOrder != null ? updatedOrder.getStatus() : null);
-		result.put("allocatedQty", updatedOrder != null ? updatedOrder.getTotalAlloc() : 0);
-		result.put("backOrder", backOrderCount > 0);
+		result.put("allocated_qty", updatedOrder != null ? updatedOrder.getTotalAlloc() : 0);
+		result.put("back_order", backOrderCount > 0);
 		return result;
 	}
 
@@ -504,7 +631,7 @@ public class OmsTransactionService extends AbstractQueryService {
 	 * 출하 주문 확정 (REGISTERED → CONFIRMED)
 	 *
 	 * @param ids 주문 ID 리스트
-	 * @return { successCount, failCount, errors }
+	 * @return { success_count, fail_count, errors }
 	 */
 	public Map<String, Object> confirmShipmentOrders(List<String> ids) {
 		Long domainId = Domain.currentDomainId();
@@ -535,8 +662,8 @@ public class OmsTransactionService extends AbstractQueryService {
 		}
 
 		Map<String, Object> result = new HashMap<>();
-		result.put("successCount", successCount);
-		result.put("failCount", failCount);
+		result.put("success_count", successCount);
+		result.put("fail_count", failCount);
 		result.put("errors", errors);
 		return result;
 	}
@@ -548,7 +675,7 @@ public class OmsTransactionService extends AbstractQueryService {
 	 * 전체 할당 완료 시 ALLOCATED, 부분 할당 시 BACK_ORDER로 상태 변경.
 	 *
 	 * @param ids 주문 ID 리스트
-	 * @return { successCount, allocatedCount, backOrderCount }
+	 * @return { success_count, allocated_count, back_order_count }
 	 */
 	public Map<String, Object> allocateShipmentOrders(List<String> ids) {
 		Long domainId = Domain.currentDomainId();
@@ -677,9 +804,9 @@ public class OmsTransactionService extends AbstractQueryService {
 		}
 
 		Map<String, Object> result = new HashMap<>();
-		result.put("successCount", successCount);
-		result.put("allocatedCount", allocatedCount);
-		result.put("backOrderCount", backOrderCount);
+		result.put("success_count", successCount);
+		result.put("allocated_count", allocatedCount);
+		result.put("back_order_count", backOrderCount);
 		result.put("errors", errors);
 		return result;
 	}
@@ -688,7 +815,7 @@ public class OmsTransactionService extends AbstractQueryService {
 	 * 출하 주문 할당 해제 (ALLOCATED → CONFIRMED)
 	 *
 	 * @param id 주문 ID
-	 * @return { success, releasedCount }
+	 * @return { success, released_count }
 	 */
 	public Map<String, Object> deallocateShipmentOrder(String id) {
 		Long domainId = Domain.currentDomainId();
@@ -738,7 +865,7 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		Map<String, Object> result = new HashMap<>();
 		result.put("success", true);
-		result.put("releasedCount", allocations.size());
+		result.put("released_count", allocations.size());
 		return result;
 	}
 
@@ -749,7 +876,7 @@ public class OmsTransactionService extends AbstractQueryService {
 	 * 할당된 재고가 있으면 해제 처리한다.
 	 *
 	 * @param ids 주문 ID 리스트
-	 * @return { successCount, failCount }
+	 * @return { success_count, fail_count }
 	 */
 	public Map<String, Object> cancelShipmentOrders(List<String> ids) {
 		Long domainId = Domain.currentDomainId();
@@ -805,8 +932,8 @@ public class OmsTransactionService extends AbstractQueryService {
 		}
 
 		Map<String, Object> result = new HashMap<>();
-		result.put("successCount", successCount);
-		result.put("failCount", failCount);
+		result.put("success_count", successCount);
+		result.put("fail_count", failCount);
 		result.put("errors", errors);
 		return result;
 	}
@@ -852,7 +979,7 @@ public class OmsTransactionService extends AbstractQueryService {
 	 * 웨이브 상태를 RELEASED로 변경하고, 포함된 주문을 RELEASED 상태로 전환한다.
 	 *
 	 * @param id 웨이브 ID
-	 * @return { success, orderCount }
+	 * @return { success, order_count }
 	 */
 	public Map<String, Object> releaseWave(String id) {
 		Long domainId = Domain.currentDomainId();
@@ -887,7 +1014,7 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		Map<String, Object> result = new HashMap<>();
 		result.put("success", true);
-		result.put("orderCount", orderCount != null ? orderCount : 0);
+		result.put("order_count", orderCount != null ? orderCount : 0);
 		return result;
 	}
 
@@ -897,7 +1024,7 @@ public class OmsTransactionService extends AbstractQueryService {
 	 * 웨이브를 취소하고, 포함된 주문을 ALLOCATED 상태로 복원한다.
 	 *
 	 * @param id 웨이브 ID
-	 * @return { success, restoredOrderCount }
+	 * @return { success, restored_order_count }
 	 */
 	public Map<String, Object> cancelWave(String id) {
 		Long domainId = Domain.currentDomainId();
@@ -931,7 +1058,7 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		Map<String, Object> result = new HashMap<>();
 		result.put("success", true);
-		result.put("restoredOrderCount", restoredCount);
+		result.put("restored_order_count", restoredCount);
 		return result;
 	}
 
@@ -969,7 +1096,8 @@ public class OmsTransactionService extends AbstractQueryService {
 	 * 웨이브에 포함된 전체 주문의 품목을 SKU 기준으로 합산하여 반환한다.
 	 *
 	 * @param id 웨이브 ID
-	 * @return SKU 합산 목록 [ { skuCd, skuNm, totalQty, orderCount, locCd, availableQty
+	 * @return SKU 합산 목록 [ { sku_cd, sku_nm, total_qty, order_count, loc_cd,
+	 *         available_qty
 	 *         } ]
 	 */
 	public List<Map> getWaveSummary(String id) {
@@ -1008,7 +1136,7 @@ public class OmsTransactionService extends AbstractQueryService {
 	 *
 	 * @param waveId   웨이브 ID
 	 * @param orderIds 추가할 주문 ID 리스트
-	 * @return { addedCount, waveNo }
+	 * @return { added_count, wave_no }
 	 */
 	public Map<String, Object> addOrdersToWave(String waveId, List<String> orderIds) {
 		Long domainId = Domain.currentDomainId();
@@ -1040,8 +1168,8 @@ public class OmsTransactionService extends AbstractQueryService {
 		this.recalcWavePlanStats(domainId, waveId, wave.getWaveNo());
 
 		Map<String, Object> result = new HashMap<>();
-		result.put("addedCount", addedCount);
-		result.put("waveNo", wave.getWaveNo());
+		result.put("added_count", addedCount);
+		result.put("wave_no", wave.getWaveNo());
 		return result;
 	}
 
@@ -1053,7 +1181,7 @@ public class OmsTransactionService extends AbstractQueryService {
 	 *
 	 * @param waveId   웨이브 ID
 	 * @param orderIds 제거할 주문 ID 리스트
-	 * @return { removedCount, waveNo }
+	 * @return { removed_count, wave_no }
 	 */
 	public Map<String, Object> removeOrdersFromWave(String waveId, List<String> orderIds) {
 		Long domainId = Domain.currentDomainId();
@@ -1087,8 +1215,8 @@ public class OmsTransactionService extends AbstractQueryService {
 		this.recalcWavePlanStats(domainId, waveId, wave.getWaveNo());
 
 		Map<String, Object> result = new HashMap<>();
-		result.put("removedCount", removedCount);
-		result.put("waveNo", wave.getWaveNo());
+		result.put("removed_count", removedCount);
+		result.put("wave_no", wave.getWaveNo());
 		return result;
 	}
 
@@ -1159,7 +1287,7 @@ public class OmsTransactionService extends AbstractQueryService {
 	 * 상세 항목의 실적 수량을 합산하여 헤더의 resultTotal을 갱신한다.
 	 *
 	 * @param id 보충 지시 ID
-	 * @return { success, resultTotal }
+	 * @return { success, result_total }
 	 */
 	public Map<String, Object> completeReplenishOrder(String id) {
 		Long domainId = Domain.currentDomainId();
@@ -1186,7 +1314,7 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		Map<String, Object> result = new HashMap<>();
 		result.put("success", true);
-		result.put("resultTotal", resultTotal);
+		result.put("result_total", resultTotal);
 		return result;
 	}
 

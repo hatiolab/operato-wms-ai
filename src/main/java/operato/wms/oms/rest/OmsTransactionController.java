@@ -101,6 +101,20 @@ public class OmsTransactionController extends AbstractRestService {
 	}
 
 	/**
+	 * 수동 웨이브 생성 (주문 직접 선택)
+	 *
+	 * POST /rest/oms_trx/waves/create_manual
+	 *
+	 * @param params { orders: [{ id, ... }], pick_type, pick_method }
+	 * @return { wave_no, wave_seq, order_count, sku_count, total_qty, skipped_count, errors }
+	 */
+	@RequestMapping(value = "waves/create_manual", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Create wave manually from selected orders")
+	public Map<String, Object> createManualWave(@RequestBody Map<String, Object> params) {
+		return this.omsTrxService.createManualWave(params);
+	}
+
+	/**
 	 * 자동 웨이브 대상 건수 조회
 	 *
 	 * GET /rest/oms_trx/waves/preview
