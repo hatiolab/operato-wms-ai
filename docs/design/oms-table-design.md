@@ -337,14 +337,15 @@ SOFT ─→ HARD ─→ RELEASED
 | `priority_cd` | VARCHAR | Y | 10 | 우선순위 (URGENT/NORMAL/LOW) |
 | `wave_no` | VARCHAR | Y | 30 | 웨이브 번호 (FK → shipment_waves) |
 | `com_cd` | VARCHAR | N | 30 | 화주사 코드 |
-| `cust_cd` | VARCHAR | Y | 30 | 고객 코드 (B2B: 고객사 코드, B2C: 판매 채널 코드) |
-| `cust_nm` | VARCHAR | Y | 100 | 고객명 (B2B: 고객사명, B2C: 판매 채널명) |
+| `cust_cd` | VARCHAR | Y | 30 | 고객 코드 — B2C: 판매 채널 코드(OWN_MALL/COUPANG/NAVER/GMARKET/AUCTION/11ST/SSG/LOTTE_ON/ETC), B2B: 납품 거래처 코드. 섹션 1.3 채널 코드 참조 |
+| `cust_nm` | VARCHAR | Y | 100 | 주문자명 — B2C: 주문자 이름(예: "홍길동"), B2B: 납품 거래처명(예: "삼성전자") |
 | `wh_cd` | VARCHAR | N | 30 | 창고 코드 |
 | `biz_type` | VARCHAR | Y | 10 | 업무 유형 (B2C_OUT/B2B_OUT/B2C_RTN/B2B_RTN) |
 | `ship_type` | VARCHAR | Y | 20 | 출하 유형 (NORMAL/RETURN/TRANSFER/SCRAP/EXPORT/ETC) |
 | `pick_method` | VARCHAR | Y | 20 | 피킹 방식 (WCS/PAPER/INSPECT/PICK) |
 | `dlv_type` | VARCHAR | Y | 20 | 배송 유형 (PARCEL/CHARTER/QUICK/PICKUP/DIRECT) |
 | `carrier_cd` | VARCHAR | Y | 30 | 택배사 코드 |
+| `carrier_service_type` | VARCHAR | Y | 20 | 택배 서비스 유형 (STANDARD/EXPRESS/SAME_DAY/NEXT_DAY/ECONOMY) |
 | `to_wh_cd` | VARCHAR | Y | 30 | 목적 창고 코드 (이동 출고 시) |
 | `total_item` | INTEGER | Y | - | 총 품목 수 |
 | `total_order` | DOUBLE | Y | - | 총 주문 수량 |
@@ -399,7 +400,6 @@ SOFT ─→ HARD ─→ RELEASED
 | `barcode` | VARCHAR | Y | 50 | 바코드 (요청) |
 | `expired_date` | VARCHAR | Y | 10 | 유통기한 (요청) |
 | `lot_no` | VARCHAR | Y | 50 | 로트 번호 (요청) |
-| `status` | VARCHAR | Y | 20 | 상태 |
 | `remarks` | VARCHAR | Y | 1000 | 비고 |
 | `attr01~05` | VARCHAR | Y | 100 | 확장 필드 |
 
@@ -411,7 +411,6 @@ SOFT ─→ HARD ─→ RELEASED
 | `ix_shipment_order_items_1` | `domain_id, shipment_order_id, sku_cd` |
 | `ix_shipment_order_items_2` | `domain_id, shipment_order_id, line_no` |
 | `ix_shipment_order_items_3` | `domain_id, shipment_order_id, barcode` |
-| `ix_shipment_order_items_4` | `domain_id, shipment_order_id, status` |
 
 ---
 
@@ -550,7 +549,6 @@ SOFT ─→ HARD ─→ RELEASED
 | `to_loc_cd` | VARCHAR | N | 30 | 목적 로케이션 (피킹존) |
 | `order_qty` | DOUBLE | N | - | 지시 수량 |
 | `result_qty` | DOUBLE | Y | - | 실적 수량 |
-| `status` | VARCHAR | Y | 20 | 상태 |
 | `remarks` | VARCHAR | Y | 1000 | 비고 |
 
 **인덱스**:
@@ -700,8 +698,8 @@ Excel/API 임포트 시 사용하는 스테이징 모델. `ignoreDdl = true`.
 | `order_date` | VARCHAR | Y | 10 | 주문 일자 |
 | `ship_by_date` | VARCHAR | Y | 10 | 출하 기한 |
 | `com_cd` | VARCHAR | Y | 30 | 화주사 코드 |
-| `cust_cd` | VARCHAR | Y | 30 | 고객 코드 (B2B: 고객사 코드, B2C: 판매 채널 코드) |
-| `cust_nm` | VARCHAR | Y | 100 | 고객명 (B2B: 고객사명, B2C: 판매 채널명) |
+| `cust_cd` | VARCHAR | Y | 30 | 고객 코드 — B2C: 판매 채널 코드(OWN_MALL/COUPANG 등), B2B: 납품 거래처 코드 |
+| `cust_nm` | VARCHAR | Y | 100 | 주문자명 — B2C: 주문자 이름, B2B: 납품 거래처명 |
 | `wh_cd` | VARCHAR | Y | 30 | 창고 코드 |
 | `biz_type` | VARCHAR | Y | 10 | 업무 유형 |
 | `ship_type` | VARCHAR | Y | 20 | 출하 유형 |
@@ -1367,7 +1365,7 @@ operato.wms.common.event/          ← 공통 이벤트 정의
 ┌─────────────────┐                    ┌─────────────────────┐
 │   Fulfillment   │   ApplicationEvent │        OMS          │
 │ (INDIVIDUAL/    │                    │                     │
-│  BATCH)         │                    │                     │
+│  ZONE)          │                    │                     │
 │  피킹 시작 ──────┼── publish ────────→│  RELEASED → PICKING │
 │  패킹 시작 ──────┼── publish ────────→│  PICKING → PACKING  │
 │  출하 완료 ──────┼── publish ────────→│  PACKING → SHIPPED  │
