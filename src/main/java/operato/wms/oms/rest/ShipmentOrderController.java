@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import operato.wms.oms.entity.ImportShipmentOrder;
+import operato.wms.oms.entity.ShipmentDelivery;
 import operato.wms.oms.entity.ShipmentOrder;
 import operato.wms.oms.entity.ShipmentOrderItem;
 import operato.wms.oms.service.OmsTransactionService;
@@ -94,6 +95,15 @@ public class ShipmentOrderController extends AbstractRestService {
 	@ApiDesc(description = "Create, Update or Delete multiple at one time")
 	public Boolean multipleUpdate(@RequestBody List<ShipmentOrder> list) {
 		return this.cudMultipleData(this.entityClass(), list);
+	}
+
+	@GetMapping(value = "/{id}/delivery", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Find Shipment Order Items By Shipment Order ID")
+	public ShipmentDelivery findShipmentDelivery(@PathVariable("id") String id) {
+		Query query = new Query();
+		query.addFilter(new Filter("shipmentOrderId", id));
+		List<ShipmentDelivery> list = this.queryManager.selectList(ShipmentDelivery.class, query);
+		return ValueUtil.isEmpty(list) ? null : list.get(0);
 	}
 
 	@GetMapping(value = "/{id}/items", produces = MediaType.APPLICATION_JSON_VALUE)

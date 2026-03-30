@@ -108,16 +108,17 @@ export const CustomGristButtonMixin = superClass =>
       let actionType = action.type
       let actionLogic =
         actionType == 'grid-editor-popup' ||
-        actionType == 'grid-popup-link' ||
-        actionType == 'grid-pass-param' ||
-        actionType == 'grid-status-service' ||
-        actionType == 'grid-file-download' ||
-        actionType == 'grid-attributes'
+          actionType == 'grid-popup-link' ||
+          actionType == 'grid-pass-param' ||
+          actionType == 'grid-status-service' ||
+          actionType == 'grid-file-download' ||
+          actionType == 'grid-attributes'
           ? JSON.parse(action.logic)
           : null
 
       // 그리드 선택 항목의 ID 값
-      let idVal = this.menu.id_field ? record[this.menu.id_field] : ''
+      let idVal = actionLogic.parent_field ? record[actionLogic.parent_field] :
+        (this.menu.id_field ? record[this.menu.id_field] : '')
 
       // 페이지 이동
       if (action.type == 'grid-page-link') {
@@ -131,7 +132,7 @@ export const CustomGristButtonMixin = superClass =>
         actionLogic.tagname = 'basic-code-editor-element'
         await UiUtil.openDynamicPopup(null, actionLogic, record, idVal)
 
-      // 팝업 오픈
+        // 팝업 오픈
       } else if (action.type == 'grid-popup-link') {
         // 팝업 클로저 함수
         let closerCallbackFunc = this.getPopupCloseCallbackFunc(actionLogic)
@@ -140,15 +141,15 @@ export const CustomGristButtonMixin = superClass =>
         // 팝업 오픈
         await UiUtil.openDynamicPopup(null, actionLogic, record, idVal, closerCallbackFunc)
 
-      // 서비스 호출
+        // 서비스 호출
       } else if (action.type == 'grid-service') {
         await this.requestRestService(action.method, action.logic.replace(':id', idVal), record)
 
-      // 그리드 항목 선택시 선택 항목을 파라미터 패싱 처리
+        // 그리드 항목 선택시 선택 항목을 파라미터 패싱 처리
       } else if (action.type == 'grid-pass-param') {
         this.passParametersToTarget(actionLogic, record)
 
-      // 그리드 항목별 상태에 따른 아이콘 변경 및 클릭 시 처리
+        // 그리드 항목별 상태에 따른 아이콘 변경 및 클릭 시 처리
       } else if (action.type == 'grid-status-service') {
         for (var idx = 0; idx < actionLogic.length; idx++) {
           let logic = actionLogic[idx]
@@ -163,35 +164,35 @@ export const CustomGristButtonMixin = superClass =>
             })
 
           if (isMatch) {
-            if(logic.url) {
+            if (logic.url) {
               await this.requestRestService(action.method, logic.url.replace(':id', idVal), record)
-            } else if(logic.route) {
+            } else if (logic.route) {
               MetaApi.pageNavigate(logic.route.replace(':id', idVal), record)
             }
           }
         }
-      // 그리드 로우 데이터 또는 설정된 값을 참조로 파일 다운로드 
-      } else if (action.type =='grid-file-download'){
+        // 그리드 로우 데이터 또는 설정된 값을 참조로 파일 다운로드 
+      } else if (action.type == 'grid-file-download') {
         let refType = actionLogic.refType
         let refBy = actionLogic.refBy
 
-        if(refBy.includes(":")){
+        if (refBy.includes(":")) {
           // :{String}.{String}.{String}
           // Data Row 에서 설정된 값을 찾아 refBy 로 사용 한다. 
           refBy = refBy.substring(1)
 
           let findObj = record
-          refBy.split(",").reduce((acc, cur, idx) =>{
+          refBy.split(",").reduce((acc, cur, idx) => {
             findObj = findObj[cur]
-          },0);
+          }, 0);
 
           refBy = findObj
         }
 
         await ServiceUtil.fileDownload(refType, refBy)
-      
+
         // 그리드 확장 속성 버튼 
-      } else if (action.type == 'grid-attributes' ){
+      } else if (action.type == 'grid-attributes') {
         actionLogic.tagname = 'basic-attributes-element'
         actionLogic.import = 'pages/basic-attributes-element.js'
         actionLogic.popup_field = "logic"
