@@ -901,7 +901,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
       'confirm',
       'cancel'
     )
-    if (!result.confirmButton) return
+    if (!result) return
 
     this.actionLoading = true
     try {
@@ -924,7 +924,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
       'confirm',
       'cancel'
     )
-    if (!result.confirmButton) return
+    if (!result) return
 
     this.actionLoading = true
     try {
@@ -983,7 +983,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
       'confirm',
       'cancel'
     )
-    if (!result.confirmButton) return
+    if (!result) return
 
     this.actionLoading = true
     try {

@@ -863,7 +863,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
   async _startOrder() {
     const result = await UiUtil.showAlertPopup('title.confirm', '포장 작업을 시작하시겠습니까?', 'question', 'confirm', 'cancel')
-    if (!result.confirmButton) return
+    if (!result) return
 
     this.actionLoading = true
     try {
@@ -880,7 +880,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
   async _completeOrder() {
     const result = await UiUtil.showAlertPopup('title.confirm', '포장 작업을 완료하시겠습니까?', 'question', 'confirm', 'cancel')
-    if (!result.confirmButton) return
+    if (!result) return
 
     this.actionLoading = true
     try {
@@ -897,7 +897,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
   async _printLabel() {
     const result = await UiUtil.showAlertPopup('title.confirm', '라벨을 출력하시겠습니까?', 'question', 'confirm', 'cancel')
-    if (!result.confirmButton) return
+    if (!result) return
 
     this.actionLoading = true
     try {
@@ -914,7 +914,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
   async _manifest() {
     const result = await UiUtil.showAlertPopup('title.confirm', '매니페스트를 처리하시겠습니까?', 'question', 'confirm', 'cancel')
-    if (!result.confirmButton) return
+    if (!result) return
 
     this.actionLoading = true
     try {
@@ -931,7 +931,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
   async _confirmShipping() {
     const result = await UiUtil.showAlertPopup('title.confirm', '출하를 확정하시겠습니까?', 'question', 'confirm', 'cancel')
-    if (!result.confirmButton) return
+    if (!result) return
 
     this.actionLoading = true
     try {
@@ -948,7 +948,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
   async _cancelOrder() {
     const result = await UiUtil.showAlertPopup('title.confirm', '포장 지시를 취소하시겠습니까?\n이 작업은 되돌릴 수 없습니다.', 'warning', 'confirm', 'cancel')
-    if (!result.confirmButton) return
+    if (!result) return
 
     this.actionLoading = true
     try {
@@ -965,7 +965,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
   async _cancelShipping() {
     const result = await UiUtil.showAlertPopup('title.confirm', '출하를 취소하시겠습니까?\n이 작업은 되돌릴 수 없습니다.', 'warning', 'confirm', 'cancel')
-    if (!result.confirmButton) return
+    if (!result) return
 
     this.actionLoading = true
     try {

@@ -727,7 +727,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
 
   async _startTask() {
     const result = await UiUtil.showAlertPopup('title.confirm', '피킹을 시작하시겠습니까?', 'question', 'confirm', 'cancel')
-    if (!result.confirmButton) return
+    if (!result) return
 
     this.actionLoading = true
     try {
@@ -744,7 +744,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
 
   async _completeTask() {
     const result = await UiUtil.showAlertPopup('title.confirm', '피킹을 완료 처리하시겠습니까?', 'question', 'confirm', 'cancel')
-    if (!result.confirmButton) return
+    if (!result) return
 
     this.actionLoading = true
     try {
@@ -761,7 +761,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
 
   async _cancelTask() {
     const result = await UiUtil.showAlertPopup('title.confirm', '피킹 작업을 취소하시겠습니까?\n이 작업은 되돌릴 수 없습니다.', 'warning', 'confirm', 'cancel')
-    if (!result.confirmButton) return
+    if (!result) return
 
     this.actionLoading = true
     try {

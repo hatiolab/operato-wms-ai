@@ -682,7 +682,7 @@ class StockAllocationList extends localize(i18next)(PageView) {
     if (!orderId) return
     openPopup(
       html`<shipment-order-detail
-        .orderId="${orderId}"
+        .shipmentOrderId="${orderId}"
         @order-updated="${() => this._fetchData()}"
       ></shipment-order-detail>`,
       {

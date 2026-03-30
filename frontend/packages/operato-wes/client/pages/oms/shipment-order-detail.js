@@ -441,6 +441,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
   static get properties() {
     return {
       shipmentOrderId: String,
+      parent_id: String,  // shipmentOrderId의 별칭
       order: Object,
       items: Array,
       delivery: Object,
@@ -454,6 +455,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
   constructor() {
     super()
     this.shipmentOrderId = null
+    this.parent_id = null
     this.order = null
     this.items = []
     this.delivery = null
@@ -463,9 +465,20 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     this.actionLoading = false
   }
 
+  updated(changedProperties) {
+    super.updated(changedProperties)
+    // parent_id가 설정되면 shipmentOrderId에 복사
+    if (changedProperties.has('parent_id') && this.parent_id && !this.shipmentOrderId) {
+      this.shipmentOrderId = this.parent_id
+    }
+  }
+
   connectedCallback() {
     super.connectedCallback()
-    if (this.shipmentOrderId) {
+    // parent_id 또는 shipmentOrderId 중 하나라도 있으면 데이터 조회
+    const orderId = this.shipmentOrderId || this.parent_id
+    if (orderId) {
+      this.shipmentOrderId = orderId
       this._fetchOrderData()
     }
   }
@@ -1010,8 +1023,8 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
    * ============================================================ */
 
   async _confirmOrder() {
-    const result = await UiUtil.showAlertPopup('title.confirm', '주문을 확정하시겠습니까?', 'question', 'confirm', 'cancel')
-    if (!result.confirmButton) return
+    const result = await UiUtil.showAlertPopup('label.confirm', '주문을 확정하시겠습니까?', 'question', 'confirm', 'cancel')
+    if (!result) return
 
     this.actionLoading = true
     try {
@@ -1027,8 +1040,8 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
   }
 
   async _allocateOrder() {
-    const result = await UiUtil.showAlertPopup('title.confirm', '재고 할당을 실행하시겠습니까?', 'question', 'confirm', 'cancel')
-    if (!result.confirmButton) return
+    const result = await UiUtil.showAlertPopup('label.confirm', '재고 할당을 실행하시겠습니까?', 'question', 'confirm', 'cancel')
+    if (!result) return
 
     this.actionLoading = true
     try {
@@ -1045,8 +1058,8 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
   }
 
   async _deallocateOrder() {
-    const result = await UiUtil.showAlertPopup('title.confirm', '할당을 해제하시겠습니까?', 'question', 'confirm', 'cancel')
-    if (!result.confirmButton) return
+    const result = await UiUtil.showAlertPopup('label.confirm', '할당을 해제하시겠습니까?', 'question', 'confirm', 'cancel')
+    if (!result) return
 
     this.actionLoading = true
     try {
@@ -1063,8 +1076,8 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
   }
 
   async _cancelOrder() {
-    const result = await UiUtil.showAlertPopup('title.confirm', '주문을 취소하시겠습니까?\n이 작업은 되돌릴 수 없습니다.', 'warning', 'confirm', 'cancel')
-    if (!result.confirmButton) return
+    const result = await UiUtil.showAlertPopup('label.confirm', '주문을 취소하시겠습니까?\n이 작업은 되돌릴 수 없습니다.', 'warning', 'confirm', 'cancel')
+    if (!result) return
 
     this.actionLoading = true
     try {
@@ -1080,8 +1093,8 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
   }
 
   async _closeOrder() {
-    const result = await UiUtil.showAlertPopup('title.confirm', '주문을 마감하시겠습니까?', 'question', 'confirm', 'cancel')
-    if (!result.confirmButton) return
+    const result = await UiUtil.showAlertPopup('label.confirm', '주문을 마감하시겠습니까?', 'question', 'confirm', 'cancel')
+    if (!result) return
 
     this.actionLoading = true
     try {
