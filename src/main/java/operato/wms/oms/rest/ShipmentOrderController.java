@@ -1,7 +1,9 @@
 package operato.wms.oms.rest;
 
 import java.util.List;
+import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,12 +14,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import operato.wms.oms.entity.ImportShipmentOrder;
 import operato.wms.oms.entity.ShipmentOrder;
 import operato.wms.oms.entity.ShipmentOrderItem;
+import operato.wms.oms.service.OmsTransactionService;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.sys.system.service.AbstractRestService;
@@ -26,6 +31,7 @@ import xyz.elidom.dbist.dml.Filter;
 import xyz.elidom.dbist.dml.Order;
 import xyz.elidom.dbist.dml.Page;
 import xyz.elidom.dbist.dml.Query;
+import xyz.elidom.exception.server.ElidomRuntimeException;
 
 @RestController
 @Transactional
@@ -33,6 +39,9 @@ import xyz.elidom.dbist.dml.Query;
 @RequestMapping("/rest/shipment_orders")
 @ServiceDesc(description = "ShipmentOrder Service API")
 public class ShipmentOrderController extends AbstractRestService {
+
+	@Autowired
+	private OmsTransactionService omsTrxService;
 
 	@Override
 	protected Class<?> entityClass() {
@@ -111,5 +120,49 @@ public class ShipmentOrderController extends AbstractRestService {
 		}
 
 		return this.cudMultipleData(ShipmentOrderItem.class, shipmentOrderItems);
+	}
+
+	/**
+	 * B2C 출하 주문 엑셀 임포트 (업로드 + 검증 + 등록)
+	 *
+	 * POST /rest/oms_trx/shipment_orders/import/excel/b2c
+	 *
+	 * @param list 엑셀에서 파싱된 임포트 데이터
+	 * @return 임포트 결과 { total_rows, order_count, item_count, delivery_count }
+	 */
+	@RequestMapping(value = "import/b2c", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Import B2C shipment orders from Excel (validate and register)")
+	public Map<String, Object> importB2cExcel(@RequestBody List<ImportShipmentOrder> list) {
+		// 1. 데이터 검증
+		Map<String, Object> validationResult = this.omsTrxService.validateImportData(list, "B2C_OUT");
+
+		// 2. 검증 오류가 있으면 예외 발생 (첫 번째 오류만 표시)
+		int errorCount = (int) validationResult.getOrDefault("error", 0);
+		if (errorCount > 0) {
+			@SuppressWarnings("unchecked")
+			List<Map<String, Object>> rows = (List<Map<String, Object>>) validationResult.get("rows");
+			StringBuilder errorMsg = new StringBuilder();
+			errorMsg.append("데이터 검증 오류가 발생했습니다 (총 ").append(errorCount).append("건의 오류)\n\n");
+
+			// 첫 번째 오류만 표시
+			for (Map<String, Object> row : rows) {
+				Boolean valid = (Boolean) row.get("valid");
+				if (valid != null && !valid) {
+					int rowNo = (int) row.get("row_no");
+					@SuppressWarnings("unchecked")
+					List<String> errorMessages = (List<String>) row.get("error_messages");
+					if (!errorMessages.isEmpty()) {
+						errorMsg.append("[행 ").append(rowNo).append("] ").append(errorMessages.get(0));
+						break; // 첫 번째 오류만 표시
+					}
+				}
+			}
+
+			throw new ElidomRuntimeException(errorMsg.toString().trim());
+		}
+
+		// 3. 검증 통과 시 임포트 실행
+		Map<String, Object> importResult = this.omsTrxService.importShipmentOrders(list);
+		return importResult;
 	}
 }

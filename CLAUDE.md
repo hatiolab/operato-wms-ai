@@ -126,3 +126,4 @@
 | `/code_by_entity` | Entity 공통코드 일괄 등록. 인자: `EntityName` |
 | `/code_by_entity_column` | 필드별 공통코드 등록. 인자: `EntityName fieldName` |
 | `/clear_frontend_cache` | 프론트엔드 번역 캐시 삭제 |
+| `/update-shipment-order-import` | 출고주문 임포트 엑셀 파일의 원주문 번호 업데이트. 인자: `[파일경로]` (선택) |
