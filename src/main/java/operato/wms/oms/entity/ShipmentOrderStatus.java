@@ -9,6 +9,7 @@ import xyz.elidom.dbist.annotation.Table;
 CREATE OR REPLACE VIEW shipment_order_status AS
 SELECT
     si.id,
+    si.shipment_order_id,
     so.shipment_no, so.ref_order_no,
     so.order_date, so.ship_by_date, so.cutoff_time, so.priority_cd,
     so.wave_no, so.wh_cd, so.com_cd, so.cust_cd, so.cust_nm,
@@ -46,6 +47,12 @@ public class ShipmentOrderStatus extends xyz.elidom.orm.entity.basic.DomainTimeS
 	@PrimaryKey
 	@Column (name = "id", nullable = false, length = 40)
 	private String id;
+
+	/**
+	 * 출하 주문 ID (shipment_orders.id)
+	 */
+	@Column (name = "shipment_order_id", length = 40)
+	private String shipmentOrderId;
 
 	/**
 	 * 출하 번호
@@ -305,6 +312,14 @@ public class ShipmentOrderStatus extends xyz.elidom.orm.entity.basic.DomainTimeS
 
 	public void setId(String id) {
 		this.id = id;
+	}
+
+	public String getShipmentOrderId() {
+		return shipmentOrderId;
+	}
+
+	public void setShipmentOrderId(String shipmentOrderId) {
+		this.shipmentOrderId = shipmentOrderId;
 	}
 
 	public String getShipmentNo() {
