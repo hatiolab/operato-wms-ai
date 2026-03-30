@@ -2,8 +2,6 @@ import '@material/web/icon/icon.js'
 import '@things-factory/auth-ui/dist-client' /* for domain-switch */
 import '@things-factory/setting-ui/dist-client' /* theme-mode-setting-let */
 
-import './pages/oms/auto-wave-create-popup.js'
-
 import { html } from 'lit-html'
 
 import { navigate, store } from '@operato/shell'

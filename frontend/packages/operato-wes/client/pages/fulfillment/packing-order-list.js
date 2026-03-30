@@ -426,13 +426,13 @@ class PackingOrderList extends localize(i18next)(PageView) {
   }
 
   get context() {
-    return { title: i18next.t('title.packing-order-list', { defaultValue: '포장 주문 관리' }) }
+    return { title: i18next.t('menu.PackingOrderWork', { defaultValue: '포장 주문 관리' }) }
   }
 
   render() {
     return html`
       <div class="page-container">
-        <h2>${i18next.t('title.packing-order-list', { defaultValue: '포장 주문 관리' })}</h2>
+        <h2>${i18next.t('menu.PackingOrderWork', { defaultValue: '포장 주문 관리' })}</h2>
 
         <!-- 검색 조건 -->
         <section class="search-section">
@@ -557,15 +557,15 @@ class PackingOrderList extends localize(i18next)(PageView) {
         <!-- 데이터 테이블 -->
         <section class="table-section">
           ${this.loading
-            ? html`<div class="loading">${i18next.t('label.loading', { defaultValue: '데이터 로딩 중...' })}</div>`
-            : this.orders.length === 0
-              ? html`
+        ? html`<div class="loading">${i18next.t('label.loading', { defaultValue: '데이터 로딩 중...' })}</div>`
+        : this.orders.length === 0
+          ? html`
                   <div class="empty-state">
                     <div class="icon">📦</div>
                     <div class="message">${i18next.t('label.no_data', { defaultValue: '조회 결과가 없습니다' })}</div>
                   </div>
                 `
-              : html`
+          : html`
                   <table class="data-table">
                     <thead>
                       <tr>
@@ -630,7 +630,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
                     </div>
                   </div>
                 `
-          }
+      }
         </section>
       </div>
     `

@@ -347,7 +347,7 @@ class FulfillmentHome extends localize(i18next)(PageView) {
   /** 페이지 컨텍스트 반환 */
   get context() {
     return {
-      title: 'Fulfillment 대시보드'
+      title: '피킹/검수/포장 대시보드'
     }
   }
 

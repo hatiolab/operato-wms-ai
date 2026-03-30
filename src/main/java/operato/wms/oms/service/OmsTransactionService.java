@@ -105,8 +105,8 @@ public class OmsTransactionService extends AbstractQueryService {
 			resultRow.put("order_qty", row.getOrderQty());
 			resultRow.put("order_date", row.getOrderDate());
 			resultRow.put("ship_by_date", row.getShipByDate());
-			resultRow.put("cust_cd", row.getCustCd());
-			resultRow.put("cust_nm", row.getCustNm());
+			resultRow.put("cust_cd", row.getCustCd()); // B2C : 판매처 코드
+			resultRow.put("cust_nm", row.getOrdererNm()); // B2C : 주문자 명
 			resultRow.put("receiver_nm", row.getReceiverNm());
 			resultRow.put("biz_type", ValueUtil.isNotEmpty(row.getBizType()) ? row.getBizType() : bizType);
 
@@ -401,7 +401,8 @@ public class OmsTransactionService extends AbstractQueryService {
 	 * ALLOCATED 상태의 주문만 웨이브에 포함할 수 있다.
 	 *
 	 * @param params { orders: [{ id, ... }], pick_type, pick_method }
-	 * @return { wave_no, wave_seq, order_count, sku_count, total_qty, skipped_count, errors }
+	 * @return { wave_no, wave_seq, order_count, sku_count, total_qty,
+	 *         skipped_count, errors }
 	 */
 	@SuppressWarnings("unchecked")
 	public Map<String, Object> createManualWave(Map<String, Object> params) {
@@ -443,7 +444,8 @@ public class OmsTransactionService extends AbstractQueryService {
 				continue;
 			}
 			if (!ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus())) {
-				errors.add("주문 [" + order.getShipmentNo() + "] 상태가 [" + order.getStatus() + "]이므로 웨이브에 포함할 수 없습니다 (ALLOCATED 상태만 가능)");
+				errors.add("주문 [" + order.getShipmentNo() + "] 상태가 [" + order.getStatus()
+						+ "]이므로 웨이브에 포함할 수 없습니다 (ALLOCATED 상태만 가능)");
 				continue;
 			}
 			validOrders.add(order);

@@ -388,13 +388,13 @@ class PickingTaskList extends localize(i18next)(PageView) {
   }
 
   get context() {
-    return { title: i18next.t('title.picking-task-list', { defaultValue: '피킹 지시 목록' }) }
+    return { title: i18next.t('menu.PickingTaskWork', { defaultValue: '피킹 지시 목록' }) }
   }
 
   render() {
     return html`
       <div class="page-container">
-        <h2>${i18next.t('title.picking-task-list', { defaultValue: '피킹 지시 목록' })}</h2>
+        <h2>${i18next.t('menu.PickingTaskWork', { defaultValue: '피킹 지시 목록' })}</h2>
 
         <!-- 검색 조건 -->
         <section class="search-section">

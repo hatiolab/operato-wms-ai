@@ -325,13 +325,13 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
   }
 
   get context() {
-    return { title: i18next.t('title.fulfillment-progress', { defaultValue: '풀필먼트 진행 현황' }) }
+    return { title: i18next.t('menu.FulfillmentProgress', { defaultValue: '피킹/검수/포장 진행 현황' }) }
   }
 
   render() {
     return html`
       <div class="page-container">
-        <h2>${i18next.t('title.fulfillment-progress', { defaultValue: '풀필먼트 진행 현황' })}</h2>
+        <h2>${i18next.t('title.FulfillmentProgress', { defaultValue: '피킹/검수/포장 진행 현황' })}</h2>
 
         <!-- 검색 조건 -->
         <section class="search-section">
@@ -407,15 +407,15 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
         <!-- 데이터 테이블 -->
         <section class="table-section">
           ${this.loading
-            ? html`<div class="loading">${i18next.t('label.loading', { defaultValue: '데이터 로딩 중...' })}</div>`
-            : this.items.length === 0
-              ? html`
+        ? html`<div class="loading">${i18next.t('label.loading', { defaultValue: '데이터 로딩 중...' })}</div>`
+        : this.items.length === 0
+          ? html`
                   <div class="empty-state">
                     <div class="icon">📦</div>
                     <div class="message">${i18next.t('label.no_data', { defaultValue: '조회 결과가 없습니다' })}</div>
                   </div>
                 `
-              : html`
+          : html`
                   <table class="data-table">
                     <thead>
                       <tr>
@@ -457,33 +457,33 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
                           <td class="right">${this._formatNumber(row.pick_result_qty)}</td>
                           <td class="right">
                             ${row.short_total > 0
-                              ? html`<span class="short-qty">${this._formatNumber(row.short_total)}</span>`
-                              : this._formatNumber(row.short_total)}
+              ? html`<span class="short-qty">${this._formatNumber(row.short_total)}</span>`
+              : this._formatNumber(row.short_total)}
                           </td>
                           <td class="center">
                             ${row.pick_status
-                              ? html`<span class="badge pick-${row.pick_status.toLowerCase()}">${this._pickStatusLabel(row.pick_status)}</span>`
-                              : '-'}
+              ? html`<span class="badge pick-${row.pick_status.toLowerCase()}">${this._pickStatusLabel(row.pick_status)}</span>`
+              : '-'}
                           </td>
                           <td>
                             ${row.pack_order_no
-                              ? row.pack_order_no
-                              : row.pick_type === 'TOTAL'
-                                ? html`<span class="empty-hint">${i18next.t('label.pack_not_created', { defaultValue: '포장 미생성' })}</span>`
-                                : '-'}
+              ? row.pack_order_no
+              : row.pick_type === 'TOTAL'
+                ? html`<span class="empty-hint">${i18next.t('label.pack_not_created', { defaultValue: '포장 미생성' })}</span>`
+                : '-'}
                           </td>
                           <td class="center">
                             ${row.insp_type
-                              ? html`<span class="badge type-badge">${row.insp_type}</span>`
-                              : '-'}
+              ? html`<span class="badge type-badge">${row.insp_type}</span>`
+              : '-'}
                           </td>
                           <td class="right">${this._formatNumber(row.total_box)}</td>
                           <td class="center">${row.carrier_cd || '-'}</td>
                           <td class="center">${row.dock_cd || '-'}</td>
                           <td class="center">
                             ${row.pack_status
-                              ? html`<span class="badge pack-${row.pack_status.toLowerCase()}">${this._packStatusLabel(row.pack_status)}</span>`
-                              : '-'}
+              ? html`<span class="badge pack-${row.pack_status.toLowerCase()}">${this._packStatusLabel(row.pack_status)}</span>`
+              : '-'}
                           </td>
                           <td class="center">${row.shipped_at || '-'}</td>
                         </tr>
@@ -506,7 +506,7 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
                     </div>
                   </div>
                 `
-          }
+      }
         </section>
       </div>
     `

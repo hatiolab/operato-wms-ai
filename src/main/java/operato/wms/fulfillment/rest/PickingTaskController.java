@@ -1,6 +1,8 @@
 package operato.wms.fulfillment.rest;
 
 import java.util.List;
+import java.util.Map;
+import xyz.elidom.dbist.dml.Filter;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -17,16 +19,13 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import operato.wms.fulfillment.entity.PickingTask;
-import xyz.elidom.dbist.dml.Page;
+import operato.wms.fulfillment.entity.PickingTaskItem;
+
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.sys.system.service.AbstractRestService;
+import xyz.elidom.dbist.dml.Page;
 
-/**
- * 피킹 지시 CRUD 컨트롤러
- *
- * @author HatioLab
- */
 @RestController
 @Transactional
 @ResponseStatus(HttpStatus.OK)
@@ -85,5 +84,31 @@ public class PickingTaskController extends AbstractRestService {
 	@ApiDesc(description = "Create, Update or Delete multiple at one time")
 	public Boolean multipleUpdate(@RequestBody List<PickingTask> list) {
 		return this.cudMultipleData(this.entityClass(), list);
+	}
+
+	@GetMapping(value = "/{id}/include_details", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Find One included all details by ID")
+	public Map<String, Object> findDetails(@PathVariable("id") String id) {
+		return this.findOneIncludedDetails(id);
+	}
+
+	@GetMapping(value = "/{id}/items", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Search detail list by master ID")
+	public List<PickingTaskItem> findPickingTaskItem(@PathVariable("id") String id) {
+		xyz.elidom.dbist.dml.Query query = new xyz.elidom.dbist.dml.Query();
+		query.addFilter(new Filter("pickTaskId", id));
+		return this.queryManager.selectList(PickingTaskItem.class, query);
+	}
+
+	@PostMapping(value = "/{id}/update_multiple", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Create, Update, Delete multiple details at one time")
+	public List<PickingTaskItem> updatePickingTaskItem(@PathVariable("id") String id,
+			@RequestBody List<PickingTaskItem> list) {
+		for (PickingTaskItem item : list) {
+			item.setPickTaskId(id);
+		}
+
+		this.cudMultipleData(PickingTaskItem.class, list);
+		return this.findPickingTaskItem(id);
 	}
 }

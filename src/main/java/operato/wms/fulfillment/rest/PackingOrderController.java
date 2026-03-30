@@ -1,6 +1,8 @@
 package operato.wms.fulfillment.rest;
 
 import java.util.List;
+import java.util.Map;
+import xyz.elidom.dbist.dml.Filter;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -17,16 +19,14 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import operato.wms.fulfillment.entity.PackingOrder;
-import xyz.elidom.dbist.dml.Page;
+import operato.wms.fulfillment.entity.PackingBox;
+import operato.wms.fulfillment.entity.PackingOrderItem;
+
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.sys.system.service.AbstractRestService;
+import xyz.elidom.dbist.dml.Page;
 
-/**
- * 검수/포장/출하 지시 CRUD 컨트롤러
- *
- * @author HatioLab
- */
 @RestController
 @Transactional
 @ResponseStatus(HttpStatus.OK)
@@ -86,4 +86,50 @@ public class PackingOrderController extends AbstractRestService {
 	public Boolean multipleUpdate(@RequestBody List<PackingOrder> list) {
 		return this.cudMultipleData(this.entityClass(), list);
 	}
+
+	@GetMapping(value = "/{id}/include_details", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Find One included all details by ID")
+	public Map<String, Object> findDetails(@PathVariable("id") String id) {
+		return this.findOneIncludedDetails(id);
+	}
+
+	@GetMapping(value = "/{id}/boxes", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Search detail list by master ID")
+	public List<PackingBox> findPackingBoxes(@PathVariable("id") String id) {
+		xyz.elidom.dbist.dml.Query query = new xyz.elidom.dbist.dml.Query();
+		query.addFilter(new Filter("packingOrderId", id));
+		return this.queryManager.selectList(PackingBox.class, query);
+	}
+
+	@PostMapping(value = "/{id}/boxes/update_multiple", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Create, Update, Delete multiple details at one time")
+	public List<PackingBox> updatePackingBox(@PathVariable("id") String id, @RequestBody List<PackingBox> list) {
+		for (PackingBox item : list) {
+			item.setPackingOrderId(id);
+		}
+
+		this.cudMultipleData(PackingBox.class, list);
+		return this.findPackingBoxes(id);
+	}
+
+	@GetMapping(value = "/{id}/items", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Search detail list by master ID")
+	public List<PackingOrderItem> findPackingOrderItems(@PathVariable("id") String id) {
+		xyz.elidom.dbist.dml.Query query = new xyz.elidom.dbist.dml.Query();
+		query.addFilter(new Filter("packingOrderId", id));
+		return this.queryManager.selectList(PackingOrderItem.class, query);
+	}
+
+	@PostMapping(value = "/{id}/items/update_multiple", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Create, Update, Delete multiple details at one time")
+	public List<PackingOrderItem> updatePackingOrderItem(@PathVariable("id") String id,
+			@RequestBody List<PackingOrderItem> list) {
+		for (PackingOrderItem item : list) {
+			item.setPackingOrderId(id);
+		}
+
+		this.cudMultipleData(PackingOrderItem.class, list);
+		return this.findPackingOrderItems(id);
+	}
+
 }
