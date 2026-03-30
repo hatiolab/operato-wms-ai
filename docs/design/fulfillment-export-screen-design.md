@@ -302,12 +302,12 @@ PENDING ──→ DECLARED ──→ APPROVED
 
 | 컬럼 | 필드 | 너비 | 설명 |
 |------|------|------|------|
-| 출하번호 | `shipmentNo` | 160px | 클릭 시 상세 팝업 |
-| 목적지 | `destCountryCd` | 60px | 국가 코드 |
+| 출하번호 | `shipment_no` | 160px | 클릭 시 상세 팝업 |
+| 목적지 | `dest_country_cd` | 60px | 국가 코드 |
 | 인코텀즈 | `incoterms` | 70px | 배지 렌더링 |
-| 운송수단 | `transportMode` | 70px | 아이콘+배지 |
-| B/L | `blNo` | 120px | 미등록 시 "-" |
-| 통관상태 | `customsStatus` | 80px | 통관 상태 배지 |
+| 운송수단 | `transport_mode` | 70px | 아이콘+배지 |
+| B/L | `bl_no` | 120px | 미등록 시 "-" |
+| 통관상태 | `customs_status` | 80px | 통관 상태 배지 |
 | 주문상태 | `status` | 80px | OMS 주문 상태 배지 |
 
 #### 백엔드 API
@@ -471,17 +471,17 @@ Response:
 | 컬럼 | 필드 | 너비 | 정렬 | 렌더러 |
 |------|------|------|------|--------|
 | 선택 | - | 40px | 중앙 | checkbox |
-| 출하번호 | `shipmentNo` | 160px | 좌 | link (상세 팝업) |
-| 참조번호 | `refOrderNo` | 140px | 좌 | |
-| 주문일 | `orderDate` | 90px | 중앙 | |
-| 목적지 | `destCountryCd` | 60px | 중앙 | country-flag |
+| 출하번호 | `shipment_no` | 160px | 좌 | link (상세 팝업) |
+| 참조번호 | `ref_order_no` | 140px | 좌 | |
+| 주문일 | `order_date` | 90px | 중앙 | |
+| 목적지 | `dest_country_cd` | 60px | 중앙 | country-flag |
 | 인코텀즈 | `incoterms` | 70px | 중앙 | badge |
-| 통화 | `currencyCd` | 50px | 중앙 | |
-| 외화 금액 | `totalAmountFc` | 100px | 우 | number (소수점 2자리) |
-| 운송수단 | `transportMode` | 80px | 중앙 | transport-badge |
-| B/L | `blNo` | 120px | 좌 | 미등록 시 회색 "-" |
+| 통화 | `currency_cd` | 50px | 중앙 | |
+| 외화 금액 | `total_amount_fc` | 100px | 우 | number (소수점 2자리) |
+| 운송수단 | `transport_mode` | 80px | 중앙 | transport-badge |
+| B/L | `bl_no` | 120px | 좌 | 미등록 시 회색 "-" |
 | ETD | `etd` | 90px | 중앙 | 3일 이내 주황 강조 |
-| 통관상태 | `customsStatus` | 80px | 중앙 | customs-status-badge |
+| 통관상태 | `customs_status` | 80px | 중앙 | customs-status-badge |
 | 주문상태 | `status` | 80px | 중앙 | status-badge |
 
 #### 일괄 액션 버튼
@@ -563,20 +563,20 @@ Response:
 
 | 필드 | 매핑 | 편집 가능 | 설명 |
 |------|------|----------|------|
-| 목적지 국가 | `destCountryCd` | ✅ (PENDING) | ISO 3166-1 alpha-2 |
-| 원산지 국가 | `originCountryCd` | ✅ (PENDING) | |
+| 목적지 국가 | `dest_country_cd` | ✅ (PENDING) | ISO 3166-1 alpha-2 |
+| 원산지 국가 | `origin_country_cd` | ✅ (PENDING) | |
 | 인코텀즈 | `incoterms` | ✅ (PENDING) | 셀렉트 (7개 옵션) |
-| 통화 코드 | `currencyCd` | ✅ (PENDING) | USD/EUR/JPY/CNY 등 |
-| 총 금액(외화) | `totalAmountFc` | ✅ (PENDING) | 소수점 2자리 |
-| 환율 | `exchangeRate` | ✅ (PENDING) | KRW 기준 |
-| 수출 신고번호 | `exportDeclarationNo` | ✅ (DECLARED) | 신고 후 입력 |
-| 수출 허가번호 | `exportLicenseNo` | ✅ | |
-| 신고 일시 | `declaredAt` | 자동 | 신고 시 자동 설정 |
-| 통관 상태 | `customsStatus` | 자동 | 트랜잭션으로 변경 |
-| 관세사 코드 | `customsBrokerCd` | ✅ | |
-| 관세사명 | `customsBrokerNm` | ✅ | |
-| 상업 송장번호 | `commercialInvoiceNo` | ✅ | |
-| L/C 번호 | `lcNo` | ✅ | |
+| 통화 코드 | `currency_cd` | ✅ (PENDING) | USD/EUR/JPY/CNY 등 |
+| 총 금액(외화) | `total_amount_fc` | ✅ (PENDING) | 소수점 2자리 |
+| 환율 | `exchange_rate` | ✅ (PENDING) | KRW 기준 |
+| 수출 신고번호 | `export_declaration_no` | ✅ (DECLARED) | 신고 후 입력 |
+| 수출 허가번호 | `export_license_no` | ✅ | |
+| 신고 일시 | `declared_at` | 자동 | 신고 시 자동 설정 |
+| 통관 상태 | `customs_status` | 자동 | 트랜잭션으로 변경 |
+| 관세사 코드 | `customs_broker_cd` | ✅ | |
+| 관세사명 | `customs_broker_nm` | ✅ | |
+| 상업 송장번호 | `commercial_invoice_no` | ✅ | |
+| L/C 번호 | `lc_no` | ✅ | |
 
 **탭 3: 운송/선적 (shipment_export_details)**
 
@@ -602,19 +602,19 @@ Response:
 
 | 필드 | 매핑 | 편집 가능 | 설명 |
 |------|------|----------|------|
-| 운송 수단 | `transportMode` | ✅ | SEA/AIR/TRUCK/RAIL |
-| B/L 번호 | `blNo` | ✅ | 선하증권 또는 AWB |
-| 선박명 | `vesselNm` | ✅ | 항공편명 포함 |
-| 항차 | `voyageNo` | ✅ | |
-| 선적항 | `portOfLoading` | ✅ | UN/LOCODE |
-| 양륙항 | `portOfDischarge` | ✅ | UN/LOCODE |
+| 운송 수단 | `transport_mode` | ✅ | SEA/AIR/TRUCK/RAIL |
+| B/L 번호 | `bl_no` | ✅ | 선하증권 또는 AWB |
+| 선박명 | `vessel_nm` | ✅ | 항공편명 포함 |
+| 항차 | `voyage_no` | ✅ | |
+| 선적항 | `port_of_loading` | ✅ | UN/LOCODE |
+| 양륙항 | `port_of_discharge` | ✅ | UN/LOCODE |
 | 출항 예정일 | `etd` | ✅ | YYYY-MM-DD |
 | 도착 예정일 | `eta` | ✅ | YYYY-MM-DD |
-| 컨테이너 번호 | `containerNo` | ✅ | ISO 6346 형식 |
-| 컨테이너 유형 | `containerType` | ✅ | 20FT/40FT/40HC/LCL |
-| 봉인 번호 | `sealNo` | ✅ | |
-| 총 순중량 | `totalNetWt` | ✅ | kg, 소수점 2자리 |
-| 총 총중량 | `totalGrossWt` | ✅ | kg, 소수점 2자리 |
+| 컨테이너 번호 | `container_no` | ✅ | ISO 6346 형식 |
+| 컨테이너 유형 | `container_type` | ✅ | 20FT/40FT/40HC/LCL |
+| 봉인 번호 | `seal_no` | ✅ | |
+| 총 순중량 | `total_net_wt` | ✅ | kg, 소수점 2자리 |
+| 총 총중량 | `total_gross_wt` | ✅ | kg, 소수점 2자리 |
 
 **탭 4: 수출 품목 (shipment_export_items)**
 
@@ -632,15 +632,15 @@ Response:
 
 | 컬럼 | 필드 | 설명 |
 |------|------|------|
-| SKU | `skuCd` | 조인: shipment_order_items.sku_cd |
-| 상품명 | `skuNm` | 조인: shipment_order_items.sku_nm |
-| 주문수량 | `orderQty` | 조인: shipment_order_items.order_qty |
-| HS 코드 | `hsCd` | 관세 분류 코드 |
-| 원산지 | `originCountryCd` | 품목별 원산지 |
-| 외화 단가 | `unitPriceFc` | 통화별 포맷 |
-| 외화 금액 | `amountFc` | 통화별 포맷 |
-| 순중량 | `netWt` | kg |
-| 총중량 | `grossWt` | kg |
+| SKU | `sku_cd` | 조인: shipment_order_items.sku_cd |
+| 상품명 | `sku_nm` | 조인: shipment_order_items.sku_nm |
+| 주문수량 | `order_qty` | 조인: shipment_order_items.order_qty |
+| HS 코드 | `hs_cd` | 관세 분류 코드 |
+| 원산지 | `origin_country_cd` | 품목별 원산지 |
+| 외화 단가 | `unit_price_fc` | 통화별 포맷 |
+| 외화 금액 | `amount_fc` | 통화별 포맷 |
+| 순중량 | `net_wt` | kg |
+| 총중량 | `gross_wt` | kg |
 
 **탭 5: 서류 관리**
 
@@ -664,10 +664,10 @@ Response:
 
 | 서류 | 번호 필드 | 생성 시점 | 설명 |
 |------|----------|----------|------|
-| Commercial Invoice | `commercialInvoiceNo` | 통관 신고 시 | 상업 송장 |
+| Commercial Invoice | `commercial_invoice_no` | 통관 신고 시 | 상업 송장 |
 | Packing List | (자동 생성) | 통관 신고 시 | 포장 명세서 |
-| B/L | `blNo` | B/L 등록 시 | 선하증권 / AWB |
-| 수출 신고서 | `exportDeclarationNo` | 통관 승인 시 | 세관 수출 신고서 |
+| B/L | `bl_no` | B/L 등록 시 | 선하증권 / AWB |
+| 수출 신고서 | `export_declaration_no` | 통관 승인 시 | 세관 수출 신고서 |
 
 #### 통관 상태별 액션 버튼 활성화
 
@@ -772,16 +772,16 @@ Response:
 | 컬럼 | 필드 | 너비 | 정렬 | 렌더러 |
 |------|------|------|------|--------|
 | 선택 | - | 40px | 중앙 | checkbox |
-| 출하번호 | `shipmentNo` | 160px | 좌 | link (상세 팝업) |
-| 수출 신고번호 | `exportDeclarationNo` | 140px | 좌 | 미등록 시 "-" |
-| 수출 허가번호 | `exportLicenseNo` | 120px | 좌 | |
-| 관세사 | `customsBrokerNm` | 120px | 좌 | |
-| 목적지 | `destCountryCd` | 60px | 중앙 | country-flag |
+| 출하번호 | `shipment_no` | 160px | 좌 | link (상세 팝업) |
+| 수출 신고번호 | `export_declaration_no` | 140px | 좌 | 미등록 시 "-" |
+| 수출 허가번호 | `export_license_no` | 120px | 좌 | |
+| 관세사 | `customs_broker_nm` | 120px | 좌 | |
+| 목적지 | `dest_country_cd` | 60px | 중앙 | country-flag |
 | 인코텀즈 | `incoterms` | 70px | 중앙 | badge |
-| 운송수단 | `transportMode` | 80px | 중앙 | transport-badge |
-| 신고일시 | `declaredAt` | 130px | 중앙 | |
+| 운송수단 | `transport_mode` | 80px | 중앙 | transport-badge |
+| 신고일시 | `declared_at` | 130px | 중앙 | |
 | 반려 사유 | `remarks` | 150px | 좌 | REJECTED 시만 표시, 빨간 텍스트 |
-| 통관상태 | `customsStatus` | 80px | 중앙 | customs-status-badge |
+| 통관상태 | `customs_status` | 80px | 중앙 | customs-status-badge |
 
 #### 반려 건 하이라이트
 
@@ -866,19 +866,19 @@ Response:
 
 | 컬럼 | 필드 | 너비 | 정렬 | 렌더러 |
 |------|------|------|------|--------|
-| 출하번호 | `shipmentNo` | 160px | 좌 | link (상세 팝업) |
-| B/L | `blNo` | 130px | 좌 | 미등록 시 회색 "-" |
-| 운송수단 | `transportMode` | 80px | 중앙 | transport-badge |
-| 선박/편명 | `vesselNm` | 120px | 좌 | |
-| 항차 | `voyageNo` | 90px | 좌 | |
-| 선적항 | `portOfLoading` | 80px | 중앙 | |
-| 양륙항 | `portOfDischarge` | 80px | 중앙 | |
+| 출하번호 | `shipment_no` | 160px | 좌 | link (상세 팝업) |
+| B/L | `bl_no` | 130px | 좌 | 미등록 시 회색 "-" |
+| 운송수단 | `transport_mode` | 80px | 중앙 | transport-badge |
+| 선박/편명 | `vessel_nm` | 120px | 좌 | |
+| 항차 | `voyage_no` | 90px | 좌 | |
+| 선적항 | `port_of_loading` | 80px | 중앙 | |
+| 양륙항 | `port_of_discharge` | 80px | 중앙 | |
 | ETD | `etd` | 90px | 중앙 | date, 3일 이내 주황, 초과 빨간 |
 | ETA | `eta` | 90px | 중앙 | date |
-| 컨테이너 | `containerNo` | 120px | 좌 | |
-| 컨테이너 유형 | `containerType` | 70px | 중앙 | badge |
-| 봉인번호 | `sealNo` | 100px | 좌 | |
-| 통관상태 | `customsStatus` | 80px | 중앙 | customs-status-badge |
+| 컨테이너 | `container_no` | 120px | 좌 | |
+| 컨테이너 유형 | `container_type` | 70px | 중앙 | badge |
+| 봉인번호 | `seal_no` | 100px | 좌 | |
+| 통관상태 | `customs_status` | 80px | 중앙 | customs-status-badge |
 
 #### ETD 강조 규칙
 

@@ -483,16 +483,16 @@ Response:
 | 컬럼 | 필드 | 너비 | 정렬 | 렌더러 |
 |------|------|------|------|--------|
 | 선택 | - | 40px | 중앙 | checkbox |
-| 피킹번호 | `pickTaskNo` | 140px | 좌 | link (상세 팝업) |
-| 웨이브 | `waveNo` | 140px | 좌 | |
-| 출하번호 | `shipmentNo` | 130px | 좌 | 개별 피킹만 표시 |
-| 피킹유형 | `pickType` | 90px | 중앙 | badge |
-| 피킹방식 | `pickMethod` | 80px | 중앙 | badge |
-| 존 | `zoneCd` | 70px | 중앙 | 존 피킹만 표시 |
-| 작업자 | `workerId` | 80px | 중앙 | |
-| 계획수량 | `planTotal` | 80px | 우 | number |
-| 실적수량 | `resultTotal` | 80px | 우 | number |
-| 부족수량 | `shortTotal` | 80px | 우 | number (>0 시 빨간) |
+| 피킹번호 | `pick_task_no` | 140px | 좌 | link (상세 팝업) |
+| 웨이브 | `wave_no` | 140px | 좌 | |
+| 출하번호 | `shipment_no` | 130px | 좌 | 개별 피킹만 표시 |
+| 피킹유형 | `pick_type` | 90px | 중앙 | badge |
+| 피킹방식 | `pick_method` | 80px | 중앙 | badge |
+| 존 | `zone_cd` | 70px | 중앙 | 존 피킹만 표시 |
+| 작업자 | `worker_id` | 80px | 중앙 | |
+| 계획수량 | `plan_total` | 80px | 우 | number |
+| 실적수량 | `result_total` | 80px | 우 | number |
+| 부족수량 | `short_total` | 80px | 우 | number (>0 시 빨간) |
 | 진행률 | (계산) | 100px | 중앙 | progress-bar |
 | 상태 | `status` | 80px | 중앙 | status-badge |
 
@@ -514,16 +514,16 @@ Response:
   searchUrl: 'picking_tasks',
   multiSaveUrl: 'picking_tasks',
   columns: [
-    { name: 'pickTaskNo', width: 140, renderer: 'link' },
-    { name: 'waveNo', width: 140 },
-    { name: 'shipmentNo', width: 130 },
-    { name: 'pickType', width: 90, align: 'center', renderer: 'badge' },
-    { name: 'pickMethod', width: 80, align: 'center', renderer: 'badge' },
-    { name: 'zoneCd', width: 70, align: 'center' },
-    { name: 'workerId', width: 80, align: 'center' },
-    { name: 'planTotal', width: 80, align: 'right', renderer: 'number' },
-    { name: 'resultTotal', width: 80, align: 'right', renderer: 'number' },
-    { name: 'shortTotal', width: 80, align: 'right', renderer: 'number' },
+    { name: 'pick_task_no', width: 140, renderer: 'link' },
+    { name: 'wave_no', width: 140 },
+    { name: 'shipment_no', width: 130 },
+    { name: 'pick_type', width: 90, align: 'center', renderer: 'badge' },
+    { name: 'pick_method', width: 80, align: 'center', renderer: 'badge' },
+    { name: 'zone_cd', width: 70, align: 'center' },
+    { name: 'worker_id', width: 80, align: 'center' },
+    { name: 'plan_total', width: 80, align: 'right', renderer: 'number' },
+    { name: 'result_total', width: 80, align: 'right', renderer: 'number' },
+    { name: 'short_total', width: 80, align: 'right', renderer: 'number' },
     { name: 'status', width: 80, align: 'center', renderer: 'status-badge' }
   ]
 }
@@ -596,16 +596,16 @@ Response:
 | 컬럼 | 필드 | 너비 | 설명 |
 |------|------|------|------|
 | 순번 | `rank` | 50px | 피킹 경로 순서 |
-| SKU | `skuCd` | 80px | 상품 코드 |
-| 상품명 | `skuNm` | 120px | |
-| 피킹 로케이션 | `fromLocCd` | 80px | 출발 로케이션 |
-| 도착 로케이션 | `toLocCd` | 80px | 포장 스테이션/도크 |
+| SKU | `sku_cd` | 80px | 상품 코드 |
+| 상품명 | `sku_nm` | 120px | |
+| 피킹 로케이션 | `from_loc_cd` | 80px | 출발 로케이션 |
+| 도착 로케이션 | `to_loc_cd` | 80px | 포장 스테이션/도크 |
 | 바코드 | `barcode` | 100px | |
-| 로트 | `lotNo` | 80px | |
-| 유통기한 | `expiredDate` | 80px | |
-| 지시수량 | `orderQty` | 70px | 우측 정렬 |
-| 실적수량 | `pickQty` | 70px | 우측 정렬 |
-| 부족수량 | `shortQty` | 70px | >0 시 빨간색 |
+| 로트 | `lot_no` | 80px | |
+| 유통기한 | `expired_date` | 80px | |
+| 지시수량 | `order_qty` | 70px | 우측 정렬 |
+| 실적수량 | `pick_qty` | 70px | 우측 정렬 |
+| 부족수량 | `short_qty` | 70px | >0 시 빨간색 |
 | 상태 | `status` | 70px | 배지 (WAIT/RUN/PICKED/SHORT/CANCEL) |
 
 **피킹 항목 상태 색상**:
@@ -696,17 +696,17 @@ Response:
 | 컬럼 | 필드 | 너비 | 정렬 | 렌더러 |
 |------|------|------|------|--------|
 | 선택 | - | 40px | 중앙 | checkbox |
-| 포장번호 | `packOrderNo` | 140px | 좌 | link (상세 팝업) |
-| 피킹번호 | `pickTaskNo` | 130px | 좌 | |
-| 출하번호 | `shipmentNo` | 130px | 좌 | |
-| 웨이브 | `waveNo` | 130px | 좌 | |
-| 검수유형 | `inspType` | 80px | 중앙 | badge |
-| 검수결과 | `inspResult` | 70px | 중앙 | result-badge (PASS=녹, FAIL=빨) |
-| 스테이션 | `stationCd` | 80px | 중앙 | |
-| 택배사 | `carrierCd` | 80px | 중앙 | |
-| 박스수 | `totalBox` | 60px | 우 | number |
-| 총중량 | `totalWt` | 70px | 우 | number (kg) |
-| 도크 | `dockCd` | 70px | 중앙 | |
+| 포장번호 | `pack_order_no` | 140px | 좌 | link (상세 팝업) |
+| 피킹번호 | `pick_task_no` | 130px | 좌 | |
+| 출하번호 | `shipment_no` | 130px | 좌 | |
+| 웨이브 | `wave_no` | 130px | 좌 | |
+| 검수유형 | `insp_type` | 80px | 중앙 | badge |
+| 검수결과 | `insp_result` | 70px | 중앙 | result-badge (PASS=녹, FAIL=빨) |
+| 스테이션 | `station_cd` | 80px | 중앙 | |
+| 택배사 | `carrier_cd` | 80px | 중앙 | |
+| 박스수 | `total_box` | 60px | 우 | number |
+| 총중량 | `total_wt` | 70px | 우 | number (kg) |
+| 도크 | `dock_cd` | 70px | 중앙 | |
 | 상태 | `status` | 100px | 중앙 | status-badge |
 
 #### 일괄 액션 버튼
@@ -730,17 +730,17 @@ Response:
   searchUrl: 'packing_orders',
   multiSaveUrl: 'packing_orders',
   columns: [
-    { name: 'packOrderNo', width: 140, renderer: 'link' },
-    { name: 'pickTaskNo', width: 130 },
-    { name: 'shipmentNo', width: 130 },
-    { name: 'waveNo', width: 130 },
-    { name: 'inspType', width: 80, align: 'center', renderer: 'badge' },
-    { name: 'inspResult', width: 70, align: 'center', renderer: 'result-badge' },
-    { name: 'stationCd', width: 80, align: 'center' },
-    { name: 'carrierCd', width: 80, align: 'center' },
-    { name: 'totalBox', width: 60, align: 'right', renderer: 'number' },
-    { name: 'totalWt', width: 70, align: 'right', renderer: 'number' },
-    { name: 'dockCd', width: 70, align: 'center' },
+    { name: 'pack_order_no', width: 140, renderer: 'link' },
+    { name: 'pick_task_no', width: 130 },
+    { name: 'shipment_no', width: 130 },
+    { name: 'wave_no', width: 130 },
+    { name: 'insp_type', width: 80, align: 'center', renderer: 'badge' },
+    { name: 'insp_result', width: 70, align: 'center', renderer: 'result-badge' },
+    { name: 'station_cd', width: 80, align: 'center' },
+    { name: 'carrier_cd', width: 80, align: 'center' },
+    { name: 'total_box', width: 60, align: 'right', renderer: 'number' },
+    { name: 'total_wt', width: 70, align: 'right', renderer: 'number' },
+    { name: 'dock_cd', width: 70, align: 'center' },
     { name: 'status', width: 100, align: 'center', renderer: 'status-badge' }
   ]
 }
@@ -828,15 +828,15 @@ Response:
 
 | 컬럼 | 필드 | 너비 | 설명 |
 |------|------|------|------|
-| SKU | `skuCd` | 80px | 상품 코드 |
-| 상품명 | `skuNm` | 120px | |
+| SKU | `sku_cd` | 80px | 상품 코드 |
+| 상품명 | `sku_nm` | 120px | |
 | 바코드 | `barcode` | 100px | |
-| 로트 | `lotNo` | 80px | |
-| 유통기한 | `expiredDate` | 80px | |
-| 지시수량 | `orderQty` | 70px | 우측 정렬 |
-| 검수수량 | `inspQty` | 70px | 우측 정렬 |
-| 포장수량 | `packQty` | 70px | 우측 정렬 |
-| 부족수량 | `shortQty` | 70px | >0 시 빨간색 |
+| 로트 | `lot_no` | 80px | |
+| 유통기한 | `expired_date` | 80px | |
+| 지시수량 | `order_qty` | 70px | 우측 정렬 |
+| 검수수량 | `insp_qty` | 70px | 우측 정렬 |
+| 포장수량 | `pack_qty` | 70px | 우측 정렬 |
+| 부족수량 | `short_qty` | 70px | >0 시 빨간색 |
 | 상태 | `status` | 80px | 배지 (WAIT/INSPECTED/PACKED/SHORT/CANCEL) |
 
 **포장 항목 상태 색상**:
@@ -853,16 +853,16 @@ Response:
 
 | 컬럼 | 필드 | 너비 | 설명 |
 |------|------|------|------|
-| 박스순번 | `boxSeq` | 60px | |
-| 유형 | `boxTypeCd` | 80px | 배지 (BOX/BAG/ENVELOPE/PALLET) |
-| 중량 | `boxWt` | 70px | kg 표시 |
-| 아이템 | `totalItem` | 60px | 종 수 |
-| 수량 | `totalQty` | 60px | |
-| 송장번호 | `invoiceNo` | 120px | |
-| 차량번호 | `vehicleNo` | 80px | |
-| 라벨 | `labelPrintedFlag` | 50px | ✅/❌ |
-| 라벨출력일시 | `labelPrintedAt` | 130px | |
-| 출하일시 | `shippedAt` | 130px | |
+| 박스순번 | `box_seq` | 60px | |
+| 유형 | `box_type_cd` | 80px | 배지 (BOX/BAG/ENVELOPE/PALLET) |
+| 중량 | `box_wt` | 70px | kg 표시 |
+| 아이템 | `total_item` | 60px | 종 수 |
+| 수량 | `total_qty` | 60px | |
+| 송장번호 | `invoice_no` | 120px | |
+| 차량번호 | `vehicle_no` | 80px | |
+| 라벨 | `label_printed_flag` | 50px | ✅/❌ |
+| 라벨출력일시 | `label_printed_at` | 130px | |
+| 출하일시 | `shipped_at` | 130px | |
 | 상태 | `status` | 70px | 배지 (OPEN/CLOSED/SHIPPED) |
 
 #### 상태별 버튼 활성화
@@ -943,24 +943,24 @@ Response:
 
 | 컬럼 | 필드 | 너비 | 정렬 | 렌더러 |
 |------|------|------|------|--------|
-| 피킹번호 | `pickTaskNo` | 140px | 좌 | link |
-| 웨이브 | `waveNo` | 130px | 좌 | |
-| 출하번호 | `shipmentNo` | 130px | 좌 | |
-| 피킹유형 | `pickType` | 80px | 중앙 | badge |
-| 피킹방식 | `pickMethod` | 80px | 중앙 | badge |
-| 작업자 | `workerId` | 80px | 중앙 | |
-| 계획수량 | `planTotal` | 70px | 우 | number |
-| 피킹실적 | `pickResultQty` | 70px | 우 | number |
-| 부족수량 | `shortTotal` | 70px | 우 | number (>0 빨간) |
-| 피킹상태 | `pickStatus` | 80px | 중앙 | pick-status-badge |
-| 포장번호 | `packOrderNo` | 130px | 좌 | |
-| 검수유형 | `inspType` | 70px | 중앙 | badge |
-| 검수결과 | `inspResult` | 60px | 중앙 | result-badge |
-| 박스수 | `totalBox` | 50px | 우 | number |
-| 택배사 | `carrierCd` | 70px | 중앙 | |
-| 도크 | `dockCd` | 70px | 중앙 | |
-| 포장상태 | `packStatus` | 90px | 중앙 | pack-status-badge |
-| 출하일시 | `shippedAt` | 130px | 중앙 | |
+| 피킹번호 | `pick_task_no` | 140px | 좌 | link |
+| 웨이브 | `wave_no` | 130px | 좌 | |
+| 출하번호 | `shipment_no` | 130px | 좌 | |
+| 피킹유형 | `pick_type` | 80px | 중앙 | badge |
+| 피킹방식 | `pick_method` | 80px | 중앙 | badge |
+| 작업자 | `worker_id` | 80px | 중앙 | |
+| 계획수량 | `plan_total` | 70px | 우 | number |
+| 피킹실적 | `pick_result_qty` | 70px | 우 | number |
+| 부족수량 | `short_total` | 70px | 우 | number (>0 빨간) |
+| 피킹상태 | `pick_status` | 80px | 중앙 | pick-status-badge |
+| 포장번호 | `pack_order_no` | 130px | 좌 | |
+| 검수유형 | `insp_type` | 70px | 중앙 | badge |
+| 검수결과 | `insp_result` | 60px | 중앙 | result-badge |
+| 박스수 | `total_box` | 50px | 우 | number |
+| 택배사 | `carrier_cd` | 70px | 중앙 | |
+| 도크 | `dock_cd` | 70px | 중앙 | |
+| 포장상태 | `pack_status` | 90px | 중앙 | pack-status-badge |
+| 출하일시 | `shipped_at` | 130px | 중앙 | |
 
 > 이 화면은 `fulfillment_progress` 뷰를 기반으로 조회하며, **읽기 전용**(수정/삭제 불가)입니다.
 
@@ -974,8 +974,8 @@ Response:
 | 포장 생성 후 | 1 피킹 × N 포장으로 행 확장 | 동일 `pickTaskNo`가 여러 행에 반복 표시됨 (정상) |
 
 **UI 처리**:
-- 포장 컬럼(`packOrderNo`, `packStatus`, `packStartedAt`, `packCompletedAt`, `manifestedAt`, `shippedAt`)이 NULL이고 `pickType = 'TOTAL'`이면 → 포장번호 셀에 `<span class="empty-hint">포장 미생성</span>` 표시
-- 동일 `pickTaskNo`가 반복되는 행은 피킹 컬럼을 병합하지 않고 그대로 표시 (그리드 단순화)
+- 포장 컬럼(`pack_order_no`, `pack_status`, `pack_started_at`, `pack_completed_at`, `manifested_at`, `shipped_at`)이 NULL이고 `pick_type = 'TOTAL'`이면 → 포장번호 셀에 `<span class="empty-hint">포장 미생성</span>` 표시
+- 동일 `pick_task_no`가 반복되는 행은 피킹 컬럼을 병합하지 않고 그대로 표시 (그리드 단순화)
 
 ```css
 .empty-hint {
@@ -992,24 +992,24 @@ Response:
   entity: 'FulfillmentProgress',
   searchUrl: 'fulfillment_progress',
   columns: [
-    { name: 'pickTaskNo', width: 140, renderer: 'link' },
-    { name: 'waveNo', width: 130 },
-    { name: 'shipmentNo', width: 130 },
-    { name: 'pickType', width: 80, align: 'center', renderer: 'badge' },
-    { name: 'pickMethod', width: 80, align: 'center', renderer: 'badge' },
-    { name: 'workerId', width: 80, align: 'center' },
-    { name: 'planTotal', width: 70, align: 'right', renderer: 'number' },
-    { name: 'pickResultQty', width: 70, align: 'right', renderer: 'number' },
-    { name: 'shortTotal', width: 70, align: 'right', renderer: 'number' },
-    { name: 'pickStatus', width: 80, align: 'center', renderer: 'status-badge' },
-    { name: 'packOrderNo', width: 130 },
-    { name: 'inspType', width: 70, align: 'center', renderer: 'badge' },
-    { name: 'inspResult', width: 60, align: 'center', renderer: 'result-badge' },
-    { name: 'totalBox', width: 50, align: 'right', renderer: 'number' },
-    { name: 'carrierCd', width: 70, align: 'center' },
-    { name: 'dockCd', width: 70, align: 'center' },
-    { name: 'packStatus', width: 90, align: 'center', renderer: 'status-badge' },
-    { name: 'shippedAt', width: 130, align: 'center' }
+    { name: 'pick_task_no', width: 140, renderer: 'link' },
+    { name: 'wave_no', width: 130 },
+    { name: 'shipment_no', width: 130 },
+    { name: 'pick_type', width: 80, align: 'center', renderer: 'badge' },
+    { name: 'pick_method', width: 80, align: 'center', renderer: 'badge' },
+    { name: 'worker_id', width: 80, align: 'center' },
+    { name: 'plan_total', width: 70, align: 'right', renderer: 'number' },
+    { name: 'pick_result_qty', width: 70, align: 'right', renderer: 'number' },
+    { name: 'short_total', width: 70, align: 'right', renderer: 'number' },
+    { name: 'pick_status', width: 80, align: 'center', renderer: 'status-badge' },
+    { name: 'pack_order_no', width: 130 },
+    { name: 'insp_type', width: 70, align: 'center', renderer: 'badge' },
+    { name: 'insp_result', width: 60, align: 'center', renderer: 'result-badge' },
+    { name: 'total_box', width: 50, align: 'right', renderer: 'number' },
+    { name: 'carrier_cd', width: 70, align: 'center' },
+    { name: 'dock_cd', width: 70, align: 'center' },
+    { name: 'pack_status', width: 90, align: 'center', renderer: 'status-badge' },
+    { name: 'shipped_at', width: 130, align: 'center' }
   ]
 }
 ```
