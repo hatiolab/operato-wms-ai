@@ -6,9 +6,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import operato.wms.base.entity.SKU;
+import operato.wms.common.event.WaveReleasedEvent;
 import operato.wms.oms.entity.ImportShipmentOrder;
 import operato.wms.oms.entity.ReplenishOrder;
 import operato.wms.oms.entity.ShipmentDelivery;
@@ -34,6 +37,9 @@ import xyz.elidom.util.ValueUtil;
  */
 @Component
 public class OmsTransactionService extends AbstractQueryService {
+
+	@Autowired
+	private ApplicationEventPublisher eventPublisher;
 
 	/**
 	 * 임포트 데이터 검증
@@ -1036,6 +1042,17 @@ public class OmsTransactionService extends AbstractQueryService {
 				domainId, wave.getWaveNo(), ShipmentOrder.STATUS_RELEASED);
 		Integer orderCount = this.queryManager.selectBySql(countSql, countParams, Integer.class);
 
+		// ===== 이벤트 발행: Fulfillment 모듈에 피킹 지시 생성 트리거 =====
+		WaveReleasedEvent event = new WaveReleasedEvent(
+			domainId,
+			id,
+			wave.getWaveNo(),
+			wave.getPickType(),
+			wave.getPickMethod(),
+			orderCount != null ? orderCount : 0
+		);
+		this.eventPublisher.publishEvent(event);
+
 		Map<String, Object> result = new HashMap<>();
 		result.put("success", true);
 		result.put("order_count", orderCount != null ? orderCount : 0);
@@ -1069,8 +1086,11 @@ public class OmsTransactionService extends AbstractQueryService {
 		this.queryManager.executeBySql(updOrdersSql, updOrdersParams);
 
 		// 복원된 주문 건수 조회
-		String countSql = "SELECT COUNT(*) FROM shipment_orders WHERE domain_id = :domainId AND status = :status AND allocated_at IS NOT NULL AND wave_no IS NULL";
-		Map<String, Object> countParams = ValueUtil.newMap("domainId,status", domainId, ShipmentOrder.STATUS_ALLOCATED);
+		// String countSql = "SELECT COUNT(*) FROM shipment_orders WHERE domain_id =
+		// :domainId AND status = :status AND allocated_at IS NOT NULL AND wave_no IS
+		// NULL";
+		// Map<String, Object> countParams = ValueUtil.newMap("domainId,status",
+		// domainId, ShipmentOrder.STATUS_ALLOCATED);
 		// 웨이브 취소 시점에서 복원된 건수는 웨이브의 계획 주문수로 대체
 		int restoredCount = wave.getPlanOrder() != null ? wave.getPlanOrder() : 0;
 

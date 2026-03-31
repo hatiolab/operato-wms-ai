@@ -68,8 +68,10 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 
 		// 웨이브에 포함된 RELEASED 상태의 주문 조회
 		String orderSql = "SELECT * FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status ORDER BY priority_cd, shipment_no";
-		Map<String, Object> orderParams = ValueUtil.newMap("domainId,waveNo,status", domainId, waveNo, ShipmentOrder.STATUS_RELEASED);
-		List<ShipmentOrder> orders = this.queryManager.selectListBySql(orderSql, orderParams, ShipmentOrder.class, 0, 0);
+		Map<String, Object> orderParams = ValueUtil.newMap("domainId,waveNo,status", domainId, waveNo,
+				ShipmentOrder.STATUS_RELEASED);
+		List<ShipmentOrder> orders = this.queryManager.selectListBySql(orderSql, orderParams, ShipmentOrder.class, 0,
+				0);
 
 		if (orders.isEmpty()) {
 			throw new RuntimeException("웨이브 [" + waveNo + "]에 릴리스된 주문이 없습니다");
@@ -88,7 +90,8 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		if ("INDIVIDUAL".equals(pickType)) {
 			// 개별 피킹: 주문 1건 = 피킹 지시 1건
 			for (ShipmentOrder order : orders) {
-				String pickTaskNo = "PICK-" + today.replace("-", "") + "-" + String.format("%04d", nextSeq);
+				String pickTaskNo = "PICK-" + today.replace("-", "").substring(2) + "-"
+						+ String.format("%04d", nextSeq);
 
 				// 주문별 할당 정보 조회
 				String allocSql = "SELECT sa.*, soi.sku_cd, soi.sku_nm FROM stock_allocations sa"
@@ -135,16 +138,20 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 					item.setDomainId(domainId);
 					item.setPickTaskId(task.getId());
 					item.setShipmentOrderId(order.getId());
-					item.setShipmentOrderItemId(alloc.get("shipment_order_item_id") != null ? alloc.get("shipment_order_item_id").toString() : null);
+					item.setShipmentOrderItemId(
+							alloc.get("shipment_order_item_id") != null ? alloc.get("shipment_order_item_id").toString()
+									: null);
 					item.setStockAllocationId(alloc.get("id") != null ? alloc.get("id").toString() : null);
-					item.setInventoryId(alloc.get("inventory_id") != null ? alloc.get("inventory_id").toString() : null);
+					item.setInventoryId(
+							alloc.get("inventory_id") != null ? alloc.get("inventory_id").toString() : null);
 					item.setRank(rank);
 					item.setSkuCd(alloc.get("sku_cd") != null ? alloc.get("sku_cd").toString() : null);
 					item.setSkuNm(alloc.get("sku_nm") != null ? alloc.get("sku_nm").toString() : null);
 					item.setBarcode(alloc.get("barcode") != null ? alloc.get("barcode").toString() : null);
 					item.setFromLocCd(alloc.get("loc_cd") != null ? alloc.get("loc_cd").toString() : "UNKNOWN");
 					item.setLotNo(alloc.get("lot_no") != null ? alloc.get("lot_no").toString() : null);
-					item.setExpiredDate(alloc.get("expired_date") != null ? alloc.get("expired_date").toString() : null);
+					item.setExpiredDate(
+							alloc.get("expired_date") != null ? alloc.get("expired_date").toString() : null);
 
 					Object allocQty = alloc.get("alloc_qty");
 					item.setOrderQty(allocQty != null ? Double.parseDouble(allocQty.toString()) : 0);
@@ -162,7 +169,8 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 
 				// 주문 상태를 PICKING으로 변경
 				String updOrderSql = "UPDATE shipment_orders SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-				Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id", ShipmentOrder.STATUS_PICKING, domainId, order.getId());
+				Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id",
+						ShipmentOrder.STATUS_PICKING, domainId, order.getId());
 				this.queryManager.executeBySql(updOrderSql, updOrderParams);
 
 				Map<String, Object> taskInfo = new HashMap<>();
@@ -250,7 +258,8 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			// 모든 주문 상태를 PICKING으로 변경
 			for (ShipmentOrder order : orders) {
 				String updOrderSql = "UPDATE shipment_orders SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-				Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id", ShipmentOrder.STATUS_PICKING, domainId, order.getId());
+				Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id",
+						ShipmentOrder.STATUS_PICKING, domainId, order.getId());
 				this.queryManager.executeBySql(updOrderSql, updOrderParams);
 			}
 
@@ -321,8 +330,10 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 
 		// 피킹 실적에서 PackingOrderItem 생성
 		String pickItemSql = "SELECT * FROM picking_task_items WHERE domain_id = :domainId AND pick_task_id = :pickTaskId AND status = :status ORDER BY rank";
-		Map<String, Object> pickItemParams = ValueUtil.newMap("domainId,pickTaskId,status", domainId, pickTaskId, PickingTaskItem.STATUS_PICKED);
-		List<PickingTaskItem> pickedItems = this.queryManager.selectListBySql(pickItemSql, pickItemParams, PickingTaskItem.class, 0, 0);
+		Map<String, Object> pickItemParams = ValueUtil.newMap("domainId,pickTaskId,status", domainId, pickTaskId,
+				PickingTaskItem.STATUS_PICKED);
+		List<PickingTaskItem> pickedItems = this.queryManager.selectListBySql(pickItemSql, pickItemParams,
+				PickingTaskItem.class, 0, 0);
 
 		List<PackingOrderItem> packItems = new ArrayList<>();
 		for (PickingTaskItem pti : pickedItems) {
@@ -350,7 +361,8 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		// 출하 주문 상태를 PACKING으로 변경
 		if (order != null) {
 			String updOrderSql = "UPDATE shipment_orders SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-			Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id", ShipmentOrder.STATUS_PACKING, domainId, order.getId());
+			Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id", ShipmentOrder.STATUS_PACKING,
+					domainId, order.getId());
 			this.queryManager.executeBySql(updOrderSql, updOrderParams);
 		}
 
@@ -380,8 +392,10 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 
 		// 웨이브에 포함된 주문 목록 조회
 		String orderSql = "SELECT * FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status ORDER BY shipment_no";
-		Map<String, Object> orderParams = ValueUtil.newMap("domainId,waveNo,status", domainId, task.getWaveNo(), ShipmentOrder.STATUS_PICKING);
-		List<ShipmentOrder> orders = this.queryManager.selectListBySql(orderSql, orderParams, ShipmentOrder.class, 0, 0);
+		Map<String, Object> orderParams = ValueUtil.newMap("domainId,waveNo,status", domainId, task.getWaveNo(),
+				ShipmentOrder.STATUS_PICKING);
+		List<ShipmentOrder> orders = this.queryManager.selectListBySql(orderSql, orderParams, ShipmentOrder.class, 0,
+				0);
 
 		if (orders.isEmpty()) {
 			throw new RuntimeException("웨이브 [" + task.getWaveNo() + "]에 PICKING 상태 주문이 없습니다");
@@ -454,7 +468,8 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 
 			// 주문 상태를 PACKING으로 변경
 			String updOrderSql = "UPDATE shipment_orders SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-			Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id", ShipmentOrder.STATUS_PACKING, domainId, order.getId());
+			Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id", ShipmentOrder.STATUS_PACKING,
+					domainId, order.getId());
 			this.queryManager.executeBySql(updOrderSql, updOrderParams);
 
 			Map<String, Object> packInfo = new HashMap<>();
