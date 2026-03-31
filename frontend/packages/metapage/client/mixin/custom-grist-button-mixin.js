@@ -117,7 +117,7 @@ export const CustomGristButtonMixin = superClass =>
           : null
 
       // 그리드 선택 항목의 ID 값
-      let idVal = actionLogic.parent_field ? record[actionLogic.parent_field] :
+      let idVal = (actionLogic && actionLogic.parent_field) ? record[actionLogic.parent_field] :
         (this.menu.id_field ? record[this.menu.id_field] : '')
 
       // 페이지 이동

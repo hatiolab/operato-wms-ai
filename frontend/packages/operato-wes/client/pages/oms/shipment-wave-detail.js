@@ -468,6 +468,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
   static get properties() {
     return {
       waveId: String,
+      parent_id: String, // waveId 별칭 (외부에서 parent_id로 전달 시 자동 매핑)
       wave: Object,
       orders: Array,
       skuSummary: Array,
@@ -485,6 +486,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
   /** 생성자 - 초기 상태값 설정 */
   constructor() {
     super()
+    this.parent_id = null
     this.waveId = null
     this.wave = null
     this.orders = null
@@ -499,9 +501,22 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     this.selectedAddOrderIds = []
   }
 
+  /** 속성 변경 시 parent_id를 waveId로 매핑 */
+  updated(changedProperties) {
+    super.updated(changedProperties)
+    // parent_id 파라미터가 전달되면 waveId로 복사 (외부 호환성)
+    if (changedProperties.has('parent_id') && this.parent_id && !this.waveId) {
+      this.waveId = this.parent_id
+    }
+  }
+
   /** 컴포넌트 연결 시 웨이브 데이터 조회 */
   connectedCallback() {
     super.connectedCallback()
+    // parent_id 파라미터 지원 (waveId와 동일하게 처리)
+    if (!this.waveId && this.parent_id) {
+      this.waveId = this.parent_id
+    }
     if (this.waveId) {
       this._fetchWaveData()
     }
@@ -1102,8 +1117,8 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
               ${i18next.t('label.allocated_orders_available', { defaultValue: 'ALLOCATED 상태의 미배정 주문 목록입니다. 추가할 주문을 선택하세요.' })}
             </div>
             ${this.allocatedOrders.length === 0
-              ? html`<div class="empty-state"><div class="text">${i18next.t('label.no_allocated_orders', { defaultValue: '추가 가능한 주문이 없습니다' })}</div></div>`
-              : html`
+        ? html`<div class="empty-state"><div class="text">${i18next.t('label.no_allocated_orders', { defaultValue: '추가 가능한 주문이 없습니다' })}</div></div>`
+        : html`
                 <table>
                   <thead>
                     <tr>
