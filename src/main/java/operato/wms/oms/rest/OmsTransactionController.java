@@ -103,6 +103,21 @@ public class OmsTransactionController extends AbstractRestService {
 	}
 
 	/**
+	 * 웨이브 생성 (할당 완료된 주문 리스트) - 피킹 방법, 피킹 유형 등에 대한 설정은 웨이브 시작 시에 ...
+	 *
+	 * POST /rest/oms_trx/waves/create_wave
+	 *
+	 * @param params [{ id: 'id1', ... }, {id : 'id2', ...}, ...]
+	 * @return { wave_no, wave_seq, order_count, sku_count, total_qty,
+	 *         skipped_count, errors }
+	 */
+	@RequestMapping(value = "waves/create_wave", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Create waves from selected allocated orders, other settings later...")
+	public Map<String, Object> createWave(@RequestBody List<ShipmentOrder> list) {
+		return this.omsTrxService.createWave(list, null, null);
+	}
+
+	/**
 	 * 수동 웨이브 생성 (주문 직접 선택)
 	 *
 	 * POST /rest/oms_trx/waves/create_manual

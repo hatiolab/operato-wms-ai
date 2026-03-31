@@ -305,10 +305,13 @@ public class OmsTransactionService extends AbstractQueryService {
 		}
 
 		// 3. 당일 최대 wave_seq 조회
-		String seqSql = "SELECT COALESCE(MAX(wave_seq), 0) FROM shipment_waves WHERE domain_id = :domainId AND wave_date = :waveDate";
-		Map<String, Object> seqParams = ValueUtil.newMap("domainId,waveDate", domainId, today);
-		Integer maxSeq = this.queryManager.selectBySql(seqSql, seqParams, Integer.class);
-		int nextSeq = (maxSeq != null ? maxSeq : 0) + 1;
+		// String seqSql = "SELECT COALESCE(MAX(wave_seq), 0) FROM shipment_waves WHERE
+		// domain_id = :domainId AND wave_date = :waveDate";
+		// Map<String, Object> seqParams = ValueUtil.newMap("domainId,waveDate",
+		// domainId, today);
+		// Integer maxSeq = this.queryManager.selectBySql(seqSql, seqParams,
+		// Integer.class);
+		// int nextSeq = (maxSeq != null ? maxSeq : 0) + 1;
 
 		// 4. 그룹별 웨이브 생성
 		int waveCount = 0;
@@ -323,7 +326,8 @@ public class OmsTransactionService extends AbstractQueryService {
 				List<ShipmentOrder> chunk = groupOrders.subList(i, Math.min(i + maxOrderCount, groupOrders.size()));
 
 				// 웨이브 번호 생성
-				String waveNo = "WAVE-" + today.replace("-", "") + "-" + String.format("%03d", nextSeq);
+				// String waveNo = "WAVE-" + today.replace("-", "") + "-" +
+				// String.format("%03d", nextSeq);
 
 				// 계획 수량 집계
 				int planOrderCnt = chunk.size();
@@ -348,9 +352,9 @@ public class OmsTransactionService extends AbstractQueryService {
 				// ShipmentWave 생성
 				ShipmentWave wave = new ShipmentWave();
 				wave.setDomainId(domainId);
-				wave.setWaveNo(waveNo);
-				wave.setWaveDate(today);
-				wave.setWaveSeq(nextSeq);
+				// wave.setWaveNo(waveNo);
+				// wave.setWaveDate(today);
+				// wave.setWaveSeq(nextSeq);
 				wave.setPickType(pickType);
 				wave.setPickMethod(pickMethod);
 				wave.setCarrierCd(carrierCd);
@@ -366,15 +370,15 @@ public class OmsTransactionService extends AbstractQueryService {
 				// 주문에 wave_no 업데이트 및 상태 변경
 				for (ShipmentOrder ord : chunk) {
 					String updateSql = "UPDATE shipment_orders SET wave_no = :waveNo, status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-					Map<String, Object> updateParams = ValueUtil.newMap("waveNo,status,domainId,id", waveNo,
+					Map<String, Object> updateParams = ValueUtil.newMap("waveNo,status,domainId,id", wave.getWaveNo(),
 							ShipmentOrder.STATUS_WAVED, domainId, ord.getId());
 					this.queryManager.executeBySql(updateSql, updateParams);
 				}
 
 				// 결과 수집
 				Map<String, Object> waveInfo = new HashMap<>();
-				waveInfo.put("wave_no", waveNo);
-				waveInfo.put("wave_seq", nextSeq);
+				waveInfo.put("wave_no", wave.getWaveNo());
+				waveInfo.put("wave_seq", wave.getWaveSeq());
 				waveInfo.put("order_count", planOrderCnt);
 				waveInfo.put("sku_count", planItemCnt);
 				waveInfo.put("total_qty", planTotalQty);
@@ -383,7 +387,7 @@ public class OmsTransactionService extends AbstractQueryService {
 
 				waveCount++;
 				totalOrderCount += planOrderCnt;
-				nextSeq++;
+				// nextSeq++;
 			}
 		}
 
@@ -406,9 +410,6 @@ public class OmsTransactionService extends AbstractQueryService {
 	 */
 	@SuppressWarnings("unchecked")
 	public Map<String, Object> createManualWave(Map<String, Object> params) {
-		Long domainId = Domain.currentDomainId();
-		String today = DateUtil.todayStr();
-
 		// 파라미터 추출
 		List<Map<String, Object>> orders = params.get("orders") != null
 				? (List<Map<String, Object>>) params.get("orders")
@@ -421,33 +422,50 @@ public class OmsTransactionService extends AbstractQueryService {
 			throw new RuntimeException("웨이브에 포함할 주문을 선택해 주세요");
 		}
 
-		// 주문 ID 추출
-		List<String> orderIds = new ArrayList<>();
+		// 주문 ID 추출하여 주문 리스트 구성
+		List<ShipmentOrder> orderList = new ArrayList<ShipmentOrder>();
 		for (Map<String, Object> orderMap : orders) {
 			String orderId = orderMap.get("id") != null ? orderMap.get("id").toString() : null;
-			if (ValueUtil.isNotEmpty(orderId)) {
-				orderIds.add(orderId);
-			}
+			orderList.add(new ShipmentOrder(orderId));
 		}
 
-		if (orderIds.isEmpty()) {
-			throw new RuntimeException("유효한 주문 ID가 없습니다");
+		// 주문 리스트로 웨이브 생성
+		return this.createWave(orderList, pickType, pickMethod);
+	}
+
+	/**
+	 * 선택된 주문으로 웨이브 생성
+	 * 
+	 * @param list
+	 * @param pickType
+	 * @param pickMethod
+	 * @return
+	 */
+	public Map<String, Object> createWave(List<ShipmentOrder> list, String pickType, String pickMethod) {
+		Long domainId = Domain.currentDomainId();
+		// String today = DateUtil.todayStr();
+
+		if (ValueUtil.isEmpty(list)) {
+			throw new RuntimeException("웨이브에 포함할 주문을 선택해 주세요");
 		}
 
 		// ALLOCATED 상태 주문만 필터링
-		List<ShipmentOrder> validOrders = new ArrayList<>();
-		List<String> errors = new ArrayList<>();
-		for (String orderId : orderIds) {
-			ShipmentOrder order = this.findOrder(domainId, orderId);
+		List<ShipmentOrder> validOrders = new ArrayList<ShipmentOrder>();
+		List<String> errors = new ArrayList<String>();
+
+		for (ShipmentOrder so : list) {
+			ShipmentOrder order = this.findOrder(domainId, so.getId());
 			if (order == null) {
-				errors.add("주문을 찾을 수 없습니다: " + orderId);
+				errors.add("주문을 찾을 수 없습니다: " + so.getId());
 				continue;
 			}
+
 			if (!ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus())) {
 				errors.add("주문 [" + order.getShipmentNo() + "] 상태가 [" + order.getStatus()
 						+ "]이므로 웨이브에 포함할 수 없습니다 (ALLOCATED 상태만 가능)");
 				continue;
 			}
+
 			validOrders.add(order);
 		}
 
@@ -456,13 +474,17 @@ public class OmsTransactionService extends AbstractQueryService {
 		}
 
 		// 당일 최대 wave_seq 조회
-		String seqSql = "SELECT COALESCE(MAX(wave_seq), 0) FROM shipment_waves WHERE domain_id = :domainId AND wave_date = :waveDate";
-		Map<String, Object> seqParams = ValueUtil.newMap("domainId,waveDate", domainId, today);
-		Integer maxSeq = this.queryManager.selectBySql(seqSql, seqParams, Integer.class);
-		int nextSeq = (maxSeq != null ? maxSeq : 0) + 1;
+		// String seqSql = "SELECT COALESCE(MAX(wave_seq), 0) FROM shipment_waves WHERE
+		// domain_id = :domainId AND wave_date = :waveDate";
+		// Map<String, Object> seqParams = ValueUtil.newMap("domainId,waveDate",
+		// domainId, today);
+		// Integer maxSeq = this.queryManager.selectBySql(seqSql, seqParams,
+		// Integer.class);
+		// int nextSeq = (maxSeq != null ? maxSeq : 0) + 1;
 
-		// 웨이브 번호 생성
-		String waveNo = "WAVE-" + today.replace("-", "") + "-" + String.format("%03d", nextSeq);
+		// // 웨이브 번호 생성
+		// String waveNo = "WAVE-" + today.replace("-", "") + "-" +
+		// String.format("%03d", nextSeq);
 
 		// 계획 수량 집계
 		int planOrderCnt = validOrders.size();
@@ -485,9 +507,9 @@ public class OmsTransactionService extends AbstractQueryService {
 		// ShipmentWave 생성
 		ShipmentWave wave = new ShipmentWave();
 		wave.setDomainId(domainId);
-		wave.setWaveNo(waveNo);
-		wave.setWaveDate(today);
-		wave.setWaveSeq(nextSeq);
+		// wave.setWaveNo(waveNo);
+		// wave.setWaveDate(today);
+		// wave.setWaveSeq(nextSeq);
 		wave.setPickType(pickType);
 		wave.setPickMethod(pickMethod);
 		wave.setCarrierCd(carrierCd);
@@ -503,18 +525,18 @@ public class OmsTransactionService extends AbstractQueryService {
 		// 주문에 wave_no 업데이트 및 상태 변경
 		for (ShipmentOrder ord : validOrders) {
 			String updateSql = "UPDATE shipment_orders SET wave_no = :waveNo, status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-			Map<String, Object> updateParams = ValueUtil.newMap("waveNo,status,domainId,id", waveNo,
+			Map<String, Object> updateParams = ValueUtil.newMap("waveNo,status,domainId,id", wave.getWaveNo(),
 					ShipmentOrder.STATUS_WAVED, domainId, ord.getId());
 			this.queryManager.executeBySql(updateSql, updateParams);
 		}
 
 		Map<String, Object> result = new HashMap<>();
-		result.put("wave_no", waveNo);
-		result.put("wave_seq", nextSeq);
+		result.put("wave_no", wave.getWaveNo());
+		result.put("wave_seq", wave.getWaveSeq());
 		result.put("order_count", planOrderCnt);
 		result.put("sku_count", planItemCnt);
 		result.put("total_qty", planTotalQty);
-		result.put("skipped_count", orderIds.size() - validOrders.size());
+		result.put("skipped_count", list.size() - validOrders.size());
 		result.put("errors", errors);
 		return result;
 	}

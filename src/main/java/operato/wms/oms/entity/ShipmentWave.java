@@ -1,10 +1,16 @@
 package operato.wms.oms.entity;
 
+import java.util.Map;
+
+import operato.wms.stock.entity.Inventory;
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
 import xyz.elidom.dbist.annotation.Index;
 import xyz.elidom.dbist.annotation.PrimaryKey;
 import xyz.elidom.dbist.annotation.Table;
+import xyz.elidom.exception.server.ElidomRuntimeException;
+import xyz.elidom.orm.IQueryManager;
+import xyz.elidom.util.BeanUtil;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -14,12 +20,12 @@ import xyz.elidom.util.ValueUtil;
  * @author HatioLab
  */
 @Table(name = "shipment_waves", idStrategy = GenerationRule.UUID, uniqueFields = "domainId,waveNo", indexes = {
-	@Index(name = "ix_shipment_waves_0", columnList = "domain_id,wave_no", unique = true),
-	@Index(name = "ix_shipment_waves_1", columnList = "domain_id,wave_date,wave_seq"),
-	@Index(name = "ix_shipment_waves_2", columnList = "domain_id,wave_date,com_cd,wh_cd"),
-	@Index(name = "ix_shipment_waves_3", columnList = "domain_id,wave_date,status"),
-	@Index(name = "ix_shipment_waves_4", columnList = "domain_id,wave_date,carrier_cd"),
-	@Index(name = "ix_shipment_waves_5", columnList = "domain_id,wave_date,pick_type")
+		@Index(name = "ix_shipment_waves_0", columnList = "domain_id,wave_no", unique = true),
+		@Index(name = "ix_shipment_waves_1", columnList = "domain_id,wave_date,wave_seq"),
+		@Index(name = "ix_shipment_waves_2", columnList = "domain_id,wave_date,com_cd,wh_cd"),
+		@Index(name = "ix_shipment_waves_3", columnList = "domain_id,wave_date,status"),
+		@Index(name = "ix_shipment_waves_4", columnList = "domain_id,wave_date,carrier_cd"),
+		@Index(name = "ix_shipment_waves_5", columnList = "domain_id,wave_date,pick_type")
 })
 public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	/**
@@ -212,21 +218,6 @@ public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	 */
 	@Column(name = "attr05", length = 100)
 	private String attr05;
-
-	@Override
-	public void beforeCreate() {
-		super.beforeCreate();
-
-		// 상태 기본값 설정
-		if (ValueUtil.isEmpty(this.status)) {
-			this.status = STATUS_CREATED;
-		}
-
-		// wave_date 기본값 설정 (당일)
-		if (ValueUtil.isEmpty(this.waveDate)) {
-			this.waveDate = DateUtil.todayStr();
-		}
-	}
 
 	public String getId() {
 		return id;
@@ -450,5 +441,29 @@ public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setAttr05(String attr05) {
 		this.attr05 = attr05;
+	}
+
+	@Override
+	public void beforeCreate() {
+		super.beforeCreate();
+
+		// 상태 기본값 설정
+		if (ValueUtil.isEmpty(this.status)) {
+			this.status = STATUS_CREATED;
+		}
+
+		// wave_date 기본값 설정 (당일)
+		if (ValueUtil.isEmpty(this.waveDate)) {
+			this.waveDate = DateUtil.todayStr();
+		}
+
+		// 당일 최대 wave_seq 조회
+		String seqSql = "SELECT COALESCE(MAX(wave_seq), 0) FROM shipment_waves WHERE domain_id = :domainId AND wave_date = :waveDate";
+		Map<String, Object> seqParams = ValueUtil.newMap("domainId,waveDate", domainId, this.waveDate);
+		Integer maxSeq = BeanUtil.get(IQueryManager.class).selectBySql(seqSql, seqParams, Integer.class);
+		this.waveSeq = (maxSeq != null ? maxSeq : 0) + 1;
+
+		// 웨이브 번호 생성
+		this.waveNo = "W-" + this.waveDate.replace("-", "").substring(2) + "-" + String.format("%03d", this.waveSeq);
 	}
 }
