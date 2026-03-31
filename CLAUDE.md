@@ -127,3 +127,5 @@
 | `/code_by_entity_column` | 필드별 공통코드 등록. 인자: `EntityName fieldName` |
 | `/clear_frontend_cache` | 프론트엔드 번역 캐시 삭제 |
 | `/update-shipment-order-import` | 출고주문 임포트 엑셀 파일의 원주문 번호 업데이트. 인자: `[파일경로]` (선택) |
+| `/create_domain` | 신규 도메인 생성 및 초기 설정 (순차 질문 → menus/roles/permissions 등 자동 복제). 인자: 없음 (대화형) |
+| `/delete_domain` | 도메인 삭제 (설정 데이터만 또는 전체 선택, 이중 확인 절차 포함). 인자: 없음 (대화형) |
