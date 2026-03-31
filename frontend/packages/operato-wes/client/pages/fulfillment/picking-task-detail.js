@@ -378,6 +378,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
     ]
   }
 
+  /** 컴포넌트 반응형 속성 정의 */
   static get properties() {
     return {
       pickingTaskId: String,
@@ -389,6 +390,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 생성자 - 초기 상태값 설정 */
   constructor() {
     super()
     this.pickingTaskId = null
@@ -399,12 +401,14 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
     this.actionLoading = false
   }
 
+  /** 속성 변경 후 실행 (pickingTaskId 변경 시 데이터 조회) */
   updated(changedProps) {
     if (changedProps.has('pickingTaskId') && this.pickingTaskId) {
       this._fetchTask()
     }
   }
 
+  /** 화면 렌더링 */
   render() {
     if (this.loading) {
       return html`<div class="loading">데이터 로딩 중...</div>`
@@ -428,6 +432,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
    * 렌더링 — 헤더
    * ============================================================ */
 
+  /** 헤더 영역 렌더링 (타이틀, 상태 배지, 액션 버튼, 타임라인) */
   _renderHeader() {
     const t = this.task
     return html`
@@ -447,6 +452,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
     `
   }
 
+  /** 수평 상태 타임라인 렌더링 (3단계) */
   _renderTimeline() {
     const steps = [
       { key: 'CREATED', label: '생성' },
@@ -475,6 +481,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
     `
   }
 
+  /** 상태별 액션 버튼 렌더링 */
   _renderActionButtons() {
     const s = this.task?.status
     return html`
@@ -493,6 +500,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
    * 렌더링 — 탭 바
    * ============================================================ */
 
+  /** 탭 바 렌더링 (기본정보/피킹항목) */
   _renderTabs() {
     const itemCount = this.pickingItems ? this.pickingItems.length : 0
     return html`
@@ -511,6 +519,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
    * Tab 0: 기본정보
    * ============================================================ */
 
+  /** 기본정보 탭 렌더링 */
   _renderBasicInfoTab() {
     const t = this.task
     return html`
@@ -616,6 +625,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
    * Tab 1: 피킹 항목
    * ============================================================ */
 
+  /** 피킹 항목 탭 렌더링 */
   _renderPickingItemsTab() {
     if (this.pickingItems === null) {
       return html`<div class="loading">피킹 항목 로딩 중...</div>`
@@ -686,6 +696,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
    * 데이터 조회
    * ============================================================ */
 
+  /** 피킹 작업 헤더 정보 조회 */
   async _fetchTask() {
     this.loading = true
     try {
@@ -699,6 +710,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 피킹 항목 목록 조회 */
   async _fetchPickingItems() {
     try {
       const data = await ServiceUtil.restGet('ful_trx/picking_tasks/' + this.pickingTaskId + '/items')
@@ -713,6 +725,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
    * 탭 전환 (lazy loading)
    * ============================================================ */
 
+  /** 탭 전환 (lazy loading) */
   _switchTab(index) {
     this.activeTab = index
 
@@ -725,6 +738,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
    * 액션
    * ============================================================ */
 
+  /** 피킹 작업 시작 */
   async _startTask() {
     const result = await UiUtil.showAlertPopup('title.confirm', '피킹을 시작하시겠습니까?', 'question', 'confirm', 'cancel')
     if (!result) return
@@ -742,6 +756,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 피킹 작업 완료 */
   async _completeTask() {
     const result = await UiUtil.showAlertPopup('title.confirm', '피킹을 완료 처리하시겠습니까?', 'question', 'confirm', 'cancel')
     if (!result) return
@@ -759,6 +774,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 피킹 작업 취소 */
   async _cancelTask() {
     const result = await UiUtil.showAlertPopup('title.confirm', '피킹 작업을 취소하시겠습니까?\n이 작업은 되돌릴 수 없습니다.', 'warning', 'confirm', 'cancel')
     if (!result) return
@@ -776,12 +792,14 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 액션 실행 후 데이터 새로고침 */
   async _refreshAfterAction() {
     await this._fetchTask()
     this.pickingItems = null
     this._dispatchTaskUpdated()
   }
 
+  /** 부모 컴포넌트에 변경 이벤트 발행 */
   _dispatchTaskUpdated() {
     this.dispatchEvent(
       new CustomEvent('task-updated', {
@@ -796,6 +814,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
    * 유틸리티
    * ============================================================ */
 
+  /** 피킹 상태 한글 라벨 반환 */
   _statusLabel(status) {
     const labels = {
       CREATED: '생성',
@@ -806,6 +825,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
     return labels[status] || status || '-'
   }
 
+  /** 피킹 항목 상태 한글 라벨 반환 */
   _itemStatusLabel(status) {
     const labels = {
       WAIT: '대기',
@@ -817,6 +837,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
     return labels[status] || status || '-'
   }
 
+  /** 피킹 유형 한글 라벨 반환 */
   _pickTypeLabel(type) {
     const labels = {
       ORDER: '오더 피킹',
@@ -827,6 +848,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
     return labels[type] || type || '-'
   }
 
+  /** 피킹 방식 한글 라벨 반환 */
   _pickMethodLabel(type) {
     const labels = {
       WCS: 'WCS 위임',
@@ -837,6 +859,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
     return labels[type] || type || '-'
   }
 
+  /** 날짜/시간을 YYYY-MM-DD HH:mm 형식으로 포맷 */
   _formatDateTime(dateValue) {
     if (!dateValue) return '-'
     const d = new Date(dateValue)

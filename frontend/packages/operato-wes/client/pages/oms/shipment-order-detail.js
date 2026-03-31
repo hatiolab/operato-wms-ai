@@ -20,6 +20,7 @@ import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
  * UiUtil.openPopupByElement('출하 주문 상세', 'large', el, true)
  */
 class ShipmentOrderDetail extends localize(i18next)(LitElement) {
+  /** 컴포넌트 스타일 정의 */
   static get styles() {
     return [
       css`
@@ -438,6 +439,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     ]
   }
 
+  /** 컴포넌트 반응형 속성 정의 */
   static get properties() {
     return {
       shipmentOrderId: String,
@@ -452,6 +454,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 생성자 - 초기 상태값 설정 */
   constructor() {
     super()
     this.shipmentOrderId = null
@@ -465,6 +468,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     this.actionLoading = false
   }
 
+  /** 속성 변경 감지 - parent_id가 설정되면 shipmentOrderId에 복사 */
   updated(changedProperties) {
     super.updated(changedProperties)
     // parent_id가 설정되면 shipmentOrderId에 복사
@@ -473,6 +477,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 컴포넌트 연결 시 주문 데이터 조회 */
   connectedCallback() {
     super.connectedCallback()
     // parent_id 또는 shipmentOrderId 중 하나라도 있으면 데이터 조회
@@ -483,6 +488,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 화면 렌더링 - 로딩 상태 또는 주문 상세 전체 출력 */
   render() {
     if (this.loading) {
       return html`<div class="loading">데이터 로딩 중...</div>`
@@ -508,6 +514,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
    * 렌더링 — 헤더
    * ============================================================ */
 
+  /** 헤더 영역 렌더링 - 주문번호, 상태 배지, 액션 버튼, 타임라인 */
   _renderHeader() {
     const o = this.order
     return html`
@@ -531,6 +538,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     `
   }
 
+  /** 수평 상태 타임라인 렌더링 - 등록부터 마감까지 9단계 */
   _renderTimeline() {
     const steps = [
       { key: 'REGISTERED', label: '등록' },
@@ -565,6 +573,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     `
   }
 
+  /** 액션 버튼 렌더링 - 상태별로 확정/할당/취소 등 버튼 표시 */
   _renderActionButtons() {
     const s = this.order?.status
     return html`
@@ -597,6 +606,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
    * 렌더링 — 탭 바
    * ============================================================ */
 
+  /** 탭 바 렌더링 - 기본정보/주문상세/배송정보/할당내역 */
   _renderTabs() {
     return html`
       <div class="tab-bar">
@@ -620,6 +630,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
    * Tab 0: 기본정보
    * ============================================================ */
 
+  /** 기본정보 탭 렌더링 - 주문정보, 조직정보, 유형정보, 수량정보, 처리이력 */
   _renderBasicInfoTab() {
     const o = this.order
     return html`
@@ -753,6 +764,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
    * Tab 1: 주문상세 (Items)
    * ============================================================ */
 
+  /** 주문상세 탭 렌더링 - 주문 항목 테이블 및 합계 */
   _renderItemsTab() {
     if (!this.items.length) {
       return html`<div class="empty-state"><div class="icon">📦</div><div class="text">주문 항목이 없습니다</div></div>`
@@ -819,6 +831,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
    * Tab 2: 배송정보
    * ============================================================ */
 
+  /** 배송정보 탭 렌더링 - 발송인/주문자/수취인 정보 */
   _renderDeliveryTab() {
     if (this.delivery === null) {
       return html`<div class="loading">배송정보 로딩 중...</div>`
@@ -905,6 +918,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
    * Tab 3: 할당내역
    * ============================================================ */
 
+  /** 할당내역 탭 렌더링 - 재고 할당 테이블 및 합계 */
   _renderAllocationsTab() {
     if (this.allocations === null) {
       return html`<div class="loading">할당내역 로딩 중...</div>`
@@ -963,6 +977,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
    * 데이터 조회
    * ============================================================ */
 
+  /** 출하 주문 헤더 및 항목 데이터 조회 */
   async _fetchOrderData() {
     this.loading = true
     try {
@@ -980,6 +995,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 배송정보 조회 (lazy loading) */
   async _fetchDelivery() {
     try {
       const query = JSON.stringify([{ name: 'shipmentOrderId', value: this.shipmentOrderId }])
@@ -991,6 +1007,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 할당내역 조회 (lazy loading) */
   async _fetchAllocations() {
     try {
       const query = JSON.stringify([{ name: 'shipmentOrderId', value: this.shipmentOrderId }])
@@ -1006,6 +1023,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
    * 탭 전환 (lazy loading)
    * ============================================================ */
 
+  /** 탭 전환 - 배송정보/할당내역 탭은 lazy loading */
   _switchTab(index) {
     this.activeTab = index
 
@@ -1022,6 +1040,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
    * 액션
    * ============================================================ */
 
+  /** 주문 확정 처리 */
   async _confirmOrder() {
     const result = await UiUtil.showAlertPopup('label.confirm', '주문을 확정하시겠습니까?', 'question', 'confirm', 'cancel')
     if (!result) return
@@ -1039,6 +1058,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 재고 할당 실행 */
   async _allocateOrder() {
     const result = await UiUtil.showAlertPopup('label.confirm', '재고 할당을 실행하시겠습니까?', 'question', 'confirm', 'cancel')
     if (!result) return
@@ -1057,6 +1077,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 할당 해제 처리 */
   async _deallocateOrder() {
     const result = await UiUtil.showAlertPopup('label.confirm', '할당을 해제하시겠습니까?', 'question', 'confirm', 'cancel')
     if (!result) return
@@ -1075,6 +1096,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 주문 취소 처리 */
   async _cancelOrder() {
     const result = await UiUtil.showAlertPopup('label.confirm', '주문을 취소하시겠습니까?\n이 작업은 되돌릴 수 없습니다.', 'warning', 'confirm', 'cancel')
     if (!result) return
@@ -1092,6 +1114,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 주문 마감 처리 */
   async _closeOrder() {
     const result = await UiUtil.showAlertPopup('label.confirm', '주문을 마감하시겠습니까?', 'question', 'confirm', 'cancel')
     if (!result) return
@@ -1109,11 +1132,13 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 액션 실행 후 데이터 새로고침 및 이벤트 발행 */
   async _refreshAfterAction() {
     await this._fetchOrderData()
     this._dispatchOrderUpdated()
   }
 
+  /** order-updated 커스텀 이벤트 발행 */
   _dispatchOrderUpdated() {
     this.dispatchEvent(
       new CustomEvent('order-updated', {
@@ -1128,6 +1153,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
    * 유틸리티
    * ============================================================ */
 
+  /** 주문 상태 코드를 한글 라벨로 변환 */
   _statusLabel(status) {
     const labels = {
       REGISTERED: '등록',
@@ -1145,6 +1171,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     return labels[status] || status || '-'
   }
 
+  /** 업무유형 코드를 한글 라벨로 변환 */
   _bizTypeLabel(type) {
     const labels = {
       B2C_OUT: 'B2C 출고',
@@ -1155,6 +1182,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     return labels[type] || type || '-'
   }
 
+  /** 출하유형 코드를 한글 라벨로 변환 */
   _shipTypeLabel(type) {
     const labels = {
       NORMAL: '일반 출하',
@@ -1167,6 +1195,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     return labels[type] || type || '-'
   }
 
+  /** 피킹방식 코드를 한글 라벨로 변환 */
   _pickMethodLabel(type) {
     const labels = {
       WCS: 'WCS 위임',
@@ -1177,6 +1206,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     return labels[type] || type || '-'
   }
 
+  /** 배송유형 코드를 한글 라벨로 변환 */
   _dlvTypeLabel(type) {
     const labels = {
       STANDARD: '일반 배송',
@@ -1187,6 +1217,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     return labels[type] || type || '-'
   }
 
+  /** 우선순위 코드를 한글 라벨로 변환 */
   _priorityLabel(priority) {
     const labels = {
       URGENT: '긴급',
@@ -1197,6 +1228,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     return labels[priority] || priority || '보통'
   }
 
+  /** 할당 상태 코드를 한글 라벨로 변환 */
   _allocStatusLabel(status) {
     const labels = {
       SOFT: '임시할당',
@@ -1208,6 +1240,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     return labels[status] || status || '-'
   }
 
+  /** 할당 전략 코드를 한글 라벨로 변환 */
   _allocStrategyLabel(strategy) {
     const labels = {
       FEFO: 'FEFO',
@@ -1218,6 +1251,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     return labels[strategy] || strategy || '-'
   }
 
+  /** 날짜 시간 포맷팅 (YYYY-MM-DD HH:mm) */
   _formatDateTime(dateValue) {
     if (!dateValue) return '-'
     const d = new Date(dateValue)

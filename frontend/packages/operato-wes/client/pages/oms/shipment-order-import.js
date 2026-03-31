@@ -14,6 +14,7 @@ import { IMPORT } from '@things-factory/import-base'
  * Step 3: 결과 확인 (임포트 완료 요약)
  */
 class ShipmentOrderImport extends localize(i18next)(PageView) {
+  /** 컴포넌트 스타일 정의 */
   static get styles() {
     return [
       css`
@@ -375,6 +376,7 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
     ]
   }
 
+  /** 컴포넌트 반응형 속성 정의 */
   static get properties() {
     return {
       currentStep: Number,
@@ -388,6 +390,7 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
     }
   }
 
+  /** 생성자 - 초기 상태값 설정 */
   constructor() {
     super()
     this.currentStep = 1
@@ -400,10 +403,12 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
     this.processing = false
   }
 
+  /** 페이지 컨텍스트 반환 - 브라우저 타이틀 설정 */
   get context() {
     return { title: i18next.t('menu.ImportShipmentOrder', { defaultValue: '주문 임포트' }) }
   }
 
+  /** 화면 렌더링 - 3단계 마법사 (파일 업로드 → 검증 → 결과) */
   render() {
     return html`
       <h2>${i18next.t('menu.ImportShipmentOrder', { defaultValue: '주문 임포트' })}</h2>

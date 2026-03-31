@@ -295,6 +295,7 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
     ]
   }
 
+  /** 컴포넌트 반응형 속성 정의 */
   static get properties() {
     return {
       loading: Boolean,
@@ -306,6 +307,7 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
     }
   }
 
+  /** 생성자 - 초기 상태값 설정 */
   constructor() {
     super()
     this.loading = true
@@ -324,10 +326,12 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
     this.pageSize = 20
   }
 
+  /** 페이지 컨텍스트 반환 */
   get context() {
     return { title: i18next.t('menu.FulfillmentProgress', { defaultValue: '피킹/검수/포장 진행 현황' }) }
   }
 
+  /** 화면 렌더링 */
   render() {
     return html`
       <div class="page-container">
@@ -512,12 +516,14 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
     `
   }
 
+  /** 페이지 활성화 시 데이터 조회 */
   async pageUpdated(changes, lifecycle, before) {
     if (this.active) {
       await this._fetchData()
     }
   }
 
+  /** 데이터 일괄 조회 */
   async _fetchData() {
     try {
       this.loading = true
@@ -529,6 +535,7 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
     }
   }
 
+  /** 진행 현황 목록 조회 */
   async _fetchItems() {
     try {
       let filters = []
@@ -570,10 +577,12 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
     }
   }
 
+  /** 검색 조건 단일 필드 업데이트 */
   _updateSearch(field, value) {
     this.searchParams = { ...this.searchParams, [field]: value }
   }
 
+  /** 검색 조건 초기화 */
   _resetSearch() {
     this.searchParams = {
       order_date_from: this._todayStr(),
@@ -588,11 +597,13 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
     this._fetchData()
   }
 
+  /** 검색 실행 (첫 페이지부터 재조회) */
   _search() {
     this.currentPage = 1
     this._fetchData()
   }
 
+  /** 피킹 상태 한글 라벨 반환 */
   _pickStatusLabel(status) {
     const labels = {
       CREATED: i18next.t('label.created', { defaultValue: '생성' }),
@@ -603,6 +614,7 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
     return labels[status] || status
   }
 
+  /** 포장 상태 한글 라벨 반환 */
   _packStatusLabel(status) {
     const labels = {
       CREATED: i18next.t('label.created', { defaultValue: '생성' }),
@@ -616,20 +628,24 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
     return labels[status] || status
   }
 
+  /** 숫자를 천단위 구분자 포맷으로 반환 */
   _formatNumber(value) {
     if (value == null) return '-'
     return Number(value).toLocaleString()
   }
 
+  /** 오늘 날짜를 YYYY-MM-DD 형식 문자열로 반환 */
   _todayStr() {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
+  /** 전체 페이지 수 계산 */
   get _totalPages() {
     return Math.max(1, Math.ceil(this.totalCount / this.pageSize))
   }
 
+  /** 페이지네이션 버튼 배열 생성 (현재 페이지 기준 ±2) */
   get _pageButtons() {
     const total = this._totalPages
     const current = this.currentPage
@@ -642,6 +658,7 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
     return pages
   }
 
+  /** 지정 페이지로 이동 */
   _goPage(page) {
     if (page < 1 || page > this._totalPages) return
     this.currentPage = page

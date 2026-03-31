@@ -20,6 +20,7 @@ import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
  * )
  */
 class AutoWaveCreatePopup extends localize(i18next)(LitElement) {
+  /** 컴포넌트 스타일 정의 */
   static get styles() {
     return [
       css`
@@ -190,6 +191,7 @@ class AutoWaveCreatePopup extends localize(i18next)(LitElement) {
     ]
   }
 
+  /** 컴포넌트 반응형 속성 정의 */
   static get properties() {
     return {
       groupByCarrier: Boolean,
@@ -203,6 +205,7 @@ class AutoWaveCreatePopup extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 생성자 - 초기 상태값 설정 */
   constructor() {
     super()
     this.groupByCarrier = true
@@ -221,6 +224,7 @@ class AutoWaveCreatePopup extends localize(i18next)(LitElement) {
     this._fetchPreviewCount()
   }
 
+  /** 화면 렌더링 - 웨이브 생성 조건 폼 */
   render() {
     return html`
       <!-- 폼 내용 -->
@@ -361,6 +365,7 @@ class AutoWaveCreatePopup extends localize(i18next)(LitElement) {
     UiUtil.closePopupBy(this)
   }
 
+  /** 오늘 날짜 문자열 반환 (YYYY-MM-DD) */
   _todayStr() {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`

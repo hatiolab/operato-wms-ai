@@ -183,7 +183,7 @@ export const CustomButtonMixin = superClass =>
         customLogic['param_data'] = customAction.type.replace('popup-link-', '')
         customLogic['logic'] = JSON.parse(customAction.logic)
 
-         // Diy Export Excel
+        // Diy Export Excel
       } else if (customAction.type.startsWith('print-excel')) {
         customLogic['action'] = 'print-excel'
         customLogic['param_data'] = customAction.type.replace('print-excel-', '')
@@ -227,7 +227,7 @@ export const CustomButtonMixin = superClass =>
           // Diy Export Excel
         } else if (customLogic.action == 'print-excel') {
           let logic = customLogic.logic
-          let fileName = logic.filename? logic.filename : null
+          let fileName = logic.filename ? logic.filename : null
           let excelUrl = logic.url.replace(':id', parameters.id)
           await ServiceUtil.excelFileDownload('stream/' + excelUrl, null, fileName)
 
@@ -243,7 +243,8 @@ export const CustomButtonMixin = superClass =>
             if (customLogic.param_data == 'search-form') {
               return await this.requestRestService(customLogic.method, customLogic.logic, { form: parameters })
             } else if (customLogic.param_data == 'list' || customLogic.param_data == 'changed') {
-              return await this.requestRestService(customLogic.method, customLogic.logic, { list: parameters })
+              // return await this.requestRestService(customLogic.method, customLogic.logic, { list: parameters })
+              return await this.requestRestService(customLogic.method, customLogic.logic, parameters)
             } else if (customLogic.param_data == 'selected') {
               return await this.requestRestService(customLogic.method, customLogic.logic, { data: parameters })
             } else if (customLogic.param_data == 'selected-bare' || customLogic.param_data == 'changed-bare') {

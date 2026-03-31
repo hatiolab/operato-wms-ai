@@ -20,6 +20,7 @@ import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
  * openPopup(el, { backdrop: true, size: 'large', title: '웨이브 상세' })
  */
 class ShipmentWaveDetail extends localize(i18next)(LitElement) {
+  /** 컴포넌트 스타일 정의 */
   static get styles() {
     return [
       css`
@@ -463,6 +464,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     ]
   }
 
+  /** 컴포넌트 반응형 속성 정의 */
   static get properties() {
     return {
       waveId: String,
@@ -480,6 +482,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 생성자 - 초기 상태값 설정 */
   constructor() {
     super()
     this.waveId = null
@@ -496,6 +499,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     this.selectedAddOrderIds = []
   }
 
+  /** 컴포넌트 연결 시 웨이브 데이터 조회 */
   connectedCallback() {
     super.connectedCallback()
     if (this.waveId) {
@@ -503,6 +507,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 화면 렌더링 - 로딩 상태 또는 웨이브 상세 전체 출력 */
   render() {
     if (this.loading) {
       return html`<div class="loading">${i18next.t('label.loading', { defaultValue: '데이터 로딩 중...' })}</div>`
@@ -528,6 +533,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
    * 렌더링 — 헤더
    * ============================================================ */
 
+  /** 헤더 영역 렌더링 - 웨이브번호, 상태 배지, 액션 버튼, 통계 박스 */
   _renderHeader() {
     const w = this.wave
 
@@ -574,6 +580,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     `
   }
 
+  /** 통계 박스 렌더링 - 계획/실적/진행률 */
   _renderStats() {
     const w = this.wave
     const progress = this._calcProgress()
@@ -625,6 +632,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     `
   }
 
+  /** 액션 버튼 렌더링 - 상태별로 주문추가/제거/확정/취소 버튼 표시 */
   _renderActionButtons() {
     const s = this.wave?.status
 
@@ -650,6 +658,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
    * 렌더링 — 탭 바
    * ============================================================ */
 
+  /** 탭 바 렌더링 - 주문목록/SKU합산/보충지시 */
   _renderTabs() {
     const orderCount = this.orders ? this.orders.length : ''
     const replenishCount = this.replenishes ? this.replenishes.length : ''
@@ -673,6 +682,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
    * 렌더링 — Tab 0: 주문 목록
    * ============================================================ */
 
+  /** 주문 목록 탭 렌더링 - 웨이브에 포함된 주문 테이블 및 합계 */
   _renderOrdersTab() {
     if (this.orders === null) {
       return html`<div class="loading">${i18next.t('label.loading', { defaultValue: '데이터 로딩 중...' })}</div>`
@@ -736,6 +746,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
    * 렌더링 — Tab 1: SKU 합산
    * ============================================================ */
 
+  /** SKU 합산 탭 렌더링 - SKU별 합산 수량 및 주문건수 테이블 */
   _renderSkuSummaryTab() {
     if (this.skuSummary === null) {
       return html`<div class="loading">${i18next.t('label.loading', { defaultValue: '데이터 로딩 중...' })}</div>`
@@ -789,6 +800,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
    * 렌더링 — Tab 2: 보충 지시
    * ============================================================ */
 
+  /** 보충 지시 탭 렌더링 - 웨이브 관련 보충 지시 목록 */
   _renderReplenishTab() {
     if (this.replenishes === null) {
       return html`<div class="loading">${i18next.t('label.loading', { defaultValue: '데이터 로딩 중...' })}</div>`
@@ -835,6 +847,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
    * 데이터 조회
    * ============================================================ */
 
+  /** 웨이브 헤더, 주문 목록, SKU 합산 데이터 조회 */
   async _fetchWaveData() {
     this.loading = true
     try {
@@ -857,6 +870,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 보충 지시 조회 (lazy loading) */
   async _fetchReplenishes() {
     try {
       const waveNo = this.wave?.wave_no
@@ -877,6 +891,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
    * 탭 전환 (lazy loading)
    * ============================================================ */
 
+  /** 탭 전환 - 보충 지시 탭은 lazy loading */
   _switchTab(index) {
     this.activeTab = index
 
@@ -889,6 +904,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
    * 액션
    * ============================================================ */
 
+  /** 웨이브 확정 처리 */
   async _releaseWave() {
     const w = this.wave
     const result = await UiUtil.showAlertPopup(
@@ -916,6 +932,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 웨이브 취소 처리 */
   async _cancelWave() {
     const result = await UiUtil.showAlertPopup(
       'title.confirm',
@@ -939,6 +956,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 액션 실행 후 데이터 새로고침 및 이벤트 발행 */
   async _refreshAfterAction() {
     this.orders = null
     this.skuSummary = null
@@ -952,6 +970,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
    * 주문 체크박스 선택
    * ============================================================ */
 
+  /** 주문 체크박스 개별 선택 처리 */
   _toggleOrderSelection(orderId, e) {
     if (e.target.checked) {
       this.selectedOrderIds = [...this.selectedOrderIds, orderId]
@@ -960,6 +979,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 주문 체크박스 전체 선택/해제 처리 */
   _toggleAllOrders(e) {
     if (e.target.checked) {
       this.selectedOrderIds = this.orders.map(o => o.id)
@@ -972,6 +992,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
    * 주문 제거
    * ============================================================ */
 
+  /** 선택된 주문을 웨이브에서 제거 */
   async _removeSelectedOrders() {
     if (this.selectedOrderIds.length === 0) return
 
@@ -1005,6 +1026,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
    * 주문 추가 팝업
    * ============================================================ */
 
+  /** 주문 추가 팝업 열기 - ALLOCATED 상태 주문 조회 */
   async _openAddOrderPopup() {
     this.actionLoading = true
     try {
@@ -1021,12 +1043,14 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 주문 추가 팝업 닫기 */
   _closeAddOrderPopup() {
     this.showAddOrderPopup = false
     this.allocatedOrders = []
     this.selectedAddOrderIds = []
   }
 
+  /** 추가 팝업에서 주문 개별 선택 처리 */
   _toggleAddOrderSelection(orderId, e) {
     if (e.target.checked) {
       this.selectedAddOrderIds = [...this.selectedAddOrderIds, orderId]
@@ -1035,6 +1059,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 추가 팝업에서 주문 전체 선택/해제 처리 */
   _toggleAllAddOrders(e) {
     if (e.target.checked) {
       this.selectedAddOrderIds = this.allocatedOrders.map(o => o.id)
@@ -1043,6 +1068,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 선택된 주문을 웨이브에 추가 */
   async _confirmAddOrders() {
     if (this.selectedAddOrderIds.length === 0) return
 
@@ -1062,6 +1088,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 주문 추가 팝업 렌더링 */
   _renderAddOrderPopup() {
     return html`
       <div class="popup-overlay" @click="${e => { if (e.target === e.currentTarget) this._closeAddOrderPopup() }}">
@@ -1119,6 +1146,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     `
   }
 
+  /** wave-updated 커스텀 이벤트 발행 */
   _dispatchWaveUpdated() {
     this.dispatchEvent(
       new CustomEvent('wave-updated', {
@@ -1133,6 +1161,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
    * 유틸리티
    * ============================================================ */
 
+  /** 웨이브 상태 코드를 한글 라벨로 변환 */
   _statusLabel(status) {
     const labels = {
       CREATED: i18next.t('label.created', { defaultValue: '생성' }),
@@ -1143,6 +1172,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     return labels[status] || status
   }
 
+  /** 주문 상태 코드를 한글 라벨로 변환 */
   _orderStatusLabel(status) {
     const labels = {
       REGISTERED: '등록',
@@ -1160,6 +1190,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     return labels[status] || status
   }
 
+  /** 보충 지시 상태 코드를 한글 라벨로 변환 */
   _replenishStatusLabel(status) {
     const labels = {
       CREATED: i18next.t('label.created', { defaultValue: '생성' }),
@@ -1170,6 +1201,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     return labels[status] || status
   }
 
+  /** 피킹유형 코드를 한글 라벨로 변환 */
   _pickTypeLabel(type) {
     const labels = {
       TOTAL: i18next.t('label.total_picking', { defaultValue: '토털 피킹' }),
@@ -1179,6 +1211,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     return labels[type] || type || '-'
   }
 
+  /** 피킹방식 코드를 한글 라벨로 변환 */
   _pickMethodLabel(type) {
     const labels = {
       WCS: i18next.t('label.pick_method_wcs', { defaultValue: 'WCS 위임' }),
@@ -1189,6 +1222,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     return labels[type] || type || '-'
   }
 
+  /** 업무유형 코드를 한글 라벨로 변환 */
   _bizTypeLabel(type) {
     const labels = {
       B2C_OUT: 'B2C',
@@ -1199,6 +1233,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     return labels[type] || type || '-'
   }
 
+  /** 출하유형 코드를 한글 라벨로 변환 */
   _shipTypeLabel(type) {
     const labels = {
       NORMAL: '일반',
@@ -1212,6 +1247,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     return labels[type] || type || '-'
   }
 
+  /** 진행률 계산 - 계획 대비 실적 백분율 */
   _calcProgress() {
     const plan = this.wave?.plan_order || 0
     const result = this.wave?.result_order || 0
@@ -1219,6 +1255,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     return Math.min(100, Math.round((result / plan) * 100))
   }
 
+  /** 날짜 시간 포맷팅 (YYYY-MM-DD HH:mm) */
   _formatDateTime(dateValue) {
     if (!dateValue) return '-'
     try {

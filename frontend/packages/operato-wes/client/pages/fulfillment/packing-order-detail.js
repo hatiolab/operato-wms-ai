@@ -404,6 +404,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     ]
   }
 
+  /** 컴포넌트 반응형 속성 정의 */
   static get properties() {
     return {
       packingOrderId: String,
@@ -416,6 +417,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 생성자 - 초기 상태값 설정 */
   constructor() {
     super()
     this.packingOrderId = null
@@ -427,6 +429,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     this.actionLoading = false
   }
 
+  /** 컴포넌트가 DOM에 연결될 때 실행 */
   connectedCallback() {
     super.connectedCallback()
     if (this.packingOrderId) {
@@ -434,6 +437,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 화면 렌더링 */
   render() {
     if (this.loading) {
       return html`<div class="loading">데이터 로딩 중...</div>`
@@ -458,6 +462,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
    * 렌더링 -- 헤더
    * ============================================================ */
 
+  /** 헤더 영역 렌더링 (타이틀, 상태 배지, 액션 버튼, 타임라인) */
   _renderHeader() {
     const o = this.order
     return html`
@@ -477,6 +482,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     `
   }
 
+  /** 수평 상태 타임라인 렌더링 (6단계) */
   _renderTimeline() {
     const steps = [
       { key: 'CREATED', label: '생성' },
@@ -508,6 +514,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     `
   }
 
+  /** 상태별 액션 버튼 렌더링 */
   _renderActionButtons() {
     const s = this.order?.status
     return html`
@@ -543,6 +550,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
    * 렌더링 -- 탭 바
    * ============================================================ */
 
+  /** 탭 바 렌더링 (기본정보/포장항목/포장박스) */
   _renderTabs() {
     return html`
       <div class="tab-bar">
@@ -563,6 +571,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
    * Tab 0: 기본정보
    * ============================================================ */
 
+  /** 기본정보 탭 렌더링 */
   _renderBasicInfoTab() {
     const o = this.order
     return html`
@@ -664,6 +673,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
    * Tab 1: 포장 항목
    * ============================================================ */
 
+  /** 포장 항목 탭 렌더링 */
   _renderItemsTab() {
     if (this.items === null) {
       return html`<div class="loading">포장 항목 로딩 중...</div>`
@@ -738,6 +748,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
    * Tab 2: 포장 박스
    * ============================================================ */
 
+  /** 포장 박스 탭 렌더링 */
   _renderBoxesTab() {
     if (this.boxes === null) {
       return html`<div class="loading">포장 박스 로딩 중...</div>`
@@ -808,6 +819,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
    * 데이터 조회
    * ============================================================ */
 
+  /** 포장 지시 헤더 정보 조회 */
   async _fetchOrder() {
     this.loading = true
     try {
@@ -821,6 +833,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 포장 항목 목록 조회 */
   async _fetchItems() {
     try {
       const data = await ServiceUtil.restGet('ful_trx/packing_orders/' + this.packingOrderId + '/items')
@@ -831,6 +844,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 포장 박스 목록 조회 */
   async _fetchBoxes() {
     try {
       const data = await ServiceUtil.restGet('ful_trx/packing_orders/' + this.packingOrderId + '/boxes')
@@ -845,6 +859,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
    * 탭 전환 (lazy loading)
    * ============================================================ */
 
+  /** 탭 전환 (lazy loading) */
   _switchTab(index) {
     this.activeTab = index
 
@@ -861,6 +876,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
    * 액션
    * ============================================================ */
 
+  /** 포장 작업 시작 */
   async _startOrder() {
     const result = await UiUtil.showAlertPopup('title.confirm', '포장 작업을 시작하시겠습니까?', 'question', 'confirm', 'cancel')
     if (!result) return
@@ -878,6 +894,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 포장 작업 완료 */
   async _completeOrder() {
     const result = await UiUtil.showAlertPopup('title.confirm', '포장 작업을 완료하시겠습니까?', 'question', 'confirm', 'cancel')
     if (!result) return
@@ -895,6 +912,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 라벨 출력 */
   async _printLabel() {
     const result = await UiUtil.showAlertPopup('title.confirm', '라벨을 출력하시겠습니까?', 'question', 'confirm', 'cancel')
     if (!result) return
@@ -912,6 +930,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 매니페스트 처리 */
   async _manifest() {
     const result = await UiUtil.showAlertPopup('title.confirm', '매니페스트를 처리하시겠습니까?', 'question', 'confirm', 'cancel')
     if (!result) return
@@ -929,6 +948,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 출하 확정 */
   async _confirmShipping() {
     const result = await UiUtil.showAlertPopup('title.confirm', '출하를 확정하시겠습니까?', 'question', 'confirm', 'cancel')
     if (!result) return
@@ -946,6 +966,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 포장 지시 취소 */
   async _cancelOrder() {
     const result = await UiUtil.showAlertPopup('title.confirm', '포장 지시를 취소하시겠습니까?\n이 작업은 되돌릴 수 없습니다.', 'warning', 'confirm', 'cancel')
     if (!result) return
@@ -963,6 +984,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 출하 취소 */
   async _cancelShipping() {
     const result = await UiUtil.showAlertPopup('title.confirm', '출하를 취소하시겠습니까?\n이 작업은 되돌릴 수 없습니다.', 'warning', 'confirm', 'cancel')
     if (!result) return
@@ -980,6 +1002,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 액션 실행 후 데이터 새로고침 */
   async _refreshAfterAction() {
     this.items = null
     this.boxes = null
@@ -993,6 +1016,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
+  /** 부모 컴포넌트에 변경 이벤트 발행 */
   _dispatchOrderUpdated() {
     this.dispatchEvent(
       new CustomEvent('order-updated', {

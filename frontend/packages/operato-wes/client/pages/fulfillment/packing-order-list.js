@@ -383,6 +383,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
     ]
   }
 
+  /** 컴포넌트 반응형 속성 정의 */
   static get properties() {
     return {
       loading: Boolean,
@@ -396,6 +397,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
     }
   }
 
+  /** 생성자 - 초기 상태값 설정 */
   constructor() {
     super()
     this.loading = true
@@ -425,10 +427,12 @@ class PackingOrderList extends localize(i18next)(PageView) {
     this.selectedIds = []
   }
 
+  /** 페이지 컨텍스트 반환 */
   get context() {
     return { title: i18next.t('menu.PackingOrderWork', { defaultValue: '포장 주문 관리' }) }
   }
 
+  /** 화면 렌더링 */
   render() {
     return html`
       <div class="page-container">
@@ -636,12 +640,14 @@ class PackingOrderList extends localize(i18next)(PageView) {
     `
   }
 
+  /** 페이지 활성화 시 데이터 조회 */
   async pageUpdated(changes, lifecycle, before) {
     if (this.active) {
       await this._fetchData()
     }
   }
 
+  /** 데이터 일괄 조회 (주문 목록 + 상태 요약) */
   async _fetchData() {
     try {
       this.loading = true
@@ -656,6 +662,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
     }
   }
 
+  /** 포장 주문 목록 조회 */
   async _fetchOrders() {
     try {
       let filters = []
@@ -700,6 +707,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
     }
   }
 
+  /** 포장 상태 요약 조회 */
   async _fetchStatusSummary() {
     try {
       const data = await ServiceUtil.restGet('ful_trx/dashboard/packing_status')
@@ -719,10 +727,12 @@ class PackingOrderList extends localize(i18next)(PageView) {
     }
   }
 
+  /** 검색 조건 단일 필드 업데이트 */
   _updateSearch(field, value) {
     this.searchParams = { ...this.searchParams, [field]: value }
   }
 
+  /** 검색 조건 초기화 */
   _resetSearch() {
     this.searchParams = {
       order_date_from: this._todayStr(),
@@ -739,12 +749,14 @@ class PackingOrderList extends localize(i18next)(PageView) {
     this._fetchData()
   }
 
+  /** 검색 실행 (첫 페이지부터 재조회) */
   _search() {
     this.currentPage = 1
     this.selectedIds = []
     this._fetchData()
   }
 
+  /** 상태별 필터링 */
   _filterByStatus(status) {
     this.searchParams = { ...this.searchParams, status }
     this.currentPage = 1
@@ -752,11 +764,12 @@ class PackingOrderList extends localize(i18next)(PageView) {
     this._fetchData()
   }
 
-  /* 체크박스 선택 */
+  /** 전체 선택 여부 확인 */
   get _isAllSelected() {
     return this.orders.length > 0 && this.selectedIds.length === this.orders.length
   }
 
+  /** 전체 선택 토글 */
   _toggleSelectAll(e) {
     if (e.target.checked) {
       this.selectedIds = this.orders.map(o => o.id)
@@ -766,6 +779,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
     this.requestUpdate()
   }
 
+  /** 개별 항목 선택 토글 */
   _toggleSelect(id, checked) {
     if (checked) {
       this.selectedIds = [...this.selectedIds, id]
@@ -775,11 +789,12 @@ class PackingOrderList extends localize(i18next)(PageView) {
     this.requestUpdate()
   }
 
+  /** 선택된 주문 목록 반환 */
   _getSelectedOrders() {
     return this.orders.filter(o => this.selectedIds.includes(o.id))
   }
 
-  /* 일괄 라벨 출력 - COMPLETED 상태만 */
+  /** 일괄 라벨 출력 (COMPLETED 상태만) */
   async _printLabelBatch() {
     const selected = this._getSelectedOrders().filter(o => o.status === 'COMPLETED')
     if (selected.length === 0) {
@@ -800,7 +815,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
     }
   }
 
-  /* 매니페스트 - LABEL_PRINTED 상태만 */
+  /** 일괄 매니페스트 (LABEL_PRINTED 상태만) */
   async _manifestBatch() {
     const selected = this._getSelectedOrders().filter(o => o.status === 'LABEL_PRINTED')
     if (selected.length === 0) {
@@ -821,7 +836,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
     }
   }
 
-  /* 일괄 출하 확정 - COMPLETED/LABEL_PRINTED/MANIFESTED 상태 */
+  /** 일괄 출하 확정 (COMPLETED/LABEL_PRINTED/MANIFESTED 상태) */
   async _confirmShippingBatch() {
     const validStatuses = ['COMPLETED', 'LABEL_PRINTED', 'MANIFESTED']
     const selected = this._getSelectedOrders().filter(o => validStatuses.includes(o.status))
@@ -842,7 +857,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
     }
   }
 
-  /* 일괄 취소 - SHIPPED 제외 */
+  /** 일괄 취소 (SHIPPED 제외) */
   async _cancelBatch() {
     const selected = this._getSelectedOrders().filter(o => o.status !== 'SHIPPED')
     if (selected.length === 0) {
@@ -863,7 +878,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
     }
   }
 
-  /* 상세 팝업 */
+  /** 상세 팝업 열기 */
   _openDetail(id) {
     openPopup(
       html`<packing-order-detail
@@ -878,6 +893,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
     )
   }
 
+  /** 포장 상태 한글 라벨 반환 */
   _statusLabel(status) {
     const labels = {
       CREATED: i18next.t('label.created', { defaultValue: '생성' }),
@@ -891,25 +907,30 @@ class PackingOrderList extends localize(i18next)(PageView) {
     return labels[status] || status
   }
 
+  /** 숫자를 천단위 구분자 포맷으로 반환 */
   _formatNumber(value) {
     if (value == null) return '-'
     return Number(value).toLocaleString()
   }
 
+  /** 중량을 소수점 포함 천단위 구분자 포맷으로 반환 */
   _formatWeight(value) {
     if (value == null) return '-'
     return Number(value).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })
   }
 
+  /** 오늘 날짜를 YYYY-MM-DD 형식 문자열로 반환 */
   _todayStr() {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
+  /** 전체 페이지 수 계산 */
   get _totalPages() {
     return Math.max(1, Math.ceil(this.totalCount / this.pageSize))
   }
 
+  /** 페이지네이션 버튼 배열 생성 (현재 페이지 기준 ±2) */
   get _pageButtons() {
     const total = this._totalPages
     const current = this.currentPage
@@ -922,6 +943,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
     return pages
   }
 
+  /** 지정 페이지로 이동 */
   _goPage(page) {
     if (page < 1 || page > this._totalPages) return
     this.currentPage = page

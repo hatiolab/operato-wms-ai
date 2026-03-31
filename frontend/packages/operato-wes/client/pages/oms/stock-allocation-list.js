@@ -13,6 +13,7 @@ import './shipment-order-detail'
  * 출하 주문에 대한 재고 할당(SOFT/HARD) 상태를 조회·모니터링
  */
 class StockAllocationList extends localize(i18next)(PageView) {
+  /** 컴포넌트 스타일 정의 */
   static get styles() {
     return [
       css`
@@ -366,6 +367,7 @@ class StockAllocationList extends localize(i18next)(PageView) {
     ]
   }
 
+  /** 컴포넌트 반응형 속성 정의 */
   static get properties() {
     return {
       loading: Boolean,
@@ -378,6 +380,7 @@ class StockAllocationList extends localize(i18next)(PageView) {
     }
   }
 
+  /** 생성자 - 초기 상태값 설정 */
   constructor() {
     super()
     this.loading = true
@@ -395,10 +398,12 @@ class StockAllocationList extends localize(i18next)(PageView) {
     this.pageSize = 20
   }
 
+  /** 페이지 컨텍스트 반환 - 브라우저 타이틀 설정 */
   get context() {
     return { title: i18next.t('title.stock-allocation-list', { defaultValue: '재고 할당 현황' }) }
   }
 
+  /** 화면 렌더링 - 상태요약, 검색폼, 할당 목록 표시 */
   render() {
     return html`
       <div class="page-container">
@@ -569,12 +574,14 @@ class StockAllocationList extends localize(i18next)(PageView) {
     `
   }
 
+  /** 페이지 활성화 시 데이터 조회 */
   async pageUpdated(changes, lifecycle, before) {
     if (this.active) {
       await this._fetchData()
     }
   }
 
+  /** 할당 목록 및 상태 요약 데이터 일괄 조회 */
   async _fetchData() {
     try {
       this.loading = true
@@ -589,6 +596,7 @@ class StockAllocationList extends localize(i18next)(PageView) {
     }
   }
 
+  /** 재고 할당 목록 조회 (검색 조건 및 페이지네이션 적용) */
   async _fetchAllocations() {
     try {
       let filters = []
@@ -624,6 +632,7 @@ class StockAllocationList extends localize(i18next)(PageView) {
     }
   }
 
+  /** 할당 상태별 요약 통계 조회 (SOFT/HARD/RELEASED/EXPIRED/CANCELLED) */
   async _fetchStatusSummary() {
     try {
       const statuses = ['SOFT', 'HARD', 'RELEASED', 'EXPIRED', 'CANCELLED']
@@ -647,14 +656,17 @@ class StockAllocationList extends localize(i18next)(PageView) {
     }
   }
 
+  /** 데이터 새로고침 */
   _refresh() {
     this._fetchData()
   }
 
+  /** 검색 조건 업데이트 */
   _updateSearch(field, value) {
     this.searchParams = { ...this.searchParams, [field]: value }
   }
 
+  /** 검색 조건 초기화 및 재조회 */
   _resetSearch() {
     this.searchParams = {
       status: '',
@@ -667,17 +679,20 @@ class StockAllocationList extends localize(i18next)(PageView) {
     this._fetchData()
   }
 
+  /** 검색 실행 (페이지를 1로 초기화하고 조회) */
   _search() {
     this.currentPage = 1
     this._fetchData()
   }
 
+  /** 상태별 필터링 (요약 카드 클릭 시) */
   _filterByStatus(status) {
     this.searchParams = { ...this.searchParams, status }
     this.currentPage = 1
     this._fetchData()
   }
 
+  /** 출하 주문 상세 팝업 열기 */
   _openOrderDetail(orderId) {
     if (!orderId) return
     openPopup(
@@ -693,6 +708,7 @@ class StockAllocationList extends localize(i18next)(PageView) {
     )
   }
 
+  /** 할당 상태 코드를 한글 라벨로 변환 */
   _statusLabel(status) {
     const labels = {
       SOFT: i18next.t('label.soft_alloc', { defaultValue: '임시 할당' }),
@@ -704,6 +720,7 @@ class StockAllocationList extends localize(i18next)(PageView) {
     return labels[status] || status
   }
 
+  /** 할당 전략 코드를 한글 라벨로 변환 */
   _strategyLabel(strategy) {
     const labels = {
       FEFO: 'FEFO (선출고 우선)',
@@ -714,6 +731,7 @@ class StockAllocationList extends localize(i18next)(PageView) {
     return labels[strategy] || strategy || '-'
   }
 
+  /** SOFT 할당이 30분 이내 만료되는지 확인 */
   _isSoftExpiringSoon(alloc) {
     if (alloc.status !== 'SOFT' || !alloc.expired_at) return false
     try {
@@ -726,6 +744,7 @@ class StockAllocationList extends localize(i18next)(PageView) {
     }
   }
 
+  /** 날짜/시간 포맷팅 (YYYY-MM-DD HH:mm) */
   _formatDateTime(dateValue) {
     if (!dateValue) return '-'
     try {
@@ -738,15 +757,18 @@ class StockAllocationList extends localize(i18next)(PageView) {
     }
   }
 
+  /** 숫자 천단위 콤마 포맷팅 */
   _formatNumber(value) {
     if (value == null) return '0'
     return Number(value).toLocaleString()
   }
 
+  /** 전체 페이지 수 계산 */
   get _totalPages() {
     return Math.max(1, Math.ceil(this.totalCount / this.pageSize))
   }
 
+  /** 페이지네이션 버튼 배열 생성 (현재 페이지 기준 ±2) */
   get _pageButtons() {
     const total = this._totalPages
     const current = this.currentPage
@@ -759,6 +781,7 @@ class StockAllocationList extends localize(i18next)(PageView) {
     return pages
   }
 
+  /** 지정된 페이지로 이동하여 할당 목록 재조회 */
   _goPage(page) {
     if (page < 1 || page > this._totalPages) return
     this.currentPage = page

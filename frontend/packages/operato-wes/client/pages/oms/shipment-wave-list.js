@@ -14,6 +14,7 @@ import './shipment-wave-detail'
  * 웨이브를 조회·생성하고, 확정(릴리스)하여 Fulfillment/WCS에 인계
  */
 class ShipmentWaveList extends localize(i18next)(PageView) {
+  /** 컴포넌트 스타일 정의 */
   static get styles() {
     return [
       css`
@@ -374,6 +375,7 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
     ]
   }
 
+  /** 컴포넌트 반응형 속성 정의 */
   static get properties() {
     return {
       loading: Boolean,
@@ -386,6 +388,7 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
     }
   }
 
+  /** 생성자 - 초기 상태값 설정 */
   constructor() {
     super()
     this.loading = true
@@ -403,10 +406,12 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
     this.pageSize = 20
   }
 
+  /** 페이지 컨텍스트 반환 - 브라우저 타이틀 설정 */
   get context() {
     return { title: i18next.t('title.shipment-wave-list', { defaultValue: '웨이브 관리' }) }
   }
 
+  /** 화면 렌더링 - 검색폼, 상태요약, 웨이브 목록 표시 */
   render() {
     return html`
       <div class="page-container">
@@ -597,12 +602,14 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
     )
   }
 
+  /** 페이지 활성화 시 데이터 조회 */
   async pageUpdated(changes, lifecycle, before) {
     if (this.active) {
       await this._fetchData()
     }
   }
 
+  /** 웨이브 목록 및 상태 요약 데이터 일괄 조회 */
   async _fetchData() {
     try {
       this.loading = true
@@ -617,6 +624,7 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
     }
   }
 
+  /** 웨이브 목록 조회 (검색 조건 및 페이지네이션 적용) */
   async _fetchWaves() {
     try {
       let queryParts = []
@@ -655,6 +663,7 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
     }
   }
 
+  /** 웨이브 상태별 요약 통계 조회 (생성/확정/완료/취소) */
   async _fetchStatusSummary() {
     try {
       const waveDate = this.searchParams.wave_date_from || this._todayStr()
@@ -672,10 +681,12 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
     }
   }
 
+  /** 검색 조건 업데이트 */
   _updateSearch(field, value) {
     this.searchParams = { ...this.searchParams, [field]: value }
   }
 
+  /** 검색 조건 초기화 및 재조회 */
   _resetSearch() {
     this.searchParams = {
       wave_date_from: this._todayStr(),
@@ -688,25 +699,30 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
     this._fetchData()
   }
 
+  /** 검색 실행 (페이지를 1로 초기화하고 조회) */
   _search() {
     this.currentPage = 1
     this._fetchData()
   }
 
+  /** 상태별 필터링 (요약 카드 클릭 시) */
   _filterByStatus(status) {
     this.searchParams = { ...this.searchParams, status }
     this.currentPage = 1
     this._fetchData()
   }
 
+  /** 웨이브 생성 모달 열기 (내부적으로 _openWaveNewPopup 호출) */
   _openCreateModal() {
     this._openWaveNewPopup()
   }
 
+  /** 웨이브 생성 완료 후 목록 재조회 */
   _onWaveCreated() {
     this._fetchData()
   }
 
+  /** 웨이브 상세 팝업 열기 */
   _navigateToDetail(id) {
     openPopup(
       html`<shipment-wave-detail
@@ -721,6 +737,7 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
     )
   }
 
+  /** 웨이브 진행률 계산 (실적주문수 / 계획주문수 * 100) */
   _calcProgress(wave) {
     const plan = wave.plan_order || 0
     const result = wave.result_order || 0
@@ -728,6 +745,7 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
     return Math.min(100, Math.round((result / plan) * 100))
   }
 
+  /** 웨이브 상태 코드를 한글 라벨로 변환 */
   _statusLabel(status) {
     const labels = {
       CREATED: i18next.t('label.created', { defaultValue: '생성' }),
@@ -738,20 +756,24 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
     return labels[status] || status
   }
 
+  /** 숫자 천단위 콤마 포맷팅 */
   _formatNumber(value) {
     if (value == null) return '-'
     return Number(value).toLocaleString()
   }
 
+  /** 오늘 날짜 문자열 반환 (YYYY-MM-DD) */
   _todayStr() {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
+  /** 전체 페이지 수 계산 */
   get _totalPages() {
     return Math.max(1, Math.ceil(this.totalCount / this.pageSize))
   }
 
+  /** 페이지네이션 버튼 배열 생성 (현재 페이지 기준 ±2) */
   get _pageButtons() {
     const total = this._totalPages
     const current = this.currentPage
@@ -764,6 +786,7 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
     return pages
   }
 
+  /** 지정된 페이지로 이동하여 웨이브 목록 재조회 */
   _goPage(page) {
     if (page < 1 || page > this._totalPages) return
     this.currentPage = page
