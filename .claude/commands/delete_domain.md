@@ -72,6 +72,10 @@ SELECT 'roles'               AS tbl, count(*) FROM roles               WHERE dom
 SELECT 'menus'               AS tbl, count(*) FROM menus               WHERE domain_id = {target_domain_id}
 SELECT 'menu_columns'        AS tbl, count(*) FROM menu_columns        WHERE domain_id = {target_domain_id}
 SELECT 'menu_buttons'        AS tbl, count(*) FROM menu_buttons        WHERE domain_id = {target_domain_id}
+SELECT 'menu_details'        AS tbl, count(*) FROM menu_details        WHERE domain_id = {target_domain_id}
+SELECT 'menu_detail_buttons' AS tbl, count(*) FROM menu_detail_buttons WHERE domain_id = {target_domain_id}
+SELECT 'menu_detail_columns' AS tbl, count(*) FROM menu_detail_columns WHERE domain_id = {target_domain_id}
+SELECT 'menu_params'         AS tbl, count(*) FROM menu_params         WHERE domain_id = {target_domain_id}
 SELECT 'terminologies'       AS tbl, count(*) FROM terminologies       WHERE domain_id = {target_domain_id}
 SELECT 'entities'            AS tbl, count(*) FROM entities            WHERE domain_id = {target_domain_id}
 SELECT 'entity_columns'      AS tbl, count(*) FROM entity_columns      WHERE domain_id = {target_domain_id}
@@ -199,6 +203,10 @@ DELETE FROM users_roles WHERE domain_id = {target_domain_id}
 # 2. 메뉴 관련 (menus 참조)
 DELETE FROM menu_columns WHERE domain_id = {target_domain_id}
 DELETE FROM menu_buttons WHERE domain_id = {target_domain_id}
+DELETE FROM menu_params WHERE domain_id = {target_domain_id}
+DELETE FROM menu_detail_buttons WHERE domain_id = {target_domain_id}
+DELETE FROM menu_detail_columns WHERE domain_id = {target_domain_id}
+DELETE FROM menu_details WHERE domain_id = {target_domain_id}
 DELETE FROM menus WHERE domain_id = {target_domain_id}
 
 # 3. 엔티티 관련 (entities 참조)

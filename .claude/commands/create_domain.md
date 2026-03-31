@@ -128,7 +128,9 @@ if not reinit_mode:
 ```python
 config_tables = [
     'permissions', 'users_roles',
-    'menu_columns', 'menu_buttons', 'menus',
+    'menu_columns', 'menu_buttons', 'menu_params',
+    'menu_detail_buttons', 'menu_detail_columns', 'menu_details',
+    'menus',
     'entity_columns', 'entities',
     'common_code_details', 'common_codes',
     'terminologies', 'settings', 'roles',
@@ -215,7 +217,7 @@ SELECT id, name FROM roles WHERE domain_id = {source_domain_id}
 
 ---
 
-### Step 4: menus + menu_columns + menu_buttons 복제
+### Step 4: menus + menu_columns + menu_buttons + menu_details + menu_detail_buttons + menu_detail_columns + menu_params 복제
 
 #### 4-1. menus 복제 (parent-child 구조 보존)
 
@@ -273,6 +275,74 @@ SELECT * FROM menu_buttons WHERE domain_id = {source_domain_id}
 INSERT INTO menu_buttons (
     id, menu_id, name, description, rank, button_type,
     icon_path, action_type, action_name,
+    domain_id, creator_id, updater_id, created_at, updated_at
+) VALUES (...)
+```
+
+#### 4-4. menu_details 복제
+
+```python
+SELECT * FROM menu_details WHERE domain_id = {source_domain_id}
+```
+
+- `id` → 신규 UUID, 구 id → 신 id 매핑 딕셔너리 유지: `menu_detail_id_map = {}`
+- `menu_id` → `menu_id_map[old_menu_id]` 로 교체
+- `domain_id` → `new_domain_id`
+
+```python
+INSERT INTO menu_details (
+    id, menu_id, name, description, rank, ...
+    domain_id, creator_id, updater_id, created_at, updated_at
+) VALUES (...)
+```
+
+#### 4-5. menu_detail_buttons 복제
+
+```python
+SELECT * FROM menu_detail_buttons WHERE domain_id = {source_domain_id}
+```
+
+- `id` → 신규 UUID
+- `menu_detail_id` → `menu_detail_id_map[old_menu_detail_id]` 로 교체
+- `domain_id` → `new_domain_id`
+
+```python
+INSERT INTO menu_detail_buttons (
+    id, menu_detail_id, name, description, rank, ...
+    domain_id, creator_id, updater_id, created_at, updated_at
+) VALUES (...)
+```
+
+#### 4-6. menu_detail_columns 복제
+
+```python
+SELECT * FROM menu_detail_columns WHERE domain_id = {source_domain_id}
+```
+
+- `id` → 신규 UUID
+- `menu_detail_id` → `menu_detail_id_map[old_menu_detail_id]` 로 교체
+- `domain_id` → `new_domain_id`
+
+```python
+INSERT INTO menu_detail_columns (
+    id, menu_detail_id, name, description, rank, ...
+    domain_id, creator_id, updater_id, created_at, updated_at
+) VALUES (...)
+```
+
+#### 4-7. menu_params 복제
+
+```python
+SELECT * FROM menu_params WHERE domain_id = {source_domain_id}
+```
+
+- `id` → 신규 UUID
+- `menu_id` → `menu_id_map[old_menu_id]` 로 교체
+- `domain_id` → `new_domain_id`
+
+```python
+INSERT INTO menu_params (
+    id, menu_id, name, description, rank, ...
     domain_id, creator_id, updater_id, created_at, updated_at
 ) VALUES (...)
 ```
@@ -561,6 +631,10 @@ for user_id in target_users:
   menus               : {n}건 복제
   menu_columns        : {n}건 복제
   menu_buttons        : {n}건 복제
+  menu_details        : {n}건 복제
+  menu_detail_buttons : {n}건 복제
+  menu_detail_columns : {n}건 복제
+  menu_params         : {n}건 복제
   terminologies       : {n}건 복제
   entities            : {n}건 복제
   entity_columns      : {n}건 복제
