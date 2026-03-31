@@ -243,8 +243,7 @@ export const CustomButtonMixin = superClass =>
             if (customLogic.param_data == 'search-form') {
               return await this.requestRestService(customLogic.method, customLogic.logic, { form: parameters })
             } else if (customLogic.param_data == 'list' || customLogic.param_data == 'changed') {
-              // return await this.requestRestService(customLogic.method, customLogic.logic, { list: parameters })
-              return await this.requestRestService(customLogic.method, customLogic.logic, parameters)
+              return await this.requestRestService(customLogic.method, customLogic.logic, { list: parameters })
             } else if (customLogic.param_data == 'selected') {
               return await this.requestRestService(customLogic.method, customLogic.logic, { data: parameters })
             } else if (customLogic.param_data == 'selected-bare' || customLogic.param_data == 'changed-bare') {
@@ -300,7 +299,7 @@ export const CustomButtonMixin = superClass =>
       }
 
       // 여러 개의 선택한 그리드 리스트 혹은 선택한 하나의 항목을 파라미터로 사용하는 경우
-      if (paramType == 'list' || paramType == 'selected' || paramType == 'selected-bare') {
+      if (paramType == 'list' || paramType == 'list-bare' || paramType == 'selected' || paramType == 'selected-bare') {
         let selectedList = this.grist.selected
 
         if (!selectedList || selectedList.length == 0) {
@@ -308,7 +307,7 @@ export const CustomButtonMixin = superClass =>
           return undefined
         }
 
-        return paramType == 'list' ? selectedList : selectedList[0]
+        return paramType == 'list' || paramType == 'list-bare' ? selectedList : selectedList[0]
       }
 
       // 그리드에서 사용자가 변경한 정보를 리스트로 리턴
