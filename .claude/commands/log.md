@@ -34,6 +34,17 @@
    | HH:MM | 작업명 | 파일 또는 결과 |
    ```
 
-5. **기록 제외 항목**: 단순 질문·답변, 파일 조회만 한 경우는 생략
+5. **기록 제외 항목**:
+   - 단순 질문·답변, 파일 조회만 한 경우
+   - 다음 skill 실행 내용 (기록용/유틸리티 skill은 제외):
+     - `add_term` — 용어 등록
+     - `clear_frontend_cache` — 프론트엔드 캐시 삭제
+     - `translate` — 번역
+     - `update-shipment-order-import` — 엑셀 업데이트
+     - `code_by_entity` — 공통코드 등록
+     - `code_by_entity_column` — 필드별 공통코드 등록
+     - `build` — 빌드
+     - `commit` — git commit
+     - `log` — 작업 로그 기록 (재귀 방지)
 
 작업 기록 후 생성/수정된 파일 경로를 알려줘.
