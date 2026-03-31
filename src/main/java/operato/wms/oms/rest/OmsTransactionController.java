@@ -2,6 +2,7 @@ package operato.wms.oms.rest;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,7 @@ import operato.wms.oms.service.OmsTransactionService;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.sys.system.service.AbstractRestService;
+import xyz.elidom.sys.util.ValueUtil;
 
 /**
  * OMS 트랜잭션 컨트롤러
@@ -106,7 +108,8 @@ public class OmsTransactionController extends AbstractRestService {
 	 * POST /rest/oms_trx/waves/create_manual
 	 *
 	 * @param params { orders: [{ id, ... }], pick_type, pick_method }
-	 * @return { wave_no, wave_seq, order_count, sku_count, total_qty, skipped_count, errors }
+	 * @return { wave_no, wave_seq, order_count, sku_count, total_qty,
+	 *         skipped_count, errors }
 	 */
 	@RequestMapping(value = "waves/create_manual", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Create wave manually from selected orders")
@@ -143,7 +146,7 @@ public class OmsTransactionController extends AbstractRestService {
 	 * REGISTERED → CONFIRMED → ALLOCATED (또는 BACK_ORDER)를 한 번에 수행한다.
 	 *
 	 * @param id 주문 ID
-	 * @return { success, status, allocatedQty, backOrder }
+	 * @return { success, status, allocated_qty, back_order }
 	 */
 	@RequestMapping(value = "shipment_orders/{id}/confirm_and_allocate", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Confirm and allocate shipment order (REGISTERED → CONFIRMED → ALLOCATED)")
@@ -157,7 +160,7 @@ public class OmsTransactionController extends AbstractRestService {
 	 * POST /rest/oms_trx/shipment_orders/confirm
 	 *
 	 * @param params { ids: ["id1", "id2", ...] }
-	 * @return { successCount, failCount, errors }
+	 * @return { success_count, fail_count, errors }
 	 */
 	@SuppressWarnings("unchecked")
 	@RequestMapping(value = "shipment_orders/confirm", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -167,12 +170,27 @@ public class OmsTransactionController extends AbstractRestService {
 	}
 
 	/**
+	 * 출하 주문 확정 (Multiple)
+	 *
+	 * POST /rest/oms_trx/shipment_orders/confirm_list
+	 *
+	 * @param params [{ id: "id1" }, { id: "id2" }, ...]
+	 * @return { success_count, fail_count, errors }
+	 */
+	@RequestMapping(value = "shipment_orders/confirm_list", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Confirm shipment orders (REGISTERED → CONFIRMED)")
+	public Map<String, Object> confirmOrderList(@RequestBody List<ShipmentOrder> list) {
+		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
+		return this.omsTrxService.confirmShipmentOrders(ids);
+	}
+
+	/**
 	 * 출하 주문 재고 할당
 	 *
 	 * POST /rest/oms_trx/shipment_orders/allocate
 	 *
 	 * @param params { ids: ["id1", "id2", ...] }
-	 * @return { successCount, allocatedCount, backOrderCount }
+	 * @return { success_count, allocated_count, back_order_count }
 	 */
 	@SuppressWarnings("unchecked")
 	@RequestMapping(value = "shipment_orders/allocate", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -182,12 +200,27 @@ public class OmsTransactionController extends AbstractRestService {
 	}
 
 	/**
+	 * 출하 주문 재고 할당 (Multiple)
+	 *
+	 * POST /rest/oms_trx/shipment_orders/allocate_list
+	 *
+	 * @param params [{ id: "id1" }, { id: "id2" }, ...]
+	 * @return { success_count, allocated_count, back_order_count }
+	 */
+	@RequestMapping(value = "shipment_orders/allocate_list", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Allocate inventory for shipment orders (CONFIRMED → ALLOCATED)")
+	public Map<String, Object> allocateOrders(@RequestBody List<ShipmentOrder> list) {
+		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
+		return this.omsTrxService.allocateShipmentOrders(ids);
+	}
+
+	/**
 	 * 출하 주문 할당 해제
 	 *
 	 * POST /rest/oms_trx/shipment_orders/deallocate
 	 *
 	 * @param params { id: "order_id" }
-	 * @return { success, releasedCount }
+	 * @return { success, released_count }
 	 */
 	@RequestMapping(value = "shipment_orders/deallocate", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Deallocate inventory from shipment order (ALLOCATED → CONFIRMED)")
@@ -196,18 +229,59 @@ public class OmsTransactionController extends AbstractRestService {
 	}
 
 	/**
+	 * 출하 주문 재고 할당 (Multiple)
+	 *
+	 * POST /rest/oms_trx/shipment_orders/deallocate_list
+	 *
+	 * @param params [{ id: "id1" }, { id: "id2" }, ...]
+	 * @return { success_count, allocated_count, back_order_count }
+	 */
+	@RequestMapping(value = "shipment_orders/deallocate_list", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Deallocate inventory from shipment order (ALLOCATED → CONFIRMED)")
+	public Map<String, Object> deallocateOrderList(@RequestBody List<ShipmentOrder> list) {
+		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
+		Map<String, Object> result = ValueUtil.newMap("success,released_count", true, 0);
+		for (String id : ids) {
+			Map<String, Object> itemResult = this.omsTrxService.deallocateShipmentOrder(id);
+			if ((Boolean) itemResult.get("success")) {
+				result.put("released_count",
+						(Integer) result.get("released_count") + (Integer) itemResult.get("released_count"));
+			} else {
+				result.put("success", false);
+			}
+		}
+
+		return result;
+	}
+
+	/**
 	 * 출하 주문 취소
 	 *
 	 * POST /rest/oms_trx/shipment_orders/cancel
 	 *
 	 * @param params { ids: ["id1", "id2", ...] }
-	 * @return { successCount, failCount }
+	 * @return { success_count, fail_count }
 	 */
 	@SuppressWarnings("unchecked")
 	@RequestMapping(value = "shipment_orders/cancel", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Cancel shipment orders")
 	public Map<String, Object> cancelOrders(@RequestBody Map<String, Object> params) {
 		return this.omsTrxService.cancelShipmentOrders((List<String>) params.get("ids"));
+	}
+
+	/**
+	 * 출하 주문 취소 (Multiple)
+	 *
+	 * POST /rest/oms_trx/shipment_orders/cancel_list
+	 *
+	 * @param params [{ id: "id1" }, { id: "id2" }, ...]
+	 * @return { success_count, fail_count }
+	 */
+	@RequestMapping(value = "shipment_orders/cancel_list", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Cancel shipment orders")
+	public Map<String, Object> cancelOrdersList(@RequestBody List<ShipmentOrder> list) {
+		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
+		return this.omsTrxService.cancelShipmentOrders(ids);
 	}
 
 	/**
@@ -222,6 +296,25 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Close shipment order (SHIPPED → CLOSED)")
 	public Map<String, Object> closeOrder(@PathVariable("id") String id) {
 		return this.omsTrxService.closeShipmentOrder(id);
+	}
+
+	/**
+	 * 출하 주문 마감 (Multiple)
+	 *
+	 * POST /rest/oms_trx/shipment_orders/close_list
+	 *
+	 * @param params [{ id: "id1" }, { id: "id2" }, ...]
+	 * @return { success }
+	 */
+	@RequestMapping(value = "shipment_orders/close_list", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Close shipment order (SHIPPED → CLOSED)")
+	public Map<String, Object> closeOrderList(@RequestBody List<ShipmentOrder> list) {
+		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
+		for (String id : ids) {
+			this.omsTrxService.closeShipmentOrder(id);
+		}
+
+		return ValueUtil.newMap("success", true);
 	}
 
 	/*

@@ -604,7 +604,7 @@ public class OmsTransactionService extends AbstractQueryService {
 		ids.add(id);
 		Map<String, Object> confirmResult = this.confirmShipmentOrders(ids);
 
-		int confirmSuccess = (int) confirmResult.getOrDefault("successCount", 0);
+		int confirmSuccess = (int) confirmResult.getOrDefault("success_count", 0);
 		if (confirmSuccess == 0) {
 			@SuppressWarnings("unchecked")
 			List<String> confirmErrors = (List<String>) confirmResult.getOrDefault("errors", new ArrayList<>());
@@ -615,8 +615,8 @@ public class OmsTransactionService extends AbstractQueryService {
 		// 2. 재고 할당 처리
 		Map<String, Object> allocResult = this.allocateShipmentOrders(ids);
 
-		int allocSuccess = (int) allocResult.getOrDefault("successCount", 0);
-		int backOrderCount = (int) allocResult.getOrDefault("backOrderCount", 0);
+		int allocSuccess = (int) allocResult.getOrDefault("success_count", 0);
+		int backOrderCount = (int) allocResult.getOrDefault("back_order_count", 0);
 
 		// 최종 주문 상태 조회
 		ShipmentOrder updatedOrder = this.findOrder(domainId, id);

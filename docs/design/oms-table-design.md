@@ -742,6 +742,7 @@ Excel/API 임포트 시 사용하는 스테이징 모델. `ignoreDdl = true`.
 CREATE OR REPLACE VIEW shipment_order_status AS
 SELECT
     si.id,
+    si.shipment_order_id,
     so.shipment_no, so.ref_order_no,
     so.order_date, so.ship_by_date, so.cutoff_time, so.priority_cd,
     so.wave_no, so.wh_cd, so.com_cd, so.cust_cd, so.cust_nm,
