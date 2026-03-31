@@ -923,7 +923,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
   async _releaseWave() {
     const w = this.wave
     const result = await UiUtil.showAlertPopup(
-      'title.confirm',
+      'label.confirm',
       `${i18next.t('message.wave_release_confirm', { defaultValue: '웨이브를 확정(릴리스)하시겠습니까?' })}\n\n` +
       `${i18next.t('label.wave', { defaultValue: '웨이브' })}: ${w.wave_no}\n` +
       `${i18next.t('label.target_orders', { defaultValue: '대상 주문' })}: ${w.plan_order || 0}${i18next.t('label.count_unit', { defaultValue: '건' })}\n` +
@@ -950,7 +950,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
   /** 웨이브 취소 처리 */
   async _cancelWave() {
     const result = await UiUtil.showAlertPopup(
-      'title.confirm',
+      'label.confirm',
       i18next.t('message.wave_cancel_confirm', { defaultValue: '웨이브를 취소하시겠습니까?\n포함된 주문은 할당 상태로 되돌아갑니다.' }),
       'warning',
       'confirm',
@@ -1012,7 +1012,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     if (this.selectedOrderIds.length === 0) return
 
     const result = await UiUtil.showAlertPopup(
-      'title.confirm',
+      'label.confirm',
       `${i18next.t('message.remove_orders_confirm', { defaultValue: '선택된 주문을 웨이브에서 제거하시겠습니까?' })}\n\n` +
       `${i18next.t('label.selected', { defaultValue: '선택' })}: ${this.selectedOrderIds.length}${i18next.t('label.count_unit', { defaultValue: '건' })}`,
       'question',

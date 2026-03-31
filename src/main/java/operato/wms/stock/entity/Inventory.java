@@ -18,32 +18,32 @@ import xyz.elidom.util.BeanUtil;
 import xyz.elidom.util.ValueUtil;
 
 @Table(name = "inventories", idStrategy = GenerationRule.UUID, indexes = {
-    @Index(name = "ix_inventories_0", columnList = "domain_id,barcode,loc_cd"),
-    @Index(name = "ix_inventories_1", columnList = "domain_id,wh_cd,com_cd"),
-    @Index(name = "ix_inventories_2", columnList = "domain_id,wh_cd,vend_cd,maker_cd"),
-    @Index(name = "ix_inventories_3", columnList = "domain_id,wh_cd,com_cd,loc_cd,sku_cd"),
-    @Index(name = "ix_inventories_4", columnList = "domain_id,wh_cd,invoice_no,lot_no,expired_date"),
-    @Index(name = "ix_inventories_5", columnList = "domain_id,wh_cd,last_tran_cd"),
-    @Index(name = "ix_inventories_6", columnList = "domain_id,wh_cd,rcv_no"),
-    @Index(name = "ix_inventories_7", columnList = "domain_id,wh_cd,rls_ord_no"),
-    @Index(name = "ix_inventories_8", columnList = "domain_id,wh_cd,expire_status"),
-    @Index(name = "ix_inventories_9", columnList = "domain_id,wh_cd,status"),
-    @Index(name = "ix_inventories_10", columnList = "domain_id,wh_cd,del_flag")
+		@Index(name = "ix_inventories_0", columnList = "domain_id,barcode,loc_cd"),
+		@Index(name = "ix_inventories_1", columnList = "domain_id,wh_cd,com_cd"),
+		@Index(name = "ix_inventories_2", columnList = "domain_id,wh_cd,vend_cd,maker_cd"),
+		@Index(name = "ix_inventories_3", columnList = "domain_id,wh_cd,com_cd,loc_cd,sku_cd"),
+		@Index(name = "ix_inventories_4", columnList = "domain_id,wh_cd,invoice_no,lot_no,expired_date"),
+		@Index(name = "ix_inventories_5", columnList = "domain_id,wh_cd,last_tran_cd"),
+		@Index(name = "ix_inventories_6", columnList = "domain_id,wh_cd,rcv_no"),
+		@Index(name = "ix_inventories_7", columnList = "domain_id,wh_cd,rls_ord_no"),
+		@Index(name = "ix_inventories_8", columnList = "domain_id,wh_cd,expire_status"),
+		@Index(name = "ix_inventories_9", columnList = "domain_id,wh_cd,status"),
+		@Index(name = "ix_inventories_10", columnList = "domain_id,wh_cd,del_flag")
 })
 public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	/**
 	 * SerialVersion UID
 	 */
 	private static final long serialVersionUID = 611417470988406642L;
-	
-    /**
-     * 재고 상태 - EMPTY (비어있음)
-     */
-    public static final String STATUS_EMPTY = "EMPTY";
-    /**
-     * 재고 상태 - WAIT (입고 대기)
-     */
-    public static final String STATUS_WAITING = "WAITING";
+
+	/**
+	 * 재고 상태 - EMPTY (비어있음)
+	 */
+	public static final String STATUS_EMPTY = "EMPTY";
+	/**
+	 * 재고 상태 - WAIT (입고 대기)
+	 */
+	public static final String STATUS_WAITING = "WAITING";
 	/**
 	 * 재고 상태 - STORED (보관 중)
 	 */
@@ -56,217 +56,217 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	 * 재고 상태 - PICKING (피킹 중)
 	 */
 	public static final String STATUS_PICK = "PICKING";
-    /**
-     * 재고 상태 - LOCKED (잠김)
-     */
-    public static final String STATUS_LOCK = "LOCKED";
 	/**
-     * 재고 상태 - BAD (불량, 파손)
-     */
-    public static final String STATUS_BAD = "BAD";
-    
+	 * 재고 상태 - LOCKED (잠김)
+	 */
+	public static final String STATUS_LOCK = "LOCKED";
 	/**
-     * 재고 임박 상태 - NORMAL (정상)
-     */
-    public static final String EXPIRE_STATUS_NORMAL = "NORMAL";
-    /**
-     * 재고 임박 상태 - IMMINENT (임박)
-     */
-    public static final String EXPIRE_STATUS_IMMINENT = "IMMINENT";
-    /**
-     * 재고 임박 상태 - EXPIRED (유효기간 지남)
-     */
-    public static final String EXPIRE_STATUS_EXPIRED = "EXPIRED";
-    
-    /**
-     * 재고 트렌젝션 - IN-INSP (입고 검수)
-     */
-    public static final String TRANSACTION_IN_INSP = "IN-INSP";
-    /**
-     * 재고 트렌젝션 - IN (입고)
-     */
-    public static final String TRANSACTION_IN = "IN";
-    /**
-     * 재고 트렌젝션 - OUT (출고)
-     */
-    public static final String TRANSACTION_OUT = "OUT";
-    /**
-     * 재고 트렌젝션 - OUT_CANCEL (출고 취소)
-     */
-    public static final String TRANSACTION_OUT_CANCEL = "OUT_CANCEL";
-    /**
-     * 재고 트렌젝션 - MOVE (로케이션 이동)
-     */
-    public static final String TRANSACTION_MOVE = "MOVE";
-    /**
-     * 재고 트렌젝션 - TRANSFER (창고 이동)
-     */
-    public static final String TRANSACTION_TRANSFER = "TRANSFER";
-    /**
-     * 재고 트렌젝션 - RESERVE (피킹 예약)
-     */
-    public static final String TRANSACTION_RESERVE = "RESERVE";
-    /**
-     * 재고 트렌젝션 - HOLD (홀드)
-     */
-    public static final String TRANSACTION_HOLD = "HOLD";
-    /**
-     * 재고 트렌젝션 - RELEASE_HOLD (잠금 해제)
-     */
-    public static final String TRANSACTION_RELEASE_HOLD = "RELEASE_HOLD";
-    /**
-     * 재고 트렌젝션 - SCRAP (폐기 처리)
-     */
-    public static final String TRANSACTION_SCRAP = "SCRAP";
-    /**
-     * 재고 트렌젝션 - SPLIT (분할)
-     */
-    public static final String TRANSACTION_SPLIT = "SPLIT";
-    /**
-     * 재고 트렌젝션 - MERGE (병합)
-     */
-    public static final String TRANSACTION_MERGE = "MERGE";
-    /**
-     * 재고 트렌젝션 - ADJUST (재고 조정)
-     */
-    public static final String TRANSACTION_ADJUST = "ADJUST";
-    /**
-     * 재고 트렌젝션 - NEW (재고 생성)
-     */
-    public static final String TRANSACTION_NEW = "NEW";
-    /**
-     * 재고 트렌젝션 - RWA_RESTOCK (반품 재입고)
-     */
-    public static final String TRANSACTION_RWA_RESTOCK = "RWA_RESTOCK";
+	 * 재고 상태 - BAD (불량, 파손)
+	 */
+	public static final String STATUS_BAD = "BAD";
 
-    public Inventory() {
-    }
-    
-    public Inventory(String id) {
-        this.id = id;
-    }
-    
-    public Inventory(Long domainId, String barcode, String locCd) {
-        this.domainId = domainId;
-        this.barcode = barcode;
-        this.locCd = locCd;
-    }
-    
+	/**
+	 * 재고 임박 상태 - NORMAL (정상)
+	 */
+	public static final String EXPIRE_STATUS_NORMAL = "NORMAL";
+	/**
+	 * 재고 임박 상태 - IMMINENT (임박)
+	 */
+	public static final String EXPIRE_STATUS_IMMINENT = "IMMINENT";
+	/**
+	 * 재고 임박 상태 - EXPIRED (유효기간 지남)
+	 */
+	public static final String EXPIRE_STATUS_EXPIRED = "EXPIRED";
+
+	/**
+	 * 재고 트렌젝션 - IN-INSP (입고 검수)
+	 */
+	public static final String TRANSACTION_IN_INSP = "IN-INSP";
+	/**
+	 * 재고 트렌젝션 - IN (입고)
+	 */
+	public static final String TRANSACTION_IN = "IN";
+	/**
+	 * 재고 트렌젝션 - OUT (출고)
+	 */
+	public static final String TRANSACTION_OUT = "OUT";
+	/**
+	 * 재고 트렌젝션 - OUT_CANCEL (출고 취소)
+	 */
+	public static final String TRANSACTION_OUT_CANCEL = "OUT_CANCEL";
+	/**
+	 * 재고 트렌젝션 - MOVE (로케이션 이동)
+	 */
+	public static final String TRANSACTION_MOVE = "MOVE";
+	/**
+	 * 재고 트렌젝션 - TRANSFER (창고 이동)
+	 */
+	public static final String TRANSACTION_TRANSFER = "TRANSFER";
+	/**
+	 * 재고 트렌젝션 - RESERVE (피킹 예약)
+	 */
+	public static final String TRANSACTION_RESERVE = "RESERVE";
+	/**
+	 * 재고 트렌젝션 - HOLD (홀드)
+	 */
+	public static final String TRANSACTION_HOLD = "HOLD";
+	/**
+	 * 재고 트렌젝션 - RELEASE_HOLD (잠금 해제)
+	 */
+	public static final String TRANSACTION_RELEASE_HOLD = "RELEASE_HOLD";
+	/**
+	 * 재고 트렌젝션 - SCRAP (폐기 처리)
+	 */
+	public static final String TRANSACTION_SCRAP = "SCRAP";
+	/**
+	 * 재고 트렌젝션 - SPLIT (분할)
+	 */
+	public static final String TRANSACTION_SPLIT = "SPLIT";
+	/**
+	 * 재고 트렌젝션 - MERGE (병합)
+	 */
+	public static final String TRANSACTION_MERGE = "MERGE";
+	/**
+	 * 재고 트렌젝션 - ADJUST (재고 조정)
+	 */
+	public static final String TRANSACTION_ADJUST = "ADJUST";
+	/**
+	 * 재고 트렌젝션 - NEW (재고 생성)
+	 */
+	public static final String TRANSACTION_NEW = "NEW";
+	/**
+	 * 재고 트렌젝션 - RWA_RESTOCK (반품 재입고)
+	 */
+	public static final String TRANSACTION_RWA_RESTOCK = "RWA_RESTOCK";
+
+	public Inventory() {
+	}
+
+	public Inventory(String id) {
+		this.id = id;
+	}
+
+	public Inventory(Long domainId, String barcode, String locCd) {
+		this.domainId = domainId;
+		this.barcode = barcode;
+		this.locCd = locCd;
+	}
+
 	@PrimaryKey
-	@Column (name = "id", nullable = false, length = 40)
+	@Column(name = "id", nullable = false, length = 40)
 	private String id;
-	
-	@Column (name = "barcode", nullable = false, length = 30)
+
+	@Column(name = "barcode", nullable = false, length = 30)
 	private String barcode;
-	
-    @Column (name = "wh_cd", nullable = false, length = 30)
-    private String whCd;
-    
-	@Column (name = "com_cd", nullable = false, length = 30)
+
+	@Column(name = "wh_cd", nullable = false, length = 30)
+	private String whCd;
+
+	@Column(name = "com_cd", nullable = false, length = 30)
 	private String comCd;
 
-	@Column (name = "sku_cd", nullable = false, length = 30)
+	@Column(name = "sku_cd", nullable = false, length = 30)
 	private String skuCd;
 
-	@Column (name = "sku_bcd", length = 50)
+	@Column(name = "sku_bcd", length = 50)
 	private String skuBcd;
 
-	@Column (name = "sku_nm", length = 255)
+	@Column(name = "sku_nm", length = 255)
 	private String skuNm;
 
-	@Column (name = "vend_cd", length = 30)
+	@Column(name = "vend_cd", length = 30)
 	private String vendCd;
 
-	@Column (name = "maker_cd", length = 30)
+	@Column(name = "maker_cd", length = 30)
 	private String makerCd;
 
-	@Column (name = "loc_cd", nullable = false, length = 30)
+	@Column(name = "loc_cd", nullable = false, length = 30)
 	private String locCd;
-	
-	@Column (name = "pallet_cd", length = 30)
-    private String palletCd;
 
-	@Column (name = "po_no", length = 30)
+	@Column(name = "pallet_cd", length = 30)
+	private String palletCd;
+
+	@Column(name = "po_no", length = 30)
 	private String poNo;
 
-	@Column (name = "invoice_no", length = 30)
+	@Column(name = "invoice_no", length = 30)
 	private String invoiceNo;
 
-	@Column (name = "rcv_no", length = 30)
+	@Column(name = "rcv_no", length = 30)
 	private String rcvNo;
-	
-	@Column (name = "rcv_seq")
+
+	@Column(name = "rcv_seq")
 	private Integer rcvSeq;
-	
-	@Column (name = "rls_ord_no", length = 30)
+
+	@Column(name = "rls_ord_no", length = 30)
 	private String rlsOrdNo;
-	
-	@Column (name = "rls_line_no", length = 30)
+
+	@Column(name = "rls_line_no", length = 30)
 	private String rlsLineNo;
 
-	@Column (name = "pack_type", length = 20)
+	@Column(name = "pack_type", length = 20)
 	private String packType;
 
-	@Column (name = "pack_no", length = 30)
+	@Column(name = "pack_no", length = 30)
 	private String packNo;
 
-	@Column (name = "origin", length = 10)
+	@Column(name = "origin", length = 10)
 	private String origin;
-	   
-	@Column (name = "lot_no", length = 50)
+
+	@Column(name = "lot_no", length = 50)
 	private String lotNo;
 
-	@Column (name = "serial_no", length = 50)
+	@Column(name = "serial_no", length = 50)
 	private String serialNo;
 
-	@Column (name = "expired_date", length = 10)
+	@Column(name = "expired_date", length = 10)
 	private String expiredDate;
 
-	@Column (name = "prod_date", length = 10)
+	@Column(name = "prod_date", length = 10)
 	private String prodDate;
 
-	@Column (name = "weight")
+	@Column(name = "weight")
 	private Double weight;
 
-	@Column (name = "cbm")
+	@Column(name = "cbm")
 	private Double cbm;
 
-    @Column (name = "pallet_qty")
-    private Integer palletQty;
-    
-	@Column (name = "box_qty")
+	@Column(name = "pallet_qty")
+	private Integer palletQty;
+
+	@Column(name = "box_qty")
 	private Integer boxQty;
-	
-	@Column (name = "ea_qty")
+
+	@Column(name = "ea_qty")
 	private Double eaQty;
 
-    @Column (name = "reserved_qty")
-    private Double reservedQty;
-    
-	@Column (name = "inv_qty", nullable = false)
+	@Column(name = "reserved_qty")
+	private Double reservedQty;
+
+	@Column(name = "inv_qty", nullable = false)
 	private Double invQty;
 
-	@Column (name = "last_tran_cd", length = 20)
+	@Column(name = "last_tran_cd", length = 20)
 	private String lastTranCd;
 
-	@Column (name = "expire_status", length = 10)
+	@Column(name = "expire_status", length = 10)
 	private String expireStatus;
-	
-	@Column (name = "owner", length = 32)
+
+	@Column(name = "owner", length = 32)
 	private String owner;
 
-	@Column (name = "status", length = 10)
+	@Column(name = "status", length = 10)
 	private String status;
-	
-	@Column (name = "erp_status", length = 20)
+
+	@Column(name = "erp_status", length = 20)
 	private String erpStatus;
 
-	@Column (name = "remarks", length = 1000)
+	@Column(name = "remarks", length = 1000)
 	private String remarks;
 
-	@Column (name = "del_flag")
+	@Column(name = "del_flag")
 	private Boolean delFlag;
-  
+
 	public String getId() {
 		return id;
 	}
@@ -276,22 +276,22 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	}
 
 	public String getBarcode() {
-        return barcode;
-    }
+		return barcode;
+	}
 
-    public void setBarcode(String barcode) {
-        this.barcode = barcode;
-    }
+	public void setBarcode(String barcode) {
+		this.barcode = barcode;
+	}
 
-    public String getWhCd() {
-        return whCd;
-    }
+	public String getWhCd() {
+		return whCd;
+	}
 
-    public void setWhCd(String whCd) {
-        this.whCd = whCd;
-    }
+	public void setWhCd(String whCd) {
+		this.whCd = whCd;
+	}
 
-    public String getComCd() {
+	public String getComCd() {
 		return comCd;
 	}
 
@@ -388,14 +388,14 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	}
 
 	public String getOrigin() {
-        return origin;
-    }
+		return origin;
+	}
 
-    public void setOrigin(String origin) {
-        this.origin = origin;
-    }
+	public void setOrigin(String origin) {
+		this.origin = origin;
+	}
 
-    public String getLotNo() {
+	public String getLotNo() {
 		return lotNo;
 	}
 
@@ -411,7 +411,7 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.serialNo = serialNo;
 	}
 
-    public String getExpiredDate() {
+	public String getExpiredDate() {
 		return expiredDate;
 	}
 
@@ -444,22 +444,22 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	}
 
 	public Integer getPalletQty() {
-        return palletQty;
-    }
+		return palletQty;
+	}
 
-    public void setPalletQty(Integer palletQty) {
-        this.palletQty = palletQty;
-    }
+	public void setPalletQty(Integer palletQty) {
+		this.palletQty = palletQty;
+	}
 
-    public Integer getBoxQty() {
-        return boxQty;
-    }
+	public Integer getBoxQty() {
+		return boxQty;
+	}
 
-    public void setBoxQty(Integer boxQty) {
-        this.boxQty = boxQty;
-    }
+	public void setBoxQty(Integer boxQty) {
+		this.boxQty = boxQty;
+	}
 
-    public Double getEaQty() {
+	public Double getEaQty() {
 		return eaQty;
 	}
 
@@ -468,14 +468,14 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	}
 
 	public Double getReservedQty() {
-        return reservedQty;
-    }
+		return reservedQty;
+	}
 
-    public void setReservedQty(Double reservedQty) {
-        this.reservedQty = reservedQty;
-    }
+	public void setReservedQty(Double reservedQty) {
+		this.reservedQty = reservedQty;
+	}
 
-    public Double getInvQty() {
+	public Double getInvQty() {
 		return invQty;
 	}
 
@@ -570,91 +570,96 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	public void setOwner(String owner) {
 		this.owner = owner;
 	}
-	
+
 	/**
 	 * 바코드 생성
 	 * 
 	 * @return
 	 */
 	public static String newBarcode() {
-	    return (String)BeanUtil.get(ICustomService.class).doCustomService(Domain.currentDomainId(), "diy-generate-inv-barcode", ValueUtil.newMap(SysConstants.EMPTY_STRING));
+		return (String) BeanUtil.get(ICustomService.class).doCustomService(Domain.currentDomainId(),
+				"diy-generate-inv-barcode", ValueUtil.newMap(SysConstants.EMPTY_STRING));
 	}
 
 	@Override
-    public void beforeCreate() {
-        super.beforeCreate();
-        
-        if(this.barcode == null) {
-            this.barcode = Inventory.newBarcode();
-        }
-        
-        if(ValueUtil.isEmpty(this.barcode)) {
-            throw new ElidomRuntimeException("재고 바코드가 생성되지 않았습니다. 커스텀 서비스 [diy-generate-inv-barcode]를 확인하세요.");
-        }
-        
-        this.weight = (this.weight == null) ? 0.0f : this.weight;
-        this.cbm = (this.cbm == null) ? 0 : this.cbm;
-        this.palletQty = (this.palletQty == null) ? 0 : this.palletQty;
-        this.boxQty = (this.boxQty == null) ? 0 : this.boxQty;
-        this.eaQty = (this.eaQty == null) ? 0.0 : this.eaQty;
-        this.delFlag = (this.delFlag == null) ? false : this.delFlag;
-        this.expireStatus = (this.expireStatus == null) ? Inventory.EXPIRE_STATUS_NORMAL : this.expireStatus;
-        
-        if(ValueUtil.isEmpty(this.skuNm) && ValueUtil.isNotEmpty(this.skuCd) && ValueUtil.isNotEmpty(this.comCd)) {
-            String sql = "select sku_nm from sku where domain_id = :domainId and com_cd = :comCd and sku_cd = :skuCd";
-            this.skuNm = BeanUtil.get(IQueryManager.class).selectBySql(sql, ValueUtil.newMap("domainId,comCd,skuCd", this.domainId, this.comCd, this.skuCd), String.class);
-        }
-        
-        if(this.invQty <= 0) {
-        	// 재고 소진시 상태 : 비어있음 
-            this.status = Inventory.STATUS_EMPTY;
-            this.delFlag = true;
-        } else {
-        	// 상태 초기화 : 보관 중 
-            this.status = (this.status == null) ? Inventory.STATUS_STORED : this.status;
-        }
-    }
-    
-    @Override
-    public void afterCreate() {
-        super.afterCreate();
-        
-        // 재고 생성 시 이력 저장
-        this.createInventoryHistory();
-    }
-    
-    @Override
-    public void beforeUpdate() {
-        super.beforeUpdate();
-        
-        if(this.invQty <= 0) {
-            this.status = Inventory.STATUS_EMPTY;
-            this.delFlag = true;
-        }
-    }
-    
-    @Override
-    public void afterUpdate() {
-        super.afterUpdate();
-        
-        // 재고 업데이트 시 이력 저장
-        this.createInventoryHistory();
-    }
-    
-    /**
-     * 재고 이력 생성 - 재고 트랜잭션은 반드시 개별 재고 정보 조회 후 처리해야 이력에 남는다. (insert, update 쿼리로 처리하면 이력에 남지 않는다.)
-     */
-    private void createInventoryHistory() {
-        InventoryHist hist = ValueUtil.populate(this, new InventoryHist());
-        hist.setId(UUID.randomUUID().toString());
-        hist.setDomainId(this.domainId == null ? Domain.currentDomainId() : this.domainId);
+	public void beforeCreate() {
+		this.id = null;
+		super.beforeCreate();
 
-        IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
-        String sql = "select max(hist_seq) from inventory_hists where domain_id = :domainId and barcode = :barcode";
-        Integer maxSeq = queryMgr.selectBySql(sql, ValueUtil.newMap("domainId,barcode", hist.getDomainId(), hist.getBarcode()), Integer.class);
-        hist.setHistSeq(maxSeq == null ? 1 : maxSeq + 1);
-        hist.setCreatorId(User.currentUser().getId());
-        hist.setCreatedAt(new Date());
-        queryMgr.insert(hist);
-    }
+		if (ValueUtil.isEmpty(this.barcode)) {
+			this.barcode = Inventory.newBarcode();
+		}
+
+		if (ValueUtil.isEmpty(this.barcode)) {
+			throw new ElidomRuntimeException("재고 바코드가 생성되지 않았습니다. 커스텀 서비스 [diy-generate-inv-barcode]를 확인하세요.");
+		}
+
+		this.weight = (this.weight == null) ? 0.0f : this.weight;
+		this.cbm = (this.cbm == null) ? 0 : this.cbm;
+		this.palletQty = (this.palletQty == null) ? 0 : this.palletQty;
+		this.boxQty = (this.boxQty == null) ? 0 : this.boxQty;
+		this.eaQty = (this.eaQty == null) ? 0.0 : this.eaQty;
+		this.delFlag = (this.delFlag == null) ? false : this.delFlag;
+		this.expireStatus = (this.expireStatus == null) ? Inventory.EXPIRE_STATUS_NORMAL : this.expireStatus;
+
+		if (ValueUtil.isEmpty(this.skuNm) && ValueUtil.isNotEmpty(this.skuCd) && ValueUtil.isNotEmpty(this.comCd)) {
+			String sql = "select sku_nm from sku where domain_id = :domainId and com_cd = :comCd and sku_cd = :skuCd";
+			this.skuNm = BeanUtil.get(IQueryManager.class).selectBySql(sql,
+					ValueUtil.newMap("domainId,comCd,skuCd", this.domainId, this.comCd, this.skuCd), String.class);
+		}
+
+		if (this.invQty <= 0) {
+			// 재고 소진시 상태 : 비어있음
+			this.status = Inventory.STATUS_EMPTY;
+			this.delFlag = true;
+		} else {
+			// 상태 초기화 : 보관 중
+			this.status = (this.status == null) ? Inventory.STATUS_STORED : this.status;
+		}
+	}
+
+	@Override
+	public void afterCreate() {
+		super.afterCreate();
+
+		// 재고 생성 시 이력 저장
+		this.createInventoryHistory();
+	}
+
+	@Override
+	public void beforeUpdate() {
+		super.beforeUpdate();
+
+		if (this.invQty <= 0) {
+			this.status = Inventory.STATUS_EMPTY;
+			this.delFlag = true;
+		}
+	}
+
+	@Override
+	public void afterUpdate() {
+		super.afterUpdate();
+
+		// 재고 업데이트 시 이력 저장
+		this.createInventoryHistory();
+	}
+
+	/**
+	 * 재고 이력 생성 - 재고 트랜잭션은 반드시 개별 재고 정보 조회 후 처리해야 이력에 남는다. (insert, update 쿼리로 처리하면
+	 * 이력에 남지 않는다.)
+	 */
+	private void createInventoryHistory() {
+		InventoryHist hist = ValueUtil.populate(this, new InventoryHist());
+		hist.setId(UUID.randomUUID().toString());
+		hist.setDomainId(this.domainId == null ? Domain.currentDomainId() : this.domainId);
+
+		IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
+		String sql = "select max(hist_seq) from inventory_hists where domain_id = :domainId and barcode = :barcode";
+		Integer maxSeq = queryMgr.selectBySql(sql,
+				ValueUtil.newMap("domainId,barcode", hist.getDomainId(), hist.getBarcode()), Integer.class);
+		hist.setHistSeq(maxSeq == null ? 1 : maxSeq + 1);
+		hist.setCreatorId(User.currentUser().getId());
+		hist.setCreatedAt(new Date());
+		queryMgr.insert(hist);
+	}
 }
