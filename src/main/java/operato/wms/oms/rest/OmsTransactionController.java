@@ -420,6 +420,26 @@ public class OmsTransactionController extends AbstractRestService {
 	}
 
 	/**
+	 * 웨이브 확정 취소
+	 *
+	 * POST /rest/oms_trx/waves/{id}/cancel_release
+	 *
+	 * 웨이브 확정을 취소하고 피킹 지시를 삭제한다.
+	 *
+	 * 취소 가능 조건:
+	 * - 웨이브 상태 = RELEASED
+	 * - 모든 피킹 지시 상태 = WAIT (아직 피킹 시작 전)
+	 *
+	 * @param id 웨이브 ID
+	 * @return { success, waveNo }
+	 */
+	@RequestMapping(value = "waves/{id}/cancel_release", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Cancel wave release (RELEASED → CREATED)")
+	public Map<String, Object> cancelWaveRelease(@PathVariable("id") String id) {
+		return this.omsTrxService.cancelWaveRelease(id);
+	}
+
+	/**
 	 * 웨이브 취소
 	 *
 	 * POST /rest/oms_trx/waves/{id}/cancel

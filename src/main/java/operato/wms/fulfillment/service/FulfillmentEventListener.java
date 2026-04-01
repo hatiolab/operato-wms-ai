@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import operato.wms.common.event.WaveCancelledEvent;
 import operato.wms.common.event.WaveReleasedEvent;
 
 /**
@@ -60,6 +61,46 @@ public class FulfillmentEventListener {
 			e.printStackTrace();
 
 			// TODO: 실패 시 재시도 또는 관리자 알림 처리
+		}
+	}
+
+	/**
+	 * 웨이브 확정 취소 이벤트 처리
+	 *
+	 * OMS에서 웨이브 확정을 취소하면 자동으로 피킹 지시를 삭제한다.
+	 *
+	 * 삭제 조건:
+	 * - 피킹 지시 상태가 모두 WAIT인 경우에만 삭제
+	 * - IN_PROGRESS 또는 COMPLETED 상태가 하나라도 있으면 예외 발생
+	 *
+	 * @param event WaveCancelledEvent
+	 */
+	@EventListener
+	public void onWaveCancelled(WaveCancelledEvent event) {
+		try {
+			// 피킹 지시 삭제 파라미터 구성
+			Map<String, Object> params = new HashMap<>();
+			params.put("wave_no", event.getWaveNo());
+
+			// 피킹 지시 삭제 (WAIT 상태만)
+			Map<String, Object> result = this.fulfillmentTrxService.deletePickingTasksByWave(params);
+
+			// 결과 로깅
+			int deletedTaskCount = (int) result.getOrDefault("deleted_task_count", 0);
+			int deletedItemCount = (int) result.getOrDefault("deleted_item_count", 0);
+			System.out.println(String.format(
+				"[Fulfillment] 웨이브 확정 취소 이벤트 처리 완료 - wave_no: %s, deleted_task_count: %d, deleted_item_count: %d",
+				event.getWaveNo(), deletedTaskCount, deletedItemCount
+			));
+		} catch (Exception e) {
+			// 에러 발생 시 로깅 (트랜잭션 롤백되지 않도록 예외를 상위로 전파하지 않음)
+			System.err.println(String.format(
+				"[Fulfillment] 웨이브 확정 취소 이벤트 처리 실패 - wave_no: %s, error: %s",
+				event.getWaveNo(), e.getMessage()
+			));
+			e.printStackTrace();
+
+			// TODO: 실패 시 관리자 알림 처리
 		}
 	}
 }

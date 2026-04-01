@@ -10,7 +10,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.annotation.JacksonInject.Value;
+
 import operato.wms.base.entity.SKU;
+import operato.wms.common.event.WaveCancelledEvent;
 import operato.wms.common.event.WaveReleasedEvent;
 import operato.wms.oms.entity.ImportShipmentOrder;
 import operato.wms.oms.entity.ReplenishOrder;
@@ -24,6 +27,8 @@ import xyz.anythings.sys.service.AbstractQueryService;
 import xyz.anythings.sys.util.AnyOrmUtil;
 import xyz.elidom.dbist.dml.Filter;
 import xyz.elidom.dbist.dml.Query;
+import xyz.elidom.exception.server.ElidomRuntimeException;
+import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
@@ -425,7 +430,7 @@ public class OmsTransactionService extends AbstractQueryService {
 				: "PICK";
 
 		if (orders.isEmpty()) {
-			throw new RuntimeException("웨이브에 포함할 주문을 선택해 주세요");
+			throw new ElidomValidationException("웨이브에 포함할 주문을 선택해 주세요");
 		}
 
 		// 주문 ID 추출하여 주문 리스트 구성
@@ -452,7 +457,7 @@ public class OmsTransactionService extends AbstractQueryService {
 		// String today = DateUtil.todayStr();
 
 		if (ValueUtil.isEmpty(list)) {
-			throw new RuntimeException("웨이브에 포함할 주문을 선택해 주세요");
+			throw new ElidomValidationException("웨이브에 포함할 주문을 선택해 주세요");
 		}
 
 		// ALLOCATED 상태 주문만 필터링
@@ -476,7 +481,7 @@ public class OmsTransactionService extends AbstractQueryService {
 		}
 
 		if (validOrders.isEmpty()) {
-			throw new RuntimeException("웨이브에 포함할 수 있는 주문이 없습니다 (ALLOCATED 상태의 주문만 가능)");
+			throw new ElidomValidationException("웨이브에 포함할 수 있는 주문이 없습니다 (ALLOCATED 상태의 주문만 가능)");
 		}
 
 		// 당일 최대 wave_seq 조회
@@ -620,11 +625,12 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		ShipmentOrder order = this.findOrder(domainId, id);
 		if (order == null) {
-			throw new RuntimeException("주문을 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("주문을 찾을 수 없습니다: " + id);
 		}
 
 		if (!ShipmentOrder.STATUS_REGISTERED.equals(order.getStatus())) {
-			throw new RuntimeException("주문 상태가 [" + order.getStatus() + "]이므로 확정+할당할 수 없습니다 (REGISTERED 상태만 가능)");
+			throw new ElidomValidationException(
+					"주문 상태가 [" + order.getStatus() + "]이므로 확정+할당할 수 없습니다 (REGISTERED 상태만 가능)");
 		}
 
 		// 1. 확정 처리
@@ -637,7 +643,7 @@ public class OmsTransactionService extends AbstractQueryService {
 			@SuppressWarnings("unchecked")
 			List<String> confirmErrors = (List<String>) confirmResult.getOrDefault("errors", new ArrayList<>());
 			String errorMsg = confirmErrors.isEmpty() ? "확정 처리 실패" : confirmErrors.get(0);
-			throw new RuntimeException(errorMsg);
+			throw new ElidomRuntimeException(errorMsg);
 		}
 
 		// 2. 재고 할당 처리
@@ -853,11 +859,11 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		ShipmentOrder order = this.findOrder(domainId, id);
 		if (order == null) {
-			throw new RuntimeException("주문을 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("주문을 찾을 수 없습니다: " + id);
 		}
 
 		if (!ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus())) {
-			throw new RuntimeException("주문 상태가 [" + order.getStatus() + "]이므로 할당을 해제할 수 없습니다");
+			throw new ElidomValidationException("주문 상태가 [" + order.getStatus() + "]이므로 할당을 해제할 수 없습니다");
 		}
 
 		// 할당 레코드 조회
@@ -980,11 +986,11 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		ShipmentOrder order = this.findOrder(domainId, id);
 		if (order == null) {
-			throw new RuntimeException("주문을 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("주문을 찾을 수 없습니다: " + id);
 		}
 
 		if (!ShipmentOrder.STATUS_SHIPPED.equals(order.getStatus())) {
-			throw new RuntimeException("주문 상태가 [" + order.getStatus() + "]이므로 마감할 수 없습니다");
+			throw new ElidomValidationException("주문 상태가 [" + order.getStatus() + "]이므로 마감할 수 없습니다");
 		}
 
 		String sql = "UPDATE shipment_orders SET status = :status, closed_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :id";
@@ -992,9 +998,8 @@ public class OmsTransactionService extends AbstractQueryService {
 				ShipmentOrder.STATUS_CLOSED, now, domainId, id);
 		this.queryManager.executeBySql(sql, params);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success", true);
 	}
 
 	/*
@@ -1017,11 +1022,11 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		ShipmentWave wave = this.findWave(domainId, id);
 		if (wave == null) {
-			throw new RuntimeException("웨이브를 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("웨이브를 찾을 수 없습니다: " + id);
 		}
 
 		if (!ShipmentWave.STATUS_CREATED.equals(wave.getStatus())) {
-			throw new RuntimeException("웨이브 상태가 [" + wave.getStatus() + "]이므로 릴리스할 수 없습니다");
+			throw new ElidomValidationException("웨이브 상태가 [" + wave.getStatus() + "]이므로 릴리스할 수 없습니다");
 		}
 
 		// 웨이브 상태 변경
@@ -1044,19 +1049,91 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		// ===== 이벤트 발행: Fulfillment 모듈에 피킹 지시 생성 트리거 =====
 		WaveReleasedEvent event = new WaveReleasedEvent(
-			domainId,
-			id,
-			wave.getWaveNo(),
-			wave.getPickType(),
-			wave.getPickMethod(),
-			orderCount != null ? orderCount : 0
-		);
+				domainId,
+				id,
+				wave.getWaveNo(),
+				wave.getPickType(),
+				wave.getPickMethod(),
+				orderCount != null ? orderCount : 0);
 		this.eventPublisher.publishEvent(event);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		result.put("order_count", orderCount != null ? orderCount : 0);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success,order_count", true, orderCount != null ? orderCount : 0);
+	}
+
+	/**
+	 * 웨이브 확정 취소 (RELEASED → CREATED)
+	 *
+	 * 웨이브 확정을 취소하고, 피킹 지시를 삭제하며, 주문 상태를 원복한다.
+	 *
+	 * 취소 가능 조건:
+	 * - 웨이브 상태 = RELEASED
+	 * - 모든 피킹 지시 상태 = WAIT (아직 피킹 시작 전)
+	 *
+	 * @param id 웨이브 ID
+	 * @return { success, wave_no }
+	 */
+	public Map<String, Object> cancelWaveRelease(String id) {
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 웨이브 조회
+		ShipmentWave wave = this.findWave(domainId, id);
+		if (wave == null) {
+			throw new ElidomValidationException("웨이브를 찾을 수 없습니다: " + id);
+		}
+
+		// 2. 웨이브 상태 확인 (RELEASED만 취소 가능)
+		if (!ShipmentWave.STATUS_RELEASED.equals(wave.getStatus())) {
+			throw new ElidomValidationException(
+					"RELEASED 상태의 웨이브만 확정 취소할 수 있습니다 (현재 상태: " + wave.getStatus() + ")");
+		}
+
+		// 3. Fulfillment 모듈의 피킹 지시 상태 확인
+		// (이벤트 발행 전 미리 확인하여 빠른 실패)
+		String checkSql = "SELECT COUNT(*) FROM picking_tasks " +
+				"WHERE domain_id = :domainId AND wave_no = :waveNo AND status not in ('CANCELLED', 'CREATED')";
+		Map<String, Object> checkParams = ValueUtil.newMap("domainId,waveNo", domainId, wave.getWaveNo());
+		Integer inProgressCount = this.queryManager.selectBySql(checkSql, checkParams, Integer.class);
+
+		if (inProgressCount != null && inProgressCount > 0) {
+			throw new ElidomValidationException(
+					"피킹이 이미 진행 중인 주문이 있어 웨이브 확정을 취소할 수 없습니다 (" + inProgressCount + "건)");
+		}
+
+		// 4. 웨이브 상태 변경: RELEASED → CREATED
+		String updWaveSql = "UPDATE shipment_waves SET status = :status, updated_at = now() " +
+				"WHERE domain_id = :domainId AND id = :id";
+		Map<String, Object> updWaveParams = ValueUtil.newMap("status,domainId,id",
+				ShipmentWave.STATUS_CREATED, domainId, id);
+		this.queryManager.executeBySql(updWaveSql, updWaveParams);
+
+		// 5. 주문 상태 변경: RELEASED/PICKING → WAVED
+		// (웨이브에는 여전히 포함되어 있으므로 WAVED 상태로 복원)
+		String updOrdersSql = "UPDATE shipment_orders SET status = :newStatus, updated_at = now() " +
+				"WHERE domain_id = :domainId AND wave_no = :waveNo AND status IN (:oldStatuses)";
+		Map<String, Object> updOrdersParams = ValueUtil.newMap("domainId,waveNo,oldStatuses,newStatus",
+				domainId, wave.getWaveNo(),
+				java.util.Arrays.asList(ShipmentOrder.STATUS_RELEASED, ShipmentOrder.STATUS_PICKING),
+				ShipmentOrder.STATUS_WAVED);
+		this.queryManager.executeBySql(updOrdersSql, updOrdersParams);
+
+		// 6. (선택) 재고 할당 상태 변경: HARD → SOFT
+		// NOTE: 비즈니스 정책에 따라 생략 가능 (HARD 유지 또는 SOFT로 변경)
+		// String updAllocSql = "UPDATE stock_allocations SET status = :newStatus,
+		// updated_at = now() " +
+		// "WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :oldStatus";
+		// Map<String, Object> updAllocParams =
+		// ValueUtil.newMap("domainId,waveNo,oldStatus,newStatus",
+		// domainId, wave.getWaveNo(), StockAllocation.STATUS_HARD,
+		// StockAllocation.STATUS_SOFT);
+		// this.queryManager.executeBySql(updAllocSql, updAllocParams);
+
+		// 7. ===== 이벤트 발행: Fulfillment 모듈에 피킹 지시 삭제 트리거 =====
+		WaveCancelledEvent event = new WaveCancelledEvent(domainId, id, wave.getWaveNo());
+		this.eventPublisher.publishEvent(event);
+
+		// 8. 결과 리턴
+		return ValueUtil.newMap("success,wave_no", true, wave.getWaveNo());
 	}
 
 	/**
@@ -1072,11 +1149,11 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		ShipmentWave wave = this.findWave(domainId, id);
 		if (wave == null) {
-			throw new RuntimeException("웨이브를 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("웨이브를 찾을 수 없습니다: " + id);
 		}
 
 		if (!ShipmentWave.STATUS_CREATED.equals(wave.getStatus())) {
-			throw new RuntimeException("웨이브 상태가 [" + wave.getStatus() + "]이므로 취소할 수 없습니다");
+			throw new ElidomValidationException("웨이브 상태가 [" + wave.getStatus() + "]이므로 취소할 수 없습니다");
 		}
 
 		// 포함된 주문 상태 복원 (WAVED → ALLOCATED, wave_no 제거)
@@ -1100,10 +1177,8 @@ public class OmsTransactionService extends AbstractQueryService {
 				ShipmentWave.STATUS_CANCELLED, domainId, id);
 		this.queryManager.executeBySql(updWaveSql, updWaveParams);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		result.put("restored_order_count", restoredCount);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success,restored_order_count", true, restoredCount);
 	}
 
 	/*
@@ -1187,10 +1262,11 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		ShipmentWave wave = this.findWave(domainId, waveId);
 		if (wave == null) {
-			throw new RuntimeException("웨이브를 찾을 수 없습니다: " + waveId);
+			throw new ElidomValidationException("웨이브를 찾을 수 없습니다: " + waveId);
 		}
 		if (!ShipmentWave.STATUS_CREATED.equals(wave.getStatus())) {
-			throw new RuntimeException("웨이브 상태가 [" + wave.getStatus() + "]이므로 주문을 추가할 수 없습니다 (CREATED 상태만 가능)");
+			throw new ElidomValidationException(
+					"웨이브 상태가 [" + wave.getStatus() + "]이므로 주문을 추가할 수 없습니다 (CREATED 상태만 가능)");
 		}
 
 		int addedCount = 0;
@@ -1211,10 +1287,8 @@ public class OmsTransactionService extends AbstractQueryService {
 		// 웨이브 헤더 계획 수량 재집계
 		this.recalcWavePlanStats(domainId, waveId, wave.getWaveNo());
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("added_count", addedCount);
-		result.put("wave_no", wave.getWaveNo());
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("added_count,wave_no", addedCount, wave.getWaveNo());
 	}
 
 	/**
@@ -1232,10 +1306,11 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		ShipmentWave wave = this.findWave(domainId, waveId);
 		if (wave == null) {
-			throw new RuntimeException("웨이브를 찾을 수 없습니다: " + waveId);
+			throw new ElidomValidationException("웨이브를 찾을 수 없습니다: " + waveId);
 		}
 		if (!ShipmentWave.STATUS_CREATED.equals(wave.getStatus())) {
-			throw new RuntimeException("웨이브 상태가 [" + wave.getStatus() + "]이므로 주문을 제거할 수 없습니다 (CREATED 상태만 가능)");
+			throw new ElidomValidationException(
+					"웨이브 상태가 [" + wave.getStatus() + "]이므로 주문을 제거할 수 없습니다 (CREATED 상태만 가능)");
 		}
 
 		int removedCount = 0;
@@ -1258,10 +1333,8 @@ public class OmsTransactionService extends AbstractQueryService {
 		// 웨이브 헤더 계획 수량 재집계
 		this.recalcWavePlanStats(domainId, waveId, wave.getWaveNo());
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("removed_count", removedCount);
-		result.put("wave_no", wave.getWaveNo());
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("removed_count,wave_no", removedCount, wave.getWaveNo());
 	}
 
 	/**
@@ -1308,11 +1381,12 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		ReplenishOrder order = this.findReplenishOrder(domainId, id);
 		if (order == null) {
-			throw new RuntimeException("보충 지시를 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("보충 지시를 찾을 수 없습니다: " + id);
 		}
 
 		if (!ReplenishOrder.STATUS_CREATED.equals(order.getStatus())) {
-			throw new RuntimeException("보충 지시 상태가 [" + order.getStatus() + "]이므로 시작할 수 없습니다 (CREATED 상태만 가능)");
+			throw new ElidomValidationException(
+					"보충 지시 상태가 [" + order.getStatus() + "]이므로 시작할 수 없습니다 (CREATED 상태만 가능)");
 		}
 
 		String sql = "UPDATE replenish_orders SET status = :status, started_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :id";
@@ -1320,9 +1394,8 @@ public class OmsTransactionService extends AbstractQueryService {
 				ReplenishOrder.STATUS_IN_PROGRESS, now, domainId, id);
 		this.queryManager.executeBySql(sql, params);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success", true);
 	}
 
 	/**
@@ -1339,11 +1412,12 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		ReplenishOrder order = this.findReplenishOrder(domainId, id);
 		if (order == null) {
-			throw new RuntimeException("보충 지시를 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("보충 지시를 찾을 수 없습니다: " + id);
 		}
 
 		if (!ReplenishOrder.STATUS_IN_PROGRESS.equals(order.getStatus())) {
-			throw new RuntimeException("보충 지시 상태가 [" + order.getStatus() + "]이므로 완료할 수 없습니다 (IN_PROGRESS 상태만 가능)");
+			throw new ElidomValidationException(
+					"보충 지시 상태가 [" + order.getStatus() + "]이므로 완료할 수 없습니다 (IN_PROGRESS 상태만 가능)");
 		}
 
 		// 상세 항목의 실적 수량 합산
@@ -1356,10 +1430,8 @@ public class OmsTransactionService extends AbstractQueryService {
 				ReplenishOrder.STATUS_COMPLETED, resultTotal, now, domainId, id);
 		this.queryManager.executeBySql(sql, params);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		result.put("result_total", resultTotal);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success,result_total", true, resultTotal);
 	}
 
 	/**
@@ -1373,12 +1445,12 @@ public class OmsTransactionService extends AbstractQueryService {
 
 		ReplenishOrder order = this.findReplenishOrder(domainId, id);
 		if (order == null) {
-			throw new RuntimeException("보충 지시를 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("보충 지시를 찾을 수 없습니다: " + id);
 		}
 
 		String status = order.getStatus();
 		if (ReplenishOrder.STATUS_COMPLETED.equals(status) || ReplenishOrder.STATUS_CANCELLED.equals(status)) {
-			throw new RuntimeException("보충 지시 상태가 [" + status + "]이므로 취소할 수 없습니다");
+			throw new ElidomValidationException("보충 지시 상태가 [" + status + "]이므로 취소할 수 없습니다");
 		}
 
 		String sql = "UPDATE replenish_orders SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
@@ -1386,9 +1458,8 @@ public class OmsTransactionService extends AbstractQueryService {
 				ReplenishOrder.STATUS_CANCELLED, domainId, id);
 		this.queryManager.executeBySql(sql, params);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success", true);
 	}
 
 	/*

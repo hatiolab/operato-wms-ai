@@ -79,7 +79,7 @@ public class ImportShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStamp
 	private String bizType;
 
 	/**
-	 * 출하 유형 (PARCEL/FREIGHT/DIRECT/STORE_PICKUP)
+	 * 출하 유형 (NORMAL/RETURN/TRANSFER/SCRAP/EXPORT/ETC)
 	 */
 	@Column(name = "ship_type", length = 20)
 	private String shipType;
