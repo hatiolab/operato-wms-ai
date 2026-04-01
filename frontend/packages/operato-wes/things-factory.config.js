@@ -14,6 +14,7 @@ export default {
     { tagname: 'fulfillment-progress', page: 'fulfillment-progress' },
     { tagname: 'picking-task-list', page: 'picking-task-list' },
     { tagname: 'packing-order-list', page: 'packing-order-list' },
+    { tagname: 'fulfillment-picking-pc', page: 'fulfillment-picking-pc' },
 
     { tagname: 'inbound-home', page: 'inbound-home' },
     { tagname: 'outbound-home', page: 'outbound-home' },

@@ -52,6 +52,38 @@ public class FulfillmentTransactionController {
 	// ==================== 9.1 피킹 트랜잭션 API ====================
 
 	/**
+	 * 작업할 피킹 지시 목록 조회
+	 * GET /rest/ful_trx/picking_tasks/todo
+	 */
+	@GetMapping(value = "picking_tasks/todo", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Search todo picking tasks")
+	@SuppressWarnings("rawtypes")
+	public List<Map> searchPickingTasks() {
+		return this.pickingService.searchTodoPickingTasks();
+	}
+
+	/**
+	 * 작업 완료된 피킹 지시 목록 조회
+	 * GET /rest/ful_trx/picking_tasks/done
+	 */
+	@GetMapping(value = "picking_tasks/done", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Search done picking tasks")
+	@SuppressWarnings("rawtypes")
+	public List<Map> searchDonePickingTasks() {
+		return this.pickingService.searchDonePickingTasks();
+	}
+
+	/**
+	 * 피킹 지시 상세 조회
+	 * GET /rest/ful_trx/picking_tasks/{id}
+	 */
+	@GetMapping(value = "picking_tasks/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get picking task detail")
+	public Map<String, Object> getPickingTask(@PathVariable("id") String id) {
+		return this.pickingService.getPickingTask(id);
+	}
+
+	/**
 	 * 피킹 지시 생성 (OMS 웨이브 인계)
 	 * POST /rest/ful_trx/picking_tasks/create
 	 */

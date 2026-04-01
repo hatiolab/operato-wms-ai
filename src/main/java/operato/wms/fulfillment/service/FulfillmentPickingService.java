@@ -93,10 +93,13 @@ public class FulfillmentPickingService extends AbstractQueryService {
 
 		if (!sumList.isEmpty()) {
 			Map sumRow = sumList.get(0);
-			resultTotal = sumRow.get("result_total") != null ? Double.parseDouble(sumRow.get("result_total").toString()) : 0;
-			shortTotal = sumRow.get("short_total") != null ? Double.parseDouble(sumRow.get("short_total").toString()) : 0;
+			resultTotal = sumRow.get("result_total") != null ? Double.parseDouble(sumRow.get("result_total").toString())
+					: 0;
+			shortTotal = sumRow.get("short_total") != null ? Double.parseDouble(sumRow.get("short_total").toString())
+					: 0;
 			resultItem = sumRow.get("result_item") != null ? Integer.parseInt(sumRow.get("result_item").toString()) : 0;
-			resultOrder = sumRow.get("result_order") != null ? Integer.parseInt(sumRow.get("result_order").toString()) : 0;
+			resultOrder = sumRow.get("result_order") != null ? Integer.parseInt(sumRow.get("result_order").toString())
+					: 0;
 		}
 
 		// 총량 피킹인 경우 result_order는 plan_order 사용
@@ -108,7 +111,8 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		String updSql = "UPDATE picking_tasks SET status = :status, completed_at = :now,"
 				+ " result_order = :resultOrder, result_item = :resultItem, result_total = :resultTotal, short_total = :shortTotal,"
 				+ " updated_at = now() WHERE domain_id = :domainId AND id = :id";
-		Map<String, Object> updParams = ValueUtil.newMap("status,now,resultOrder,resultItem,resultTotal,shortTotal,domainId,id",
+		Map<String, Object> updParams = ValueUtil.newMap(
+				"status,now,resultOrder,resultItem,resultTotal,shortTotal,domainId,id",
 				PickingTask.STATUS_COMPLETED, now, resultOrder, resultItem, resultTotal, shortTotal, domainId, id);
 		this.queryManager.executeBySql(updSql, updParams);
 
@@ -143,7 +147,8 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		// 상세 아이템 전체 취소
 		String itemSql = "UPDATE picking_task_items SET status = :status, updated_at = now() WHERE domain_id = :domainId AND pick_task_id = :pickTaskId AND status NOT IN (:s1, :s2)";
 		Map<String, Object> itemParams = ValueUtil.newMap("status,domainId,pickTaskId,s1,s2",
-				PickingTaskItem.STATUS_CANCEL, domainId, id, PickingTaskItem.STATUS_PICKED, PickingTaskItem.STATUS_CANCEL);
+				PickingTaskItem.STATUS_CANCEL, domainId, id, PickingTaskItem.STATUS_PICKED,
+				PickingTaskItem.STATUS_CANCEL);
 		this.queryManager.executeBySql(itemSql, itemParams);
 
 		// 피킹 지시 헤더 취소
@@ -156,6 +161,87 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		result.put("success", true);
 		result.put("pick_task_no", task.getPickTaskNo());
 		return result;
+	}
+
+	/**
+	 * 피킹 지시 목록 조회
+	 *
+	 * CREATED, IN_PROGRESS 상태의 피킹 지시 목록을 반환한다.
+	 * 우선순위 순으로 정렬된다.
+	 *
+	 * @return 피킹 지시 목록
+	 */
+	public List<Map> searchTodoPickingTasks() {
+		Long domainId = Domain.currentDomainId();
+
+		String sql = "SELECT pt.id, pt.pick_task_no, pt.wave_no, pt.shipment_no, pt.order_date,"
+				+ " pt.pick_type, pt.pick_method, pt.zone_cd, pt.priority_cd, pt.worker_id,"
+				+ " pt.plan_order, pt.plan_item, pt.plan_total,"
+				+ " pt.result_order, pt.result_item, pt.result_total, pt.short_total,"
+				+ " pt.status, pt.created_at, pt.started_at, pt.completed_at,"
+				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id) AS total_items,"
+				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id AND pti.status = 'PICKED') AS picked_items"
+				+ " FROM picking_tasks pt"
+				+ " WHERE pt.domain_id = :domainId AND pt.status IN (:s1, :s2)"
+				+ " ORDER BY CASE pt.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, pt.created_at";
+		Map<String, Object> params = ValueUtil.newMap("domainId,s1,s2",
+				domainId, PickingTask.STATUS_CREATED, PickingTask.STATUS_IN_PROGRESS);
+		return this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+	}
+
+	/**
+	 * 피킹 지시 목록 조회
+	 *
+	 * COMPLETED 상태의 피킹 지시 목록을 반환한다.
+	 * 우선순위 순으로 정렬된다.
+	 *
+	 * @return 피킹 지시 목록
+	 */
+	public List<Map> searchDonePickingTasks() {
+		Long domainId = Domain.currentDomainId();
+
+		String sql = "SELECT pt.id, pt.pick_task_no, pt.wave_no, pt.shipment_no, pt.order_date,"
+				+ " pt.pick_type, pt.pick_method, pt.zone_cd, pt.priority_cd, pt.worker_id,"
+				+ " pt.plan_order, pt.plan_item, pt.plan_total,"
+				+ " pt.result_order, pt.result_item, pt.result_total, pt.short_total,"
+				+ " pt.status, pt.created_at, pt.started_at, pt.completed_at,"
+				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id) AS total_items,"
+				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id AND pti.status = 'PICKED') AS picked_items"
+				+ " FROM picking_tasks pt"
+				+ " WHERE pt.domain_id = :domainId AND pt.status = :status"
+				+ " ORDER BY CASE pt.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, pt.created_at";
+		Map<String, Object> params = ValueUtil.newMap("domainId,status",
+				domainId, PickingTask.STATUS_COMPLETED);
+		return this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+	}
+
+	/**
+	 * 피킹 지시 상세 조회
+	 *
+	 * @param id 피킹 지시 ID
+	 * @return 피킹 지시 상세 정보
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public Map<String, Object> getPickingTask(String id) {
+		Long domainId = Domain.currentDomainId();
+
+		String sql = "SELECT pt.id, pt.pick_task_no, pt.wave_no, pt.shipment_no, pt.order_date,"
+				+ " pt.pick_type, pt.pick_method, pt.zone_cd, pt.priority_cd, pt.worker_id,"
+				+ " pt.plan_order, pt.plan_item, pt.plan_total,"
+				+ " pt.result_order, pt.result_item, pt.result_total, pt.short_total,"
+				+ " pt.status, pt.created_at, pt.started_at, pt.completed_at,"
+				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id) AS total_items,"
+				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id AND pti.status = 'PICKED') AS picked_items"
+				+ " FROM picking_tasks pt"
+				+ " WHERE pt.domain_id = :domainId AND pt.id = :id";
+		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
+		List<Map> list = this.queryManager.selectListBySql(sql, params, Map.class, 0, 1);
+
+		if (list.isEmpty()) {
+			throw new RuntimeException("피킹 지시를 찾을 수 없습니다: " + id);
+		}
+
+		return (Map<String, Object>) list.get(0);
 	}
 
 	/**
@@ -226,11 +312,13 @@ public class FulfillmentPickingService extends AbstractQueryService {
 
 		PickingTaskItem item = this.findPickingTaskItem(domainId, itemId);
 
-		if (!PickingTaskItem.STATUS_RUN.equals(item.getStatus()) && !PickingTaskItem.STATUS_WAIT.equals(item.getStatus())) {
+		if (!PickingTaskItem.STATUS_RUN.equals(item.getStatus())
+				&& !PickingTaskItem.STATUS_WAIT.equals(item.getStatus())) {
 			throw new RuntimeException("피킹 항목 상태가 [" + item.getStatus() + "]이므로 피킹할 수 없습니다 (WAIT/RUN 상태만 가능)");
 		}
 
-		double pickQty = params.get("pick_qty") != null ? Double.parseDouble(params.get("pick_qty").toString()) : item.getOrderQty();
+		double pickQty = params.get("pick_qty") != null ? Double.parseDouble(params.get("pick_qty").toString())
+				: item.getOrderQty();
 		String locCd = params.get("loc_cd") != null ? params.get("loc_cd").toString() : null;
 
 		String sql = "UPDATE picking_task_items SET pick_qty = :pickQty, status = :status, picked_at = :now"
@@ -267,11 +355,13 @@ public class FulfillmentPickingService extends AbstractQueryService {
 
 		PickingTaskItem item = this.findPickingTaskItem(domainId, itemId);
 
-		if (!PickingTaskItem.STATUS_RUN.equals(item.getStatus()) && !PickingTaskItem.STATUS_WAIT.equals(item.getStatus())) {
+		if (!PickingTaskItem.STATUS_RUN.equals(item.getStatus())
+				&& !PickingTaskItem.STATUS_WAIT.equals(item.getStatus())) {
 			throw new RuntimeException("피킹 항목 상태가 [" + item.getStatus() + "]이므로 부족 처리할 수 없습니다 (WAIT/RUN 상태만 가능)");
 		}
 
-		double shortQty = params.get("short_qty") != null ? Double.parseDouble(params.get("short_qty").toString()) : item.getOrderQty();
+		double shortQty = params.get("short_qty") != null ? Double.parseDouble(params.get("short_qty").toString())
+				: item.getOrderQty();
 		double pickQty = params.get("pick_qty") != null ? Double.parseDouble(params.get("pick_qty").toString()) : 0;
 
 		String sql = "UPDATE picking_task_items SET pick_qty = :pickQty, short_qty = :shortQty, status = :status, picked_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :id";
