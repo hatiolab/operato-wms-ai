@@ -134,6 +134,7 @@ config_tables = [
     'entity_columns', 'entities',
     'common_code_details', 'common_codes',
     'terminologies', 'settings', 'roles',
+    'diy_services', 'diy_templates', 'printouts',
 ]
 
 residual = {}
@@ -478,7 +479,64 @@ INSERT INTO permissions (
 
 ---
 
-### Step 9: settings INSERT
+### Step 9: diy_services + diy_templates + printouts 복제
+
+세 테이블 모두 `domain_id` 기반으로 복제한다. 실제 컬럼 목록은 `information_schema.columns` 에서 확인 후 사용한다.
+
+#### 9-1. diy_services 복제
+
+```python
+SELECT * FROM diy_services WHERE domain_id = {source_domain_id}
+```
+
+- `id` → 신규 UUID, 구 id → 신 id 매핑: `diy_service_id_map = {}`
+- `domain_id` → `new_domain_id`
+- 나머지 컬럼 그대로 복제
+
+```python
+INSERT INTO diy_services (
+    -- information_schema.columns 로 실제 컬럼 확인 후 사용
+    id, ..., domain_id, creator_id, updater_id, created_at, updated_at
+) VALUES (...)
+```
+
+#### 9-2. diy_templates 복제
+
+```python
+SELECT * FROM diy_templates WHERE domain_id = {source_domain_id}
+```
+
+- `id` → 신규 UUID
+- `service_id` 컬럼이 있으면 → `diy_service_id_map[old_service_id]` 로 교체 (없으면 원본 유지)
+- `domain_id` → `new_domain_id`
+
+```python
+INSERT INTO diy_templates (
+    -- information_schema.columns 로 실제 컬럼 확인 후 사용
+    id, ..., domain_id, creator_id, updater_id, created_at, updated_at
+) VALUES (...)
+```
+
+#### 9-3. printouts 복제
+
+```python
+SELECT * FROM printouts WHERE domain_id = {source_domain_id}
+```
+
+- `id` → 신규 UUID
+- `domain_id` → `new_domain_id`
+- 나머지 컬럼 그대로 복제
+
+```python
+INSERT INTO printouts (
+    -- information_schema.columns 로 실제 컬럼 확인 후 사용
+    id, ..., domain_id, creator_id, updater_id, created_at, updated_at
+) VALUES (...)
+```
+
+---
+
+### Step 10: settings INSERT (구 Step 9)
 
 아래 항목들을 `new_domain_id` 로 INSERT한다.
 복제 원본 도메인(`source_domain_id`)의 settings에서 공통 항목은 그대로 복제하되,
@@ -509,7 +567,7 @@ INSERT INTO settings (
 
 ---
 
-### Step 10: 관리자 계정 생성
+### Step 11: 관리자 계정 생성
 
 ```python
 # 계정 중복 확인 (이메일 기준, 다른 도메인에 이미 있을 수 있음)
@@ -548,7 +606,7 @@ hashed = bcrypt.hashpw(init_password.encode('utf-8'), bcrypt.gensalt()).decode('
 
 ---
 
-### Step 11: domain_users INSERT
+### Step 12: domain_users INSERT
 
 대상 사용자 목록을 구성한다:
 1. 입력받은 관리자 계정 (`{admin_email}`)
@@ -577,7 +635,7 @@ for user_id in target_users:
 
 ---
 
-### Step 12: users_roles INSERT
+### Step 13: users_roles INSERT
 
 admin role을 연결할 대상 사용자 목록을 구성한다:
 1. 입력받은 관리자 계정 (`{admin_email}`)
@@ -612,7 +670,7 @@ for user_id in target_users:
 
 ---
 
-### Step 13: 결과 보고
+### Step 14: 결과 보고
 
 모든 단계 완료 후 아래 형식으로 결과를 출력한다.
 
@@ -641,6 +699,9 @@ for user_id in target_users:
   common_codes        : {n}건 복제
   common_code_details : {n}건 복제
   permissions         : {n}건 복제
+  diy_services        : {n}건 복제
+  diy_templates       : {n}건 복제
+  printouts           : {n}건 복제
   settings            : {n}건 생성
   users               : {신규생성 또는 기존계정 사용}
   domain_users        : {n}건 등록 (관리자 + super_user 대상)
