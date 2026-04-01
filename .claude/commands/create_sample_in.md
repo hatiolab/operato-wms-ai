@@ -240,7 +240,7 @@ INSERT INTO receivings (
     domain_id, creator_id, updater_id, created_at, updated_at
 ) VALUES (
     {uuid4()}, {rcv_no}, {rcv_no}, {rcv_date}, NULL,
-    'READY', '1', {wh_cd}, {com_cd}, {vend_cd},
+    'INWORK', '1', {wh_cd}, {com_cd}, {vend_cd},
     {total_box}, NULL, NULL,
     {domain_id}, 'system', 'system', NOW(), NOW()
 )
@@ -257,7 +257,7 @@ INSERT INTO receiving_items (
     domain_id, creator_id, updater_id, created_at, updated_at
 ) VALUES (
     {uuid4()}, {receiving_id}, {seq}, NULL,
-    'READY', {sku_cd}, {sku_nm}, 'KR',
+    'INWORK', {sku_cd}, {sku_nm}, 'KR',
     {rcv_date}, NULL,
     {exp_qty}, {exp_qty},
     {n_box}, {exp_qty},
