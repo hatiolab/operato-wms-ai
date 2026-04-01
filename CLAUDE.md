@@ -131,3 +131,4 @@
 | `/delete_domain` | 도메인 삭제 (설정 데이터만 또는 전체 선택, 이중 확인 절차 포함). 인자: 없음 (대화형) |
 | `/create_sample_master` | 기준정보 샘플 데이터 생성 (도메인·업종·수량 입력 → 창고/구역/로케이션/화주사/거래처/SKU/VAS 등 자동 생성). 인자: 없음 (대화형) |
 | `/create_sample_in` | 입고 주문 샘플 데이터 생성 (도메인·주문수·아이템수·입고예정일·일수 입력 → receivings + receiving_items 자동 생성). 인자: 없음 (대화형) |
+| `/create_sample_stock` | 입고 완료 + 재고 샘플 데이터 생성 (도메인·화주사·주문수·아이템수·입고날짜 입력 → receivings(END) + receiving_items(END) + inventories + inventory_hists 자동 생성). 인자: 없음 (대화형) |
