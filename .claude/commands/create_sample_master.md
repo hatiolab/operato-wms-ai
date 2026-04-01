@@ -502,17 +502,22 @@ VALUES (uuid4(), {domain_id}, 'WH001', '{com_prefix} 물류센터', '{com_prefix
 
 #### 3-2. 구역 (zones) — 5건
 
-업종별 zones 템플릿 사용. `wh_cd = 'WH001'`.
+업종별 zones 템플릿 사용. `wh_cd = 'WH001'`, `temp_type = 'ROOM'`.
+- `rack_type`: zone_type=`PICKABLE` 또는 `PICKING`이면 `'SHELF'`, 나머지는 `'PLAIN'`
 
 #### 3-3. 로케이션 (locations)
 
-- **Z-RCV** (입고 대기): `A-01-01` 1건
-- **Z-PICK** (피킹): `B-{row:02d}-{col:02d}` 형식으로 `pick_loc_count`건 생성
+모든 로케이션 공통 설정:
+- `mixable_flag = true`, `loc_type = 'NORMAL'`, `temp_type = 'ROOM'`
+- `rack_type`: zone_type=`PICKABLE` 또는 `PICKING`인 존은 `'SHELF'`, 나머지는 `'PLAIN'`
+- `restrict_type`: zone_type=`DEFECT`인 존은 `'OUT'`, 나머지는 `null`
+
+- **Z-RCV** (입고 대기): `A-01-01` 1건 — rack_type=`PLAIN`
+- **Z-PICK** (피킹): `B-{row:02d}-{col:02d}` 형식으로 `pick_loc_count`건 생성 — rack_type=`SHELF`
   - row는 01부터, 각 row당 최대 6개 col, 넘치면 row 증가
-  - `mixable_flag = true`, `loc_type = 'NORMAL'`
-- **Z-SHIP** (출고): `STG-01` 1건
-- **Z-DEF** (불량): `NG-01` 1건
-- **Z-VAS** (유통가공): `VAS-01` 1건
+- **Z-SHIP** (출고): `STG-01` 1건 — rack_type=`SHELF`
+- **Z-DEF** (불량/폐기): `NG-01` 1건 — rack_type=`PLAIN`, restrict_type=`OUT`
+- **Z-VAS** (유통가공): `VAS-01` 1건 — rack_type=`PLAIN`
 
 ---
 
@@ -598,12 +603,38 @@ for sku_no in range(1, sku_count + 1):
     sku_nm   = names[(sku_no - 1) % len(names)]  # 순환, 중복 시 suffix 추가
     barcd    = f'88{domain_id:02d}{sku_no:06d}'
     vend_cd  = f'VD{(sku_no % vendor_count) + 1:03d}'
-    
+
+    # 카테고리별 치수/무게/팔레트 입수 — cat_prefix 기준으로 적당한 값 사용
+    # (sku_wd, sku_len, sku_ht 단위: cm / sku_wt 단위: g)
+    dims = get_sku_dims(cat_prefix, sku_nm)
+    # get_sku_dims() 반환: dict { wd, len, ht, wt, plt_in_qty }
+    # sku_vol = wd * len * ht (자동 계산)
+
+    # 유효기간 관련 (use_exp=True인 경우에만 값 설정, False이면 모두 0)
+    if use_exp:
+        expire_period      = 카테고리별 적정값 (예: 180~730일)
+        prd_expired_period = expire_period + 추가 여유기간 (예: 90~365일)
+        imminent_period    = 30~60일
+        no_out_period      = 7~14일
+    else:
+        expire_period = prd_expired_period = imminent_period = no_out_period = 0
+
     INSERT INTO sku (id, domain_id, com_cd, vend_cd, sku_cd, sku_nm, sku_barcd,
         sku_type, stock_unit, temp_type, use_expire_date, bom_set_flag, del_flag,
+        plt_in_qty, sku_wd, sku_len, sku_ht, sku_vol, sku_wt,
+        expire_period, prd_expired_period, imminent_period, no_out_period,
         creator_id, updater_id, created_at, updated_at)
     idx += 1
 ```
+
+**카테고리별 치수/무게 기준값** (업종 템플릿에서 `box_in_qty`와 함께 정의):
+
+| 크기 유형 | 가로(wd) | 세로(len) | 높이(ht) | 무게(wt) | plt_in_qty |
+|---|---|---|---|---|---|
+| 대형 (사료, 침구 등) | 30~50 cm | 40~60 cm | 15~20 cm | 500~5000 g | 10~40 |
+| 중형 (간식, 장난감 등) | 12~25 cm | 15~30 cm | 5~15 cm | 100~800 g | 50~150 |
+| 소형 (영양제, 위생용품 등) | 5~10 cm | 5~10 cm | 10~20 cm | 100~500 g | 100~200 |
+| 세트 상품 | 30~40 cm | 35~45 cm | 20~30 cm | 1000~3000 g | 10~20 |
 
 **중복 상품명 처리**: 같은 이름이 반복될 경우 ` #{n}` suffix를 붙여 구분.
 
