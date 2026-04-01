@@ -130,3 +130,4 @@
 | `/create_domain` | 신규 도메인 생성 및 초기 설정 (순차 질문 → menus/roles/permissions 등 자동 복제). 인자: 없음 (대화형) |
 | `/delete_domain` | 도메인 삭제 (설정 데이터만 또는 전체 선택, 이중 확인 절차 포함). 인자: 없음 (대화형) |
 | `/create_sample_master` | 기준정보 샘플 데이터 생성 (도메인·업종·수량 입력 → 창고/구역/로케이션/화주사/거래처/SKU/VAS 등 자동 생성). 인자: 없음 (대화형) |
+| `/create_sample_in` | 입고 주문 샘플 데이터 생성 (도메인·주문수·아이템수·입고예정일·일수 입력 → receivings + receiving_items 자동 생성). 인자: 없음 (대화형) |
