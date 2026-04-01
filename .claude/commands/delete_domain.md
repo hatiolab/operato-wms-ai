@@ -85,6 +85,9 @@ SELECT 'permissions'         AS tbl, count(*) FROM permissions         WHERE dom
 SELECT 'settings'            AS tbl, count(*) FROM settings            WHERE domain_id = {target_domain_id}
 SELECT 'users_roles'         AS tbl, count(*) FROM users_roles         WHERE domain_id = {target_domain_id}
 SELECT 'domain_users'        AS tbl, count(*) FROM domain_users        WHERE domain_id = {target_domain_id}
+SELECT 'diy_services'        AS tbl, count(*) FROM diy_services        WHERE domain_id = {target_domain_id}
+SELECT 'diy_templates'       AS tbl, count(*) FROM diy_templates       WHERE domain_id = {target_domain_id}
+SELECT 'printouts'           AS tbl, count(*) FROM printouts           WHERE domain_id = {target_domain_id}
 
 # 업무 기준 데이터
 SELECT 'warehouses'          AS tbl, count(*) FROM warehouses          WHERE domain_id = {target_domain_id}
@@ -217,7 +220,12 @@ DELETE FROM entities WHERE domain_id = {target_domain_id}
 DELETE FROM common_code_details WHERE domain_id = {target_domain_id}
 DELETE FROM common_codes WHERE domain_id = {target_domain_id}
 
-# 5. 독립 테이블
+# 5. DIY 및 출력 설정
+DELETE FROM diy_templates WHERE domain_id = {target_domain_id}
+DELETE FROM diy_services WHERE domain_id = {target_domain_id}
+DELETE FROM printouts WHERE domain_id = {target_domain_id}
+
+# 6. 독립 테이블
 DELETE FROM terminologies WHERE domain_id = {target_domain_id}
 DELETE FROM settings WHERE domain_id = {target_domain_id}
 DELETE FROM roles WHERE domain_id = {target_domain_id}
