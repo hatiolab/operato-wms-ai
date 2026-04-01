@@ -86,7 +86,10 @@ public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String whCd;
 
 	/**
-	 * 피킹 유형 (INDIVIDUAL/TOTAL/ZONE)
+	 * 피킹 유형 (TOTAL/ZONE/INDIVIDUAL)
+	 * - TOTAL: 토털 피킹 (여러 주문을 묶어 SKU별로 피킹 후 분배)
+	 * - ZONE: 존별 피킹 (존별로 분할 피킹)
+	 * - INDIVIDUAL: 개별 피킹 (주문별로 개별 피킹)
 	 */
 	@Column(name = "pick_type", length = 20)
 	private String pickType;
@@ -98,10 +101,12 @@ public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String dlvType;
 
 	/**
-	 * 피킹 방식 (WCS/PAPER/INSPECT/PICK)
+	 * WCS 위임 여부
+	 * - true: WCS 시스템에 자동 피킹 지시
+	 * - false: 수동 피킹 (종이 리스트 또는 모바일)
 	 */
-	@Column(name = "pick_method", length = 20)
-	private String pickMethod;
+	@Column(name = "wcs_flag")
+	private Boolean wcsFlag;
 
 	/**
 	 * 택배사 코드
@@ -281,12 +286,12 @@ public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.dlvType = dlvType;
 	}
 
-	public String getPickMethod() {
-		return pickMethod;
+	public Boolean getWcsFlag() {
+		return wcsFlag;
 	}
 
-	public void setPickMethod(String pickMethod) {
-		this.pickMethod = pickMethod;
+	public void setWcsFlag(Boolean wcsFlag) {
+		this.wcsFlag = wcsFlag;
 	}
 
 	public String getCarrierCd() {

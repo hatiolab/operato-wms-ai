@@ -342,7 +342,6 @@ SOFT ─→ HARD ─→ RELEASED
 | `wh_cd` | VARCHAR | N | 30 | 창고 코드 |
 | `biz_type` | VARCHAR | Y | 10 | 업무 유형 (B2C_OUT/B2B_OUT/B2C_RTN/B2B_RTN) |
 | `ship_type` | VARCHAR | Y | 20 | 출하 유형 (NORMAL/RETURN/TRANSFER/SCRAP/EXPORT/ETC) |
-| `pick_method` | VARCHAR | Y | 20 | 피킹 방식 (WCS/PAPER/INSPECT/PICK) |
 | `dlv_type` | VARCHAR | Y | 20 | 배송 유형 (PARCEL/FREIGHT/CHARTER/QUICK/PICKUP/DIRECT) |
 | `carrier_cd` | VARCHAR | Y | 30 | 택배사 코드 |
 | `carrier_service_type` | VARCHAR | Y | 20 | 택배 서비스 유형 (STANDARD/EXPRESS/SAME_DAY/NEXT_DAY/ECONOMY) |
@@ -371,7 +370,7 @@ SOFT ─→ HARD ─→ RELEASED
 | `ix_shipment_orders_2` | `domain_id, order_date, status` | N |
 | `ix_shipment_orders_3` | `domain_id, wave_no` | N |
 | `ix_shipment_orders_4` | `domain_id, com_cd, wh_cd` | N |
-| `ix_shipment_orders_5` | `domain_id, biz_type, ship_type, pick_method` | N |
+| `ix_shipment_orders_5` | `domain_id, biz_type, ship_type` | N |
 | `ix_shipment_orders_6` | `domain_id, cust_cd, order_date` | N |
 | `ix_shipment_orders_7` | `domain_id, priority_cd, ship_by_date` | N |
 
@@ -426,8 +425,8 @@ SOFT ─→ HARD ─→ RELEASED
 | `wave_seq` | INTEGER | N | - | 웨이브 순번 (일자 내) |
 | `com_cd` | VARCHAR | Y | 30 | 화주사 코드 |
 | `wh_cd` | VARCHAR | Y | 30 | 창고 코드 |
-| `pick_type` | VARCHAR | Y | 20 | 피킹 유형 (INDIVIDUAL/TOTAL/ZONE) |
-| `pick_method` | VARCHAR | Y | 20 | 피킹 방식 (WCS/PAPER/INSPECT/PICK) |
+| `pick_type` | VARCHAR | Y | 20 | 피킹 유형 (TOTAL/ZONE/INDIVIDUAL) — 토털/존별/개별 |
+| `wcs_flag` | BOOLEAN | Y | - | WCS 위임 여부 (true: WCS 자동, false: 수동) |
 | `dlv_type` | VARCHAR | Y | 20 | 배송 유형 (PARCEL/FREIGHT/CHARTER/QUICK/PICKUP/DIRECT) |
 | `carrier_cd` | VARCHAR | Y | 30 | 택배사 코드 (택배사별 웨이브 시) |
 | `insp_flag` | BOOLEAN | Y | - | 검수 여부 |

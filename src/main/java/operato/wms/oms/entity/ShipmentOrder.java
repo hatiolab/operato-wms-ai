@@ -22,7 +22,7 @@ import xyz.elidom.util.ValueUtil;
 		@Index(name = "ix_shipment_orders_2", columnList = "domain_id,order_date,status"),
 		@Index(name = "ix_shipment_orders_3", columnList = "domain_id,wave_no"),
 		@Index(name = "ix_shipment_orders_4", columnList = "domain_id,com_cd,wh_cd"),
-		@Index(name = "ix_shipment_orders_5", columnList = "domain_id,biz_type,ship_type,pick_method"),
+		@Index(name = "ix_shipment_orders_5", columnList = "domain_id,biz_type,ship_type"),
 		@Index(name = "ix_shipment_orders_6", columnList = "domain_id,cust_cd,order_date"),
 		@Index(name = "ix_shipment_orders_7", columnList = "domain_id,priority_cd,ship_by_date")
 })
@@ -161,12 +161,6 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	 */
 	@Column(name = "ship_type", length = 20)
 	private String shipType;
-
-	/**
-	 * 피킹 방식 (WCS/PAPER/INSPECT/PICK)
-	 */
-	@Column(name = "pick_method", length = 20)
-	private String pickMethod;
 
 	/**
 	 * 배송 유형 (PARCEL/FREIGHT/CHARTER/QUICK/PICKUP/DIRECT)
@@ -423,14 +417,6 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setShipType(String shipType) {
 		this.shipType = shipType;
-	}
-
-	public String getPickMethod() {
-		return pickMethod;
-	}
-
-	public void setPickMethod(String pickMethod) {
-		this.pickMethod = pickMethod;
 	}
 
 	public String getDlvType() {

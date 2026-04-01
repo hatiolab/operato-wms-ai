@@ -367,7 +367,6 @@ public class OmsTransactionService extends AbstractQueryService {
 				// wave.setWaveDate(today);
 				// wave.setWaveSeq(nextSeq);
 				wave.setPickType(pickType);
-				wave.setPickMethod(pickMethod);
 				wave.setCarrierCd(carrierCd);
 				wave.setPlanOrder(planOrderCnt);
 				wave.setPlanItem(planItemCnt);
@@ -522,7 +521,6 @@ public class OmsTransactionService extends AbstractQueryService {
 		// wave.setWaveDate(today);
 		// wave.setWaveSeq(nextSeq);
 		wave.setPickType(pickType);
-		wave.setPickMethod(pickMethod);
 		wave.setCarrierCd(carrierCd);
 		wave.setPlanOrder(planOrderCnt);
 		wave.setPlanItem(planItemCnt);
@@ -1053,7 +1051,8 @@ public class OmsTransactionService extends AbstractQueryService {
 				id,
 				wave.getWaveNo(),
 				wave.getPickType(),
-				wave.getPickMethod(),
+				wave.getWcsFlag(),
+				wave.getInspFlag(),
 				orderCount != null ? orderCount : 0);
 		this.eventPublisher.publishEvent(event);
 

@@ -24,26 +24,32 @@ public class WaveReleasedEvent extends FulfillmentEvent {
 	private final String waveNo;
 
 	/**
-	 * 피킹 유형 (INDIVIDUAL / TOTAL / ZONE)
+	 * 피킹 유형 (TOTAL / ZONE / INDIVIDUAL)
 	 */
 	private final String pickType;
 
 	/**
-	 * 피킹 방식 (PICK / DPS / DAS)
+	 * WCS 위임 여부
 	 */
-	private final String pickMethod;
+	private final Boolean wcsFlag;
+
+	/**
+	 * 검수 여부
+	 */
+	private final Boolean inspFlag;
 
 	/**
 	 * 웨이브에 포함된 주문 수
 	 */
 	private final Integer orderCount;
 
-	public WaveReleasedEvent(Long domainId, String waveId, String waveNo, String pickType, String pickMethod, Integer orderCount) {
+	public WaveReleasedEvent(Long domainId, String waveId, String waveNo, String pickType, Boolean wcsFlag, Boolean inspFlag, Integer orderCount) {
 		super(domainId, "OMS");
 		this.waveId = waveId;
 		this.waveNo = waveNo;
 		this.pickType = pickType;
-		this.pickMethod = pickMethod;
+		this.wcsFlag = wcsFlag;
+		this.inspFlag = inspFlag;
 		this.orderCount = orderCount;
 	}
 
@@ -59,8 +65,12 @@ public class WaveReleasedEvent extends FulfillmentEvent {
 		return pickType;
 	}
 
-	public String getPickMethod() {
-		return pickMethod;
+	public Boolean getWcsFlag() {
+		return wcsFlag;
+	}
+
+	public Boolean getInspFlag() {
+		return inspFlag;
 	}
 
 	public Integer getOrderCount() {

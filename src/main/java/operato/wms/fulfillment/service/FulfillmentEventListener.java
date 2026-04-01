@@ -40,7 +40,10 @@ public class FulfillmentEventListener {
 			Map<String, Object> params = new HashMap<>();
 			params.put("wave_no", event.getWaveNo());
 			params.put("pick_type", event.getPickType());
-			params.put("pick_method", event.getPickMethod());
+
+			// WCS 위임 여부에 따라 피킹 방식 결정
+			String pickMethod = (event.getWcsFlag() != null && event.getWcsFlag()) ? "WCS" : "PICK";
+			params.put("pick_method", pickMethod);
 
 			// 피킹 지시 생성
 			Map<String, Object> result = this.fulfillmentTrxService.createPickingTasks(params);

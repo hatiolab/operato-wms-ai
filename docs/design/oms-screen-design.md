@@ -831,8 +831,9 @@ Excel 파일 또는 API를 통해 외부 주문 데이터를 일괄 수신
 | 웨이브번호 | `wave_no` | 160px | link | 클릭 시 상세 이동 |
 | 일자 | `wave_date` | 90px | | |
 | 순번 | `wave_seq` | 50px | | 일자 내 순번 |
-| 피킹유형 | `pick_type` | 90px | badge | INDIVIDUAL/TOTAL/ZONE |
-| 피킹방식 | `pick_method` | 80px | badge | WCS/PAPER/INSPECT/PICK |
+| 피킹유형 | `pick_type` | 90px | badge | TOTAL/ZONE/INDIVIDUAL |
+| WCS위임 | `wcs_flag` | 70px | checkbox | WCS 자동 처리 여부 |
+| 검수여부 | `insp_flag` | 70px | checkbox | 검수 필요 여부 |
 | 배송유형 | `dlv_type` | 80px | badge | PARCEL/FREIGHT/CHARTER/QUICK/PICKUP/DIRECT |
 | 택배사 | `carrier_cd` | 100px | | |
 | 총 품목수 | `plan_item` | 80px | number | |
@@ -883,7 +884,8 @@ Excel 파일 또는 API를 통해 외부 주문 데이터를 일괄 수신
 │    ☐ 업무유형별 (biz_type)                 │
 │                                            │
 │  피킹 유형: [TOTAL ▼]                      │
-│  피킹 방식: [PICK ▼]                       │
+│  WCS 위임: [✓]                            │
+│  검수 여부: [✓]                            │
 │  웨이브당 최대 주문수: [200]               │
 │                                            │
 │  ※ 대상: 128건 (ALLOCATED)                 │
@@ -911,7 +913,8 @@ Request:
 {
   "group_by": ["carrier_cd"],
   "pick_type": "TOTAL",
-  "pick_method": "PICK",
+  "wcs_flag": true,
+  "insp_flag": true,
   "max_order_count": 200,
   "order_date": "2026-03-26"
 }
@@ -931,7 +934,7 @@ Request:
 │  🌊 웨이브 상세                             WAVE-20260326-001       │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  상태: [🟣 생성(CREATED)]  피킹유형: TOTAL  피킹방식: PICK  실행유형: BATCH  │
+│  상태: [🟣 생성(CREATED)]  피킹유형: TOTAL  WCS위임: Y  검수: Y         │
 │  웨이브일: 2026-03-26  순번: 1  택배사: CJ대한통운                   │
 │                                                                      │
 │  ┌─── 계획 ───────┐    ┌─── 실적 ───────┐    ┌─── 진행률 ──────┐  │
