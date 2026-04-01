@@ -343,7 +343,7 @@ SOFT ─→ HARD ─→ RELEASED
 | `biz_type` | VARCHAR | Y | 10 | 업무 유형 (B2C_OUT/B2B_OUT/B2C_RTN/B2B_RTN) |
 | `ship_type` | VARCHAR | Y | 20 | 출하 유형 (NORMAL/RETURN/TRANSFER/SCRAP/EXPORT/ETC) |
 | `pick_method` | VARCHAR | Y | 20 | 피킹 방식 (WCS/PAPER/INSPECT/PICK) |
-| `dlv_type` | VARCHAR | Y | 20 | 배송 유형 (PARCEL/CHARTER/QUICK/PICKUP/DIRECT) |
+| `dlv_type` | VARCHAR | Y | 20 | 배송 유형 (PARCEL/FREIGHT/CHARTER/QUICK/PICKUP/DIRECT) |
 | `carrier_cd` | VARCHAR | Y | 30 | 택배사 코드 |
 | `carrier_service_type` | VARCHAR | Y | 20 | 택배 서비스 유형 (STANDARD/EXPRESS/SAME_DAY/NEXT_DAY/ECONOMY) |
 | `to_wh_cd` | VARCHAR | Y | 30 | 목적 창고 코드 (이동 출고 시) |
@@ -428,7 +428,7 @@ SOFT ─→ HARD ─→ RELEASED
 | `wh_cd` | VARCHAR | Y | 30 | 창고 코드 |
 | `pick_type` | VARCHAR | Y | 20 | 피킹 유형 (INDIVIDUAL/TOTAL/ZONE) |
 | `pick_method` | VARCHAR | Y | 20 | 피킹 방식 (WCS/PAPER/INSPECT/PICK) |
-| `ship_type` | VARCHAR | Y | 20 | 출하 유형 |
+| `dlv_type` | VARCHAR | Y | 20 | 배송 유형 (PARCEL/FREIGHT/CHARTER/QUICK/PICKUP/DIRECT) |
 | `carrier_cd` | VARCHAR | Y | 30 | 택배사 코드 (택배사별 웨이브 시) |
 | `insp_flag` | BOOLEAN | Y | - | 검수 여부 |
 | `label_template_cd` | VARCHAR | Y | 36 | 라벨 템플릿 코드 |
@@ -703,7 +703,7 @@ Excel/API 임포트 시 사용하는 스테이징 모델. `ignoreDdl = true`.
 | `wh_cd` | VARCHAR | Y | 30 | 창고 코드 |
 | `biz_type` | VARCHAR | Y | 10 | 업무 유형 |
 | `ship_type` | VARCHAR | Y | 20 | 출하 유형 |
-| `dlv_type` | VARCHAR | Y | 20 | 배송 유형 (PARCEL/CHARTER/QUICK/PICKUP/DIRECT) |
+| `dlv_type` | VARCHAR | Y | 20 | 배송 유형 (PARCEL/FREIGHT/CHARTER/QUICK/PICKUP/DIRECT) |
 | `priority_cd` | VARCHAR | Y | 10 | 우선순위 |
 | **주문 상세** | | | | |
 | `line_no` | VARCHAR | Y | 5 | 라인 번호 |
@@ -897,6 +897,7 @@ FROM
 | 코드 | 값 | 설명 |
 |------|-----|------|
 | `DLV_TYPE_PARCEL` | `PARCEL` | 택배 (CJ대한통운, 한진, 롯데 등) |
+| `DLV_TYPE_FREIGHT` | `FREIGHT` | 화물 (화물차) |
 | `DLV_TYPE_CHARTER` | `CHARTER` | 용차 (차량 전세) |
 | `DLV_TYPE_QUICK` | `QUICK` | 퀵서비스 (오토바이/다마스) |
 | `DLV_TYPE_PICKUP` | `PICKUP` | 직접 인수 (고객/거래처 방문 수령) |
@@ -1347,6 +1348,8 @@ public class OmsEventListener {
 ```
 operato.wms.common.event/          ← 공통 이벤트 정의
 ├── FulfillmentEvent.java          ← 추상 베이스
+├── WaveReleasedEvent.java         ← OMS → Fulfillment 웨이브 확정 이벤트
+├── WaveCancelledEvent.java        ← OMS → Fulfillment 웨이브 확정 취소 이벤트
 ├── PickingStartedEvent.java
 ├── PackingStartedEvent.java
 ├── ShipmentCompletedEvent.java
@@ -1356,6 +1359,73 @@ operato.wms.common.event/          ← 공통 이벤트 정의
 
 > **동일 JVM 내 이벤트**: Spring `ApplicationEventPublisher`를 사용하므로 별도 메시지 브로커 불필요.
 > 향후 마이크로서비스 분리 시 Kafka/RabbitMQ로 교체 가능.
+
+#### 11.4.4 OMS가 발행하는 이벤트 (OMS → Fulfillment)
+
+OMS는 상위 모듈로서 Fulfillment를 직접 의존하지 않고 이벤트를 발행합니다:
+
+| 이벤트 클래스 | 발행 시점 | 페이로드 | 구독자 |
+|--------------|----------|----------|--------|
+| `WaveReleasedEvent` | 웨이브 확정 시 | domainId, waveId, waveNo, pickType, pickMethod, orderCount | Fulfillment.FulfillmentEventListener |
+| `WaveCancelledEvent` | 웨이브 확정 취소 시 | domainId, waveId, waveNo | Fulfillment.FulfillmentEventListener |
+
+**이벤트 발행 예시:**
+
+```java
+// OmsTransactionService.java
+@Autowired
+private ApplicationEventPublisher eventPublisher;
+
+public Map<String, Object> releaseWave(String id) {
+    // 웨이브 상태 변경 후 이벤트 발행
+    WaveReleasedEvent event = new WaveReleasedEvent(
+        domainId, id, wave.getWaveNo(), wave.getPickType(),
+        wave.getPickMethod(), orderCount
+    );
+    this.eventPublisher.publishEvent(event);
+    // Fulfillment에서 자동으로 피킹 지시 생성
+}
+
+public Map<String, Object> cancelWaveRelease(String id) {
+    // 피킹 지시 상태 확인 후 이벤트 발행
+    WaveCancelledEvent event = new WaveCancelledEvent(
+        domainId, id, wave.getWaveNo()
+    );
+    this.eventPublisher.publishEvent(event);
+    // Fulfillment에서 자동으로 피킹 지시 삭제
+}
+```
+
+**Fulfillment 이벤트 리스너:**
+
+```java
+// FulfillmentEventListener.java
+@Component
+public class FulfillmentEventListener {
+
+    @Autowired
+    private FulfillmentTransactionService fulfillmentTrxService;
+
+    @EventListener
+    public void onWaveReleased(WaveReleasedEvent event) {
+        // 피킹 지시 자동 생성
+        Map<String, Object> params = new HashMap<>();
+        params.put("wave_no", event.getWaveNo());
+        params.put("pick_type", event.getPickType());
+        params.put("pick_method", event.getPickMethod());
+        fulfillmentTrxService.createPickingTasks(params);
+    }
+
+    @EventListener
+    public void onWaveCancelled(WaveCancelledEvent event) {
+        // 피킹 지시 자동 삭제 (WAIT 상태만)
+        fulfillmentTrxService.deletePickingTasksByWave(event.getWaveNo());
+    }
+}
+```
+
+> **의존성 역전**: OMS(상위) → Fulfillment(하위)는 이벤트 발행으로 느슨한 결합 유지.
+> Fulfillment → OMS는 API 호출 가능 (하위가 상위 의존은 허용).
 
 ### 11.5 OMS ↔ Fulfillment/WCS 상태 매핑
 
@@ -1392,6 +1462,254 @@ operato.wms.common.event/          ← 공통 이벤트 정의
 
 > **단방향 원칙**: Fulfillment/WCS → OMS는 이벤트로, OMS → Fulfillment/WCS는 서비스/API 호출로.
 > 취소는 OMS가 직접 호출하는 유일한 예외이며, Fulfillment는 서비스 호출, WCS는 API 호출.
+
+### 11.6 웨이브 확정 및 확정 취소
+
+#### 11.6.1 웨이브 확정 프로세스
+
+웨이브 확정 시 OMS는 `WaveReleasedEvent`를 발행하여 Fulfillment에 피킹 지시 생성을 트리거합니다.
+
+**흐름:**
+
+```
+[사용자가 웨이브 확정 버튼 클릭]
+    ↓
+[OMS.releaseWave()]
+    ├─ 1. 웨이브 상태 변경: CREATED → RELEASED
+    ├─ 2. 주문 상태 변경: WAVED → RELEASED
+    ├─ 3. 재고 할당 상태 변경: SOFT → HARD
+    ├─ 4. WaveReleasedEvent 발행 (domainId, waveId, waveNo, pickType, pickMethod, orderCount)
+    ↓
+[Fulfillment.onWaveReleased() 자동 실행]
+    ├─ 5. createPickingTasks() 호출
+    │   ├─ pick_type=INDIVIDUAL → 주문별 피킹 지시 생성
+    │   └─ pick_type=TOTAL → SKU+로케이션별 토털 피킹 지시 생성
+    ├─ 6. PickingTask, PickingTaskItem 생성
+    └─ 7. 주문 상태 변경: RELEASED → PICKING
+```
+
+**구현 코드:**
+
+```java
+// OmsTransactionService.java
+public Map<String, Object> releaseWave(String id) {
+    Long domainId = Domain.currentDomainId();
+    ShipmentWave wave = this.findWave(domainId, id);
+
+    // 상태 확인
+    if (!ShipmentWave.STATUS_CREATED.equals(wave.getStatus())) {
+        throw new RuntimeException("CREATED 상태의 웨이브만 확정할 수 있습니다");
+    }
+
+    // 1. 웨이브 상태 변경
+    wave.setStatus(ShipmentWave.STATUS_RELEASED);
+    this.queryManager.update(wave);
+
+    // 2. 주문 상태 변경: WAVED → RELEASED
+    String updOrdersSql = "UPDATE shipment_orders SET status = :newStatus, updated_at = now() " +
+        "WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :oldStatus";
+    this.queryManager.executeBySql(updOrdersSql, ValueUtil.newMap(
+        "domainId,waveNo,oldStatus,newStatus",
+        domainId, wave.getWaveNo(), ShipmentOrder.STATUS_WAVED, ShipmentOrder.STATUS_RELEASED
+    ));
+
+    // 3. 재고 할당 상태 변경: SOFT → HARD
+    String updAllocSql = "UPDATE stock_allocations SET status = :newStatus, updated_at = now() " +
+        "WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :oldStatus";
+    this.queryManager.executeBySql(updAllocSql, ValueUtil.newMap(
+        "domainId,waveNo,oldStatus,newStatus",
+        domainId, wave.getWaveNo(), StockAllocation.STATUS_SOFT, StockAllocation.STATUS_HARD
+    ));
+
+    // 4. 주문 건수 조회
+    Integer orderCount = this.queryManager.selectBySql(
+        "SELECT COUNT(*) FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo",
+        ValueUtil.newMap("domainId,waveNo", domainId, wave.getWaveNo()), Integer.class
+    );
+
+    // ===== 5. 이벤트 발행: Fulfillment 모듈에 피킹 지시 생성 트리거 =====
+    WaveReleasedEvent event = new WaveReleasedEvent(
+        domainId, id, wave.getWaveNo(), wave.getPickType(),
+        wave.getPickMethod(), orderCount != null ? orderCount : 0
+    );
+    this.eventPublisher.publishEvent(event);
+
+    Map<String, Object> result = new HashMap<>();
+    result.put("success", true);
+    result.put("order_count", orderCount);
+    return result;
+}
+```
+
+#### 11.6.2 웨이브 확정 취소 프로세스
+
+웨이브 확정 후 피킹이 시작되기 전이라면 확정을 취소할 수 있습니다.
+
+**취소 가능 조건:**
+
+| 조건 | 설명 |
+|------|------|
+| 웨이브 상태 | `RELEASED` (확정됨) |
+| 피킹 지시 상태 | 모든 피킹 지시가 `WAIT` (대기 중) |
+| 피킹 진행 여부 | 어떤 주문도 피킹이 시작되지 않음 (`IN_PROGRESS`, `COMPLETED` 없음) |
+
+**취소 불가능한 경우:**
+
+- 피킹 지시 중 하나라도 `IN_PROGRESS` 또는 `COMPLETED` 상태
+- 웨이브 상태가 `RELEASED`가 아님 (`CREATED`, `COMPLETED`, `CANCELLED`)
+
+**흐름:**
+
+```
+[사용자가 웨이브 확정 취소 버튼 클릭]
+    ↓
+[OMS.cancelWaveRelease()]
+    ├─ 1. 웨이브 상태 확인 (RELEASED?)
+    ├─ 2. 피킹 지시 상태 확인 (모두 WAIT?)
+    │   └─ ❌ 하나라도 IN_PROGRESS/COMPLETED → Exception
+    ├─ 3. 웨이브 상태 변경: RELEASED → CREATED
+    ├─ 4. 주문 상태 변경: RELEASED → CREATED
+    ├─ 5. 재고 할당 상태 변경: HARD → SOFT (선택적)
+    ├─ 6. WaveCancelledEvent 발행 (domainId, waveId, waveNo)
+    ↓
+[Fulfillment.onWaveCancelled() 자동 실행]
+    ├─ 7. 피킹 지시 상태 재확인 (WAIT만 삭제)
+    ├─ 8. PickingTask, PickingTaskItem 삭제
+    └─ 9. 주문 상태 변경: PICKING → CREATED (만약 상태가 변경되었다면 원복)
+```
+
+**구현 코드:**
+
+```java
+// OmsTransactionService.java
+public Map<String, Object> cancelWaveRelease(String id) {
+    Long domainId = Domain.currentDomainId();
+    ShipmentWave wave = this.findWave(domainId, id);
+
+    // 1. 웨이브 상태 확인
+    if (!ShipmentWave.STATUS_RELEASED.equals(wave.getStatus())) {
+        throw new RuntimeException("RELEASED 상태의 웨이브만 확정 취소할 수 있습니다");
+    }
+
+    // 2. Fulfillment 모듈에서 피킹 지시 상태 확인 (API 호출)
+    // NOTE: 이벤트로 삭제 요청하기 전에 미리 확인
+    String checkSql = "SELECT COUNT(*) FROM picking_tasks " +
+        "WHERE domain_id = :domainId AND wave_no = :waveNo AND status != :waitStatus";
+    Integer inProgressCount = this.queryManager.selectBySql(checkSql,
+        ValueUtil.newMap("domainId,waveNo,waitStatus", domainId, wave.getWaveNo(), "WAIT"),
+        Integer.class
+    );
+
+    if (inProgressCount != null && inProgressCount > 0) {
+        throw new RuntimeException(
+            "피킹이 이미 진행 중인 주문이 있어 웨이브 확정을 취소할 수 없습니다 (" + inProgressCount + "건)"
+        );
+    }
+
+    // 3. 웨이브 상태 변경: RELEASED → CREATED
+    wave.setStatus(ShipmentWave.STATUS_CREATED);
+    this.queryManager.update(wave);
+
+    // 4. 주문 상태 변경: RELEASED → CREATED
+    String updOrdersSql = "UPDATE shipment_orders SET status = :newStatus, updated_at = now() " +
+        "WHERE domain_id = :domainId AND wave_no = :waveNo AND status IN (:oldStatuses)";
+    this.queryManager.executeBySql(updOrdersSql, ValueUtil.newMap(
+        "domainId,waveNo,oldStatuses,newStatus",
+        domainId, wave.getWaveNo(),
+        Arrays.asList(ShipmentOrder.STATUS_RELEASED, ShipmentOrder.STATUS_PICKING),
+        ShipmentOrder.STATUS_CREATED
+    ));
+
+    // 5. (선택) 재고 할당 상태 변경: HARD → SOFT
+    // NOTE: 비즈니스 정책에 따라 생략 가능 (HARD 유지)
+    // String updAllocSql = "UPDATE stock_allocations SET status = :newStatus ...";
+
+    // ===== 6. 이벤트 발행: Fulfillment 모듈에 피킹 지시 삭제 트리거 =====
+    WaveCancelledEvent event = new WaveCancelledEvent(
+        domainId, id, wave.getWaveNo()
+    );
+    this.eventPublisher.publishEvent(event);
+
+    Map<String, Object> result = new HashMap<>();
+    result.put("success", true);
+    result.put("wave_no", wave.getWaveNo());
+    return result;
+}
+```
+
+**Fulfillment 이벤트 리스너:**
+
+```java
+// FulfillmentEventListener.java
+@EventListener
+public void onWaveCancelled(WaveCancelledEvent event) {
+    try {
+        Long domainId = event.getDomainId();
+        String waveNo = event.getWaveNo();
+
+        // 1. 피킹 지시 조회
+        String findSql = "SELECT * FROM picking_tasks " +
+            "WHERE domain_id = :domainId AND wave_no = :waveNo";
+        List<PickingTask> tasks = this.queryManager.selectListBySql(findSql,
+            ValueUtil.newMap("domainId,waveNo", domainId, waveNo),
+            PickingTask.class, 0, 0
+        );
+
+        if (tasks.isEmpty()) {
+            System.out.println("[Fulfillment] 삭제할 피킹 지시가 없습니다: wave_no=" + waveNo);
+            return;
+        }
+
+        // 2. WAIT 상태 확인 (안전장치)
+        for (PickingTask task : tasks) {
+            if (!PickingTask.STATUS_WAIT.equals(task.getStatus())) {
+                throw new RuntimeException(
+                    "피킹 지시 [" + task.getPickTaskNo() + "]가 WAIT 상태가 아니므로 삭제할 수 없습니다"
+                );
+            }
+        }
+
+        // 3. 피킹 지시 아이템 삭제
+        String delItemsSql = "DELETE FROM picking_task_items " +
+            "WHERE domain_id = :domainId AND pick_task_id IN (" +
+            tasks.stream().map(t -> "'" + t.getId() + "'").collect(Collectors.joining(",")) +
+            ")";
+        this.queryManager.executeBySql(delItemsSql,
+            ValueUtil.newMap("domainId", domainId)
+        );
+
+        // 4. 피킹 지시 삭제
+        String delTasksSql = "DELETE FROM picking_tasks " +
+            "WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status";
+        this.queryManager.executeBySql(delTasksSql,
+            ValueUtil.newMap("domainId,waveNo,status", domainId, waveNo, PickingTask.STATUS_WAIT)
+        );
+
+        System.out.println(String.format(
+            "[Fulfillment] 웨이브 확정 취소 완료 - wave_no: %s, 삭제된 피킹 지시: %d건",
+            waveNo, tasks.size()
+        ));
+
+    } catch (Exception e) {
+        System.err.println(String.format(
+            "[Fulfillment] 웨이브 확정 취소 실패 - wave_no: %s, error: %s",
+            event.getWaveNo(), e.getMessage()
+        ));
+        e.printStackTrace();
+        // 에러를 상위로 전파하지 않음 (OMS 트랜잭션 롤백 방지)
+    }
+}
+```
+
+#### 11.6.3 상태 변경 요약
+
+| 대상 | 확정 시 | 확정 취소 시 |
+|------|---------|-------------|
+| 웨이브 | CREATED → RELEASED | RELEASED → CREATED |
+| 주문 | WAVED → RELEASED | RELEASED → WAVED |
+| 재고 할당 | SOFT → HARD | HARD → SOFT (선택적) |
+| 피킹 지시 | ✅ 생성 (WAIT) | ❌ 삭제 |
+| 피킹 아이템 | ✅ 생성 (WAIT) | ❌ 삭제 |
 
 ---
 

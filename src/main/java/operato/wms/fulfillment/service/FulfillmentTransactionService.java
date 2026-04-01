@@ -489,6 +489,80 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		return result;
 	}
 
+	/**
+	 * 웨이브별 피킹 지시 삭제 (웨이브 확정 취소 시)
+	 *
+	 * 웨이브 확정 취소 시 해당 웨이브의 모든 피킹 지시를 삭제한다.
+	 *
+	 * 삭제 조건:
+	 * - 모든 피킹 지시가 WAIT 상태여야 함
+	 * - 하나라도 IN_PROGRESS/COMPLETED 상태면 예외 발생
+	 *
+	 * @param params { wave_no }
+	 * @return { deleted_task_count, deleted_item_count }
+	 */
+	public Map<String, Object> deletePickingTasksByWave(Map<String, Object> params) {
+		Long domainId = Domain.currentDomainId();
+		String waveNo = params.get("wave_no") != null ? params.get("wave_no").toString() : null;
+
+		if (ValueUtil.isEmpty(waveNo)) {
+			throw new RuntimeException("wave_no는 필수 파라미터입니다");
+		}
+
+		// 1. 웨이브에 속한 모든 피킹 지시 조회
+		String findTasksSql = "SELECT * FROM picking_tasks WHERE domain_id = :domainId AND wave_no = :waveNo";
+		Map<String, Object> findParams = ValueUtil.newMap("domainId,waveNo", domainId, waveNo);
+		List<PickingTask> tasks = this.queryManager.selectListBySql(findTasksSql, findParams, PickingTask.class, 0, 0);
+
+		if (tasks.isEmpty()) {
+			// 피킹 지시가 없으면 정상 처리 (이미 삭제되었거나 아직 생성 전)
+			Map<String, Object> result = new HashMap<>();
+			result.put("deleted_task_count", 0);
+			result.put("deleted_item_count", 0);
+			return result;
+		}
+
+		// 2. 모든 피킹 지시가 WAIT 상태인지 확인
+		for (PickingTask task : tasks) {
+			if (!PickingTask.STATUS_CREATED.equals(task.getStatus())) {
+				throw new RuntimeException(String.format(
+						"피킹 지시 [%s]가 WAIT 상태가 아니므로 삭제할 수 없습니다 (현재 상태: %s)",
+						task.getPickTaskNo(), task.getStatus()));
+			}
+		}
+
+		// 3. 피킹 지시 아이템 개수 조회 (삭제 전 카운트)
+		String countItemsSql = "SELECT COUNT(*) FROM picking_task_items WHERE domain_id = :domainId AND pick_task_id IN ("
+				+
+				tasks.stream().map(t -> "'" + t.getId() + "'").collect(java.util.stream.Collectors.joining(",")) + ")";
+		Integer itemCount = this.queryManager.selectBySql(countItemsSql, ValueUtil.newMap("domainId", domainId),
+				Integer.class);
+
+		// 4. 피킹 지시 아이템 삭제
+		String delItemsSql = "DELETE FROM picking_task_items WHERE domain_id = :domainId AND pick_task_id IN (" +
+				tasks.stream().map(t -> "'" + t.getId() + "'").collect(java.util.stream.Collectors.joining(",")) + ")";
+		this.queryManager.executeBySql(delItemsSql, ValueUtil.newMap("domainId", domainId));
+
+		// 5. 피킹 지시 삭제
+		String delTasksSql = "DELETE FROM picking_tasks WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status";
+		Map<String, Object> delParams = ValueUtil.newMap("domainId,waveNo,status", domainId, waveNo,
+				PickingTask.STATUS_CREATED);
+		this.queryManager.executeBySql(delTasksSql, delParams);
+
+		// 6. 주문 상태 원복: PICKING → CREATED
+		String updOrdersSql = "UPDATE shipment_orders SET status = :newStatus, updated_at = now() " +
+				"WHERE domain_id = :domainId AND wave_no = :waveNo AND status IN (:oldStatuses)";
+		Map<String, Object> updOrdersParams = ValueUtil.newMap("domainId,waveNo,oldStatuses,newStatus",
+				domainId, waveNo, java.util.Arrays.asList(ShipmentOrder.STATUS_RELEASED, ShipmentOrder.STATUS_PICKING),
+				ShipmentOrder.STATUS_WAVED);
+		this.queryManager.executeBySql(updOrdersSql, updOrdersParams);
+
+		Map<String, Object> result = new HashMap<>();
+		result.put("deleted_task_count", tasks.size());
+		result.put("deleted_item_count", itemCount != null ? itemCount : 0);
+		return result;
+	}
+
 	/*
 	 * ============================================================
 	 * 내부 유틸리티

@@ -157,7 +157,7 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String bizType;
 
 	/**
-	 * 출하 유형 (PARCEL/FREIGHT/DIRECT/STORE_PICKUP)
+	 * 출하 유형 (NORMAL/RETURN/TRANSFER/SCRAP/EXPORT/ETC)
 	 */
 	@Column(name = "ship_type", length = 20)
 	private String shipType;
@@ -169,7 +169,7 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String pickMethod;
 
 	/**
-	 * 배송 유형 (STANDARD/EXPRESS/SAME_DAY/DAWN)
+	 * 배송 유형 (PARCEL/FREIGHT/CHARTER/QUICK/PICKUP/DIRECT)
 	 */
 	@Column(name = "dlv_type", length = 20)
 	private String dlvType;

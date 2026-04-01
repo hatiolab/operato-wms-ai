@@ -2,13 +2,11 @@ package operato.wms.oms.entity;
 
 import java.util.Map;
 
-import operato.wms.stock.entity.Inventory;
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
 import xyz.elidom.dbist.annotation.Index;
 import xyz.elidom.dbist.annotation.PrimaryKey;
 import xyz.elidom.dbist.annotation.Table;
-import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.orm.IQueryManager;
 import xyz.elidom.util.BeanUtil;
 import xyz.elidom.util.DateUtil;
@@ -94,10 +92,10 @@ public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String pickType;
 
 	/**
-	 * 출하 유형 (PARCEL/FREIGHT/DIRECT/STORE_PICKUP)
+	 * 배송 유형 (PARCEL/FREIGHT/CHARTER/QUICK/PICKUP/DIRECT)
 	 */
-	@Column(name = "ship_type", length = 20)
-	private String shipType;
+	@Column(name = "dlv_type", length = 20)
+	private String dlvType;
 
 	/**
 	 * 피킹 방식 (WCS/PAPER/INSPECT/PICK)
@@ -275,12 +273,12 @@ public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.pickType = pickType;
 	}
 
-	public String getShipType() {
-		return shipType;
+	public String getDlvType() {
+		return dlvType;
 	}
 
-	public void setShipType(String shipType) {
-		this.shipType = shipType;
+	public void setDlvType(String dlvType) {
+		this.dlvType = dlvType;
 	}
 
 	public String getPickMethod() {

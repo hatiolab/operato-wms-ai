@@ -647,7 +647,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     `
   }
 
-  /** 액션 버튼 렌더링 - 상태별로 주문추가/제거/확정/취소 버튼 표시 */
+  /** 액션 버튼 렌더링 - 상태별로 주문추가/제거/확정/확정취소/취소 버튼 표시 */
   _renderActionButtons() {
     const s = this.wave?.status
 
@@ -664,6 +664,11 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
         </button>
         <button class="action-btn danger" ?disabled="${this.actionLoading}" @click="${this._cancelWave}">
           ${i18next.t('button.wave_cancel', { defaultValue: '웨이브 취소' })}
+        </button>
+      ` : ''}
+      ${s === 'RELEASED' ? html`
+        <button class="action-btn danger" ?disabled="${this.actionLoading}" @click="${this._cancelWaveRelease}">
+          ${i18next.t('button.cancel_wave_release', { defaultValue: '확정 취소' })}
         </button>
       ` : ''}
     `
@@ -723,7 +728,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
             <th>${i18next.t('label.ref_no', { defaultValue: '참조번호' })}</th>
             <th>${i18next.t('label.customer', { defaultValue: '고객' })}</th>
             <th>${i18next.t('label.biz_type', { defaultValue: '업무유형' })}</th>
-            <th>${i18next.t('label.ship_type', { defaultValue: '출하유형' })}</th>
+            <th>${i18next.t('label.dlv_type', { defaultValue: '배송유형' })}</th>
             <th class="text-right">${i18next.t('label.order_qty', { defaultValue: '주문수량' })}</th>
             <th>${i18next.t('label.status', { defaultValue: '상태' })}</th>
           </tr>
@@ -736,7 +741,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
               <td>${o.ref_no || '-'}</td>
               <td>${o.cust_nm || o.cust_cd || '-'}</td>
               <td>${this._bizTypeLabel(o.biz_type)}</td>
-              <td>${this._shipTypeLabel(o.ship_type)}</td>
+              <td>${this._deliveryTypeLabel(o.dlv_type)}</td>
               <td class="text-right">${o.total_order ?? 0}</td>
               <td><span class="item-status ${o.status}">${this._orderStatusLabel(o.status)}</span></td>
             </tr>
@@ -966,6 +971,35 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     } catch (error) {
       console.error('웨이브 취소 실패:', error)
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'error', message: error.message || i18next.t('message.wave_cancel_failed', { defaultValue: '웨이브 취소에 실패했습니다' }) } }))
+    } finally {
+      this.actionLoading = false
+    }
+  }
+
+  /** 웨이브 확정 취소 처리 */
+  async _cancelWaveRelease() {
+    const w = this.wave
+    const result = await UiUtil.showAlertPopup(
+      'label.confirm',
+      `${i18next.t('message.cancel_wave_release_confirm', { defaultValue: '웨이브 확정을 취소하시겠습니까?' })}\n\n` +
+      `${i18next.t('label.wave', { defaultValue: '웨이브' })}: ${w.wave_no}\n` +
+      `${i18next.t('label.target_orders', { defaultValue: '대상 주문' })}: ${w.plan_order || 0}${i18next.t('label.count_unit', { defaultValue: '건' })}\n\n` +
+      `⚠️ ${i18next.t('message.cancel_release_warning', { defaultValue: '확정 취소 시 피킹 지시가 모두 삭제되고 주문 상태가 WAVED로 원복됩니다.' })}\n` +
+      `${i18next.t('message.cancel_release_condition', { defaultValue: '※ 피킹이 시작되지 않은 경우에만 취소 가능합니다.' })}`,
+      'warning',
+      'confirm',
+      'cancel'
+    )
+    if (!result) return
+
+    this.actionLoading = true
+    try {
+      await ServiceUtil.restPost(`oms_trx/waves/${this.waveId}/cancel_release`, {})
+      document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'info', message: i18next.t('message.wave_release_cancelled', { defaultValue: '웨이브 확정이 취소되었습니다' }) } }))
+      await this._refreshAfterAction()
+    } catch (error) {
+      console.error('웨이브 확정 취소 실패:', error)
+      document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'error', message: error.message || i18next.t('message.cancel_wave_release_failed', { defaultValue: '웨이브 확정 취소에 실패했습니다' }) } }))
     } finally {
       this.actionLoading = false
     }
@@ -1248,16 +1282,14 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     return labels[type] || type || '-'
   }
 
-  /** 출하유형 코드를 한글 라벨로 변환 */
-  _shipTypeLabel(type) {
+  /** 배송유형 코드를 한글 라벨로 변환 */
+  _deliveryTypeLabel(type) {
     const labels = {
-      NORMAL: '일반',
-      RETURN: '반품',
-      EXCHANGE: '교환',
       PARCEL: '택배',
       FREIGHT: '화물',
-      DIRECT: '직송',
-      STORE_PICKUP: '매장픽업'
+      CHARTER: '용차',
+      DIRECT: '직접배송',
+      PICKUP: '매장픽업'
     }
     return labels[type] || type || '-'
   }
