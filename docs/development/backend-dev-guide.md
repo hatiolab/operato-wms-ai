@@ -16,7 +16,8 @@
    - [2.5 마스터-디테일 화면](#25-마스터-디테일-화면)
 3. [메타데이터 테이블 구조](#3-메타데이터-테이블-구조)
 4. [API 응답 네이밍 컨벤션](#4-api-응답-네이밍-컨벤션-중요)
-5. [자동화 참조 정보](#5-자동화-참조-정보)
+5. [예외 처리 가이드](#5-예외-처리-가이드-중요)
+6. [자동화 참조 정보](#6-자동화-참조-정보)
 
 ---
 
@@ -662,9 +663,290 @@ ${alloc.allocQty}
 
 ---
 
-## 5. 자동화 참조 정보
+## 5. 예외 처리 가이드 (중요)
 
-### 5.1 Entity Java 클래스 → 메타데이터 매핑 규칙
+### 5.1 개요
+
+Operato WMS 백엔드 서비스에서는 **반드시 `ElidomException` 하위 클래스를 사용하여 예외를 던져야 한다.**
+
+#### 핵심 원칙
+
+> **❌ 절대 금지**: 일반 `RuntimeException`, `IllegalArgumentException`, `NullPointerException` 등을 직접 던지지 말 것
+>
+> **✅ 필수 규칙**: 모든 예외는 `ElidomException` 하위 클래스로 던질 것
+
+**이유:**
+- `RestExceptionHandlerAspect`는 `ElidomException`만 처리하여 일관된 ErrorOutput 응답을 생성한다
+- 일반 예외는 500 에러로만 처리되어 사용자에게 유용한 메시지를 전달할 수 없다
+- `ElidomException`은 HTTP 상태 코드, 에러 코드, 사용자 메시지를 구조화하여 클라이언트에 전달한다
+
+### 5.2 예외 계층 구조
+
+#### 전체 구조
+
+```
+ElidomException (최상위 — 추상)
+├─ ElidomServerException (HTTP 500번대 — 서버 오류)
+│  ├─ ElidomServiceException (서비스 로직 오류)
+│  ├─ ElidomValidationException (Validation 검증 실패)
+│  ├─ ElidomInvalidStatusException (잘못된 상태)
+│  ├─ ElidomDatabaseException (DB 오류)
+│  ├─ ElidomRuntimeException (일반 런타임 오류)
+│  ├─ ElidomAlreadyExistException (중복 데이터)
+│  └─ ElidomScriptRuntimeException (스크립트 실행 오류)
+│
+└─ ElidomClientException (HTTP 400번대 — 클라이언트 오류)
+   ├─ ElidomBadRequestException (잘못된 요청)
+   ├─ ElidomInvalidParamsException (잘못된 파라미터)
+   ├─ ElidomRecordNotFoundException (데이터 미존재)
+   ├─ ElidomUnauthorizedException (인증 실패)
+   └─ ElidomInputException (입력 오류)
+```
+
+### 5.3 주요 예외 클래스
+
+#### 서버 예외 (500번대)
+
+| 예외 클래스 | HTTP 상태 | 용도 | 사용 예시 |
+|-----------|----------|------|----------|
+| `ElidomServiceException` | 500 | 일반적인 서비스 로직 오류 | 재고 부족, 할당 실패 등 |
+| `ElidomValidationException` | 500 | 비즈니스 규칙 검증 실패 | 주문 확정 조건 미충족 등 |
+| `ElidomInvalidStatusException` | 500 | 상태 전이 규칙 위반 | 이미 확정된 주문을 다시 확정 시도 |
+| `ElidomDatabaseException` | 500 | DB 접근 오류 | SQL 실행 실패, 연결 오류 |
+| `ElidomAlreadyExistException` | 500 | 중복 데이터 생성 시도 | 이미 존재하는 주문 번호 등록 |
+
+#### 클라이언트 예외 (400번대)
+
+| 예외 클래스 | HTTP 상태 | 용도 | 사용 예시 |
+|-----------|----------|------|----------|
+| `ElidomRecordNotFoundException` | 404 | 요청한 데이터 미존재 | 존재하지 않는 주문 ID 조회 |
+| `ElidomInvalidParamsException` | 400 | 필수 파라미터 누락/잘못됨 | 필수 필드 null, 잘못된 형식 |
+| `ElidomBadRequestException` | 400 | 일반적인 잘못된 요청 | 잘못된 API 호출 |
+| `ElidomUnauthorizedException` | 401 | 인증 실패 | 로그인 실패, 토큰 만료 |
+
+### 5.4 사용 예시
+
+#### 예시 1: 필수 파라미터 검증
+
+```java
+public void confirmOrder(String orderId) {
+    // ❌ 잘못된 예
+    if (orderId == null) {
+        throw new IllegalArgumentException("주문 ID는 필수입니다");
+    }
+
+    // ✅ 올바른 예
+    if (orderId == null) {
+        throw new ElidomInvalidParamsException("주문 ID는 필수입니다");
+    }
+}
+```
+
+#### 예시 2: 데이터 미존재
+
+```java
+public ShipmentOrder getOrder(String id) {
+    ShipmentOrder order = orderRepository.findById(id).orElse(null);
+
+    // ❌ 잘못된 예
+    if (order == null) {
+        throw new RuntimeException("주문을 찾을 수 없습니다");
+    }
+
+    // ✅ 올바른 예
+    if (order == null) {
+        throw new ElidomRecordNotFoundException("주문을 찾을 수 없습니다: " + id);
+    }
+
+    return order;
+}
+```
+
+#### 예시 3: 상태 검증
+
+```java
+public void allocateOrder(ShipmentOrder order) {
+    // ❌ 잘못된 예
+    if (!ShipmentOrder.STATUS_CONFIRMED.equals(order.getStatus())) {
+        throw new IllegalStateException("확정 상태가 아닙니다");
+    }
+
+    // ✅ 올바른 예
+    if (!ShipmentOrder.STATUS_CONFIRMED.equals(order.getStatus())) {
+        throw new ElidomInvalidStatusException(
+            "ORDER_NOT_CONFIRMED",
+            "주문이 확정 상태가 아닙니다. 현재 상태: " + order.getStatus()
+        );
+    }
+}
+```
+
+#### 예시 4: 비즈니스 규칙 검증
+
+```java
+public void createWave(List<String> orderIds) {
+    if (orderIds == null || orderIds.isEmpty()) {
+        throw new ElidomInvalidParamsException("웨이브에 포함할 주문이 없습니다");
+    }
+
+    List<ShipmentOrder> orders = orderRepository.findAllById(orderIds);
+
+    // 모든 주문이 ALLOCATED 상태인지 검증
+    long notAllocatedCount = orders.stream()
+        .filter(o -> !ShipmentOrder.STATUS_ALLOCATED.equals(o.getStatus()))
+        .count();
+
+    if (notAllocatedCount > 0) {
+        throw new ElidomValidationException(
+            "WAVE_INVALID_ORDER_STATUS",
+            notAllocatedCount + "건의 주문이 할당 상태가 아닙니다"
+        );
+    }
+}
+```
+
+#### 예시 5: 서비스 로직 오류
+
+```java
+public void allocateInventory(ShipmentOrderItem item) {
+    try {
+        // 재고 할당 로직
+        StockAllocation allocation = inventoryService.allocate(item);
+
+        if (allocation == null) {
+            throw new ElidomServiceException(
+                "STOCK_ALLOC_FAILED",
+                "재고 할당에 실패했습니다: " + item.getSkuCd()
+            );
+        }
+    } catch (ElidomException e) {
+        // ElidomException은 그대로 throw
+        throw e;
+    } catch (Exception e) {
+        // 일반 예외는 ElidomServiceException으로 래핑
+        throw new ElidomServiceException(
+            "STOCK_ALLOC_ERROR",
+            "재고 할당 중 오류가 발생했습니다",
+            e
+        );
+    }
+}
+```
+
+### 5.5 예외 생성자 패턴
+
+#### 기본 생성자
+
+```java
+// 메시지만
+throw new ElidomServiceException("재고가 부족합니다");
+
+// 코드 + 메시지
+throw new ElidomServiceException("STOCK_SHORTAGE", "재고가 부족합니다");
+
+// 코드 + 메시지 + 원인 예외
+throw new ElidomServiceException("DB_ERROR", "DB 조회 실패", sqlException);
+```
+
+#### 파라미터를 사용한 메시지 포맷팅
+
+```java
+// 파라미터 리스트 전달
+List<String> params = Arrays.asList("SKU-123", "5");
+throw new ElidomServiceException(
+    "STOCK_SHORTAGE",
+    "상품 {0}의 재고가 {1}개 부족합니다",
+    params
+);
+// → "상품 SKU-123의 재고가 5개 부족합니다"
+```
+
+### 5.6 예외 처리 흐름
+
+```
+1. Service/Controller에서 ElidomException 발생
+   ↓
+2. RestExceptionHandlerAspect (@ControllerAdvice)가 catch
+   ↓
+3. ExceptionHandlerFilterChain 실행 (등록된 Filter가 있으면)
+   ↓
+4. ErrorOutput 생성
+   - status: HTTP 상태 코드 (400/404/500 등)
+   - errorId: UUID
+   - code: 에러 코드
+   - msg: 사용자 메시지
+   - detail: 상세 정보 (스택 트레이스 등)
+   ↓
+5. ResponseEntity<ErrorOutput> 반환
+```
+
+### 5.7 주의사항
+
+#### 1. 일반 예외를 ElidomException으로 래핑
+
+외부 라이브러리나 시스템 예외를 catch했을 때는 반드시 `ElidomException`으로 래핑하여 던진다.
+
+```java
+try {
+    // 외부 API 호출
+    externalService.call();
+} catch (IOException e) {
+    // ❌ 그냥 throw하면 안 됨
+    // throw e;
+
+    // ✅ ElidomException으로 래핑
+    throw new ElidomServiceException("EXTERNAL_API_ERROR", "외부 API 호출 실패", e);
+}
+```
+
+#### 2. ElidomException은 그대로 전파
+
+이미 `ElidomException`인 경우 다시 래핑하지 않고 그대로 throw한다.
+
+```java
+try {
+    subService.doSomething();
+} catch (ElidomException e) {
+    // ✅ 그대로 throw (다시 래핑하지 않음)
+    throw e;
+} catch (Exception e) {
+    // ✅ 일반 예외만 래핑
+    throw new ElidomServiceException("SERVICE_ERROR", "서비스 실행 실패", e);
+}
+```
+
+#### 3. 명확한 에러 코드 사용
+
+에러 코드는 대문자 + 언더스코어 형식으로 명확하게 작성한다.
+
+```java
+// ❌ 나쁜 예
+throw new ElidomServiceException("error", "오류가 발생했습니다");
+
+// ✅ 좋은 예
+throw new ElidomServiceException("ORDER_NOT_FOUND", "주문을 찾을 수 없습니다");
+throw new ElidomServiceException("STOCK_SHORTAGE", "재고가 부족합니다");
+throw new ElidomServiceException("WAVE_ALREADY_RELEASED", "웨이브가 이미 확정되었습니다");
+```
+
+#### 4. 사용자 친화적인 메시지
+
+예외 메시지는 최종 사용자(현업)가 이해할 수 있도록 작성한다.
+
+```java
+// ❌ 나쁜 예 (개발자 중심 메시지)
+throw new ElidomServiceException("NullPointerException at line 42");
+
+// ✅ 좋은 예 (사용자 중심 메시지)
+throw new ElidomRecordNotFoundException("주문 번호 " + orderNo + "를 찾을 수 없습니다");
+throw new ElidomValidationException("출하 기한일은 주문일보다 이전일 수 없습니다");
+```
+
+---
+
+## 6. 자동화 참조 정보
+
+### 6.1 Entity Java 클래스 → 메타데이터 매핑 규칙
 
 Entity Java 클래스 정보로부터 메타데이터를 자동 생성하기 위한 매핑 규칙:
 
@@ -700,7 +982,7 @@ Entity Java 클래스 정보로부터 메타데이터를 자동 생성하기 위
 | 나머지 String | `text` |
 | 나머지 Number | `number` |
 
-### 5.2 자동화 대상 테이블 목록
+### 6.2 자동화 대상 테이블 목록
 
 Entity 정보를 기반으로 자동 생성해야 하는 데이터:
 
@@ -712,7 +994,7 @@ Entity 정보를 기반으로 자동 생성해야 하는 데이터:
 | 4 | `common_codes` | 코드형 필드 1개당 1행 | 모든 도메인에 등록 |
 | 5 | `common_code_details` | 코드 값 1개당 1행 | 모든 도메인에 등록 |
 
-### 5.3 도메인 정보
+### 6.3 도메인 정보
 
 모든 메타데이터는 각 도메인별로 별도 등록해야 한다.
 
@@ -725,12 +1007,12 @@ SELECT id, name FROM domains;
 -- 15, cdc
 ```
 
-### 5.4 DB 접속 정보
+### 6.4 DB 접속 정보
 
 - 접속 정보는 `frontend/packages/operato-wes/config/config.development.js` 파일에서 확인
 - Python/psycopg2를 사용하여 접속 (psql CLI 미설치 환경 대응)
 
-### 5.5 시스템 자동 추가 필드
+### 6.5 시스템 자동 추가 필드
 
 Entity를 등록할 때 시스템이 자동으로 추가하는 필드 (entity_columns 등록 불필요):
 
@@ -742,7 +1024,7 @@ Entity를 등록할 때 시스템이 자동으로 추가하는 필드 (entity_co
 | `updated_at` | 수정일시 |
 | `updater_id` | 수정자 ID |
 
-### 5.6 Seed SQL 참고
+### 6.6 Seed SQL 참고
 
 > Seed SQL은 초기 개발 시 참고용으로 생성되었으며, `/entity_meta_by_entity` skill이 이를 대체한다.
 > Entity 클래스 분석으로 entities, entity_columns, terminologies, common_codes, common_code_details를 자동 등록하므로 별도 Seed SQL 작성이 불필요하다.

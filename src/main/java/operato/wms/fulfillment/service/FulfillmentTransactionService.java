@@ -13,8 +13,6 @@ import operato.wms.fulfillment.entity.PackingOrderItem;
 import operato.wms.fulfillment.entity.PickingTask;
 import operato.wms.fulfillment.entity.PickingTaskItem;
 import operato.wms.oms.entity.ShipmentOrder;
-import operato.wms.oms.entity.ShipmentOrderItem;
-import operato.wms.oms.entity.StockAllocation;
 import xyz.anythings.sys.service.AbstractQueryService;
 import xyz.anythings.sys.util.AnyOrmUtil;
 import xyz.elidom.sys.entity.Domain;
@@ -60,7 +58,6 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 
 		String waveNo = params.get("wave_no") != null ? params.get("wave_no").toString() : null;
 		String pickType = params.get("pick_type") != null ? params.get("pick_type").toString() : "INDIVIDUAL";
-		String pickMethod = params.get("pick_method") != null ? params.get("pick_method").toString() : "PICK";
 
 		if (ValueUtil.isEmpty(waveNo)) {
 			throw new RuntimeException("wave_no는 필수 파라미터입니다");
@@ -112,7 +109,6 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				task.setComCd(order.getComCd());
 				task.setWhCd(ValueUtil.isNotEmpty(order.getWhCd()) ? order.getWhCd() : "DEFAULT");
 				task.setPickType(pickType);
-				task.setPickMethod(pickMethod);
 				task.setPriorityCd(order.getPriorityCd());
 				task.setPlanOrder(1);
 				task.setPlanItem(allocations.size());
@@ -208,7 +204,6 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			task.setComCd(orders.get(0).getComCd());
 			task.setWhCd(ValueUtil.isNotEmpty(orders.get(0).getWhCd()) ? orders.get(0).getWhCd() : "DEFAULT");
 			task.setPickType(pickType);
-			task.setPickMethod(pickMethod);
 			task.setPlanOrder(orders.size());
 			task.setPlanItem(allocations.size());
 

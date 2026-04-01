@@ -427,7 +427,6 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
                         <th>${i18next.t('label.wave_no', { defaultValue: '웨이브' })}</th>
                         <th>${i18next.t('label.shipment_no', { defaultValue: '출하번호' })}</th>
                         <th class="center">${i18next.t('label.pick_type', { defaultValue: '피킹유형' })}</th>
-                        <th class="center">${i18next.t('label.pick_method', { defaultValue: '피킹방식' })}</th>
                         <th class="center">${i18next.t('label.worker_id', { defaultValue: '작업자' })}</th>
                         <th class="right">${i18next.t('label.plan_total', { defaultValue: '계획수량' })}</th>
                         <th class="right">${i18next.t('label.pick_result_qty', { defaultValue: '피킹실적' })}</th>
@@ -452,9 +451,6 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
                           <td>${row.shipment_no || '-'}</td>
                           <td class="center">
                             <span class="badge type-badge">${row.pick_type || '-'}</span>
-                          </td>
-                          <td class="center">
-                            <span class="badge type-badge">${row.pick_method || '-'}</span>
                           </td>
                           <td class="center">${row.worker_id || '-'}</td>
                           <td class="right">${this._formatNumber(row.plan_total)}</td>

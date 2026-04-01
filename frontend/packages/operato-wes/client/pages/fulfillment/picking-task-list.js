@@ -379,10 +379,10 @@ class PickingTaskList extends localize(i18next)(PageView) {
       order_date_to: this._todayStr(),
       status: '',
       pick_type: '',
-      pick_method: '',
       wave_no: '',
       worker_id: '',
-      shipment_no: ''
+      shipment_no: '',
+      priority_cd: ''
     }
     this.currentPage = 1
     this.totalCount = 0
@@ -435,14 +435,14 @@ class PickingTaskList extends localize(i18next)(PageView) {
               </select>
             </div>
             <div class="form-group">
-              <label>${i18next.t('label.pick_method', { defaultValue: '피킹방식' })}</label>
-              <select .value="${this.searchParams.pick_method}"
-                @change="${e => this._updateSearch('pick_method', e.target.value)}">
+              <label>${i18next.t('label.priority_cd', { defaultValue: '우선순위' })}</label>
+              <select .value="${this.searchParams.priority_cd}"
+                @change="${e => this._updateSearch('priority_cd', e.target.value)}">
                 <option value="">${i18next.t('label.all', { defaultValue: '전체' })}</option>
-                <option value="WCS">WCS</option>
-                <option value="PAPER">PAPER</option>
-                <option value="INSPECT">INSPECT</option>
-                <option value="PICK">PICK</option>
+                <option value="URGENT">긴급</option>
+                <option value="HIGH">높음</option>
+                <option value="NORMAL">보통</option>
+                <option value="LOW">낮음</option>
               </select>
             </div>
             <div class="form-group">
@@ -523,7 +523,7 @@ class PickingTaskList extends localize(i18next)(PageView) {
                         <th>${i18next.t('label.wave_no', { defaultValue: '웨이브' })}</th>
                         <th>${i18next.t('label.shipment_no', { defaultValue: '출하번호' })}</th>
                         <th class="center">${i18next.t('label.pick_type', { defaultValue: '피킹유형' })}</th>
-                        <th class="center">${i18next.t('label.pick_method', { defaultValue: '피킹방식' })}</th>
+                        <th class="center">${i18next.t('label.priority_cd', { defaultValue: '우선순위' })}</th>
                         <th class="center">${i18next.t('label.worker_id', { defaultValue: '작업자' })}</th>
                         <th class="right">${i18next.t('label.plan_total', { defaultValue: '계획수량' })}</th>
                         <th class="right">${i18next.t('label.result_total', { defaultValue: '실적수량' })}</th>
@@ -547,7 +547,7 @@ class PickingTaskList extends localize(i18next)(PageView) {
                               <span class="badge ${(item.pick_type || '').toLowerCase()}">${item.pick_type || '-'}</span>
                             </td>
                             <td class="center">
-                              <span class="badge">${item.pick_method || '-'}</span>
+                              <span class="badge">${item.priority_cd || '-'}</span>
                             </td>
                             <td class="center">${item.worker_id || '-'}</td>
                             <td class="right">${this._formatNumber(item.plan_total)}</td>
@@ -624,8 +624,8 @@ class PickingTaskList extends localize(i18next)(PageView) {
       if (this.searchParams.pick_type) {
         filters.push({ name: 'pick_type', value: this.searchParams.pick_type })
       }
-      if (this.searchParams.pick_method) {
-        filters.push({ name: 'pick_method', value: this.searchParams.pick_method })
+      if (this.searchParams.priority_cd) {
+        filters.push({ name: 'priority_cd', value: this.searchParams.priority_cd })
       }
       if (this.searchParams.wave_no) {
         filters.push({ name: 'wave_no', operator: 'like', value: this.searchParams.wave_no })
@@ -682,7 +682,7 @@ class PickingTaskList extends localize(i18next)(PageView) {
       order_date_to: this._todayStr(),
       status: '',
       pick_type: '',
-      pick_method: '',
+      priority_cd: '',
       wave_no: '',
       worker_id: '',
       shipment_no: ''

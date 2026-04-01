@@ -13,7 +13,7 @@ SELECT
     so.shipment_no, so.ref_order_no,
     so.order_date, so.ship_by_date, so.cutoff_time, so.priority_cd,
     so.wave_no, so.wh_cd, so.com_cd, so.cust_cd, so.cust_nm,
-    so.biz_type, so.ship_type, so.pick_method, so.dlv_type,
+    so.biz_type, so.ship_type, so.dlv_type,
     so.status,
     so.total_item, so.total_order, so.total_alloc, so.total_shipped,
     so.confirmed_at, so.allocated_at, so.released_at, so.shipped_at,
@@ -131,12 +131,6 @@ public class ShipmentOrderStatus extends xyz.elidom.orm.entity.basic.DomainTimeS
 	 */
 	@Column(name = "ship_type", length = 20)
 	private String shipType;
-
-	/**
-	 * 피킹 방식
-	 */
-	@Column(name = "pick_method", length = 20)
-	private String pickMethod;
 
 	/**
 	 * 배송 유형 (PARCEL/FREIGHT/CHARTER/QUICK/PICKUP/DIRECT)
@@ -424,14 +418,6 @@ public class ShipmentOrderStatus extends xyz.elidom.orm.entity.basic.DomainTimeS
 
 	public void setShipType(String shipType) {
 		this.shipType = shipType;
-	}
-
-	public String getPickMethod() {
-		return pickMethod;
-	}
-
-	public void setPickMethod(String pickMethod) {
-		this.pickMethod = pickMethod;
 	}
 
 	public String getDlvType() {
