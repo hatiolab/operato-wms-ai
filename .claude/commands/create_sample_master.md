@@ -40,8 +40,10 @@ $ARGUMENTS 가 비어있으면 AskUserQuestion 도구를 사용하여 아래 항
        expiration_dates : N건
        vas_boms         : N건
        vas_bom_items    : N건
-       runtime_envs     : N건
-       runtime_env_items: N건
+       runtime_envs               : N건
+       runtime_env_items          : N건
+       warehouse_charge_settings  : N건
+       warehouse_charge_setting_items: N건
 
      처리 방식을 선택해주세요.
        [1] 기존 데이터 유지 후 추가 생성
@@ -113,7 +115,8 @@ $ARGUMENTS 가 비어있으면 AskUserQuestion 도구를 사용하여 아래 항
   VAS BOM          : {vas_count}개
 
   + 창고 1개, 구역 5개(입고대기/피킹/출고/폐기/VAS), 나머지 구역 로케이션 각 1개
-  + 박스유형 3개(S/M/L), 택배사계약 1개, 유효기간정책 2개, 런타임환경 설정
+  + 박스유형 3개(S/M/L), 택배사계약 1개, 유효기간정책 2개
+  + 화주사별: 런타임환경 설정(17항목), 창고요금설정(입고/출고 작업료, 각 5구간)
 
 진행할까요? (y/n)
 ```
@@ -138,9 +141,11 @@ Python psycopg2 사용 (미설치 시 `pip3 install psycopg2-binary`).
 
 ```python
 reset_tables = [
-    'runtime_env_items',   # runtime_envs 참조
+    'runtime_env_items',              # runtime_envs 참조
     'runtime_envs',
-    'vas_bom_items',       # vas_boms 참조
+    'warehouse_charge_setting_items', # warehouse_charge_settings 참조
+    'warehouse_charge_settings',
+    'vas_bom_items',                  # vas_boms 참조
     'vas_boms',
     'courier_contracts',
     'box_types',
@@ -148,8 +153,8 @@ reset_tables = [
     'customers',
     'vendors',
     'companies',
-    'locations',           # zones 참조
-    'zones',               # warehouses 참조
+    'locations',                      # zones 참조
+    'zones',                          # warehouses 참조
     'warehouses',
     'expiration_dates',
 ]
@@ -702,40 +707,107 @@ INSERT INTO expiration_dates (id, domain_id, name, description, active_flag,
 
 ---
 
-### Step 12: 런타임 환경 설정
+### Step 12: 런타임 환경 설정 및 창고 요금 설정
 
-#### 12-1. runtime_envs — 1건
+화주사(`companies`)별로 아래를 반복한다. 생성된 모든 화주사 코드 목록(`com_cd_list = [{com_prefix}01, {com_prefix}02, ...]`)을 순회한다.
+
+#### 12-1. runtime_envs — 화주사별 1건
 
 ```python
-INSERT INTO runtime_envs (id, domain_id, wh_cd, com_cd,
-    creator_id, updater_id, created_at, updated_at)
-VALUES (uuid4(), {domain_id}, 'WH001', '{primary_com_cd}', 1, 1, now(), now())
+for com_cd in com_cd_list:
+    INSERT INTO runtime_envs (id, domain_id, wh_cd, com_cd,
+        creator_id, updater_id, created_at, updated_at)
+    VALUES (uuid4(), {domain_id}, 'WH001', com_cd, 1, 1, now(), now())
 ```
 
-#### 12-2. runtime_env_items — 17건 고정
+#### 12-2. runtime_env_items — 화주사별 17건
 
 ```python
-runtime_env_id = 방금 생성한 runtime_envs.id
+for com_cd in com_cd_list:
+    runtime_env_id = 해당 화주사의 runtime_envs.id
 
-items = [
-    ('inbound',  'in.putaway.strategy',                    '입고 적치 전략',                        'DISTANCE',              '잘 나가는 상품이 출고장에 가깝게 적치'),
-    ('inbound',  'in.receipt.finish.location',              '입고 처리 완료시 기본 로케이션',          'A-01-01',               '입고 대기 존'),
-    ('inbound',  'in.receipt.finish.auto.flag',             '입고 완료시 자동 완료 처리 여부',         'false',                 None),
-    ('inbound',  'in.receipt.qty.auto.setting.flag',        '입고 수량 자동 계산 처리',               'false',                 None),
-    ('inbound',  'in.receipt.order.sheet.template',         '입고지시서 템플릿',                      'RECEIVING_ORDER_SHEET', '값이 없다면 출력하지 않음'),
-    ('inventory','inv.barcode.label.template',              '바코드 라벨 템플릿',                     'INVENTORY_BARCODE',     None),
-    ('outbound', 'out.picking.reservation.strategy',        '할당 전략',                             'FIFO',                  'FIFO / EXPIRED_DATE / MANUAL'),
-    ('outbound', 'out.picking.reservation.method',          '피킹 예약 방식',                         'INV_CHECK_ONLY',        None),
-    ('outbound', 'out.picking.order.sheet.template',        '피킹지시서 템플릿',                      'PICKING_ORDER_SHEET',   '값이 없다면 출력하지 않음'),
-    ('outbound', 'out.picking.order.auto-close.enabled',    '피킹 완료시 자동 마감 여부',              'false',                 None),
-    ('outbound', 'out.picking.auto-start.release-order.started', '출고 피킹 시작시 자동 시작 여부',  'false',                 None),
-    ('outbound', 'out.wave.creation.trigger',               '웨이브 생성 트리거',                     'MANUAL',                'SCHEDULER / ORDER_COUNT / MANUAL'),
-    ('outbound', 'out.wave.creation.trigger.order_count',   '웨이브 생성 누적 주문 개수',              '50',                    None),
-    ('outbound', 'out.release.waiting.location',            '출고 확정 전 임시 로케이션',              'STG-01',                None),
-    ('outbound', 'out.release.order.sheet.template',        '거래명세서 템플릿',                      'TRADE_STATEMENT_SHEET', '값이 없다면 출력하지 않음'),
-    ('outbound', 'out.release.label.template',              '출고 라벨 출력 템플릿',                  '',                      '출력 안 함'),
-    ('rwa',      'rwa.disposition.auto.stock.flag',         '처분 즉시 재고 반영 여부',               'false',                 None),
-]
+    items = [
+        ('inbound',  'in.putaway.strategy',                    '입고 적치 전략',                        'DISTANCE',              '잘 나가는 상품이 출고장에 가깝게 적치'),
+        ('inbound',  'in.receipt.finish.location',              '입고 처리 완료시 기본 로케이션',          'A-01-01',               '입고 대기 존'),
+        ('inbound',  'in.receipt.finish.auto.flag',             '입고 완료시 자동 완료 처리 여부',         'false',                 None),
+        ('inbound',  'in.receipt.qty.auto.setting.flag',        '입고 수량 자동 계산 처리',               'false',                 None),
+        ('inbound',  'in.receipt.order.sheet.template',         '입고지시서 템플릿',                      'RECEIVING_ORDER_SHEET', '값이 없다면 출력하지 않음'),
+        ('inventory','inv.barcode.label.template',              '바코드 라벨 템플릿',                     'INVENTORY_BARCODE',     None),
+        ('outbound', 'out.picking.reservation.strategy',        '할당 전략',                             'FIFO',                  'FIFO / EXPIRED_DATE / MANUAL'),
+        ('outbound', 'out.picking.reservation.method',          '피킹 예약 방식',                         'INV_CHECK_ONLY',        None),
+        ('outbound', 'out.picking.order.sheet.template',        '피킹지시서 템플릿',                      'PICKING_ORDER_SHEET',   '값이 없다면 출력하지 않음'),
+        ('outbound', 'out.picking.order.auto-close.enabled',    '피킹 완료시 자동 마감 여부',              'false',                 None),
+        ('outbound', 'out.picking.auto-start.release-order.started', '출고 피킹 시작시 자동 시작 여부',  'false',                 None),
+        ('outbound', 'out.wave.creation.trigger',               '웨이브 생성 트리거',                     'MANUAL',                'SCHEDULER / ORDER_COUNT / MANUAL'),
+        ('outbound', 'out.wave.creation.trigger.order_count',   '웨이브 생성 누적 주문 개수',              '50',                    None),
+        ('outbound', 'out.release.waiting.location',            '출고 확정 전 임시 로케이션',              'STG-01',                None),
+        ('outbound', 'out.release.order.sheet.template',        '거래명세서 템플릿',                      'TRADE_STATEMENT_SHEET', '값이 없다면 출력하지 않음'),
+        ('outbound', 'out.release.label.template',              '출고 라벨 출력 템플릿',                  '',                      '출력 안 함'),
+        ('rwa',      'rwa.disposition.auto.stock.flag',         '처분 즉시 재고 반영 여부',               'false',                 None),
+    ]
+    for (category, name, description, value, remarks) in items:
+        INSERT INTO runtime_env_items (id, domain_id, runtime_env_id,
+            category, name, description, value, remarks,
+            creator_id, updater_id, created_at, updated_at)
+        VALUES (uuid4(), {domain_id}, runtime_env_id,
+                category, name, description, value, remarks, 1, 1, now(), now())
+```
+
+#### 12-3. warehouse_charge_settings 및 items — 화주사별
+
+화주사별 창고 요금 설정 2건 + 각 설정에 대한 구간 요금 items를 생성한다.
+
+```python
+for com_cd in com_cd_list:
+    # 설정 1: 입고 작업료
+    in_setting_id = uuid4()
+    INSERT INTO warehouse_charge_settings (id, domain_id, wh_cd, com_cd,
+        setting_cd, setting_nm, value, default_flag, remarks,
+        creator_id, updater_id, created_at, updated_at)
+    VALUES (in_setting_id, {domain_id}, 'WH001', com_cd,
+            'IN_WORKING_EXPENSES', '입고 작업료', '8000', true,
+            '팔레트당 입고 작업료 (원)',
+            1, 1, now(), now())
+
+    # 설정 1의 구간 items (중량별 단계 요금)
+    in_items = [
+        (10, 'DEFAULT', '10',  '4400', '10 Kg 이하'),
+        (20, 'DEFAULT', '20',  '5500', '20 Kg 이하'),
+        (30, 'DEFAULT', '30',  '6600', '30 Kg 이하'),
+        (40, 'DEFAULT', '40',  '9900', '40 Kg 이하'),
+        (50, 'DEFAULT', '50', '12100', '50 Kg 이하'),
+    ]
+    for (rank, type_, code, value, remarks) in in_items:
+        INSERT INTO warehouse_charge_setting_items (id, domain_id,
+            warehouse_charge_setting_id, rank, type, code, value, del_flag, remarks,
+            creator_id, updater_id, created_at, updated_at)
+        VALUES (uuid4(), {domain_id}, in_setting_id, rank, type_, code, value, false, remarks,
+                1, 1, now(), now())
+
+    # 설정 2: 출고 작업료
+    out_setting_id = uuid4()
+    INSERT INTO warehouse_charge_settings (id, domain_id, wh_cd, com_cd,
+        setting_cd, setting_nm, value, default_flag, remarks,
+        creator_id, updater_id, created_at, updated_at)
+    VALUES (out_setting_id, {domain_id}, 'WH001', com_cd,
+            'OUT_WORKING_EXPENSES', '출고 작업료', '7000', true,
+            '팔레트당 출고 작업료 (원)',
+            1, 1, now(), now())
+
+    # 설정 2의 구간 items
+    out_items = [
+        (10, 'DEFAULT', '10',  '3500', '10 Kg 이하'),
+        (20, 'DEFAULT', '20',  '4500', '20 Kg 이하'),
+        (30, 'DEFAULT', '30',  '5500', '30 Kg 이하'),
+        (40, 'DEFAULT', '40',  '8000', '40 Kg 이하'),
+        (50, 'DEFAULT', '50', '10000', '50 Kg 이하'),
+    ]
+    for (rank, type_, code, value, remarks) in out_items:
+        INSERT INTO warehouse_charge_setting_items (id, domain_id,
+            warehouse_charge_setting_id, rank, type, code, value, del_flag, remarks,
+            creator_id, updater_id, created_at, updated_at)
+        VALUES (uuid4(), {domain_id}, out_setting_id, rank, type_, code, value, false, remarks,
+                1, 1, now(), now())
 ```
 
 ---
@@ -771,9 +843,11 @@ items = [
   vas_boms          : {vas_count}건
   vas_bom_items     : {총 구성품 건수}건
 
-⚙ 런타임 환경
-  runtime_envs      :  1건
-  runtime_env_items : 17건
+⚙ 런타임 환경 / 요금 설정 (화주사별)
+  runtime_envs                  : {company_count}건
+  runtime_env_items             : {company_count * 17}건
+  warehouse_charge_settings     : {company_count * 2}건 (입고/출고 작업료)
+  warehouse_charge_setting_items: {company_count * 10}건 (설정별 5구간씩)
 ```
 
 ---
