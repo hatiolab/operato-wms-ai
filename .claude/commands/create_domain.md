@@ -134,7 +134,7 @@ config_tables = [
     'entity_columns', 'entities',
     'common_code_details', 'common_codes',
     'terminologies', 'settings', 'roles',
-    'diy_services', 'diy_templates', 'printouts',
+    'diy_services', 'diy_templates', 'printouts', 'messages',
 ]
 
 residual = {}
@@ -534,6 +534,23 @@ INSERT INTO printouts (
 ) VALUES (...)
 ```
 
+#### 9-4. messages 복제
+
+```python
+SELECT * FROM messages WHERE domain_id = {source_domain_id}
+```
+
+- `id` → 신규 UUID
+- `domain_id` → `new_domain_id`
+- 나머지 컬럼 그대로 복제
+
+```python
+INSERT INTO messages (
+    -- information_schema.columns 로 실제 컬럼 확인 후 사용
+    id, ..., domain_id, creator_id, updater_id, created_at, updated_at
+) VALUES (...)
+```
+
 ---
 
 ### Step 10: settings INSERT (구 Step 9)
@@ -702,6 +719,7 @@ for user_id in target_users:
   diy_services        : {n}건 복제
   diy_templates       : {n}건 복제
   printouts           : {n}건 복제
+  messages            : {n}건 복제
   settings            : {n}건 생성
   users               : {신규생성 또는 기존계정 사용}
   domain_users        : {n}건 등록 (관리자 + super_user 대상)

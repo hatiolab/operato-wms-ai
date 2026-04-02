@@ -88,6 +88,7 @@ SELECT 'domain_users'        AS tbl, count(*) FROM domain_users        WHERE dom
 SELECT 'diy_services'        AS tbl, count(*) FROM diy_services        WHERE domain_id = {target_domain_id}
 SELECT 'diy_templates'       AS tbl, count(*) FROM diy_templates       WHERE domain_id = {target_domain_id}
 SELECT 'printouts'           AS tbl, count(*) FROM printouts           WHERE domain_id = {target_domain_id}
+SELECT 'messages'            AS tbl, count(*) FROM messages            WHERE domain_id = {target_domain_id}
 
 # 업무 기준 데이터
 SELECT 'warehouses'          AS tbl, count(*) FROM warehouses          WHERE domain_id = {target_domain_id}
@@ -108,7 +109,6 @@ SELECT 'release_order_items' AS tbl, count(*) FROM release_order_items WHERE dom
 # 로그 데이터
 SELECT 'login_histories'     AS tbl, count(*) FROM login_histories     WHERE domain_id = {target_domain_id}
 SELECT 'error_logs'          AS tbl, count(*) FROM error_logs          WHERE domain_id = {target_domain_id}
-SELECT 'messages'            AS tbl, count(*) FROM messages            WHERE domain_id = {target_domain_id}
 ```
 
 존재하지 않는 테이블은 조회를 생략한다 (try/except).
@@ -222,8 +222,9 @@ DELETE FROM common_codes WHERE domain_id = {target_domain_id}
 
 # 5. DIY 및 출력 설정
 DELETE FROM diy_templates WHERE domain_id = {target_domain_id}
-DELETE FROM diy_services WHERE domain_id = {target_domain_id}
-DELETE FROM printouts WHERE domain_id = {target_domain_id}
+DELETE FROM diy_services  WHERE domain_id = {target_domain_id}
+DELETE FROM printouts     WHERE domain_id = {target_domain_id}
+DELETE FROM messages      WHERE domain_id = {target_domain_id}
 
 # 6. 독립 테이블
 DELETE FROM terminologies WHERE domain_id = {target_domain_id}
@@ -256,7 +257,6 @@ DELETE FROM ranged_seqs WHERE domain_id = {target_domain_id}
 # 로그 데이터
 DELETE FROM login_histories WHERE domain_id = {target_domain_id}
 DELETE FROM error_logs WHERE domain_id = {target_domain_id}
-DELETE FROM messages WHERE domain_id = {target_domain_id}
 
 # 사용자 연결 해제
 DELETE FROM domain_users WHERE domain_id = {target_domain_id}
