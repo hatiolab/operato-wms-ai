@@ -1,6 +1,5 @@
 package operato.wms.fulfillment.service;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -46,8 +45,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 				PackingOrder.STATUS_IN_PROGRESS, now, domainId, id);
 		this.queryManager.executeBySql(sql, params);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
+		Map<String, Object> result = ValueUtil.newMap("success", true);
 		result.put("pack_order_no", order.getPackOrderNo());
 		result.put("status", PackingOrder.STATUS_IN_PROGRESS);
 		return result;
@@ -56,10 +54,15 @@ public class FulfillmentPackingService extends AbstractQueryService {
 	/**
 	 * 패킹 지시 완료 (IN_PROGRESS -> COMPLETED)
 	 *
-	 * @param id 패킹 지시 ID
+	 * 1. INSPECTED 아이템을 PACKED로 일괄 변경
+	 * 2. 포장 박스 생성 (boxType, boxCount, boxWeight, trackingNo)
+	 * 3. 패킹 지시 상태를 COMPLETED로 변경
+	 *
+	 * @param id     패킹 지시 ID
+	 * @param params { boxType, boxCount, boxWeight, trackingNo }
 	 * @return { success, pack_order_no, status }
 	 */
-	public Map<String, Object> completePackingOrder(String id) {
+	public Map<String, Object> completePackingOrder(String id, Map<String, Object> params) {
 		Long domainId = Domain.currentDomainId();
 		String now = DateUtil.currentTimeStr();
 
@@ -70,30 +73,87 @@ public class FulfillmentPackingService extends AbstractQueryService {
 					"패킹 지시 상태가 [" + order.getStatus() + "]이므로 완료할 수 없습니다 (IN_PROGRESS 상태만 가능)");
 		}
 
-		// 박스 수 집계
-		String boxCountSql = "SELECT COUNT(*) FROM packing_boxes WHERE domain_id = :domainId AND packing_order_id = :packingOrderId";
-		Map<String, Object> boxCountParams = ValueUtil.newMap("domainId,packingOrderId", domainId, id);
-		Integer totalBox = this.queryManager.selectBySql(boxCountSql, boxCountParams, Integer.class);
+		// 1. INSPECTED 상태 아이템을 PACKED로 일괄 변경 (pack_qty = insp_qty)
+		String packItemsSql = "UPDATE packing_order_items SET pack_qty = insp_qty, status = :packedStatus, updated_at = now()"
+				+ " WHERE domain_id = :domainId AND packing_order_id = :packingOrderId AND status = :inspectedStatus";
+		Map<String, Object> packItemsParams = ValueUtil.newMap("packedStatus,domainId,packingOrderId,inspectedStatus",
+				PackingOrderItem.STATUS_PACKED, domainId, id, PackingOrderItem.STATUS_INSPECTED);
+		this.queryManager.executeBySql(packItemsSql, packItemsParams);
 
-		// 총 중량 집계
-		String wtSql = "SELECT COALESCE(SUM(box_wt), 0) FROM packing_boxes WHERE domain_id = :domainId AND packing_order_id = :packingOrderId";
-		Double totalWt = this.queryManager.selectBySql(wtSql, boxCountParams, Double.class);
+		// 2. 포장 박스 생성
+		String boxType = params.get("boxType") != null ? params.get("boxType").toString() : null;
+		int boxCount = params.get("boxCount") != null ? Integer.parseInt(params.get("boxCount").toString()) : 1;
+		double boxWeight = params.get("boxWeight") != null ? Double.parseDouble(params.get("boxWeight").toString())
+				: 0.0;
+		String trackingNo = params.get("trackingNo") != null ? params.get("trackingNo").toString().trim() : null;
 
+		// 아이템 집계 (총 품목수, 총 수량)
+		String aggSql = "SELECT COUNT(DISTINCT sku_cd) AS total_item, COALESCE(SUM(pack_qty), 0) AS total_qty"
+				+ " FROM packing_order_items WHERE domain_id = :domainId AND packing_order_id = :packingOrderId AND status = :packedStatus";
+		Map<String, Object> aggParams = ValueUtil.newMap("domainId,packingOrderId,packedStatus", domainId, id,
+				PackingOrderItem.STATUS_PACKED);
+		List<Map> aggList = this.queryManager.selectListBySql(aggSql, aggParams, Map.class, 0, 1);
+
+		int totalItem = 0;
+		double totalQty = 0;
+		if (!aggList.isEmpty()) {
+			Map aggRow = aggList.get(0);
+			totalItem = aggRow.get("total_item") != null ? Integer.parseInt(aggRow.get("total_item").toString()) : 0;
+			totalQty = aggRow.get("total_qty") != null ? Double.parseDouble(aggRow.get("total_qty").toString()) : 0;
+		}
+
+		double weightPerBox = boxCount > 0 ? boxWeight / boxCount : 0.0;
+
+		String firstBoxId = null;
+
+		for (int i = 1; i <= boxCount; i++) {
+			PackingBox box = new PackingBox();
+			box.setDomainId(domainId);
+			box.setPackingOrderId(id);
+			box.setBoxSeq(i);
+			box.setBoxTypeCd(boxType);
+			box.setBoxWt(Math.round(weightPerBox * 100.0) / 100.0);
+			box.setInvoiceNo(trackingNo);
+			box.setLabelPrintedFlag(false);
+			box.setStatus(PackingBox.STATUS_CLOSED);
+
+			// 첫 번째 박스에 전체 아이템 수/수량 집계
+			if (i == 1) {
+				box.setTotalItem(totalItem);
+				box.setTotalQty(totalQty);
+			} else {
+				box.setTotalItem(0);
+				box.setTotalQty(0.0);
+			}
+
+			this.queryManager.insert(box);
+
+			if (i == 1) {
+				firstBoxId = box.getId();
+			}
+		}
+
+		// 2-1. PACKED 아이템에 첫 번째 박스 ID 할당
+		if (firstBoxId != null) {
+			String boxAssignSql = "UPDATE packing_order_items SET packing_box_id = :boxId, updated_at = now()"
+					+ " WHERE domain_id = :domainId AND packing_order_id = :packingOrderId AND status = :packedStatus";
+			Map<String, Object> boxAssignParams = ValueUtil.newMap("boxId,domainId,packingOrderId,packedStatus",
+					firstBoxId, domainId, id, PackingOrderItem.STATUS_PACKED);
+			this.queryManager.executeBySql(boxAssignSql, boxAssignParams);
+		}
+
+		// 3. 패킹 지시 완료 처리
 		String sql = "UPDATE packing_orders SET status = :status, completed_at = :now,"
 				+ " total_box = :totalBox, total_wt = :totalWt, updated_at = now()"
 				+ " WHERE domain_id = :domainId AND id = :id";
-		Map<String, Object> params = ValueUtil.newMap("status,now,totalBox,totalWt,domainId,id",
-				PackingOrder.STATUS_COMPLETED, now,
-				totalBox != null ? totalBox : 0,
-				totalWt != null ? totalWt : 0.0,
-				domainId, id);
-		this.queryManager.executeBySql(sql, params);
+		Map<String, Object> updParams = ValueUtil.newMap("status,now,totalBox,totalWt,domainId,id",
+				PackingOrder.STATUS_COMPLETED, now, boxCount, boxWeight, domainId, id);
+		this.queryManager.executeBySql(sql, updParams);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		result.put("pack_order_no", order.getPackOrderNo());
-		result.put("status", PackingOrder.STATUS_COMPLETED);
-		return result;
+		Map<String, Object> results = ValueUtil.newMap("success", true);
+		results.put("pack_order_no", order.getPackOrderNo());
+		results.put("status", PackingOrder.STATUS_COMPLETED);
+		return results;
 	}
 
 	/**
@@ -135,8 +195,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 				PackingOrder.STATUS_CANCELLED, domainId, id);
 		this.queryManager.executeBySql(sql, params);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
+		Map<String, Object> result = ValueUtil.newMap("success", true);
 		result.put("pack_order_no", order.getPackOrderNo());
 		return result;
 	}
@@ -177,8 +236,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 		box.setStatus(PackingBox.STATUS_OPEN);
 		this.queryManager.insert(box);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
+		Map<String, Object> result = ValueUtil.newMap("success", true);
 		result.put("box_id", box.getId());
 		result.put("box_seq", nextSeq);
 		return result;
@@ -220,8 +278,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 				PackingBox.STATUS_CLOSED, totalItem, totalQty, domainId, boxId);
 		this.queryManager.executeBySql(sql, params);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
+		Map<String, Object> result = ValueUtil.newMap("success", true);
 		result.put("box_seq", box.getBoxSeq());
 		result.put("total_item", totalItem);
 		result.put("total_qty", totalQty);
@@ -416,8 +473,9 @@ public class FulfillmentPackingService extends AbstractQueryService {
 
 		PackingOrderItem item = this.findPackingOrderItem(domainId, itemId);
 
-		if (!PackingOrderItem.STATUS_WAIT.equals(item.getStatus())) {
-			throw new ElidomValidationException("포장 항목 상태가 [" + item.getStatus() + "]이므로 검수할 수 없습니다 (WAIT 상태만 가능)");
+		if (!PackingOrderItem.STATUS_WAIT.equals(item.getStatus())
+				&& !PackingOrderItem.STATUS_INSPECTED.equals(item.getStatus())) {
+			throw new ElidomValidationException("검수가 이미 종료되었습니다.");
 		}
 
 		double inspQty = params.get("insp_qty") != null ? Double.parseDouble(params.get("insp_qty").toString())
@@ -428,8 +486,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 				inspQty, PackingOrderItem.STATUS_INSPECTED, domainId, itemId);
 		this.queryManager.executeBySql(sql, updParams);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
+		Map<String, Object> result = ValueUtil.newMap("success", true);
 		result.put("item_id", itemId);
 		result.put("sku_cd", item.getSkuCd());
 		result.put("insp_qty", inspQty);
@@ -485,8 +542,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 		}
 		this.queryManager.executeBySql(sql, updParams);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
+		Map<String, Object> result = ValueUtil.newMap("success", true);
 		result.put("item_id", itemId);
 		result.put("sku_cd", item.getSkuCd());
 		result.put("pack_qty", packQty);

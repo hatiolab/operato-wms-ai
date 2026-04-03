@@ -447,7 +447,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
         .inspection-table .col-sku { width: 120px; font-family: 'Courier New', monospace; }
         .inspection-table .col-lot { width: 100px; }
         .inspection-table .col-exp { width: 100px; }
-        .inspection-table .col-qty { width: 80px; text-align: right; font-variant-numeric: tabular-nums; }
+        .inspection-table .col-qty { width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
         .inspection-table .col-status { width: 40px; text-align: center; font-size: 16px; }
 
         /* ===== 현재 스캔 대상 패널 ===== */
@@ -522,18 +522,6 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
           justify-content: flex-end;
           margin-top: 12px;
         }
-
-        .btn-skip {
-          padding: 8px 16px;
-          background: var(--md-sys-color-surface-variant, #F5F5F5);
-          color: var(--md-sys-color-on-surface-variant, #757575);
-          border: 1px solid var(--md-sys-color-outline-variant, #E0E0E0);
-          border-radius: 6px;
-          cursor: pointer;
-          font-size: 13px;
-        }
-
-        .btn-skip:hover { background: #EEEEEE; }
 
         .btn-confirm {
           padding: 8px 20px;
@@ -930,7 +918,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
             <span class="stat-value">${this.packingOrders.length}건</span>
           </span>
         </div>
-        <span>${new Date().toLocaleTimeString('ko-KR')}</span>
+        <!--span>${new Date().toLocaleTimeString('ko-KR')}</span-->
       </div>
 
       ${this.feedbackMsg ? html`
@@ -999,7 +987,8 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
         class="order-card ${isSelected ? 'selected' : ''} ${isCompleted ? 'completed' : ''}"
         @click="${() => this._onSelectOrder(order)}"
       >
-        <div class="order-no">${order.pack_order_no || '-'}</div>
+        <div class="order-no">포장 번호 : ${order.pack_order_no || '-'}</div>
+        <div class="order-no">출고 번호 : ${order.shipment_no || '-'}</div>
         <div class="meta">${customerNm}${itemCount ? ` | ${itemCount}종 ${totalQty}EA` : ''}</div>
         ${progressPct > 0 && progressPct < 100 ? html`
           <div class="progress-mini">
@@ -1056,7 +1045,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
       <div class="right-panel">
         <div class="right-panel-header">
           <div class="order-info">
-            ${order.pack_order_no}
+            포장 번호 : ${order.pack_order_no} (주문번호 : ${order.shipment_no})
             <span>${order.cust_nm || ''}</span>
           </div>
           <button class="btn-close" @click="${this._closeWork}">닫기</button>
@@ -1094,11 +1083,11 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
               <thead>
                 <tr>
                   <th class="col-num">#</th>
-                  <th class="col-sku">SKU</th>
+                  <th class="col-sku">상품 코드</th>
                   <th>상품명</th>
                   <th class="col-lot">LOT</th>
                   <th class="col-exp">유통기한</th>
-                  <th class="col-qty">수량</th>
+                  <th class="col-qty">검수/수량</th>
                   <th class="col-status">상태</th>
                 </tr>
               </thead>
@@ -1114,7 +1103,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
                       <td>${item.sku_nm || item.product_nm || '-'}</td>
                       <td class="col-lot">${item.lot_no || '-'}</td>
                       <td class="col-exp">${item.expired_date ? item.expired_date.substring(0, 10) : '-'}</td>
-                      <td class="col-qty">${item.pack_qty || item.ord_qty || 0}</td>
+                      <td class="col-qty">${item.insp_qty || 0} / ${item.pack_qty || item.order_qty || 0}</td>
                       <td class="col-status">${isCompleted ? '✅' : isCurrent ? '→' : '☐'}</td>
                     </tr>
                   `
@@ -1123,12 +1112,12 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
             </table>
           </div>
 
-          <!-- 현재 스캔 대상 패널 (수량 2 이상) -->
-          ${currentItem && !currentItem._autoConfirmed ? html`
+          <!-- 현재 스캔 대상 패널 -->
+          ${currentItem && currentItem.status !== 'COMPLETED' ? html`
             <div class="current-item-panel">
               <div class="item-header">
-                <span class="sku-code">${currentItem.sku_cd || currentItem.product_cd || '-'}</span>
-                <span class="sku-name">${currentItem.sku_nm || currentItem.product_nm || '-'}</span>
+                <span class="sku-code">상품 : ${currentItem.sku_cd || currentItem.product_cd || '-'}</span>
+                <span class="sku-name">상품명 : ${currentItem.sku_nm || currentItem.product_nm || '-'}</span>
               </div>
               ${currentItem.lot_no || currentItem.expired_date ? html`
                 <div class="item-detail">
@@ -1138,21 +1127,11 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
                 </div>
               ` : ''}
               <div class="qty-row">
-                <label>포장 수량: ${currentItem.pack_qty || currentItem.ord_qty || 0} EA</label>
-                <span style="margin-left: auto">검수 수량:</span>
-                <input
-                  id="qtyInput"
-                  type="number"
-                  min="1"
-                  max="${currentItem.pack_qty || currentItem.ord_qty || 1}"
-                  .value="${String(currentItem.pack_qty || currentItem.ord_qty || 1)}"
-                  @keydown="${e => { if (e.key === 'Enter') this._confirmInspection() }}"
-                />
-                <span class="unit">EA</span>
+                <label>주문 수량: ${currentItem.pack_qty || currentItem.order_qty || 0} EA</label>
+                <span style="margin-left: auto">검수 수량: <strong>${currentItem.insp_qty || 0}</strong> / ${currentItem.pack_qty || currentItem.order_qty || 0} EA</span>
               </div>
               <div class="actions">
-                <button class="btn-skip" @click="${this._skipCurrentItem}">건너뛰기 (F3)</button>
-                <button class="btn-confirm" @click="${this._confirmInspection}">검수 확인 (F2)</button>
+                <button class="btn-confirm" @click="${this._confirmInspection}">검수 완료</button>
               </div>
             </div>
           ` : ''}
@@ -1190,15 +1169,16 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
           <!-- 요약 + 배송 정보 -->
           <div class="packing-section">
             <div class="info-card">
-              <h4>검수 완료 요약</h4>
-              <div class="info-row"><span class="label">총 SKU</span><span class="value">${this.totalCount}종</span></div>
-              <div class="info-row"><span class="label">총 수량</span><span class="value">${this.packingItems.reduce((s, i) => s + (i.pack_qty || i.ord_qty || 0), 0)} EA</span></div>
+              <h4>검수/포장 완료 요약</h4>
+              <div class="info-row"><span class="label">총 품목</span><span class="value">${this.totalCount}종</span></div>
+              <div class="info-row"><span class="label">총 수량</span><span class="value">${this.packingItems.reduce((s, i) => s + (i.pack_qty || i.order_qty || 0), 0)} EA</span></div>
               <div class="info-row"><span class="label">검수 소요</span><span class="value">${elapsed}</span></div>
               <div class="info-row"><span class="label">전체 일치</span><span class="value" style="color:#4CAF50">✅</span></div>
             </div>
             <div class="info-card">
               <h4>주문 정보</h4>
               <div class="info-row"><span class="label">고객명</span><span class="value">${order.cust_nm || '-'}</span></div>
+              <div class="info-row"><span class="label">출고번호</span><span class="value">${order.shipment_no || '-'}</span></div>
               <div class="info-row"><span class="label">포장번호</span><span class="value">${order.pack_order_no || '-'}</span></div>
               <div class="info-row"><span class="label">주문일자</span><span class="value">${order.order_date || '-'}</span></div>
             </div>
@@ -1276,7 +1256,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
             <div class="complete-stats">
               <div class="stat-row"><span class="label">포장 주문</span><span class="value">${order.pack_order_no}</span></div>
               <div class="stat-row"><span class="label">고객</span><span class="value">${order.cust_nm || '-'}</span></div>
-              <div class="stat-row"><span class="label">총 SKU / 수량</span><span class="value">${this.totalCount}종 / ${this.packingItems.reduce((s, i) => s + (i.pack_qty || i.ord_qty || 0), 0)} EA</span></div>
+              <div class="stat-row"><span class="label">총 품목 / 수량</span><span class="value">${this.totalCount}종 / ${this.packingItems.reduce((s, i) => s + (i.pack_qty || i.order_qty || 0), 0)} EA</span></div>
               <div class="stat-row"><span class="label">박스</span><span class="value">${this._boxTypeLabel(this.boxType)} × ${this.boxCount}개</span></div>
               <div class="stat-row"><span class="label">운송장</span><span class="value">${this.trackingNo}</span></div>
               <div class="stat-row"><span class="label">소요 시간</span><span class="value">${elapsed}</span></div>
@@ -1394,6 +1374,18 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
       return
     }
 
+    // CREATED 상태인 경우 IN_PROGRESS로 전환
+    if (order.status === 'CREATED') {
+      try {
+        await ServiceUtil.restPost(`ful_trx/packing_orders/${order.id}/start`, {})
+        order.status = 'IN_PROGRESS'
+      } catch (err) {
+        console.error('포장 주문 시작 실패:', err)
+        this._showFeedback('error', '포장 주문 시작 처리 중 오류가 발생했습니다')
+        return
+      }
+    }
+
     this.selectedOrder = order
     this.rightPanelMode = 'inspection'
     this.startTime = Date.now()
@@ -1424,7 +1416,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
    * 우측 패널: 검수 작업
    * ============================================================== */
 
-  /** 바코드 입력 처리 - Enter 키 입력 시 항목 매칭 및 검수 진행 */
+  /** 바코드 입력 처리 - Enter 키 입력 시 항목 매칭 및 검수 수량 자동 1 증가 */
   _onBarcodeInput(e) {
     if (e.key !== 'Enter') return
     const barcode = e.target.value.trim()
@@ -1432,16 +1424,47 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
 
     // 미완료 항목 중 바코드 매칭
     const matchIndex = this.packingItems.findIndex(
-      (item, idx) => item.status !== 'COMPLETED' && (item.barcode === barcode || item.sku_cd === barcode || item.product_cd === barcode)
+      (item, idx) => item.status !== 'COMPLETED' && (item.barcode === barcode || item.sku_cd === barcode)
     )
 
     if (matchIndex >= 0) {
+      const item = this.packingItems[matchIndex]
+      const orderQty = item.pack_qty || item.order_qty || 1
+      const currentInspQty = item.insp_qty || 0
+
+      // 이미 검수 수량이 주문 수량 이상이면 추가 스캔 차단
+      if (currentInspQty >= orderQty) {
+        this.lastScannedItem = {
+          success: false,
+          message: `${item.sku_cd} — 이미 검수가 완료된 상품입니다 (${currentInspQty}/${orderQty})`
+        }
+        this._showFeedback('warning', `${item.sku_cd} 이미 검수 완료 (${currentInspQty}/${orderQty})`)
+        e.target.value = ''
+        e.target.focus()
+        return
+      }
+
       this.currentItemIndex = matchIndex
+
+      // 검수 수량 1 증가
+      const newInspQty = currentInspQty + 1
+
+      // 로컬 상태 업데이트
+      this.packingItems = this.packingItems.map((it, idx) =>
+        idx === matchIndex ? { ...it, insp_qty: newInspQty } : it
+      )
+
       this.lastScannedItem = {
         success: true,
-        message: `${this.packingItems[matchIndex].sku_cd || this.packingItems[matchIndex].product_cd} (${this.packingItems[matchIndex].sku_nm || this.packingItems[matchIndex].product_nm}) ✅`
+        message: `${item.sku_cd} (${item.sku_nm}) — ${newInspQty}/${orderQty} ✅`
       }
-      this._autoConfirmIfSingleQty()
+
+      // 주문 수량에 도달하면 자동 검수 완료
+      if (newInspQty >= orderQty) {
+        this._confirmInspection()
+      } else {
+        this._showFeedback('success', `${item.sku_cd} 스캔 완료 (${newInspQty}/${orderQty})`)
+      }
     } else {
       this.lastScannedItem = {
         success: false,
@@ -1454,30 +1477,12 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     e.target.focus()
   }
 
-  /** 수량 1개 항목 자동 검수 확인 - 수량이 1이면 즉시 검수 완료 */
-  _autoConfirmIfSingleQty() {
-    const item = this.packingItems[this.currentItemIndex]
-    if (!item) return
-    const qty = item.pack_qty || item.ord_qty || 0
-    if (qty <= 1) {
-      this._confirmInspection()
-    }
-  }
-
   /** 검수 확인 - 현재 항목 검수 완료 처리 및 다음 항목으로 이동 */
   async _confirmInspection() {
     const item = this.packingItems[this.currentItemIndex]
     if (!item) return
 
-    // 수량 입력 확인
-    const qtyInput = this.shadowRoot?.getElementById('qtyInput')
-    const confirmQty = qtyInput ? Number(qtyInput.value) : (item.pack_qty || item.ord_qty || 1)
-    const maxQty = item.pack_qty || item.ord_qty || 1
-
-    if (confirmQty > maxQty) {
-      this._showFeedback('error', '포장 수량을 초과할 수 없습니다')
-      return
-    }
+    const confirmQty = item.insp_qty || (item.pack_qty || item.order_qty || 1)
 
     try {
       await ServiceUtil.restPost(
@@ -1514,11 +1519,6 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     }
   }
 
-  /** 현재 항목 건너뛰기 - 다음 미완료 항목으로 이동 */
-  _skipCurrentItem() {
-    this._moveToNextItem()
-  }
-
   /** 다음 미완료 항목으로 이동 - 현재 인덱스 이후 또는 처음부터 검색 */
   _moveToNextItem() {
     const nextIdx = this.packingItems.findIndex(
@@ -1553,7 +1553,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
 
   /** 박스 유형 추천 - 총 수량에 따라 박스 크기 자동 선택 */
   _recommendBoxType() {
-    const totalQty = this.packingItems.reduce((s, i) => s + (i.pack_qty || i.ord_qty || 0), 0)
+    const totalQty = this.packingItems.reduce((s, i) => s + (i.pack_qty || i.order_qty || 0), 0)
     if (totalQty <= 3) this.boxType = 'SMALL'
     else if (totalQty <= 10) this.boxType = 'MEDIUM'
     else if (totalQty <= 30) this.boxType = 'LARGE'
@@ -1643,16 +1643,13 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     }, 2500)
   }
 
-  /** 키보드 단축키 설정 - F2/F3/F5/F8/Esc 키 이벤트 리스너 등록 */
+  /** 키보드 단축키 설정 - F2/F5/F8/Esc 키 이벤트 리스너 등록 */
   _setupKeyboardShortcuts() {
     this._removeKeyboardShortcuts()
     this._keyHandler = (e) => {
       if (e.key === 'F2') {
         e.preventDefault()
         if (this.rightPanelMode === 'inspection') this._confirmInspection()
-      } else if (e.key === 'F3') {
-        e.preventDefault()
-        if (this.rightPanelMode === 'inspection') this._skipCurrentItem()
       } else if (e.key === 'F5') {
         e.preventDefault()
         this._refresh()

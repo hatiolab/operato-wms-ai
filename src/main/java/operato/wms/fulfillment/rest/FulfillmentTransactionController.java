@@ -372,10 +372,11 @@ public class FulfillmentTransactionController {
 	 * 포장 완료 (IN_PROGRESS → COMPLETED)
 	 * POST /rest/ful_trx/packing_orders/{id}/complete
 	 */
-	@PostMapping(value = "packing_orders/{id}/complete", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "packing_orders/{id}/complete", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Complete packing order")
-	public Map<String, Object> completePackingOrder(@PathVariable("id") String id) {
-		return this.packingService.completePackingOrder(id);
+	public Map<String, Object> completePackingOrder(@PathVariable("id") String id,
+			@RequestBody Map<String, Object> params) {
+		return this.packingService.completePackingOrder(id, params);
 	}
 
 	/**
