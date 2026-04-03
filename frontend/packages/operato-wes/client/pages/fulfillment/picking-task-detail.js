@@ -382,6 +382,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
   static get properties() {
     return {
       pickingTaskId: String,
+      parent_id: String, // pickingTaskId 별칭 (외부에서 parent_id로 전달 시 자동 매핑)
       task: Object,
       pickingItems: Array,
       activeTab: Number,
@@ -394,6 +395,7 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
   constructor() {
     super()
     this.pickingTaskId = null
+    this.parent_id = null
     this.task = null
     this.pickingItems = null
     this.activeTab = 0
@@ -403,6 +405,11 @@ class PickingTaskDetail extends localize(i18next)(LitElement) {
 
   /** 속성 변경 후 실행 (pickingTaskId 변경 시 데이터 조회) */
   updated(changedProps) {
+    // parent_id 파라미터가 전달되면 pickingTaskId로 복사 (외부 호환성)
+    if (changedProps.has('parent_id') && this.parent_id && !this.pickingTaskId) {
+      this.pickingTaskId = this.parent_id
+    }
+
     if (changedProps.has('pickingTaskId') && this.pickingTaskId) {
       this._fetchTask()
     }

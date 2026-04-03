@@ -19,6 +19,7 @@ import operato.wms.fulfillment.entity.PickingTask;
 import operato.wms.fulfillment.service.FulfillmentPackingService;
 import operato.wms.fulfillment.service.FulfillmentPickingService;
 import operato.wms.fulfillment.service.FulfillmentShippingService;
+import operato.wms.fulfillment.service.FulfillmentTrackingService;
 import operato.wms.fulfillment.service.FulfillmentTransactionService;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
@@ -59,6 +60,11 @@ public class FulfillmentTransactionController {
 	 */
 	@Autowired
 	private FulfillmentShippingService shippingService;
+	/**
+	 * Fulfillment Tracking Service
+	 */
+	@Autowired
+	private FulfillmentTrackingService trackingService;
 
 	// ==================== 9.1 피킹 트랜잭션 API ====================
 
@@ -476,5 +482,22 @@ public class FulfillmentTransactionController {
 			@RequestBody Map<String, Object> params) {
 		String invoiceNo = (String) params.get("invoice_no");
 		return this.shippingService.updateBoxInvoice(boxId, invoiceNo);
+	}
+
+	// ==================== 9.4 출고 추적 API ====================
+
+	/**
+	 * 출고 추적 조회
+	 * GET /rest/ful_trx/tracking?keyword={keyword}&type={type}
+	 *
+	 * 송장번호/출고번호/포장번호/피킹번호/웨이브번호/원주문번호 중 하나를 입력하면
+	 * 주문 → 웨이브 → 피킹 → 포장 → 박스/출하 전체 이력을 조회한다.
+	 */
+	@GetMapping(value = "tracking", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Track shipment by keyword")
+	public Map<String, Object> trackShipment(
+			@org.springframework.web.bind.annotation.RequestParam(name = "keyword", required = false) String keyword,
+			@org.springframework.web.bind.annotation.RequestParam(name = "type", required = false, defaultValue = "auto") String type) {
+		return this.trackingService.trackByKeyword(keyword, type);
 	}
 }

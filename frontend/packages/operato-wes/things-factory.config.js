@@ -13,9 +13,12 @@ export default {
     { tagname: 'fulfillment-home', page: 'fulfillment-home' },
     { tagname: 'fulfillment-progress', page: 'fulfillment-progress' },
     { tagname: 'picking-task-list', page: 'picking-task-list' },
+    { tagname: 'picking-task-detail', page: 'picking-task-detail' },
     { tagname: 'packing-order-list', page: 'packing-order-list' },
+    { tagname: 'packing-order-detail', page: 'packing-order-detail' },
     { tagname: 'fulfillment-picking-pc', page: 'fulfillment-picking-pc' },
     { tagname: 'fulfillment-packing-pc', page: 'fulfillment-packing-pc' },
+    { tagname: 'shipment-tracking', page: 'shipment-tracking' },
 
     { tagname: 'inbound-home', page: 'inbound-home' },
     { tagname: 'outbound-home', page: 'outbound-home' },

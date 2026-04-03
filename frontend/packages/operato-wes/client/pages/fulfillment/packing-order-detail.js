@@ -408,6 +408,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
   static get properties() {
     return {
       packingOrderId: String,
+      parent_id: String, // packingOrderId 별칭 (외부에서 parent_id로 전달 시 자동 매핑)
       order: Object,
       items: Array,
       boxes: Array,
@@ -421,6 +422,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
   constructor() {
     super()
     this.packingOrderId = null
+    this.parent_id = null
     this.order = null
     this.items = null
     this.boxes = null
@@ -432,6 +434,12 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
   /** 컴포넌트가 DOM에 연결될 때 실행 */
   connectedCallback() {
     super.connectedCallback()
+
+    // parent_id 파라미터 지원 (waveId와 동일하게 처리)
+    if (!this.packingOrderId && this.parent_id) {
+      this.packingOrderId = this.parent_id
+    }
+
     if (this.packingOrderId) {
       this._fetchOrder()
     }
@@ -883,9 +891,9 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
     this.actionLoading = true
     try {
-      await ServiceUtil.restPost('ful_trx/packing_orders/' + this.packingOrderId + '/start')
+      const actionResult = await ServiceUtil.restPost('ful_trx/packing_orders/' + this.packingOrderId + '/start')
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'info', message: '포장 작업이 시작되었습니다' } }))
-      await this._refreshAfterAction()
+      await this._refreshAfterAction(actionResult)
     } catch (error) {
       console.error('포장 작업 시작 실패:', error)
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'error', message: error.message || '포장 작업 시작에 실패했습니다' } }))
@@ -901,9 +909,9 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
     this.actionLoading = true
     try {
-      await ServiceUtil.restPost('ful_trx/packing_orders/' + this.packingOrderId + '/complete')
+      const actionResult = await ServiceUtil.restPost('ful_trx/packing_orders/' + this.packingOrderId + '/complete', {})
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'info', message: '포장 작업이 완료되었습니다' } }))
-      await this._refreshAfterAction()
+      await this._refreshAfterAction(actionResult)
     } catch (error) {
       console.error('포장 작업 완료 실패:', error)
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'error', message: error.message || '포장 작업 완료에 실패했습니다' } }))
@@ -919,9 +927,9 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
     this.actionLoading = true
     try {
-      await ServiceUtil.restPost('ful_trx/packing_orders/' + this.packingOrderId + '/print_label')
+      const actionResult = await ServiceUtil.restPost('ful_trx/packing_orders/' + this.packingOrderId + '/print_label')
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'info', message: '라벨이 출력되었습니다' } }))
-      await this._refreshAfterAction()
+      await this._refreshAfterAction(actionResult)
     } catch (error) {
       console.error('라벨 출력 실패:', error)
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'error', message: error.message || '라벨 출력에 실패했습니다' } }))
@@ -937,9 +945,9 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
     this.actionLoading = true
     try {
-      await ServiceUtil.restPost('ful_trx/packing_orders/' + this.packingOrderId + '/manifest')
+      const actionResult = await ServiceUtil.restPost('ful_trx/packing_orders/' + this.packingOrderId + '/manifest')
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'info', message: '매니페스트가 처리되었습니다' } }))
-      await this._refreshAfterAction()
+      await this._refreshAfterAction(actionResult)
     } catch (error) {
       console.error('매니페스트 처리 실패:', error)
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'error', message: error.message || '매니페스트 처리에 실패했습니다' } }))
@@ -955,9 +963,9 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
     this.actionLoading = true
     try {
-      await ServiceUtil.restPost('ful_trx/packing_orders/' + this.packingOrderId + '/confirm_shipping')
+      const actionResult = await ServiceUtil.restPost('ful_trx/packing_orders/' + this.packingOrderId + '/confirm_shipping')
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'info', message: '출하가 확정되었습니다' } }))
-      await this._refreshAfterAction()
+      await this._refreshAfterAction(actionResult)
     } catch (error) {
       console.error('출하 확정 실패:', error)
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'error', message: error.message || '출하 확정에 실패했습니다' } }))
@@ -973,9 +981,9 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
     this.actionLoading = true
     try {
-      await ServiceUtil.restPost('ful_trx/packing_orders/' + this.packingOrderId + '/cancel')
+      const actionResult = await ServiceUtil.restPost('ful_trx/packing_orders/' + this.packingOrderId + '/cancel')
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'info', message: '포장 지시가 취소되었습니다' } }))
-      await this._refreshAfterAction()
+      await this._refreshAfterAction(actionResult)
     } catch (error) {
       console.error('포장 지시 취소 실패:', error)
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'error', message: error.message || '포장 지시 취소에 실패했습니다' } }))
@@ -991,9 +999,9 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
     this.actionLoading = true
     try {
-      await ServiceUtil.restPost('ful_trx/packing_orders/' + this.packingOrderId + '/cancel_shipping')
+      const actionResult = await ServiceUtil.restPost('ful_trx/packing_orders/' + this.packingOrderId + '/cancel_shipping')
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'info', message: '출하가 취소되었습니다' } }))
-      await this._refreshAfterAction()
+      await this._refreshAfterAction(actionResult)
     } catch (error) {
       console.error('출하 취소 실패:', error)
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'error', message: error.message || '출하 취소에 실패했습니다' } }))
@@ -1002,11 +1010,26 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
-  /** 액션 실행 후 데이터 새로고침 */
-  async _refreshAfterAction() {
+  /** 액션 실행 후 데이터 새로고침 (loading 상태 없이 갱신하여 팝업 플리커 방지) */
+  async _refreshAfterAction(actionResult) {
     this.items = null
     this.boxes = null
-    await this._fetchOrder()
+
+    // 액션 응답의 status로 즉시 UI 갱신 (GET 재조회 전에 반영)
+    if (actionResult?.status && this.order) {
+      this.order = { ...this.order, status: actionResult.status }
+    }
+
+    // 전체 데이터 재조회
+    try {
+      const data = await ServiceUtil.restGet('packing_orders/' + this.packingOrderId)
+      if (data) {
+        this.order = data
+      }
+    } catch (error) {
+      console.error('포장 지시 상세 조회 실패:', error)
+    }
+
     this._dispatchOrderUpdated()
 
     if (this.activeTab === 1) {

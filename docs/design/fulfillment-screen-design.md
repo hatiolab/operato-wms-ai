@@ -15,6 +15,7 @@
 5. [기술 스택](#5-기술-스택)
 6. [구현 우선순위](#6-구현-우선순위)
 7. [구현 현황](#7-구현-현황)
+8. [출고 추적 화면 상세 설계](#8-출고-추적-화면-상세-설계)
 
 ---
 
@@ -56,8 +57,10 @@ fulfillment-home (풀필먼트 대시보드)
 ├─ 검수/포장/출하 관리
 │  ├─ packing-order-list (검수/포장/출하 지시 목록)
 │  └─ packing-order-detail (검수/포장/출하 상세 — 팝업)
-└─ 모니터링
-   └─ fulfillment-progress (풀필먼트 진행 현황)
+├─ 모니터링
+│  └─ fulfillment-progress (풀필먼트 진행 현황)
+└─ 추적/조회
+   └─ shipment-tracking (출고 추적)
 ```
 
 ### 2.2 프로세스 흐름과 화면 매핑
@@ -72,6 +75,7 @@ fulfillment-home (풀필먼트 대시보드)
 | 4. 라벨 출력/매니페스트 | packing-order-detail | 포장 관리자 |
 | 5. 출하 확정 | packing-order-list (일괄), packing-order-detail (개별) | 풀필먼트 관리자 |
 | 6. 전체 진행 현황 파악 | fulfillment-progress, fulfillment-home | 전체 |
+| 7. 출고 추적 (송장/번호 기반) | shipment-tracking | 전체 |
 
 #### 2.2.1 피킹 완료 → 포장 지시 자동 생성
 
@@ -1391,6 +1395,7 @@ async confirmShippingBatch(selectedIds) {
 | 4 | 검수/포장/출하 목록 | `packing-order-list.js` | ⬜ 미구현 | - | |
 | 5 | 검수/포장/출하 상세 | `packing-order-detail.js` | ⬜ 미구현 | - | |
 | 6 | 풀필먼트 진행 현황 | `fulfillment-progress.js` | ⬜ 미구현 | - | |
+| 7 | 출고 추적 | `shipment-tracking.js` | ✅ 완료 | 2026-04-03 | 송장/출고/포장/웨이브/원주문번호 통합 추적 |
 
 ### 백엔드 컨트롤러
 
@@ -1411,6 +1416,7 @@ async confirmShippingBatch(selectedIds) {
 | 3 | `FulfillmentPackingService` | ⬜ 미구현 | 검수/포장 로직 |
 | 4 | `FulfillmentShippingService` | ⬜ 미구현 | 출하 로직 |
 | 5 | `FulfillmentEventPublisher` | ⬜ 미구현 | OMS 이벤트 발행 |
+| 6 | `FulfillmentTrackingService` | ✅ 완료 | 출고 추적 조회 |
 
 ### 엔티티
 
@@ -1431,3 +1437,455 @@ async confirmShippingBatch(selectedIds) {
 | 2 | 피킹 지시 목록 | `picking-task-list` | ⬜ 미등록 |
 | 3 | 검수/포장/출하 목록 | `packing-order-list` | ⬜ 미등록 |
 | 4 | 풀필먼트 진행 현황 | `fulfillment-progress` | ⬜ 미등록 |
+| 5 | 출고 추적 | `shipment-tracking` | ✅ 완료 |
+
+---
+
+## 8. 출고 추적 화면 상세 설계
+
+> 작성일: 2026-04-03
+> 화면명: 출고 추적 (Shipment Tracking)
+> 파일: `frontend/packages/operato-wes/client/pages/fulfillment/shipment-tracking.js`
+
+### 8.1 목적
+
+송장번호, 출고번호, 포장번호, 피킹번호, 웨이브번호, 원주문번호 중 하나를 입력하면 해당 건의 **주문 → 웨이브 → 피킹 → 포장 → 박스/출하** 전체 이력을 한 화면에서 추적할 수 있는 조회 전용 화면.
+
+### 8.2 데이터 추적 경로
+
+```
+송장번호 (invoice_no)
+  └─ PackingBox (packing_boxes.invoice_no)
+       └─ PackingOrder (packing_order_id)
+            ├─ pick_task_no ──→ PickingTask
+            ├─ shipment_no ──→ ShipmentOrder
+            │                    ├─ ref_order_no (원주문번호)
+            │                    └─ wave_no ──→ ShipmentWave
+            └─ wave_no ────────→ ShipmentWave
+```
+
+### 8.3 파일 위치 및 등록
+
+| 항목 | 값 |
+|------|---|
+| 프론트엔드 파일 | `frontend/packages/operato-wes/client/pages/fulfillment/shipment-tracking.js` |
+| 커스텀 엘리먼트 | `<shipment-tracking>` |
+| route.ts 등록 | `fulfillment/shipment-tracking` |
+| things-factory.config.js | `{ tagname: 'shipment-tracking', page: 'shipment-tracking' }` |
+| 라우트 경로 | `/shipment-tracking` |
+
+### 8.4 전체 레이아웃
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ [page-header]  출고 추적                                         │
+├──────────────────────────────────────────────────────────────────┤
+│ [search-section]                                                 │
+│  ┌────────────────┐  ┌────────────────────────────────┐  ┌────┐ │
+│  │ 자동감지     ▼ │  │ 🔍 번호 입력 또는 바코드 스캔   │  │조회│ │
+│  └────────────────┘  └────────────────────────────────┘  └────┘ │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│ [summary-cards] ─────────────────────────────────────────────── │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
+│  │ 원주문    │  │ 출고주문  │  │ 웨이브    │  │ 배송사    │        │
+│  │ CH-00123 │  │ SH-0045  │  │ W-0403-1 │  │ CJ대한통운│        │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
+│                                                                  │
+│ [flow-timeline] ────────────────────────────────────────────── │
+│  ●━━━━●━━━━●━━━━●━━━━●━━━━○                                    │
+│  주문   할당   웨이브  피킹   포장   출하                           │
+│                                                                  │
+│ [tab-bar] ─────────────────────────────────────────────────── │
+│  [ 주문 정보 ]  [ 피킹 ]  [ 포장 ]  [ 박스/송장 ]                 │
+│                                                                  │
+│ [tab-content] (스크롤 가능) ──────────────────────────────────── │
+│  (탭별 상세 내용)                                                 │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### 8.5 섹션별 상세
+
+#### 8.5.1 검색 섹션 (search-section)
+
+| 요소 | 설명 |
+|------|------|
+| 검색 유형 셀렉트 | `자동감지(기본)` / 송장번호 / 출고번호 / 포장번호 / 피킹번호 / 웨이브번호 / 원주문번호 |
+| 검색 입력 | `autofocus`, Enter키 자동 검색 (USB 바코드 스캔 대응) |
+| 조회 버튼 | 검색 실행 |
+
+**자동감지 로직** (입력값 접두사 패턴 기반):
+
+| 접두사 | 판별 결과 |
+|--------|----------|
+| `W-` | 웨이브번호 → `shipment_waves.wave_no` |
+| `PICK-` | 피킹번호 → `picking_tasks.pick_task_no` |
+| `PACK-` | 포장번호 → `packing_orders.pack_order_no` |
+| `SH-` | 출고번호 → `shipment_orders.shipment_no` |
+| 그 외 | 순차 조회: 송장번호 → 출고번호 → 원주문번호 |
+
+#### 8.5.2 요약 카드 (summary-cards)
+
+4개 카드를 가로 배치하여 핵심 식별 정보를 한눈에 표시.
+
+```
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│ 원주문번호    │  │ 출고번호      │  │ 웨이브        │  │ 배송         │
+│              │  │              │  │              │  │              │
+│ CH-20260401  │  │ SH-260401-01│  │ W-260402-001 │  │ CJ대한통운    │
+│ -00123   [📋]│  │          [📋]│  │          [📋]│  │ 일반택배      │
+│              │  │              │  │              │  │              │
+│ 고객: 홍길동  │  │ 화주: ABC물류 │  │ 유형: 토탈피킹 │  │              │
+│ 주문일: 04-01│  │ 3종 / 15EA  │  │ 5건 포함     │  │              │
+│              │  │              │  │              │  │              │
+│ [🟢 SHIPPED ]│  │ [🟢 SHIPPED ]│  │ [🟢 COMPLETED]│ │              │
+└──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
+```
+
+**CSS 레이아웃**:
+```css
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+/* 반응형: 태블릿 2열, 모바일 1열 */
+@media (max-width: 1199px) { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 767px) { grid-template-columns: 1fr; }
+```
+
+| 카드 | 주요 표시 내용 | 데이터 소스 |
+|------|--------------|------------|
+| 원주문번호 | ref_order_no, cust_nm, order_date, status | ShipmentOrder |
+| 출고번호 | shipment_no, com_cd, total_item/total_order, status | ShipmentOrder |
+| 웨이브 | wave_no, pick_type, 포함 주문 건수, status | ShipmentWave |
+| 배송 | carrier_cd(배송사명), carrier_service_type, dlv_type | ShipmentOrder |
+
+- 번호 옆 `[📋]` 클립보드 복사 버튼
+- 데이터 없는 카드: 회색 배경 + "정보 없음" 표시
+
+#### 8.5.3 흐름 타임라인 (flow-timeline)
+
+가로 방향 6단계 타임라인으로 전체 진행 상황을 시각화.
+
+```
+●━━━━━━━●━━━━━━━●━━━━━━━●━━━━━━━●━━━━━━━○
+주문접수   재고할당   웨이브    피킹     포장     출하
+
+04-01     04-01     04-02    04-02    04-03     -
+10:00     14:30     09:00    09:30    13:00
+
+   4h 30m     18h 30m    30m      3h 30m     -
+  (할당소요)   (대기)    (피킹)    (포장)   (출하대기)
+```
+
+**6단계 매핑**:
+
+| 단계 | 조건 | 시각 필드 |
+|------|------|----------|
+| 주문접수 | ShipmentOrder.status >= CONFIRMED | `shipment_order.confirmed_at` |
+| 재고할당 | ShipmentOrder.status >= ALLOCATED | `shipment_order.allocated_at` |
+| 웨이브 | ShipmentOrder.status >= RELEASED | `shipment_order.released_at` |
+| 피킹 | PickingTask.status = COMPLETED | `picking_task.completed_at` |
+| 포장 | PackingOrder.status >= COMPLETED | `packing_order.completed_at` |
+| 출하 | PackingOrder.status = SHIPPED 또는 PackingBox.status = SHIPPED | `packing_order.shipped_at` |
+
+**스타일 규칙**:
+
+| 상태 | 원 모양 | 선 스타일 | 색상 |
+|------|--------|----------|------|
+| 완료 | `●` 채워진 원 | `━━` 실선 | `var(--md-sys-color-primary)` (#1976D2) |
+| 현재 진행 | `●` + pulse 애니메이션 | `━━` 실선 | #FF9800 (주황) |
+| 미도달 | `○` 빈 원 | `┈┈` 점선 | #BDBDBD (회색) |
+
+- 구간 소요시간: 연결선 위에 `font-size: 11px; color: #9E9E9E`로 표시
+
+#### 8.5.4 탭 바 (tab-bar)
+
+```
+[ 주문 정보 (3) ]  [ 피킹 (8) ]  [ 포장 (3) ]  [ 박스/송장 (1) ]
+═══════════════
+```
+
+- 기존 `packing-order-detail.js`와 동일한 Material Design 3 탭 스타일
+- 활성 탭: `border-bottom: 2px solid var(--md-sys-color-primary)`
+- 괄호 안 숫자: 해당 탭의 상세 아이템 건수
+- 지연 로딩: 탭 전환 시 해당 데이터만 API 호출
+
+### 8.6 탭별 상세 내용
+
+#### 8.6.1 탭 1: 주문 정보
+
+**출고 주문 정보 (Info Grid — 3열)**:
+
+| 행 | 컬럼 1 | 컬럼 2 | 컬럼 3 |
+|----|--------|--------|--------|
+| 1 | 출고번호: `shipment_no` | 원주문번호: `ref_order_no` | 주문일자: `order_date` |
+| 2 | 화주사: `com_cd` | 고객코드: `cust_cd` | 고객명: `cust_nm` |
+| 3 | 업무유형: `biz_type` | 출고유형: `ship_type` | 배송유형: `dlv_type` |
+| 4 | 배송사: `carrier_cd` | 서비스유형: `carrier_service_type` | 상태: `status` (뱃지) |
+| 합계행 | 총 품목: `total_item`종 | 주문수량: `total_order` EA | 할당수량: `total_alloc` EA / 출하수량: `total_shipped` EA |
+
+**주문 상세 테이블** (`shipment_order_items`):
+
+| # | SKU | 상품명 | 주문수량 | 할당수량 | 출하수량 | 부족 | LOT | 유통기한 |
+|---|-----|-------|---------|---------|---------|-----|-----|---------|
+| 01 | SKU-A001 | 상품A | 5 | 5 | 5 | 0 | L001 | 26-12-31 |
+| **합계** | | | **15** | **15** | **15** | **0** | | |
+
+**재고 할당 테이블** (`stock_allocations`):
+
+| # | SKU | 로케이션 | 할당전략 | 수량 | 상태 | 할당시각 |
+|---|-----|---------|---------|------|------|---------|
+| 1 | SKU-A001 | A-01-01 | FEFO | 5 | RELEASED | 04-01 14:30 |
+
+#### 8.6.2 탭 2: 피킹
+
+**피킹 지시 정보 (Info Grid — 3열)**:
+
+| 행 | 컬럼 1 | 컬럼 2 | 컬럼 3 |
+|----|--------|--------|--------|
+| 1 | 피킹번호: `pick_task_no` | 웨이브번호: `wave_no` | 피킹유형: `pick_type` |
+| 2 | 피킹방법: `pick_method` | 작업자: `worker_id` | 상태: `status` (뱃지) |
+| 3 | 시작시각: `started_at` | 완료시각: `completed_at` | 소요시간: (계산값) |
+| 합계행 | 계획: `plan_order`건 `plan_item`종 `plan_total` EA | 실적: `result_order`건 `result_item`종 `result_total` EA | 부족: `short_total` EA |
+
+**피킹 항목 테이블** (`picking_task_items`):
+
+| 순위 | SKU | 피킹위치 | 행선지 | 지시수량 | 피킹수량 | 부족 | 상태 | 피킹시각 |
+|------|-----|---------|-------|---------|---------|------|------|---------|
+| 1 | SKU-A001 | A-01-01 | PK-ST1 | 5 | 5 | 0 | PICKED | 09:32 |
+
+**상태 뱃지 색상** (기존 `picking-task-detail.js` 패턴):
+
+| 상태 | 색상 |
+|------|------|
+| WAIT | #9E9E9E (회색) |
+| RUN | #FF9800 (주황) |
+| PICKED | #4CAF50 (초록) |
+| SHORT | #F44336 (빨강) |
+| CANCEL | #D32F2F (진한 빨강) |
+
+#### 8.6.3 탭 3: 포장
+
+**포장 지시 정보 (Info Grid — 3열)**:
+
+| 행 | 컬럼 1 | 컬럼 2 | 컬럼 3 |
+|----|--------|--------|--------|
+| 1 | 포장번호: `pack_order_no` | 검수유형: `insp_type` | 작업 스테이션: `station_cd` |
+| 2 | 작업자: `worker_id` | 검수결과: `insp_result` | 상태: `status` (뱃지) |
+| 3 | 시작시각: `started_at` | 완료시각: `completed_at` | 소요시간: (계산값) |
+| 합계행 | 총 박스: `total_box`개 | 총 중량: `total_wt` kg | |
+
+**포장 항목 테이블** (`packing_order_items`):
+
+| # | SKU | 상품명 | 주문수량 | 검수수량 | 포장수량 | 부족 | 박스# | 상태 |
+|---|-----|-------|---------|---------|---------|------|-------|------|
+| 1 | SKU-A001 | 상품A | 5 | 5 | 5 | 0 | #1 | PACKED |
+
+**상태 뱃지 색상** (기존 `packing-order-detail.js` 패턴):
+
+| 상태 | 색상 |
+|------|------|
+| WAIT | #9E9E9E (회색) |
+| INSPECTED | #2196F3 (파랑) |
+| PACKED | #4CAF50 (초록) |
+| SHORT | #F44336 (빨강) |
+| CANCEL | #D32F2F (진한 빨강) |
+
+#### 8.6.4 탭 4: 박스/송장
+
+**박스 목록 테이블** (`packing_boxes`):
+
+| 박스# | 박스유형 | 송장번호 | 중량(kg) | 품목수 | 수량 | 라벨출력 | 상태 |
+|------|---------|---------|---------|-------|------|---------|------|
+| 1 | 소형 | 6012345678901 | 2.5 | 3종 | 15EA | ✅ | CLOSED |
+
+**박스 클릭 → 하위 상세 표시** (해당 박스에 포함된 상품):
+
+| # | SKU | 상품명 | 수량 | LOT | 유통기한 |
+|---|-----|-------|------|-----|---------|
+| 1 | SKU-A001 | 상품A | 5 | L001 | 26-12-31 |
+
+**박스 상태 뱃지 색상**:
+
+| 상태 | 색상 |
+|------|------|
+| OPEN | #FF9800 (주황) |
+| CLOSED | #2196F3 (파랑) |
+| SHIPPED | #4CAF50 (초록) |
+
+### 8.7 빈 상태 / 에러 처리
+
+| 상태 | 표시 내용 |
+|------|----------|
+| 검색 전 | 중앙 아이콘 + "송장번호, 출고번호 등을 입력하여 추적 정보를 조회하세요" |
+| 로딩 중 | 스피너 + "조회 중..." |
+| 결과 없음 | 경고 아이콘 + "'{keyword}'에 해당하는 출고 정보를 찾을 수 없습니다" |
+| 부분 데이터 없음 | 해당 탭 영역에 "피킹 정보가 없습니다" 등 개별 안내 |
+
+### 8.8 컴포넌트 Properties
+
+```javascript
+static get properties() {
+  return {
+    // 검색
+    searchKeyword: String,
+    searchType: String,           // 'auto' | 'invoice' | 'shipment' | 'packing' | 'picking' | 'wave' | 'ref_order'
+
+    // 데이터
+    shipmentOrder: Object,        // 출고 주문 헤더
+    shipmentOrderItems: Array,    // 출고 주문 상세
+    stockAllocations: Array,      // 재고 할당
+    wave: Object,                 // 웨이브
+    pickingTask: Object,          // 피킹 지시 헤더
+    pickingTaskItems: Array,      // 피킹 항목
+    packingOrder: Object,         // 포장 지시 헤더
+    packingOrderItems: Array,     // 포장 항목
+    packingBoxes: Array,          // 박스 목록
+
+    // UI 상태
+    activeTab: Number,            // 0: 주문정보, 1: 피킹, 2: 포장, 3: 박스/송장
+    loading: Boolean,
+    searched: Boolean,            // 검색 실행 여부 (빈 상태 분기용)
+    notFound: Boolean             // 결과 없음
+  }
+}
+```
+
+### 8.9 백엔드 API
+
+#### 엔드포인트
+
+```
+GET /rest/fulfillment/tracking?keyword={검색어}&type={검색유형}
+```
+
+| 파라미터 | 타입 | 필수 | 설명 |
+|---------|------|------|------|
+| `keyword` | String | Y | 검색어 |
+| `type` | String | N | `auto`(기본) / `invoice` / `shipment` / `packing` / `picking` / `wave` / `ref_order` |
+
+#### 응답 구조
+
+> Map 응답이므로 모든 키를 snake_case로 직접 작성 (Jackson SNAKE_CASE 규칙)
+
+```json
+{
+  "shipment_order": {
+    "id": "uuid",
+    "shipment_no": "SH-260401-001",
+    "ref_order_no": "CH-20260401-00123",
+    "wave_no": "W-260402-001",
+    "com_cd": "ABC",
+    "cust_cd": "C001",
+    "cust_nm": "홍길동",
+    "biz_type": "B2C_OUT",
+    "ship_type": "NORMAL",
+    "dlv_type": "PARCEL",
+    "carrier_cd": "CJ",
+    "carrier_service_type": "STANDARD",
+    "total_item": 3,
+    "total_order": 15.0,
+    "total_alloc": 15.0,
+    "total_shipped": 15.0,
+    "status": "SHIPPED",
+    "order_date": "2026-04-01",
+    "confirmed_at": "2026-04-01 10:00:00",
+    "allocated_at": "2026-04-01 14:30:00",
+    "released_at": "2026-04-02 09:00:00",
+    "shipped_at": "2026-04-03 16:00:00"
+  },
+  "shipment_order_items": [ ... ],
+  "stock_allocations": [ ... ],
+  "wave": {
+    "wave_no": "W-260402-001",
+    "wave_date": "2026-04-02",
+    "pick_type": "TOTAL",
+    "status": "COMPLETED"
+  },
+  "picking_task": {
+    "pick_task_no": "PICK-260402-0001",
+    "pick_type": "TOTAL",
+    "pick_method": "PAPER",
+    "worker_id": "...",
+    "plan_order": 5,
+    "plan_item": 3,
+    "plan_total": 15.0,
+    "result_order": 5,
+    "result_item": 3,
+    "result_total": 15.0,
+    "short_total": 0.0,
+    "status": "COMPLETED",
+    "started_at": "2026-04-02 09:30:00",
+    "completed_at": "2026-04-02 10:00:00"
+  },
+  "picking_task_items": [ ... ],
+  "packing_order": {
+    "pack_order_no": "PACK-260403-001",
+    "insp_type": "FULL",
+    "insp_result": "PASS",
+    "station_cd": "PK-ST1",
+    "worker_id": "...",
+    "total_box": 1,
+    "total_wt": 2.5,
+    "status": "COMPLETED",
+    "started_at": "2026-04-03 13:00:00",
+    "completed_at": "2026-04-03 13:15:00"
+  },
+  "packing_order_items": [ ... ],
+  "packing_boxes": [
+    {
+      "id": "uuid",
+      "box_seq": 1,
+      "box_type_cd": "SMALL",
+      "box_wt": 2.5,
+      "total_item": 3,
+      "total_qty": 15.0,
+      "invoice_no": "6012345678901",
+      "label_printed_flag": true,
+      "status": "CLOSED"
+    }
+  ]
+}
+```
+
+#### 백엔드 조회 전략
+
+단일 쿼리가 아닌 **단계별 순차 조회**:
+
+```
+1. keyword + type 으로 기준 테이블 조회
+   ┌─ invoice  → SELECT * FROM packing_boxes WHERE invoice_no = ?
+   │            → packing_order_id로 packing_orders 조회
+   │            → shipment_order_id로 shipment_orders 조회
+   ├─ shipment → SELECT * FROM shipment_orders WHERE shipment_no = ?
+   ├─ packing  → SELECT * FROM packing_orders WHERE pack_order_no = ?
+   │            → shipment_order_id로 shipment_orders 조회
+   ├─ picking  → SELECT * FROM picking_tasks WHERE pick_task_no = ?
+   │            → shipment_order_id 또는 wave_no로 shipment_orders 조회
+   ├─ wave     → SELECT * FROM shipment_waves WHERE wave_no = ?
+   │            → wave_no로 shipment_orders 조회 (첫 번째 건)
+   ├─ ref_order→ SELECT * FROM shipment_orders WHERE ref_order_no = ?
+   └─ auto     → 순차 시도: invoice → shipment → ref_order → packing → picking → wave
+
+2. shipment_order 확정 후 나머지 연결 데이터 조회
+   ├─ shipment_order_items  WHERE shipment_order_id = ?
+   ├─ stock_allocations     WHERE shipment_order_id = ?
+   ├─ wave                  WHERE wave_no = shipment_order.wave_no
+   ├─ picking_task          WHERE shipment_order_id = ? (개별) 또는 wave_no = ? (토탈)
+   ├─ picking_task_items    WHERE pick_task_id = ?
+   ├─ packing_order         WHERE shipment_order_id = ? (개별) 또는 wave_no = ? (토탈)
+   ├─ packing_order_items   WHERE packing_order_id = ?
+   └─ packing_boxes         WHERE packing_order_id = ?
+```
+
+> **구현 위치**: `FulfillmentTrackingService` (신규) 또는 기존 `FulfillmentTransactionController`에 조회 엔드포인트 추가
+
+### 8.10 반응형 대응
+
+| 뷰포트 | 요약 카드 | Info Grid | 테이블 |
+|--------|----------|-----------|--------|
+| >= 1200px (데스크탑) | 4열 | 3열 | 전체 컬럼 |
+| 768~1199px (태블릿) | 2열 | 2열 | 주요 컬럼만 |
+| < 768px (모바일) | 1열 | 1열 | 가로 스크롤 |

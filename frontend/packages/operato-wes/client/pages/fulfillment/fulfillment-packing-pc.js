@@ -1226,7 +1226,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
             class="btn-release"
             ?disabled="${!canRelease}"
             @click="${this._confirmRelease}"
-          >출고 확정 (F8)</button>
+          >출고 확정</button>
         </div>
       </div>
     `

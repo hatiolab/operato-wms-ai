@@ -10,9 +10,12 @@ import './pages/inbound/inbound-home'
 import './pages/fulfillment/fulfillment-home'
 import './pages/fulfillment/fulfillment-progress'
 import './pages/fulfillment/picking-task-list'
+import './pages/fulfillment/picking-task-detail'  // 팝업으로 사용
 import './pages/fulfillment/packing-order-list'
+import './pages/fulfillment/packing-order-detail'  // 팝업으로 사용
 import './pages/fulfillment/fulfillment-picking-pc'
 import './pages/fulfillment/fulfillment-packing-pc'
+import './pages/fulfillment/shipment-tracking'
 
 import './pages/outbound/outbound-home'
 import './pages/outbound/outbound-inspection'
