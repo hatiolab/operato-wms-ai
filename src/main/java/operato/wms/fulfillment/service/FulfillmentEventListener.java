@@ -3,6 +3,8 @@ package operato.wms.fulfillment.service;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -22,7 +24,13 @@ import operato.wms.common.event.WaveReleasedEvent;
  */
 @Component
 public class FulfillmentEventListener {
-
+	/**
+	 * Logger
+	 */
+	protected Logger logger = LoggerFactory.getLogger(FulfillmentEventListener.class);
+	/**
+	 * Fulfillment 트랜잭션 서비스
+	 */
 	@Autowired
 	private FulfillmentTransactionService fulfillmentTrxService;
 
@@ -52,18 +60,13 @@ public class FulfillmentEventListener {
 			int taskCount = (int) result.getOrDefault("pick_task_count", 0);
 			int itemCount = (int) result.getOrDefault("item_count", 0);
 			System.out.println(String.format(
-				"[Fulfillment] 웨이브 릴리스 이벤트 처리 완료 - wave_no: %s, pick_type: %s, task_count: %d, item_count: %d",
-				event.getWaveNo(), event.getPickType(), taskCount, itemCount
-			));
+					"[Fulfillment] 웨이브 릴리스 이벤트 처리 완료 - wave_no: %s, pick_type: %s, task_count: %d, item_count: %d",
+					event.getWaveNo(), event.getPickType(), taskCount, itemCount));
 		} catch (Exception e) {
 			// 에러 발생 시 로깅 (트랜잭션 롤백되지 않도록 예외를 상위로 전파하지 않음)
-			System.err.println(String.format(
-				"[Fulfillment] 웨이브 릴리스 이벤트 처리 실패 - wave_no: %s, error: %s",
-				event.getWaveNo(), e.getMessage()
-			));
-			e.printStackTrace();
-
-			// TODO: 실패 시 재시도 또는 관리자 알림 처리
+			this.logger.error(String.format(
+					"[Fulfillment] 웨이브 릴리스 이벤트 처리 실패 - wave_no: %s, error: %s",
+					event.getWaveNo(), e.getMessage()));
 		}
 	}
 
@@ -92,18 +95,13 @@ public class FulfillmentEventListener {
 			int deletedTaskCount = (int) result.getOrDefault("deleted_task_count", 0);
 			int deletedItemCount = (int) result.getOrDefault("deleted_item_count", 0);
 			System.out.println(String.format(
-				"[Fulfillment] 웨이브 확정 취소 이벤트 처리 완료 - wave_no: %s, deleted_task_count: %d, deleted_item_count: %d",
-				event.getWaveNo(), deletedTaskCount, deletedItemCount
-			));
+					"[Fulfillment] 웨이브 확정 취소 이벤트 처리 완료 - wave_no: %s, deleted_task_count: %d, deleted_item_count: %d",
+					event.getWaveNo(), deletedTaskCount, deletedItemCount));
 		} catch (Exception e) {
 			// 에러 발생 시 로깅 (트랜잭션 롤백되지 않도록 예외를 상위로 전파하지 않음)
-			System.err.println(String.format(
-				"[Fulfillment] 웨이브 확정 취소 이벤트 처리 실패 - wave_no: %s, error: %s",
-				event.getWaveNo(), e.getMessage()
-			));
-			e.printStackTrace();
-
-			// TODO: 실패 시 관리자 알림 처리
+			this.logger.error(String.format(
+					"[Fulfillment] 웨이브 확정 취소 이벤트 처리 실패 - wave_no: %s, error: %s",
+					event.getWaveNo(), e.getMessage()));
 		}
 	}
 }

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import operato.wms.fulfillment.entity.PickingTask;
 import operato.wms.fulfillment.entity.PickingTaskItem;
 import xyz.anythings.sys.service.AbstractQueryService;
+import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
@@ -36,7 +37,7 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		PickingTask task = this.findPickingTask(domainId, id);
 
 		if (!PickingTask.STATUS_CREATED.equals(task.getStatus())) {
-			throw new RuntimeException("피킹 지시 상태가 [" + task.getStatus() + "]이므로 시작할 수 없습니다 (CREATED 상태만 가능)");
+			throw new ElidomValidationException("피킹 지시 상태가 [" + task.getStatus() + "]이므로 시작할 수 없습니다 (CREATED 상태만 가능)");
 		}
 
 		// 피킹 지시 상태 변경
@@ -73,7 +74,8 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		PickingTask task = this.findPickingTask(domainId, id);
 
 		if (!PickingTask.STATUS_IN_PROGRESS.equals(task.getStatus())) {
-			throw new RuntimeException("피킹 지시 상태가 [" + task.getStatus() + "]이므로 완료할 수 없습니다 (IN_PROGRESS 상태만 가능)");
+			throw new ElidomValidationException(
+					"피킹 지시 상태가 [" + task.getStatus() + "]이므로 완료할 수 없습니다 (IN_PROGRESS 상태만 가능)");
 		}
 
 		// 실적 수량 합산
@@ -141,7 +143,7 @@ public class FulfillmentPickingService extends AbstractQueryService {
 
 		String status = task.getStatus();
 		if (PickingTask.STATUS_COMPLETED.equals(status) || PickingTask.STATUS_CANCELLED.equals(status)) {
-			throw new RuntimeException("피킹 지시 상태가 [" + status + "]이므로 취소할 수 없습니다");
+			throw new ElidomValidationException("피킹 지시 상태가 [" + status + "]이므로 취소할 수 없습니다");
 		}
 
 		// 상세 아이템 전체 취소
@@ -238,7 +240,7 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		List<Map> list = this.queryManager.selectListBySql(sql, params, Map.class, 0, 1);
 
 		if (list.isEmpty()) {
-			throw new RuntimeException("피킹 지시를 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("피킹 지시를 찾을 수 없습니다: " + id);
 		}
 
 		return (Map<String, Object>) list.get(0);
@@ -279,7 +281,7 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		Long domainId = Domain.currentDomainId();
 
 		if (ValueUtil.isEmpty(workerCd)) {
-			throw new RuntimeException("작업자 코드(worker_cd)는 필수 파라미터입니다");
+			throw new ElidomValidationException("작업자 코드(worker_cd)는 필수 파라미터입니다");
 		}
 
 		String sql = "SELECT pt.id, pt.pick_task_no, pt.wave_no, pt.shipment_no, pt.order_date,"
@@ -314,7 +316,7 @@ public class FulfillmentPickingService extends AbstractQueryService {
 
 		if (!PickingTaskItem.STATUS_RUN.equals(item.getStatus())
 				&& !PickingTaskItem.STATUS_WAIT.equals(item.getStatus())) {
-			throw new RuntimeException("피킹 항목 상태가 [" + item.getStatus() + "]이므로 피킹할 수 없습니다 (WAIT/RUN 상태만 가능)");
+			throw new ElidomValidationException("피킹 항목 상태가 [" + item.getStatus() + "]이므로 피킹할 수 없습니다 (WAIT/RUN 상태만 가능)");
 		}
 
 		double pickQty = params.get("pick_qty") != null ? Double.parseDouble(params.get("pick_qty").toString())
@@ -357,7 +359,8 @@ public class FulfillmentPickingService extends AbstractQueryService {
 
 		if (!PickingTaskItem.STATUS_RUN.equals(item.getStatus())
 				&& !PickingTaskItem.STATUS_WAIT.equals(item.getStatus())) {
-			throw new RuntimeException("피킹 항목 상태가 [" + item.getStatus() + "]이므로 부족 처리할 수 없습니다 (WAIT/RUN 상태만 가능)");
+			throw new ElidomValidationException(
+					"피킹 항목 상태가 [" + item.getStatus() + "]이므로 부족 처리할 수 없습니다 (WAIT/RUN 상태만 가능)");
 		}
 
 		double shortQty = params.get("short_qty") != null ? Double.parseDouble(params.get("short_qty").toString())
@@ -393,7 +396,7 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
 		List<PickingTaskItem> list = this.queryManager.selectListBySql(sql, params, PickingTaskItem.class, 0, 1);
 		if (list.isEmpty()) {
-			throw new RuntimeException("피킹 항목을 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("피킹 항목을 찾을 수 없습니다: " + id);
 		}
 		return list.get(0);
 	}
@@ -406,7 +409,7 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
 		List<PickingTask> list = this.queryManager.selectListBySql(sql, params, PickingTask.class, 0, 1);
 		if (list.isEmpty()) {
-			throw new RuntimeException("피킹 지시를 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("피킹 지시를 찾을 수 없습니다: " + id);
 		}
 		return list.get(0);
 	}

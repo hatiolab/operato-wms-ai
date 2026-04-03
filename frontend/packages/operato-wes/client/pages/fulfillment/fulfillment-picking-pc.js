@@ -21,6 +21,7 @@ import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-clien
  * 키보드 단축키: F2(확인), F3(건너뛰기), F5(새로고침), Escape(닫기)
  */
 class FulfillmentPickingPc extends localize(i18next)(PageView) {
+  /** 컴포넌트 스타일 정의 */
   static get styles() {
     return [
       css`
@@ -737,6 +738,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     ]
   }
 
+  /** 컴포넌트 반응형 속성 정의 */
   static get properties() {
     return {
       loading: Boolean,
@@ -760,6 +762,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     }
   }
 
+  /** 생성자 - 초기 상태값 설정 */
   constructor() {
     super()
     this.loading = true
@@ -783,6 +786,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     this._keyHandler = null
   }
 
+  /** 페이지 컨텍스트 반환 - 브라우저 타이틀 등에 사용 */
   get context() {
     return {
       title: TermsUtil.tMenu('FulfillmentPickingPc')
@@ -793,6 +797,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
    * 렌더링
    * ============================================================== */
 
+  /** 화면 렌더링 - 페이지 헤더, 좌우 패널, 상태바, 피드백 토스트 표시 */
   render() {
     const waitCount = this.pickingTasks.filter(t => t.status === 'CREATED').length
     const runCount = this.pickingTasks.filter(t => t.status === 'IN_PROGRESS').length
@@ -840,6 +845,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
 
   /* ===== 좌측 패널 ===== */
 
+  /** 좌측 패널 렌더링 - 검색, 필터 칩, 피킹 지시 목록 표시 */
   _renderLeftPanel() {
     const filtered = this._getFilteredTasks()
     const waitCount = this.pickingTasks.filter(t => t.status === 'CREATED').length
@@ -875,6 +881,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     `
   }
 
+  /** 필터 칩 렌더링 - 상태별 피킹 지시 필터링 */
   _renderFilterChip(status, label, count) {
     return html`
       <div
@@ -886,6 +893,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     `
   }
 
+  /** 피킹 지시 카드 렌더링 - 지시번호, 주문 정보, 진행률 표시 */
   _renderPickingTaskCard(task) {
     const isSelected = this.selectedTaskId === task.id
     const isRun = task.status === 'IN_PROGRESS'
@@ -915,6 +923,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
 
   /* ===== 우측 패널 ===== */
 
+  /** 우측 패널 렌더링 - 모드에 따라 빈 화면, 작업 화면, 완료 화면 표시 */
   _renderRightPanel() {
     switch (this.rightPanelMode) {
       case 'work':
@@ -926,6 +935,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     }
   }
 
+  /** 빈 화면 렌더링 - 피킹 지시 선택 안내 및 바코드 스캔 입력 */
   _renderEmptyPanel() {
     return html`
       <div class="right-panel">
@@ -943,11 +953,12 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     `
   }
 
+  /** 작업 화면 렌더링 - 피킹 지시 헤더, 진행률, 현재 항목, 항목 테이블 표시 */
   _renderWorkPanel() {
     const task = this.pickingTask
     if (!task) return this._renderEmptyPanel()
 
-    const completedCount = this.pickingItems.filter(i => i.status === 'COMPLETED').length
+    const completedCount = this.pickingItems.filter(i => i.status === 'PICKED').length
     const totalCount = this.pickingItems.length
     const progressPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
@@ -975,6 +986,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     `
   }
 
+  /** 현재 피킹 항목 패널 렌더링 - 로케이션, SKU 정보, 바코드 입력, 수량 입력, 확인 버튼 */
   _renderCurrentItemPanel() {
     const item = this.pickingItems[this.currentItemIndex]
     if (!item) return ''
@@ -1044,6 +1056,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     `
   }
 
+  /** 피킹 항목 테이블 렌더링 - 전체 피킹 항목 목록과 진행 상태 표시 */
   _renderItemTable() {
     return html`
       <div class="picking-table-wrap">
@@ -1084,6 +1097,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     `
   }
 
+  /** 완료 화면 렌더링 - 완료 메시지, 통계, 피킹 지시서 출력 및 다음 작업 버튼 */
   _renderCompletePanel() {
     const elapsed = this.startTime ? Date.now() - this.startTime : 0
     const timeStr = this._formatElapsed(elapsed)
@@ -1133,6 +1147,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
    * 라이프사이클
    * ============================================================== */
 
+  /** 페이지 활성화 시 데이터 조회 및 키보드 단축키 설정 */
   async pageUpdated(changes, lifecycle, before) {
     if (this.active) {
       await this._refresh()
@@ -1142,6 +1157,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     }
   }
 
+  /** 페이지 해제 시 키보드 단축키 정리 */
   pageDisposed(lifecycle) {
     this._removeKeyboardShortcuts()
   }
@@ -1150,6 +1166,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
    * 데이터 로딩
    * ============================================================== */
 
+  /** 피킹 지시 목록 새로고침 - 진행 중 및 완료된 지시 조회 */
   async _refresh() {
     try {
       this.loading = true
@@ -1171,12 +1188,13 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     }
   }
 
+  /** 피킹 항목 조회 - 선택된 피킹 지시의 세부 항목 로드 */
   async _loadPickingItems(pickingTaskId) {
     try {
       const data = await ServiceUtil.restGet(`ful_trx/picking_tasks/${pickingTaskId}/items`)
       this.pickingItems = (data?.items || data || []).sort((a, b) => (a.rank || 0) - (b.rank || 0))
       this.totalCount = this.pickingItems.length
-      this.completedCount = this.pickingItems.filter(i => i.status === 'COMPLETED').length
+      this.completedCount = this.pickingItems.filter(i => i.status === 'PICKED').length
     } catch (err) {
       console.error('피킹 항목 조회 실패:', err)
       this.pickingItems = []
@@ -1189,6 +1207,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
    * 좌측 패널 로직
    * ============================================================== */
 
+  /** 필터링된 피킹 지시 목록 반환 - 상태 및 검색어로 필터링 */
   _getFilteredTasks() {
     let list = [...this.pickingTasks]
 
@@ -1207,6 +1226,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     return list
   }
 
+  /** 피킹 지시 선택 - 작업 시작 API 호출 및 우측 패널에 작업 화면 표시 */
   async _onSelectTask(task) {
     try {
       this.loading = true
@@ -1234,6 +1254,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     }
   }
 
+  /** 피킹 지시 바코드 스캔 처리 - 지시번호로 피킹 지시 검색 및 선택 */
   _onScanPickingTask(barcode) {
     const value = (barcode || '').trim()
     if (!value) return
@@ -1252,29 +1273,63 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
    * 바코드 처리
    * ============================================================== */
 
+  /** 상품 바코드 입력 처리 - 순서 무관하게 바코드 매칭 및 수량 자동 증가 */
   _onBarcodeInput(e) {
     if (e.key !== 'Enter') return
     const barcode = e.target.value.trim()
     if (!barcode) return
 
-    const item = this.pickingItems[this.currentItemIndex]
-    if (!item) return
+    // 1. 현재 항목과 일치하는지 먼저 확인
+    let item = this.pickingItems[this.currentItemIndex]
+    let matchedIndex = this.currentItemIndex
 
-    if (item.barcode === barcode || item.sku_cd === barcode) {
-      this.barcodeMatched = true
-      this.lastScannedItem = { success: true, message: '✓ 바코드 확인 완료' }
-      this._showFeedback('✓ 바코드 확인 완료', 'success')
-      this._autoConfirmIfSingleQty()
+    if (!item || (item.barcode !== barcode && item.sku_cd !== barcode)) {
+      // 2. 현재 항목과 일치하지 않으면 미완료 항목 전체에서 검색
+      matchedIndex = this.pickingItems.findIndex(
+        (it) => it.status !== 'PICKED' && (it.barcode === barcode || it.sku_cd === barcode)
+      )
+
+      if (matchedIndex >= 0) {
+        // 찾은 항목으로 자동 전환
+        item = this.pickingItems[matchedIndex]
+        this.currentItemIndex = matchedIndex
+        this._initPickForm()
+        this._showFeedback(`📦 ${item.sku_nm || item.sku_cd}로 전환`, 'info')
+      } else {
+        // 일치하는 항목이 없음
+        this.barcodeMatched = false
+        this.lastScannedItem = { success: false, message: '✗ 해당 상품이 피킹 목록에 없습니다' }
+        this._showFeedback('✗ 해당 상품이 피킹 목록에 없습니다', 'error')
+        e.target.value = ''
+        e.target.focus()
+        return
+      }
+    }
+
+    // 3. 바코드 매칭 성공 - 수량 증가
+    this.barcodeMatched = true
+    const orderQty = item.order_qty || 0
+    const currentQty = this.pickQty || 0
+
+    if (currentQty < orderQty) {
+      this.pickQty = currentQty + 1
+      this.lastScannedItem = { success: true, message: `✓ 바코드 확인 완료 (${this.pickQty}/${orderQty})` }
+      this._showFeedback(`✓ ${item.sku_nm || item.sku_cd} (${this.pickQty}/${orderQty})`, 'success')
+
+      // 지시 수량과 일치하면 자동으로 피킹 확인
+      if (this.pickQty === orderQty) {
+        setTimeout(() => this._confirmPick(), 300)
+      }
     } else {
-      this.barcodeMatched = false
-      this.lastScannedItem = { success: false, message: '✗ 바코드가 일치하지 않습니다' }
-      this._showFeedback('✗ 바코드가 일치하지 않습니다', 'error')
+      this.lastScannedItem = { success: false, message: '✗ 지시 수량을 초과할 수 없습니다' }
+      this._showFeedback('✗ 지시 수량을 초과할 수 없습니다', 'warning')
     }
 
     e.target.value = ''
     e.target.focus()
   }
 
+  /** 단일 수량 자동 확인 - 지시 수량이 1 이하이고 바코드 매칭 시 자동 피킹 확인 */
   _autoConfirmIfSingleQty() {
     const item = this.pickingItems[this.currentItemIndex]
     if (item && (item.pick_qty || 0) <= 1 && this.barcodeMatched) {
@@ -1282,6 +1337,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     }
   }
 
+  /** 바코드 입력 필드 포커스 - 렌더링 완료 후 바코드 입력 필드로 포커스 이동 */
   async _focusBarcodeInput() {
     await this.updateComplete
     const input = this.shadowRoot?.getElementById('barcodeInput')
@@ -1295,6 +1351,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
    * 피킹 확인
    * ============================================================== */
 
+  /** 피킹 확인 처리 - 바코드 및 수량 검증 후 피킹 완료 API 호출 */
   async _confirmPick() {
     const item = this.pickingItems[this.currentItemIndex]
     if (!item) return
@@ -1322,14 +1379,15 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
         barcode: item.sku_cd
       })
 
+      // 피킹 완료 시 화면 데이터 즉시 갱신 (백엔드 상태값은 'PICKED')
       const items = [...this.pickingItems]
       items[this.currentItemIndex] = {
         ...items[this.currentItemIndex],
-        status: 'COMPLETED',
-        actual_qty: qty
+        status: 'PICKED',
+        pick_qty: qty
       }
       this.pickingItems = items
-      this.completedCount = items.filter(i => i.status === 'COMPLETED').length
+      this.completedCount = items.filter(i => i.status === 'PICKED').length
 
       const remaining = this.totalCount - this.completedCount
       this._showFeedback(`피킹 완료 (${this.completedCount}/${this.totalCount})`, 'success')
@@ -1348,21 +1406,23 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     }
   }
 
+  /** 현재 항목 건너뛰기 - 다음 미완료 항목으로 이동 */
   _skipCurrentItem() {
     this._showFeedback('항목 건너뛰기', 'info')
     this._moveToNextItem()
     this._focusBarcodeInput()
   }
 
+  /** 다음 항목으로 이동 - 미완료 항목 중 다음 항목 검색 및 포커스 */
   _moveToNextItem(initial = false) {
     const startIdx = initial ? 0 : this.currentItemIndex + 1
 
     let nextIdx = this.pickingItems.findIndex(
-      (item, idx) => idx >= startIdx && item.status !== 'COMPLETED'
+      (item, idx) => idx >= startIdx && item.status !== 'PICKED'
     )
 
     if (nextIdx < 0 && !initial) {
-      nextIdx = this.pickingItems.findIndex(item => item.status !== 'COMPLETED')
+      nextIdx = this.pickingItems.findIndex(item => item.status !== 'PICKED')
     }
 
     if (nextIdx >= 0) {
@@ -1374,10 +1434,11 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     }
   }
 
+  /** 특정 항목으로 포커스 이동 - 테이블에서 항목 클릭 시 호출 */
   _focusItem(idx) {
     const item = this.pickingItems[idx]
     if (!item) return
-    if (item.status === 'COMPLETED') {
+    if (item.status === 'PICKED') {
       this._showFeedback('이미 피킹 완료된 항목입니다', 'info')
       return
     }
@@ -1386,6 +1447,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     this._focusBarcodeInput()
   }
 
+  /** 피킹 폼 초기화 - 현재 항목의 수량, 바코드 매칭 상태 초기화 */
   _initPickForm() {
     const item = this.pickingItems[this.currentItemIndex]
     if (!item) return
@@ -1398,12 +1460,33 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
    * 완료 처리
    * ============================================================== */
 
-  _onPickingComplete() {
-    this.rightPanelMode = 'complete'
-    this._showFeedback('모든 피킹이 완료되었습니다!', 'success')
-    this._refresh()
+  /** 피킹 완료 처리 - 백엔드 완료 API 호출 후 포장 지시 자동 생성 및 완료 화면으로 전환 */
+  async _onPickingComplete() {
+    if (!this.pickingTask) return
+
+    try {
+      // 백엔드에 피킹 지시 완료 요청 (insp_flag=true이면 포장 지시 자동 생성)
+      const result = await ServiceUtil.restPost(`ful_trx/picking_tasks/${this.pickingTask.id}/complete`)
+
+      this.rightPanelMode = 'complete'
+
+      if (result?.packing_created) {
+        const packInfo = result.pack_order_no
+          ? `포장 지시 ${result.pack_order_no} 생성`
+          : `포장 지시 ${result.pack_order_count}건 생성`
+        this._showFeedback(`피킹 완료! ${packInfo}`, 'success')
+      } else {
+        this._showFeedback('모든 피킹이 완료되었습니다!', 'success')
+      }
+
+      this._refresh()
+    } catch (err) {
+      console.error('피킹 완료 처리 실패:', err)
+      this._showFeedback(err.message || '피킹 완료 처리 실패', 'error')
+    }
   }
 
+  /** 피킹 지시서 출력 - 완료된 피킹 지시서 출력 API 호출 */
   async _printPickingSheet() {
     if (!this.pickingTask) return
     try {
@@ -1417,6 +1500,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     }
   }
 
+  /** 다음 피킹 작업 시작 - 대기 중인 다음 피킹 지시 자동 선택 */
   async _startNextPicking() {
     this._closeWork()
     await this._refresh()
@@ -1429,6 +1513,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     }
   }
 
+  /** 작업 화면 닫기 - 우측 패널 초기화 및 상태 리셋 */
   _closeWork() {
     this.rightPanelMode = 'empty'
     this.selectedTaskId = null
@@ -1443,9 +1528,10 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     this.startTime = 0
   }
 
+  /** 목록으로 돌아가기 확인 - 미완료 항목이 있으면 확인 후 목록으로 이동 */
   _confirmBackToList() {
     if (this.rightPanelMode === 'work') {
-      const incomplete = this.pickingItems.filter(i => i.status !== 'COMPLETED').length
+      const incomplete = this.pickingItems.filter(i => i.status !== 'PICKED').length
       if (incomplete > 0) {
         if (!confirm(`미완료 항목이 ${incomplete}건 있습니다. 목록으로 돌아가시겠습니까?`)) {
           return
@@ -1460,6 +1546,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
    * 키보드 단축키
    * ============================================================== */
 
+  /** 키보드 단축키 설정 - F2(확인), F3(건너뛰기), F5(새로고침), Esc(닫기), Enter(다음) */
   _setupKeyboardShortcuts() {
     if (this._keyHandler) return
     this._keyHandler = (e) => {
@@ -1481,6 +1568,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     document.addEventListener('keydown', this._keyHandler)
   }
 
+  /** 키보드 단축키 해제 - 이벤트 리스너 제거 */
   _removeKeyboardShortcuts() {
     if (this._keyHandler) {
       document.removeEventListener('keydown', this._keyHandler)
@@ -1492,15 +1580,18 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
    * 유틸리티
    * ============================================================== */
 
+  /** 오늘 날짜 문자열 반환 - YYYY-MM-DD 형식 */
   _todayStr() {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
+  /** 총 피킹 수량 계산 - 모든 항목의 실제 피킹 수량 합계 */
   _calcTotalPickedQty() {
-    return this.pickingItems.reduce((sum, item) => sum + (item.actual_qty || item.pick_qty || 0), 0)
+    return this.pickingItems.reduce((sum, item) => sum + (item.pick_qty || 0), 0)
   }
 
+  /** 경과 시간 포맷 - 밀리초를 "분 초" 형식 문자열로 변환 */
   _formatElapsed(ms) {
     const totalSec = Math.round(ms / 1000)
     const min = Math.floor(totalSec / 60)
@@ -1508,6 +1599,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     return `${min}분 ${sec}초`
   }
 
+  /** 피드백 토스트 표시 - 화면 우측 상단에 메시지 표시 (2.5초 자동 숨김) */
   _showFeedback(msg, type = 'info') {
     this.feedbackMsg = msg
     this.feedbackType = type

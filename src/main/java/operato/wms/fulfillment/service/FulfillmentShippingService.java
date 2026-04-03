@@ -11,6 +11,7 @@ import operato.wms.fulfillment.entity.PackingBox;
 import operato.wms.fulfillment.entity.PackingOrder;
 import operato.wms.oms.entity.ShipmentOrder;
 import xyz.anythings.sys.service.AbstractQueryService;
+import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
@@ -41,7 +42,8 @@ public class FulfillmentShippingService extends AbstractQueryService {
 		PackingOrder order = this.findPackingOrder(domainId, packingOrderId);
 
 		if (!PackingOrder.STATUS_COMPLETED.equals(order.getStatus())) {
-			throw new RuntimeException("패킹 지시 상태가 [" + order.getStatus() + "]이므로 라벨을 출력할 수 없습니다 (COMPLETED 상태만 가능)");
+			throw new ElidomValidationException(
+					"패킹 지시 상태가 [" + order.getStatus() + "]이므로 라벨을 출력할 수 없습니다 (COMPLETED 상태만 가능)");
 		}
 
 		// 패킹 지시 상태 변경
@@ -78,7 +80,8 @@ public class FulfillmentShippingService extends AbstractQueryService {
 		PackingOrder order = this.findPackingOrder(domainId, packingOrderId);
 
 		if (!PackingOrder.STATUS_LABEL_PRINTED.equals(order.getStatus())) {
-			throw new RuntimeException("패킹 지시 상태가 [" + order.getStatus() + "]이므로 적하 목록을 전송할 수 없습니다 (LABEL_PRINTED 상태만 가능)");
+			throw new ElidomValidationException(
+					"패킹 지시 상태가 [" + order.getStatus() + "]이므로 적하 목록을 전송할 수 없습니다 (LABEL_PRINTED 상태만 가능)");
 		}
 
 		String sql = "UPDATE packing_orders SET status = :status, manifested_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :id";
@@ -112,7 +115,8 @@ public class FulfillmentShippingService extends AbstractQueryService {
 		if (!PackingOrder.STATUS_COMPLETED.equals(status)
 				&& !PackingOrder.STATUS_LABEL_PRINTED.equals(status)
 				&& !PackingOrder.STATUS_MANIFESTED.equals(status)) {
-			throw new RuntimeException("패킹 지시 상태가 [" + status + "]이므로 출하 확정할 수 없습니다 (COMPLETED/LABEL_PRINTED/MANIFESTED 상태만 가능)");
+			throw new ElidomValidationException(
+					"패킹 지시 상태가 [" + status + "]이므로 출하 확정할 수 없습니다 (COMPLETED/LABEL_PRINTED/MANIFESTED 상태만 가능)");
 		}
 
 		// 패킹 지시 상태 변경
@@ -124,14 +128,16 @@ public class FulfillmentShippingService extends AbstractQueryService {
 		// 박스 상태를 SHIPPED로 변경
 		String boxSql = "UPDATE packing_boxes SET status = :status, shipped_at = :now, updated_at = now() WHERE domain_id = :domainId AND packing_order_id = :packingOrderId AND status IN (:s1, :s2)";
 		Map<String, Object> boxParams = ValueUtil.newMap("status,now,domainId,packingOrderId,s1,s2",
-				PackingBox.STATUS_SHIPPED, now, domainId, packingOrderId, PackingBox.STATUS_OPEN, PackingBox.STATUS_CLOSED);
+				PackingBox.STATUS_SHIPPED, now, domainId, packingOrderId, PackingBox.STATUS_OPEN,
+				PackingBox.STATUS_CLOSED);
 		this.queryManager.executeBySql(boxSql, boxParams);
 
 		// 연결된 출하 주문 상태를 SHIPPED로 갱신
 		if (ValueUtil.isNotEmpty(order.getShipmentOrderId())) {
 			String updOrderSql = "UPDATE shipment_orders SET status = :status, shipped_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :id AND status != :shippedStatus";
 			Map<String, Object> updOrderParams = ValueUtil.newMap("status,now,domainId,id,shippedStatus",
-					ShipmentOrder.STATUS_SHIPPED, now, domainId, order.getShipmentOrderId(), ShipmentOrder.STATUS_SHIPPED);
+					ShipmentOrder.STATUS_SHIPPED, now, domainId, order.getShipmentOrderId(),
+					ShipmentOrder.STATUS_SHIPPED);
 			this.queryManager.executeBySql(updOrderSql, updOrderParams);
 		}
 
@@ -195,7 +201,8 @@ public class FulfillmentShippingService extends AbstractQueryService {
 		PackingOrder order = this.findPackingOrder(domainId, packingOrderId);
 
 		if (!PackingOrder.STATUS_SHIPPED.equals(order.getStatus())) {
-			throw new RuntimeException("패킹 지시 상태가 [" + order.getStatus() + "]이므로 출하 취소할 수 없습니다 (SHIPPED 상태만 가능)");
+			throw new ElidomValidationException(
+					"패킹 지시 상태가 [" + order.getStatus() + "]이므로 출하 취소할 수 없습니다 (SHIPPED 상태만 가능)");
 		}
 
 		// 박스 상태를 CLOSED로 복원
@@ -219,7 +226,8 @@ public class FulfillmentShippingService extends AbstractQueryService {
 		if (ValueUtil.isNotEmpty(order.getShipmentOrderId())) {
 			// 재고 할당의 reserved_qty 복원 (stock_allocations 기반)
 			String allocSql = "SELECT * FROM stock_allocations WHERE domain_id = :domainId AND shipment_order_id = :orderId AND status IN ('SOFT','HARD')";
-			Map<String, Object> allocParams = ValueUtil.newMap("domainId,orderId", domainId, order.getShipmentOrderId());
+			Map<String, Object> allocParams = ValueUtil.newMap("domainId,orderId", domainId,
+					order.getShipmentOrderId());
 			List<Map> allocations = this.queryManager.selectListBySql(allocSql, allocParams, Map.class, 0, 0);
 
 			for (Map alloc : allocations) {
@@ -237,7 +245,8 @@ public class FulfillmentShippingService extends AbstractQueryService {
 				String allocId = alloc.get("id") != null ? alloc.get("id").toString() : null;
 				if (allocId != null) {
 					String updAllocSql = "UPDATE stock_allocations SET status = 'CANCELLED', released_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :allocId";
-					Map<String, Object> updAllocParams = ValueUtil.newMap("now,domainId,allocId", now, domainId, allocId);
+					Map<String, Object> updAllocParams = ValueUtil.newMap("now,domainId,allocId", now, domainId,
+							allocId);
 					this.queryManager.executeBySql(updAllocSql, updAllocParams);
 				}
 			}
@@ -269,7 +278,7 @@ public class FulfillmentShippingService extends AbstractQueryService {
 		PackingBox box = this.findPackingBox(domainId, boxId);
 
 		if (ValueUtil.isEmpty(invoiceNo)) {
-			throw new RuntimeException("송장 번호(invoice_no)는 필수 파라미터입니다");
+			throw new ElidomValidationException("송장 번호(invoice_no)는 필수 파라미터입니다");
 		}
 
 		String sql = "UPDATE packing_boxes SET invoice_no = :invoiceNo, updated_at = now() WHERE domain_id = :domainId AND id = :id";
@@ -297,7 +306,7 @@ public class FulfillmentShippingService extends AbstractQueryService {
 		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
 		List<PackingOrder> list = this.queryManager.selectListBySql(sql, params, PackingOrder.class, 0, 1);
 		if (list.isEmpty()) {
-			throw new RuntimeException("패킹 지시를 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("패킹 지시를 찾을 수 없습니다: " + id);
 		}
 		return list.get(0);
 	}
@@ -310,7 +319,7 @@ public class FulfillmentShippingService extends AbstractQueryService {
 		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
 		List<PackingBox> list = this.queryManager.selectListBySql(sql, params, PackingBox.class, 0, 1);
 		if (list.isEmpty()) {
-			throw new RuntimeException("포장 박스를 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("포장 박스를 찾을 수 없습니다: " + id);
 		}
 		return list.get(0);
 	}

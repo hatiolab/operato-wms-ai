@@ -12,6 +12,7 @@ import './pages/fulfillment/fulfillment-progress'
 import './pages/fulfillment/picking-task-list'
 import './pages/fulfillment/packing-order-list'
 import './pages/fulfillment/fulfillment-picking-pc'
+import './pages/fulfillment/fulfillment-packing-pc'
 
 import './pages/outbound/outbound-home'
 import './pages/outbound/outbound-inspection'

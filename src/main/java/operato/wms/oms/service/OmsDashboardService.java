@@ -2,7 +2,6 @@ package operato.wms.oms.service;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -49,8 +48,7 @@ public class OmsDashboardService extends AbstractQueryService {
 				sql, params, Map.class, 0, 0);
 
 		// 11개 상태 초기화
-		Map<String, Object> statusCounts = new HashMap<>();
-		statusCounts.put(ShipmentOrder.STATUS_REGISTERED, 0);
+		Map<String, Object> statusCounts = ValueUtil.newMap(ShipmentOrder.STATUS_REGISTERED, 0);
 		statusCounts.put(ShipmentOrder.STATUS_CONFIRMED, 0);
 		statusCounts.put(ShipmentOrder.STATUS_ALLOCATED, 0);
 		statusCounts.put(ShipmentOrder.STATUS_BACK_ORDER, 0);
@@ -96,8 +94,7 @@ public class OmsDashboardService extends AbstractQueryService {
 		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
 				sql, params, Map.class, 0, 0);
 
-		Map<String, Object> bizTypeStats = new HashMap<>();
-		bizTypeStats.put("B2C_OUT", 0);
+		Map<String, Object> bizTypeStats = ValueUtil.newMap("B2C_OUT", 0);
 		bizTypeStats.put("B2B_OUT", 0);
 		bizTypeStats.put("B2C_RTN", 0);
 		bizTypeStats.put("B2B_RTN", 0);
@@ -142,8 +139,7 @@ public class OmsDashboardService extends AbstractQueryService {
 
 		List<Map<String, Object>> channelStats = new ArrayList<>();
 		for (Map<String, Object> row : results) {
-			Map<String, Object> channel = new HashMap<>();
-			channel.put("cust_cd", row.get("cust_cd"));
+			Map<String, Object> channel = ValueUtil.newMap("cust_cd", row.get("cust_cd"));
 			channel.put("cust_nm", row.get("cust_nm"));
 			Object countObj = row.get("count");
 			int count = countObj instanceof Long ? ((Long) countObj).intValue() : ((Number) countObj).intValue();
@@ -176,8 +172,7 @@ public class OmsDashboardService extends AbstractQueryService {
 		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
 				sql, params, Map.class, 0, 0);
 
-		Map<String, Object> waveStats = new HashMap<>();
-		waveStats.put(ShipmentWave.STATUS_CREATED, 0);
+		Map<String, Object> waveStats = ValueUtil.newMap(ShipmentWave.STATUS_CREATED, 0);
 		waveStats.put(ShipmentWave.STATUS_RELEASED, 0);
 		waveStats.put(ShipmentWave.STATUS_COMPLETED, 0);
 		waveStats.put(ShipmentWave.STATUS_CANCELLED, 0);
@@ -195,20 +190,19 @@ public class OmsDashboardService extends AbstractQueryService {
 	/**
 	 * 할당 현황 통계 조회
 	 *
-	 * @return 할당 현황 Map (total_orders, allocated_orders, back_orders, alloc_rate, soft_alloc_expiring_soon)
+	 * @return 할당 현황 Map (total_orders, allocated_orders, back_orders, alloc_rate,
+	 *         soft_alloc_expiring_soon)
 	 */
 	public Map<String, Object> getAllocationStats() {
 		Long domainId = Domain.currentDomainId();
 		String today = DateUtil.todayStr();
-
-		Map<String, Object> stats = new HashMap<>();
+		Map<String, Object> stats = ValueUtil.newMap("total_orders", 0);
 
 		// 1. 총 주문 수 (취소/마감 제외, 오늘 주문)
 		String sqlTotal = "SELECT COUNT(*) as count FROM shipment_orders " +
 				"WHERE domain_id = :domainId AND order_date = :today " +
 				"AND status NOT IN (:excludeStatuses)";
-		Map<String, Object> paramsTotal = new HashMap<>();
-		paramsTotal.put("domainId", domainId);
+		Map<String, Object> paramsTotal = ValueUtil.newMap("domainId", domainId);
 		paramsTotal.put("today", today);
 		paramsTotal.put("excludeStatuses", Arrays.asList(
 				ShipmentOrder.STATUS_CANCELLED, ShipmentOrder.STATUS_CLOSED));
@@ -219,8 +213,7 @@ public class OmsDashboardService extends AbstractQueryService {
 		String sqlAllocated = "SELECT COUNT(*) as count FROM shipment_orders " +
 				"WHERE domain_id = :domainId AND order_date = :today " +
 				"AND status IN (:allocStatuses)";
-		Map<String, Object> paramsAllocated = new HashMap<>();
-		paramsAllocated.put("domainId", domainId);
+		Map<String, Object> paramsAllocated = ValueUtil.newMap("domainId", domainId);
 		paramsAllocated.put("today", today);
 		paramsAllocated.put("allocStatuses", Arrays.asList(
 				ShipmentOrder.STATUS_ALLOCATED, ShipmentOrder.STATUS_WAVED,
@@ -251,10 +244,10 @@ public class OmsDashboardService extends AbstractQueryService {
 				"AND expired_at IS NOT NULL " +
 				"AND expired_at <= :expireThreshold";
 		Map<String, Object> paramsSoft = ValueUtil.newMap("domainId,softStatus,expireThreshold",
-				domainId, StockAllocation.STATUS_SOFT, new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date(System.currentTimeMillis() + 30 * 60 * 1000L)));
+				domainId, StockAllocation.STATUS_SOFT, new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+						.format(new java.util.Date(System.currentTimeMillis() + 30 * 60 * 1000L)));
 		Integer softExpiring = this.queryManager.selectBySql(sqlSoftExpiring, paramsSoft, Integer.class);
 		stats.put("soft_alloc_expiring_soon", softExpiring != null ? softExpiring : 0);
-
 		return stats;
 	}
 
@@ -274,15 +267,13 @@ public class OmsDashboardService extends AbstractQueryService {
 				"AND ship_by_date = :today " +
 				"AND cutoff_time IS NOT NULL " +
 				"AND status NOT IN (:completedStatuses)";
-		Map<String, Object> paramsCutoff = new HashMap<>();
-		paramsCutoff.put("domainId", domainId);
+		Map<String, Object> paramsCutoff = ValueUtil.newMap("domainId", domainId);
 		paramsCutoff.put("today", today);
 		paramsCutoff.put("completedStatuses", Arrays.asList(
 				ShipmentOrder.STATUS_SHIPPED, ShipmentOrder.STATUS_CLOSED, ShipmentOrder.STATUS_CANCELLED));
 		Integer cutoffCount = this.queryManager.selectBySql(sqlCutoff, paramsCutoff, Integer.class);
 		if (cutoffCount != null && cutoffCount > 0) {
-			Map<String, Object> alert = new HashMap<>();
-			alert.put("type", "danger");
+			Map<String, Object> alert = ValueUtil.newMap("type", "danger");
 			alert.put("message", "마감 임박 주문: " + cutoffCount + "건");
 			alert.put("count", cutoffCount);
 			alerts.add(alert);
@@ -296,8 +287,7 @@ public class OmsDashboardService extends AbstractQueryService {
 				domainId, ShipmentOrder.STATUS_BACK_ORDER);
 		Integer backOrderCount = this.queryManager.selectBySql(sqlBackOrder, paramsBack, Integer.class);
 		if (backOrderCount != null && backOrderCount > 0) {
-			Map<String, Object> alert = new HashMap<>();
-			alert.put("type", "warning");
+			Map<String, Object> alert = ValueUtil.newMap("type", "warning");
 			alert.put("message", "재고 부족 주문: " + backOrderCount + "건 (BACK_ORDER)");
 			alert.put("count", backOrderCount);
 			alerts.add(alert);
@@ -310,11 +300,11 @@ public class OmsDashboardService extends AbstractQueryService {
 				"AND expired_at IS NOT NULL " +
 				"AND expired_at <= :expireThreshold";
 		Map<String, Object> paramsSoft = ValueUtil.newMap("domainId,softStatus,expireThreshold",
-				domainId, StockAllocation.STATUS_SOFT, new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date(System.currentTimeMillis() + 30 * 60 * 1000L)));
+				domainId, StockAllocation.STATUS_SOFT, new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+						.format(new java.util.Date(System.currentTimeMillis() + 30 * 60 * 1000L)));
 		Integer softCount = this.queryManager.selectBySql(sqlSoft, paramsSoft, Integer.class);
 		if (softCount != null && softCount > 0) {
-			Map<String, Object> alert = new HashMap<>();
-			alert.put("type", "info");
+			Map<String, Object> alert = ValueUtil.newMap("type", "info");
 			alert.put("message", "SOFT 할당 만료 예정: " + softCount + "건 (30분 이내)");
 			alert.put("count", softCount);
 			alerts.add(alert);

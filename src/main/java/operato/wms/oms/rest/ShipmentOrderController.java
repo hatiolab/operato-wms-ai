@@ -23,7 +23,7 @@ import operato.wms.oms.entity.ImportShipmentOrder;
 import operato.wms.oms.entity.ShipmentDelivery;
 import operato.wms.oms.entity.ShipmentOrder;
 import operato.wms.oms.entity.ShipmentOrderItem;
-import operato.wms.oms.service.OmsTransactionService;
+import operato.wms.oms.service.OmsImportService;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.sys.system.service.AbstractRestService;
@@ -42,7 +42,7 @@ import xyz.elidom.exception.server.ElidomRuntimeException;
 public class ShipmentOrderController extends AbstractRestService {
 
 	@Autowired
-	private OmsTransactionService omsTrxService;
+	private OmsImportService importService;
 
 	@Override
 	protected Class<?> entityClass() {
@@ -144,7 +144,7 @@ public class ShipmentOrderController extends AbstractRestService {
 	@ApiDesc(description = "Import B2C shipment orders from Excel (validate and register)")
 	public Map<String, Object> importB2cExcel(@RequestBody List<ImportShipmentOrder> list) {
 		// 1. 데이터 검증
-		Map<String, Object> validationResult = this.omsTrxService.validateImportData(list, "B2C_OUT");
+		Map<String, Object> validationResult = this.importService.validateImportData(list, "B2C_OUT");
 
 		// 2. 검증 오류가 있으면 예외 발생 (첫 번째 오류만 표시)
 		int errorCount = (int) validationResult.getOrDefault("error", 0);
@@ -172,7 +172,7 @@ public class ShipmentOrderController extends AbstractRestService {
 		}
 
 		// 3. 검증 통과 시 임포트 실행
-		Map<String, Object> importResult = this.omsTrxService.importShipmentOrders(list);
+		Map<String, Object> importResult = this.importService.importShipmentOrders(list);
 		return importResult;
 	}
 }

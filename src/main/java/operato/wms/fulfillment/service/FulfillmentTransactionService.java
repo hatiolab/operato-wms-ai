@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +17,7 @@ import operato.wms.fulfillment.entity.PickingTaskItem;
 import operato.wms.oms.entity.ShipmentOrder;
 import xyz.anythings.sys.service.AbstractQueryService;
 import xyz.anythings.sys.util.AnyOrmUtil;
+import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
@@ -28,16 +31,28 @@ import xyz.elidom.util.ValueUtil;
  */
 @Component
 public class FulfillmentTransactionService extends AbstractQueryService {
-
+	/**
+	 * Logger
+	 */
+	private Logger logger = LoggerFactory.getLogger(FulfillmentTransactionService.class);
+	/**
+	 * Picking Transaction Service
+	 */
 	@Autowired
 	private FulfillmentPickingService pickingService;
-
+	/**
+	 * Packing Transaction Service
+	 */
 	@Autowired
 	private FulfillmentPackingService packingService;
-
+	/**
+	 * Shipping Transaction Service
+	 */
 	@Autowired
 	private FulfillmentShippingService shippingService;
-
+	/**
+	 * Dashboard Service
+	 */
 	@Autowired
 	private FulfillmentDashboardService dashboardService;
 
@@ -50,17 +65,15 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 	 * @param params { wave_no, pick_type, pick_method, orders }
 	 * @return { pick_task_count, item_count, pick_tasks: [...] }
 	 */
-	@SuppressWarnings("unchecked")
 	public Map<String, Object> createPickingTasks(Map<String, Object> params) {
 		Long domainId = Domain.currentDomainId();
 		String today = DateUtil.todayStr();
-		String now = DateUtil.currentTimeStr();
 
 		String waveNo = params.get("wave_no") != null ? params.get("wave_no").toString() : null;
 		String pickType = params.get("pick_type") != null ? params.get("pick_type").toString() : "INDIVIDUAL";
 
 		if (ValueUtil.isEmpty(waveNo)) {
-			throw new RuntimeException("wave_no는 필수 파라미터입니다");
+			throw new ElidomValidationException("wave_no는 필수 파라미터입니다");
 		}
 
 		// 웨이브에 포함된 RELEASED 상태의 주문 조회
@@ -71,7 +84,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				0);
 
 		if (orders.isEmpty()) {
-			throw new RuntimeException("웨이브 [" + waveNo + "]에 릴리스된 주문이 없습니다");
+			throw new ElidomValidationException("웨이브 [" + waveNo + "]에 릴리스된 주문이 없습니다");
 		}
 
 		// 당일 최대 pick_task_no 시퀀스 조회
@@ -290,11 +303,13 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		PickingTask task = this.findPickingTask(domainId, pickTaskId);
 
 		if (!PickingTask.STATUS_COMPLETED.equals(task.getStatus())) {
-			throw new RuntimeException("피킹 지시 상태가 [" + task.getStatus() + "]이므로 패킹 지시를 생성할 수 없습니다 (COMPLETED 상태만 가능)");
+			throw new ElidomValidationException(
+					"피킹 지시 상태가 [" + task.getStatus() + "]이므로 패킹 지시를 생성할 수 없습니다 (COMPLETED 상태만 가능)");
 		}
 
 		if (!"INDIVIDUAL".equals(task.getPickType())) {
-			throw new RuntimeException("개별 피킹만 이 메서드로 패킹 지시를 생성할 수 있습니다. 총량 피킹은 createPackingOrdersFromBatch를 사용하세요");
+			throw new ElidomValidationException(
+					"개별 피킹만 이 메서드로 패킹 지시를 생성할 수 있습니다. 총량 피킹은 createPackingOrdersFromBatch를 사용하세요");
 		}
 
 		// 출하 주문 조회
@@ -382,7 +397,8 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		PickingTask task = this.findPickingTask(domainId, pickTaskId);
 
 		if (!PickingTask.STATUS_COMPLETED.equals(task.getStatus())) {
-			throw new RuntimeException("피킹 지시 상태가 [" + task.getStatus() + "]이므로 패킹 지시를 생성할 수 없습니다 (COMPLETED 상태만 가능)");
+			throw new ElidomValidationException(
+					"피킹 지시 상태가 [" + task.getStatus() + "]이므로 패킹 지시를 생성할 수 없습니다 (COMPLETED 상태만 가능)");
 		}
 
 		// 웨이브에 포함된 주문 목록 조회
@@ -393,7 +409,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				0);
 
 		if (orders.isEmpty()) {
-			throw new RuntimeException("웨이브 [" + task.getWaveNo() + "]에 PICKING 상태 주문이 없습니다");
+			throw new ElidomValidationException("웨이브 [" + task.getWaveNo() + "]에 PICKING 상태 주문이 없습니다");
 		}
 
 		// 패킹 지시 번호 시퀀스 조회
@@ -501,7 +517,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		String waveNo = params.get("wave_no") != null ? params.get("wave_no").toString() : null;
 
 		if (ValueUtil.isEmpty(waveNo)) {
-			throw new RuntimeException("wave_no는 필수 파라미터입니다");
+			throw new ElidomValidationException("wave_no는 필수 파라미터입니다");
 		}
 
 		// 1. 웨이브에 속한 모든 피킹 지시 조회
@@ -520,7 +536,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		// 2. 모든 피킹 지시가 WAIT 상태인지 확인
 		for (PickingTask task : tasks) {
 			if (!PickingTask.STATUS_CREATED.equals(task.getStatus())) {
-				throw new RuntimeException(String.format(
+				throw new ElidomValidationException(String.format(
 						"피킹 지시 [%s]가 WAIT 상태가 아니므로 삭제할 수 없습니다 (현재 상태: %s)",
 						task.getPickTaskNo(), task.getStatus()));
 			}
@@ -558,6 +574,198 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		return result;
 	}
 
+	/**
+	 * 피킹 지시 완료 및 포장 지시 자동 생성
+	 *
+	 * 피킹 지시를 완료(COMPLETED)하고, 해당 웨이브의 insp_flag가 true이면
+	 * 포장 지시(PackingOrder)를 자동 생성한다.
+	 *
+	 * @param pickTaskId 피킹 지시 ID
+	 * @return { success, pick_task_no, status, packing_created, pack_order_no, ...
+	 *         }
+	 */
+	public Map<String, Object> completePickingTaskWithPacking(String pickTaskId) {
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 피킹 지시 완료
+		Map<String, Object> result = this.pickingService.completePickingTask(pickTaskId);
+
+		// 2. 피킹 지시에서 wave_no, pick_type 조회
+		PickingTask task = this.findPickingTask(domainId, pickTaskId);
+
+		// 3. 웨이브의 insp_flag 확인
+		boolean inspFlag = false;
+		if (ValueUtil.isNotEmpty(task.getWaveNo())) {
+			String waveSql = "SELECT insp_flag FROM shipment_waves WHERE domain_id = :domainId AND wave_no = :waveNo";
+			Map<String, Object> waveParams = ValueUtil.newMap("domainId,waveNo", domainId, task.getWaveNo());
+			Boolean flag = this.queryManager.selectBySql(waveSql, waveParams, Boolean.class);
+			inspFlag = flag != null && flag;
+		}
+
+		// 4. insp_flag가 true이면 포장 지시 자동 생성
+		if (inspFlag) {
+			try {
+				if ("INDIVIDUAL".equals(task.getPickType())) {
+					Map<String, Object> packResult = this.createPackingOrders(pickTaskId);
+					result.put("packing_created", true);
+					result.put("pack_order_no", packResult.get("pack_order_no"));
+					result.put("pack_item_count", packResult.get("item_count"));
+				} else {
+					Map<String, Object> packResult = this.createPackingOrdersFromBatch(pickTaskId);
+					result.put("packing_created", true);
+					result.put("pack_order_count", packResult.get("pack_order_count"));
+					result.put("pack_total_item_count", packResult.get("total_item_count"));
+				}
+
+				this.logger.info(String.format(
+						"[Fulfillment] 피킹 완료 → 포장 지시 자동 생성 - pick_task_no: %s, wave_no: %s",
+						task.getPickTaskNo(), task.getWaveNo()));
+			} catch (Exception e) {
+				this.logger.error(String.format(
+						"[Fulfillment] 포장 지시 자동 생성 실패 - pick_task_no: %s, error: %s",
+						task.getPickTaskNo(), e.getMessage()));
+				result.put("packing_created", false);
+				result.put("packing_error", e.getMessage());
+			}
+		} else {
+			result.put("packing_created", false);
+		}
+
+		return result;
+	}
+
+	/**
+	 * 피킹 완료 후 취소 (COMPLETED → CANCELLED)
+	 *
+	 * 피킹 완료 상태의 피킹 지시를 취소하고, 자동 생성된 포장 지시도 함께 삭제한다.
+	 *
+	 * 취소 조건:
+	 * - 피킹 지시가 COMPLETED 상태여야 함
+	 * - 해당 웨이브가 COMPLETED 상태가 아니어야 함
+	 * - 관련 포장 지시가 모두 CREATED 상태여야 함 (IN_PROGRESS 이후는 취소 불가)
+	 *
+	 * 취소 시 처리:
+	 * 1. 관련 포장 지시 아이템/포장 지시 삭제
+	 * 2. 피킹 지시 아이템 상태 → CANCEL, 실적 수량 초기화
+	 * 3. 피킹 지시 상태 → CANCELLED
+	 * 4. 출하 주문 상태 → RELEASED (재피킹 가능)
+	 *
+	 * @param pickTaskId 피킹 지시 ID
+	 * @return { success, pick_task_no, cancelled_pack_order_count,
+	 *         reverted_order_count }
+	 */
+	public Map<String, Object> cancelCompletedPickingTask(String pickTaskId) {
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 피킹 지시 조회 및 상태 확인
+		PickingTask task = this.findPickingTask(domainId, pickTaskId);
+
+		if (!PickingTask.STATUS_COMPLETED.equals(task.getStatus())) {
+			throw new ElidomValidationException(
+					"피킹 지시 상태가 [" + task.getStatus() + "]이므로 완료 후 취소할 수 없습니다 (COMPLETED 상태만 가능)");
+		}
+
+		// 2. 웨이브 상태 확인 (COMPLETED이면 취소 불가)
+		if (ValueUtil.isNotEmpty(task.getWaveNo())) {
+			String waveSql = "SELECT status FROM shipment_waves WHERE domain_id = :domainId AND wave_no = :waveNo";
+			Map<String, Object> waveParams = ValueUtil.newMap("domainId,waveNo", domainId, task.getWaveNo());
+			String waveStatus = this.queryManager.selectBySql(waveSql, waveParams, String.class);
+
+			if ("COMPLETED".equals(waveStatus)) {
+				throw new ElidomValidationException("웨이브 [" + task.getWaveNo() + "]가 이미 완료되어 피킹을 취소할 수 없습니다");
+			}
+		}
+
+		// 3. 관련 포장 지시 조회 및 상태 확인
+		String packSql = "SELECT * FROM packing_orders WHERE domain_id = :domainId AND pick_task_no = :pickTaskNo";
+		Map<String, Object> packParams = ValueUtil.newMap("domainId,pickTaskNo", domainId, task.getPickTaskNo());
+		List<PackingOrder> packOrders = this.queryManager.selectListBySql(packSql, packParams, PackingOrder.class, 0,
+				0);
+
+		for (PackingOrder po : packOrders) {
+			if (!PackingOrder.STATUS_CREATED.equals(po.getStatus())) {
+				throw new ElidomValidationException(
+						"포장 지시 [" + po.getPackOrderNo() + "]가 이미 처리 중이므로 피킹을 취소할 수 없습니다 (현재 상태: " + po.getStatus()
+								+ ")");
+			}
+		}
+
+		// 4. 포장 지시 아이템 및 포장 지시 삭제
+		int cancelledPackOrderCount = 0;
+		int cancelledPackItemCount = 0;
+
+		for (PackingOrder po : packOrders) {
+			String countSql = "SELECT COUNT(*) FROM packing_order_items WHERE domain_id = :domainId AND packing_order_id = :packingOrderId";
+			Map<String, Object> countParams = ValueUtil.newMap("domainId,packingOrderId", domainId, po.getId());
+			Integer itemCount = this.queryManager.selectBySql(countSql, countParams, Integer.class);
+			cancelledPackItemCount += (itemCount != null ? itemCount : 0);
+
+			String delItemsSql = "DELETE FROM packing_order_items WHERE domain_id = :domainId AND packing_order_id = :packingOrderId";
+			this.queryManager.executeBySql(delItemsSql, countParams);
+
+			String delPackSql = "DELETE FROM packing_orders WHERE domain_id = :domainId AND id = :id";
+			Map<String, Object> delPackParams = ValueUtil.newMap("domainId,id", domainId, po.getId());
+			this.queryManager.executeBySql(delPackSql, delPackParams);
+
+			cancelledPackOrderCount++;
+		}
+
+		// 5. 피킹 지시 아이템 상태 변경 (PICKED/SHORT → CANCEL, 실적 초기화)
+		String updItemsSql = "UPDATE picking_task_items SET status = :newStatus, pick_qty = 0, short_qty = 0, picked_at = NULL, updated_at = now()"
+				+ " WHERE domain_id = :domainId AND pick_task_id = :pickTaskId AND status IN (:s1, :s2)";
+		Map<String, Object> updItemsParams = ValueUtil.newMap("newStatus,domainId,pickTaskId,s1,s2",
+				PickingTaskItem.STATUS_CANCEL, domainId, pickTaskId,
+				PickingTaskItem.STATUS_PICKED, PickingTaskItem.STATUS_SHORT);
+		this.queryManager.executeBySql(updItemsSql, updItemsParams);
+
+		// 6. 피킹 지시 상태 변경 (COMPLETED → CANCELLED, 실적 초기화)
+		String updTaskSql = "UPDATE picking_tasks SET status = :status,"
+				+ " result_order = 0, result_item = 0, result_total = 0, short_total = 0,"
+				+ " completed_at = NULL, updated_at = now()"
+				+ " WHERE domain_id = :domainId AND id = :id";
+		Map<String, Object> updTaskParams = ValueUtil.newMap("status,domainId,id",
+				PickingTask.STATUS_CANCELLED, domainId, pickTaskId);
+		this.queryManager.executeBySql(updTaskSql, updTaskParams);
+
+		// 7. 출하 주문 상태 원복 (PACKING/PICKING → RELEASED)
+		int revertedOrderCount = 0;
+		if ("INDIVIDUAL".equals(task.getPickType())) {
+			if (ValueUtil.isNotEmpty(task.getShipmentOrderId())) {
+				String updOrderSql = "UPDATE shipment_orders SET status = :newStatus, updated_at = now()"
+						+ " WHERE domain_id = :domainId AND id = :orderId AND status IN (:s1, :s2)";
+				Map<String, Object> updOrderParams = ValueUtil.newMap("newStatus,domainId,orderId,s1,s2",
+						ShipmentOrder.STATUS_RELEASED, domainId, task.getShipmentOrderId(),
+						ShipmentOrder.STATUS_PICKING, ShipmentOrder.STATUS_PACKING);
+				this.queryManager.executeBySql(updOrderSql, updOrderParams);
+				revertedOrderCount = 1;
+			}
+		} else {
+			String updOrdersSql = "UPDATE shipment_orders SET status = :newStatus, updated_at = now()"
+					+ " WHERE domain_id = :domainId AND wave_no = :waveNo AND status IN (:s1, :s2)";
+			Map<String, Object> updOrdersParams = ValueUtil.newMap("newStatus,domainId,waveNo,s1,s2",
+					ShipmentOrder.STATUS_RELEASED, domainId, task.getWaveNo(),
+					ShipmentOrder.STATUS_PICKING, ShipmentOrder.STATUS_PACKING);
+			this.queryManager.executeBySql(updOrdersSql, updOrdersParams);
+
+			String countOrdersSql = "SELECT COUNT(*) FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status";
+			Map<String, Object> countOrdersParams = ValueUtil.newMap("domainId,waveNo,status",
+					domainId, task.getWaveNo(), ShipmentOrder.STATUS_RELEASED);
+			Integer orderCount = this.queryManager.selectBySql(countOrdersSql, countOrdersParams, Integer.class);
+			revertedOrderCount = orderCount != null ? orderCount : 0;
+		}
+
+		this.logger.info(String.format(
+				"[Fulfillment] 피킹 완료 후 취소 - pick_task_no: %s, cancelled_pack_orders: %d, reverted_orders: %d",
+				task.getPickTaskNo(), cancelledPackOrderCount, revertedOrderCount));
+
+		Map<String, Object> result = ValueUtil.newMap("success", true);
+		result.put("pick_task_no", task.getPickTaskNo());
+		result.put("cancelled_pack_order_count", cancelledPackOrderCount);
+		result.put("cancelled_pack_item_count", cancelledPackItemCount);
+		result.put("reverted_order_count", revertedOrderCount);
+		return result;
+	}
+
 	/*
 	 * ============================================================
 	 * 내부 유틸리티
@@ -572,7 +780,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
 		List<PickingTask> list = this.queryManager.selectListBySql(sql, params, PickingTask.class, 0, 1);
 		if (list.isEmpty()) {
-			throw new RuntimeException("피킹 지시를 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("피킹 지시를 찾을 수 없습니다: " + id);
 		}
 		return list.get(0);
 	}

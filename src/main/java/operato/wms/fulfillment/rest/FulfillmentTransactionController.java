@@ -15,12 +15,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import operato.wms.fulfillment.entity.PickingTask;
 import operato.wms.fulfillment.service.FulfillmentPackingService;
 import operato.wms.fulfillment.service.FulfillmentPickingService;
 import operato.wms.fulfillment.service.FulfillmentShippingService;
 import operato.wms.fulfillment.service.FulfillmentTransactionService;
+import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
+import xyz.elidom.sys.util.ValueUtil;
 
 /**
  * 풀필먼트 트랜잭션 컨트롤러
@@ -36,16 +39,24 @@ import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 @RequestMapping("/rest/ful_trx")
 @ServiceDesc(description = "Fulfillment Transaction Service API")
 public class FulfillmentTransactionController {
-
+	/**
+	 * Fulfillment Transaction Service
+	 */
 	@Autowired
 	private FulfillmentTransactionService fulTrxService;
-
+	/**
+	 * Fulfillment Picking Service
+	 */
 	@Autowired
 	private FulfillmentPickingService pickingService;
-
+	/**
+	 * Fulfillment Packing Service
+	 */
 	@Autowired
 	private FulfillmentPackingService packingService;
-
+	/**
+	 * Fulfillment Shipping Service
+	 */
 	@Autowired
 	private FulfillmentShippingService shippingService;
 
@@ -130,34 +141,66 @@ public class FulfillmentTransactionController {
 	}
 
 	/**
-	 * 피킹 완료 (IN_PROGRESS → COMPLETED)
+	 * 피킹 완료 (IN_PROGRESS → COMPLETED) + 포장 지시 자동 생성
 	 * POST /rest/ful_trx/picking_tasks/{id}/complete
+	 *
+	 * 피킹 완료 후 웨이브의 insp_flag가 true이면 포장 지시를 자동 생성한다.
 	 */
 	@PostMapping(value = "picking_tasks/{id}/complete", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description = "Complete picking task")
+	@ApiDesc(description = "Complete picking task and auto-create packing orders if insp_flag is true")
 	public Map<String, Object> completePickingTask(@PathVariable("id") String id) {
-		return this.pickingService.completePickingTask(id);
+		return this.fulTrxService.completePickingTaskWithPacking(id);
 	}
 
 	/**
-	 * 피킹 취소 (→ CANCELLED)
+	 * 피킹 취소 (CREATED/IN_PROGRESS → CANCELLED / COMPLETED → CREATED) (N건)
+	 * POST /rest/ful_trx/picking_tasks/cancel
+	 */
+	@PostMapping(value = "picking_tasks/cancel", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Cancel picking task list (supports both in-progress and completed cancellation)")
+	public Map<String, Object> cancelPickingTaskList(@RequestBody List<PickingTask> list) {
+		if (ValueUtil.isEmpty(list)) {
+			throw new ElidomValidationException("피킹 지시 목록이 없습니다");
+		}
+
+		for (PickingTask task : list) {
+			this.fulTrxService.cancelCompletedPickingTask(task.getId());
+		}
+
+		return ValueUtil.newMap("success", true);
+	}
+
+	/**
+	 * 피킹 취소 (CREATED/IN_PROGRESS → CANCELLED / COMPLETED → CREATED)
 	 * POST /rest/ful_trx/picking_tasks/{id}/cancel
+	 *
+	 * CREATED/IN_PROGRESS: 즉시 취소
+	 * COMPLETED: 웨이브 미완료 + 포장 미처리 조건 확인 후 취소 (포장 지시 삭제, 주문 상태 원복 포함)
 	 */
 	@PostMapping(value = "picking_tasks/{id}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description = "Cancel picking task")
+	@ApiDesc(description = "Cancel picking task (supports both in-progress and completed cancellation)")
 	public Map<String, Object> cancelPickingTask(@PathVariable("id") String id) {
-		return this.pickingService.cancelPickingTask(id);
+		Map<String, Object> taskInfo = this.pickingService.getPickingTask(id);
+		String status = taskInfo.get("status") != null ? taskInfo.get("status").toString() : "";
+
+		if ("COMPLETED".equals(status)) {
+			return this.fulTrxService.cancelCompletedPickingTask(id);
+		} else {
+			return this.pickingService.cancelPickingTask(id);
+		}
 	}
 
 	/**
 	 * 피킹 시작+완료 일괄 (간소화 프로세스, CREATED → COMPLETED)
 	 * POST /rest/ful_trx/picking_tasks/{id}/start_and_complete
+	 *
+	 * 피킹 완료 후 웨이브의 insp_flag가 true이면 포장 지시를 자동 생성한다.
 	 */
 	@PostMapping(value = "picking_tasks/{id}/start_and_complete", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Start and complete picking task at once")
 	public Map<String, Object> startAndCompletePickingTask(@PathVariable("id") String id) {
 		this.pickingService.startPickingTask(id);
-		return this.pickingService.completePickingTask(id);
+		return this.fulTrxService.completePickingTaskWithPacking(id);
 	}
 
 	/**
@@ -183,6 +226,55 @@ public class FulfillmentTransactionController {
 	}
 
 	// ==================== 9.2 검수/포장 트랜잭션 API ====================
+
+	/**
+	 * 포장 주문 목록 조회 (상태/날짜 필터)
+	 * GET /rest/ful_trx/packing_orders?status=INSPECTED&order_date=2024-01-01
+	 */
+	@GetMapping(value = "packing_orders", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Search packing orders by status and order date")
+	@SuppressWarnings("rawtypes")
+	public List<Map> searchPackingOrders(
+			@org.springframework.web.bind.annotation.RequestParam(name = "status", required = false) String status,
+			@org.springframework.web.bind.annotation.RequestParam(name = "order_date", required = false) String orderDate) {
+		return this.packingService.searchPackingOrders(status, orderDate);
+	}
+
+	/**
+	 * 대기중인 포장 주문 목록 조회 (상태/날짜 필터)
+	 * GET /rest/ful_trx/packing_orders/todo?order_date=2024-01-01
+	 */
+	@GetMapping(value = "packing_orders/todo", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Search todo packing orders by status and order date")
+	@SuppressWarnings("rawtypes")
+	public List<Map> searchTodoPackingOrders(
+			@org.springframework.web.bind.annotation.RequestParam(name = "order_date", required = false) String orderDate) {
+		return this.packingService.searchTodoPackingOrders(orderDate);
+	}
+
+	/**
+	 * 완료된 포장 주문 목록 조회 (상태/날짜 필터)
+	 * GET /rest/ful_trx/packing_orders/done?order_date=2024-01-01
+	 */
+	@GetMapping(value = "packing_orders/done", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Search done packing orders by status and order date")
+	@SuppressWarnings("rawtypes")
+	public List<Map> searchDonePackingOrders(
+			@org.springframework.web.bind.annotation.RequestParam(name = "order_date", required = false) String orderDate) {
+		return this.packingService.searchDonePackingOrders(orderDate);
+	}
+
+	/**
+	 * 포장 아이템 조회 (packing_order_id로 필터)
+	 * GET /rest/ful_trx/packing_order_items?packing_order_id={id}
+	 */
+	@GetMapping(value = "packing_order_items", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get packing order items by packing_order_id")
+	@SuppressWarnings("rawtypes")
+	public List<Map> getPackingOrderItemsByOrderId(
+			@org.springframework.web.bind.annotation.RequestParam("packing_order_id") String packingOrderId) {
+		return this.packingService.getPackingOrderItemsByOrderId(packingOrderId);
+	}
 
 	/**
 	 * 포장 지시 생성 (개별 피킹 완료 후, 1건)
@@ -227,6 +319,18 @@ public class FulfillmentTransactionController {
 			@PathVariable("item_id") String itemId,
 			@RequestBody Map<String, Object> params) {
 		return this.packingService.inspectItem(itemId, params);
+	}
+
+	/**
+	 * 아이템 검수 완료 (finish)
+	 * POST /rest/ful_trx/packing_order_items/{id}/finish
+	 */
+	@PostMapping(value = "packing_order_items/{id}/finish", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Finish packing order item inspection")
+	public Map<String, Object> finishPackingItem(
+			@PathVariable("id") String itemId,
+			@RequestBody Map<String, Object> params) {
+		return this.packingService.finishPackingItem(itemId, params);
 	}
 
 	/**

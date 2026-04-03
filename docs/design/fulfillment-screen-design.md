@@ -65,11 +65,115 @@ fulfillment-home (풀필먼트 대시보드)
 | 프로세스 단계 | 화면 | 사용자 |
 |--------------|------|--------|
 | 1. 피킹 지시 확인 | picking-task-list | 피킹 관리자 |
-| 2. 피킹 실행/완료 | picking-task-detail | 피킹 관리자 |
-| 3. 검수/포장 실행 | packing-order-list, packing-order-detail | 포장 관리자 |
+| 2. 피킹 실행/완료 | picking-task-detail, fulfillment-picking-pc | 피킹 관리자/작업자 |
+| 2-1. 포장 지시 자동 생성 | (백엔드 자동) | — |
+| 2-2. 피킹 완료 후 취소 | picking-task-list, picking-task-detail | 피킹 관리자 |
+| 3. 검수/포장 실행 | packing-order-list, fulfillment-packing-pc | 포장 관리자/작업자 |
 | 4. 라벨 출력/매니페스트 | packing-order-detail | 포장 관리자 |
 | 5. 출하 확정 | packing-order-list (일괄), packing-order-detail (개별) | 풀필먼트 관리자 |
 | 6. 전체 진행 현황 파악 | fulfillment-progress, fulfillment-home | 전체 |
+
+#### 2.2.1 피킹 완료 → 포장 지시 자동 생성
+
+피킹 지시가 **COMPLETED** 상태로 전환될 때, 해당 웨이브의 `insp_flag`(검수/포장 수행 여부)에 따라 포장 지시를 자동 생성한다.
+
+```
+피킹 완료 API 호출 (POST /rest/ful_trx/picking_tasks/{id}/complete)
+  │
+  ├─ 1. PickingTask → COMPLETED (실적 수량 집계)
+  │
+  ├─ 2. shipment_waves.insp_flag 조회
+  │
+  ├─ insp_flag = true
+  │   ├─ INDIVIDUAL 피킹 → PackingOrder 1건 생성 (주문 1:1)
+  │   └─ TOTAL 피킹     → PackingOrder N건 생성 (웨이브 내 주문별 각 1건)
+  │   └─ ShipmentOrder.status → PACKING
+  │
+  └─ insp_flag = false
+      └─ 포장 지시 미생성 (피킹 완료로 종결)
+```
+
+**응답 예시** (`insp_flag = true`, INDIVIDUAL 피킹):
+```json
+{
+  "success": true,
+  "pick_task_no": "PICK-260401-0001",
+  "status": "COMPLETED",
+  "result_total": 5.0,
+  "short_total": 0.0,
+  "packing_created": true,
+  "pack_order_no": "PACK-260401-0001",
+  "pack_item_count": 3
+}
+```
+
+**응답 예시** (`insp_flag = false`):
+```json
+{
+  "success": true,
+  "pick_task_no": "PICK-260401-0002",
+  "status": "COMPLETED",
+  "packing_created": false
+}
+```
+
+> **구현 위치**: `FulfillmentTransactionService.completePickingTaskWithPacking()` — 피킹 완료와 포장 지시 생성을 하나의 트랜잭션으로 처리
+
+#### 2.2.2 피킹 완료 후 취소
+
+피킹 지시가 **COMPLETED** 상태일 때, 일정 조건을 만족하면 취소할 수 있다.
+
+**취소 가능 조건:**
+1. 해당 웨이브가 **COMPLETED** 상태가 아닐 것
+2. 관련 포장 지시가 모두 **CREATED** 상태일 것 (검수/포장이 시작되지 않은 경우만)
+
+```
+피킹 취소 API 호출 (POST /rest/ful_trx/picking_tasks/{id}/cancel)
+  │
+  ├─ 1. PickingTask.status == COMPLETED 확인
+  │
+  ├─ 2. ShipmentWave.status != COMPLETED 확인
+  │     └─ 실패 시: "웨이브가 이미 완료되어 취소 불가" 예외
+  │
+  ├─ 3. 관련 PackingOrder 상태 확인 (pick_task_no로 조회)
+  │     └─ 하나라도 IN_PROGRESS 이후 상태 → "포장이 이미 처리 중이므로 취소 불가" 예외
+  │
+  ├─ 4. 포장 지시 삭제
+  │     ├─ packing_order_items 삭제
+  │     └─ packing_orders 삭제
+  │
+  ├─ 5. 피킹 지시 원복
+  │     ├─ picking_task_items: PICKED/SHORT → CANCEL (pick_qty, short_qty 초기화)
+  │     └─ picking_tasks: COMPLETED → CANCELLED (실적 수량 초기화)
+  │
+  └─ 6. 출하 주문 상태 원복
+        ├─ INDIVIDUAL: 해당 주문 PACKING/PICKING → RELEASED
+        └─ TOTAL: 웨이브 내 모든 주문 PACKING/PICKING → RELEASED
+```
+
+**응답 예시** (취소 성공):
+```json
+{
+  "success": true,
+  "pick_task_no": "PICK-260401-0001",
+  "cancelled_pack_order_count": 1,
+  "cancelled_pack_item_count": 3,
+  "reverted_order_count": 1
+}
+```
+
+**에러 응답 예시** (웨이브 완료):
+```
+"웨이브 [W-260401-001]가 이미 완료되어 피킹을 취소할 수 없습니다"
+```
+
+**에러 응답 예시** (포장 처리 중):
+```
+"포장 지시 [PACK-260401-0001]가 이미 처리 중이므로 피킹을 취소할 수 없습니다 (현재 상태: IN_PROGRESS)"
+```
+
+> **구현 위치**: `FulfillmentTransactionService.cancelCompletedPickingTask()` — 포장 지시 삭제 + 피킹 취소 + 주문 원복을 하나의 트랜잭션으로 처리
+> **참고**: CREATED/IN_PROGRESS 상태의 피킹 취소는 기존 `FulfillmentPickingService.cancelPickingTask()`에서 처리. Controller에서 상태에 따라 자동 분기.
 
 ### 2.3 상태 전이 및 색상 매핑
 

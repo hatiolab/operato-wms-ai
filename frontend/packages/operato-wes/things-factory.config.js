@@ -15,6 +15,7 @@ export default {
     { tagname: 'picking-task-list', page: 'picking-task-list' },
     { tagname: 'packing-order-list', page: 'packing-order-list' },
     { tagname: 'fulfillment-picking-pc', page: 'fulfillment-picking-pc' },
+    { tagname: 'fulfillment-packing-pc', page: 'fulfillment-packing-pc' },
 
     { tagname: 'inbound-home', page: 'inbound-home' },
     { tagname: 'outbound-home', page: 'outbound-home' },

@@ -10,6 +10,7 @@ import operato.wms.fulfillment.entity.PackingBox;
 import operato.wms.fulfillment.entity.PackingOrder;
 import operato.wms.fulfillment.entity.PackingOrderItem;
 import xyz.anythings.sys.service.AbstractQueryService;
+import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
@@ -37,7 +38,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 		PackingOrder order = this.findPackingOrder(domainId, id);
 
 		if (!PackingOrder.STATUS_CREATED.equals(order.getStatus())) {
-			throw new RuntimeException("패킹 지시 상태가 [" + order.getStatus() + "]이므로 시작할 수 없습니다 (CREATED 상태만 가능)");
+			throw new ElidomValidationException("패킹 지시 상태가 [" + order.getStatus() + "]이므로 시작할 수 없습니다 (CREATED 상태만 가능)");
 		}
 
 		String sql = "UPDATE packing_orders SET status = :status, started_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :id";
@@ -65,7 +66,8 @@ public class FulfillmentPackingService extends AbstractQueryService {
 		PackingOrder order = this.findPackingOrder(domainId, id);
 
 		if (!PackingOrder.STATUS_IN_PROGRESS.equals(order.getStatus())) {
-			throw new RuntimeException("패킹 지시 상태가 [" + order.getStatus() + "]이므로 완료할 수 없습니다 (IN_PROGRESS 상태만 가능)");
+			throw new ElidomValidationException(
+					"패킹 지시 상태가 [" + order.getStatus() + "]이므로 완료할 수 없습니다 (IN_PROGRESS 상태만 가능)");
 		}
 
 		// 박스 수 집계
@@ -109,10 +111,10 @@ public class FulfillmentPackingService extends AbstractQueryService {
 
 		String status = order.getStatus();
 		if (PackingOrder.STATUS_SHIPPED.equals(status)) {
-			throw new RuntimeException("패킹 지시 상태가 [SHIPPED]이므로 취소할 수 없습니다");
+			throw new ElidomValidationException("패킹 지시 상태가 [SHIPPED]이므로 취소할 수 없습니다");
 		}
 		if (PackingOrder.STATUS_CANCELLED.equals(status)) {
-			throw new RuntimeException("패킹 지시가 이미 취소되었습니다");
+			throw new ElidomValidationException("패킹 지시가 이미 취소되었습니다");
 		}
 
 		// 패킹 상세 아이템 취소
@@ -152,8 +154,9 @@ public class FulfillmentPackingService extends AbstractQueryService {
 
 		PackingOrder order = this.findPackingOrder(domainId, packingOrderId);
 
-		if (PackingOrder.STATUS_CANCELLED.equals(order.getStatus()) || PackingOrder.STATUS_SHIPPED.equals(order.getStatus())) {
-			throw new RuntimeException("패킹 지시 상태가 [" + order.getStatus() + "]이므로 박스를 생성할 수 없습니다");
+		if (PackingOrder.STATUS_CANCELLED.equals(order.getStatus())
+				|| PackingOrder.STATUS_SHIPPED.equals(order.getStatus())) {
+			throw new ElidomValidationException("패킹 지시 상태가 [" + order.getStatus() + "]이므로 박스를 생성할 수 없습니다");
 		}
 
 		// 다음 box_seq 조회
@@ -195,7 +198,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 		PackingBox box = this.findPackingBox(domainId, boxId);
 
 		if (!PackingBox.STATUS_OPEN.equals(box.getStatus())) {
-			throw new RuntimeException("박스 상태가 [" + box.getStatus() + "]이므로 마감할 수 없습니다 (OPEN 상태만 가능)");
+			throw new ElidomValidationException("박스 상태가 [" + box.getStatus() + "]이므로 마감할 수 없습니다 (OPEN 상태만 가능)");
 		}
 
 		// 박스 내 아이템 집계
@@ -226,6 +229,123 @@ public class FulfillmentPackingService extends AbstractQueryService {
 	}
 
 	/**
+	 * 대기중인 포장 주문 목록 조회
+	 *
+	 * @param orderDate 주문 날짜 (YYYY-MM-DD)
+	 * @return 포장 주문 목록
+	 */
+	@SuppressWarnings("rawtypes")
+	public List<Map> searchTodoPackingOrders(String orderDate) {
+		Long domainId = Domain.currentDomainId();
+
+		StringBuilder sql = new StringBuilder();
+		sql.append("SELECT po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.carrier_cd,");
+		sql.append(" po.status, po.created_at, po.started_at, po.completed_at,");
+		sql.append(" po.total_box, po.total_wt,");
+		sql.append(
+				" (SELECT SUM(poi.order_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,");
+		sql.append(
+				" (SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,");
+		sql.append(
+				" (SELECT SUM(poi.pack_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty");
+		sql.append(" FROM packing_orders po");
+		sql.append(" WHERE po.domain_id = :domainId AND po.status in ('CREATED', 'IN_PROGRESS')");
+
+		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+
+		// if (orderDate != null && !orderDate.isEmpty()) {
+		// sql.append(" AND po.order_date = :orderDate");
+		// params.put("orderDate", orderDate);
+		// }
+
+		// sql.append(
+		// " ORDER BY CASE po.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN
+		// 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, po.created_at");
+
+		return this.queryManager.selectListBySql(sql.toString(), params, Map.class, 0, 0);
+	}
+
+	/**
+	 * 완료된 포장 주문 목록 조회
+	 *
+	 * @param orderDate 주문 날짜 (YYYY-MM-DD)
+	 * @return 포장 주문 목록
+	 */
+	@SuppressWarnings("rawtypes")
+	public List<Map> searchDonePackingOrders(String orderDate) {
+		Long domainId = Domain.currentDomainId();
+
+		StringBuilder sql = new StringBuilder();
+		sql.append("SELECT po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.carrier_cd,");
+		sql.append(" po.status, po.created_at, po.started_at, po.completed_at,");
+		sql.append(" po.total_box, po.total_wt,");
+		sql.append(
+				" (SELECT SUM(poi.order_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,");
+		sql.append(
+				" (SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,");
+		sql.append(
+				" (SELECT SUM(poi.pack_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty");
+		sql.append(" FROM packing_orders po");
+		sql.append(" WHERE po.domain_id = :domainId AND po.status not in ('CREATED', 'IN_PROGRESS', 'CANCELLED')");
+
+		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+
+		// if (orderDate != null && !orderDate.isEmpty()) {
+		// sql.append(" AND po.order_date = :orderDate");
+		// params.put("orderDate", orderDate);
+		// }
+
+		// sql.append(
+		// " ORDER BY CASE po.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN
+		// 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, po.created_at");
+
+		return this.queryManager.selectListBySql(sql.toString(), params, Map.class, 0, 0);
+	}
+
+	/**
+	 * 포장 주문 목록 조회 (상태/날짜 필터)
+	 *
+	 * @param status    주문 상태 (INSPECTED, PACKING, COMPLETED 등)
+	 * @param orderDate 주문 날짜 (YYYY-MM-DD)
+	 * @return 포장 주문 목록
+	 */
+	@SuppressWarnings("rawtypes")
+	public List<Map> searchPackingOrders(String status, String orderDate) {
+		Long domainId = Domain.currentDomainId();
+
+		StringBuilder sql = new StringBuilder();
+		sql.append("SELECT po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.carrier_cd,");
+		sql.append(" po.status, po.created_at, po.started_at, po.completed_at,");
+		sql.append(" po.total_box, po.total_wt,");
+		sql.append(
+				" (SELECT SUM(poi.order_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,");
+		sql.append(
+				" (SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,");
+		sql.append(
+				" (SELECT SUM(poi.pack_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty");
+		sql.append(" FROM packing_orders po");
+		sql.append(" WHERE po.domain_id = :domainId");
+
+		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+
+		if (status != null && !status.isEmpty()) {
+			sql.append(" AND po.status = :status");
+			params.put("status", status);
+		}
+
+		// if (orderDate != null && !orderDate.isEmpty()) {
+		// sql.append(" AND po.order_date = :orderDate");
+		// params.put("orderDate", orderDate);
+		// }
+
+		// sql.append(
+		// " ORDER BY CASE po.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN
+		// 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, po.created_at");
+
+		return this.queryManager.selectListBySql(sql.toString(), params, Map.class, 0, 0);
+	}
+
+	/**
 	 * 패킹 지시 상세 아이템 조회
 	 *
 	 * @param id 패킹 지시 ID
@@ -245,6 +365,19 @@ public class FulfillmentPackingService extends AbstractQueryService {
 				+ " ORDER BY sku_cd";
 		Map<String, Object> params = ValueUtil.newMap("domainId,packingOrderId", domainId, id);
 		return this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+	}
+
+	/**
+	 * 포장 아이템 조회 (packing_order_id로 필터)
+	 *
+	 * 프론트엔드 API 호환성을 위해 제공. getPackingOrderItems(id)와 동일한 기능.
+	 *
+	 * @param packingOrderId 포장 주문 ID
+	 * @return 포장 아이템 목록
+	 */
+	@SuppressWarnings("rawtypes")
+	public List<Map> getPackingOrderItemsByOrderId(String packingOrderId) {
+		return this.getPackingOrderItems(packingOrderId);
 	}
 
 	/**
@@ -284,10 +417,11 @@ public class FulfillmentPackingService extends AbstractQueryService {
 		PackingOrderItem item = this.findPackingOrderItem(domainId, itemId);
 
 		if (!PackingOrderItem.STATUS_WAIT.equals(item.getStatus())) {
-			throw new RuntimeException("포장 항목 상태가 [" + item.getStatus() + "]이므로 검수할 수 없습니다 (WAIT 상태만 가능)");
+			throw new ElidomValidationException("포장 항목 상태가 [" + item.getStatus() + "]이므로 검수할 수 없습니다 (WAIT 상태만 가능)");
 		}
 
-		double inspQty = params.get("insp_qty") != null ? Double.parseDouble(params.get("insp_qty").toString()) : item.getOrderQty();
+		double inspQty = params.get("insp_qty") != null ? Double.parseDouble(params.get("insp_qty").toString())
+				: item.getOrderQty();
 
 		String sql = "UPDATE packing_order_items SET insp_qty = :inspQty, status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
 		Map<String, Object> updParams = ValueUtil.newMap("inspQty,status,domainId,id",
@@ -304,6 +438,20 @@ public class FulfillmentPackingService extends AbstractQueryService {
 	}
 
 	/**
+	 * 아이템 검수 완료 (finish)
+	 *
+	 * 검수 수량을 확정하고 상태를 INSPECTED로 변경한다.
+	 * inspectItem과 동일한 기능이지만 프론트엔드 API 호환성을 위해 별도 메서드로 제공.
+	 *
+	 * @param itemId 포장 항목 ID
+	 * @param params { insp_qty }
+	 * @return { success, item_id, sku_cd, insp_qty, status }
+	 */
+	public Map<String, Object> finishPackingItem(String itemId, Map<String, Object> params) {
+		return this.inspectItem(itemId, params);
+	}
+
+	/**
 	 * 아이템 포장 (박스 투입)
 	 *
 	 * 포장 항목의 pack_qty를 갱신하고, 지정 박스에 배정하며 상태를 PACKED로 변경한다.
@@ -317,11 +465,14 @@ public class FulfillmentPackingService extends AbstractQueryService {
 
 		PackingOrderItem item = this.findPackingOrderItem(domainId, itemId);
 
-		if (!PackingOrderItem.STATUS_INSPECTED.equals(item.getStatus()) && !PackingOrderItem.STATUS_WAIT.equals(item.getStatus())) {
-			throw new RuntimeException("포장 항목 상태가 [" + item.getStatus() + "]이므로 포장할 수 없습니다 (WAIT/INSPECTED 상태만 가능)");
+		if (!PackingOrderItem.STATUS_INSPECTED.equals(item.getStatus())
+				&& !PackingOrderItem.STATUS_WAIT.equals(item.getStatus())) {
+			throw new ElidomValidationException(
+					"포장 항목 상태가 [" + item.getStatus() + "]이므로 포장할 수 없습니다 (WAIT/INSPECTED 상태만 가능)");
 		}
 
-		double packQty = params.get("pack_qty") != null ? Double.parseDouble(params.get("pack_qty").toString()) : item.getOrderQty();
+		double packQty = params.get("pack_qty") != null ? Double.parseDouble(params.get("pack_qty").toString())
+				: item.getOrderQty();
 		String boxId = params.get("packing_box_id") != null ? params.get("packing_box_id").toString() : null;
 
 		String sql = "UPDATE packing_order_items SET pack_qty = :packQty, status = :status"
@@ -358,7 +509,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
 		List<PackingOrderItem> list = this.queryManager.selectListBySql(sql, params, PackingOrderItem.class, 0, 1);
 		if (list.isEmpty()) {
-			throw new RuntimeException("포장 항목을 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("포장 항목을 찾을 수 없습니다: " + id);
 		}
 		return list.get(0);
 	}
@@ -371,7 +522,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
 		List<PackingOrder> list = this.queryManager.selectListBySql(sql, params, PackingOrder.class, 0, 1);
 		if (list.isEmpty()) {
-			throw new RuntimeException("패킹 지시를 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("패킹 지시를 찾을 수 없습니다: " + id);
 		}
 		return list.get(0);
 	}
@@ -384,7 +535,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
 		List<PackingBox> list = this.queryManager.selectListBySql(sql, params, PackingBox.class, 0, 1);
 		if (list.isEmpty()) {
-			throw new RuntimeException("포장 박스를 찾을 수 없습니다: " + id);
+			throw new ElidomValidationException("포장 박스를 찾을 수 없습니다: " + id);
 		}
 		return list.get(0);
 	}

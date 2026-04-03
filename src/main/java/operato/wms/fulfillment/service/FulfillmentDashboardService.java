@@ -1,12 +1,12 @@
 package operato.wms.fulfillment.service;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
 import xyz.anythings.sys.service.AbstractQueryService;
+import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
@@ -45,16 +45,15 @@ public class FulfillmentDashboardService extends AbstractQueryService {
 		Map<String, Object> params = ValueUtil.newMap("domainId,orderDate", domainId, date);
 		List<Map> rows = this.queryManager.selectListBySql(sql, params, Map.class, 0, 1);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("order_date", date);
+		Map<String, Object> result = ValueUtil.newMap("order_date", date);
 
 		if (!rows.isEmpty()) {
 			Map row = rows.get(0);
-			result.put("created", this.toInt(row.get("created")));
-			result.put("in_progress", this.toInt(row.get("in_progress")));
-			result.put("completed", this.toInt(row.get("completed")));
-			result.put("cancelled", this.toInt(row.get("cancelled")));
-			result.put("total", this.toInt(row.get("total")));
+			result.put("created", ValueUtil.toInteger(row.get("created")));
+			result.put("in_progress", ValueUtil.toInteger(row.get("in_progress")));
+			result.put("completed", ValueUtil.toInteger(row.get("completed")));
+			result.put("cancelled", ValueUtil.toInteger(row.get("cancelled")));
+			result.put("total", ValueUtil.toInteger(row.get("total")));
 		} else {
 			result.put("created", 0);
 			result.put("in_progress", 0);
@@ -70,10 +69,12 @@ public class FulfillmentDashboardService extends AbstractQueryService {
 	 * 패킹 현황 조회
 	 *
 	 * 지정 일자의 패킹 지시 상태별 건수를 반환한다.
-	 * 7가지 상태: CREATED, IN_PROGRESS, COMPLETED, LABEL_PRINTED, MANIFESTED, SHIPPED, CANCELLED
+	 * 7가지 상태: CREATED, IN_PROGRESS, COMPLETED, LABEL_PRINTED, MANIFESTED, SHIPPED,
+	 * CANCELLED
 	 *
 	 * @param orderDate 작업 일자 (YYYY-MM-DD, null이면 당일)
-	 * @return { order_date, created, in_progress, completed, label_printed, manifested, shipped, cancelled, total }
+	 * @return { order_date, created, in_progress, completed, label_printed,
+	 *         manifested, shipped, cancelled, total }
 	 */
 	public Map<String, Object> getPackingStatus(String orderDate) {
 		Long domainId = Domain.currentDomainId();
@@ -93,19 +94,18 @@ public class FulfillmentDashboardService extends AbstractQueryService {
 		Map<String, Object> params = ValueUtil.newMap("domainId,orderDate", domainId, date);
 		List<Map> rows = this.queryManager.selectListBySql(sql, params, Map.class, 0, 1);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("order_date", date);
+		Map<String, Object> result = ValueUtil.newMap("order_date", date);
 
 		if (!rows.isEmpty()) {
 			Map row = rows.get(0);
-			result.put("created", this.toInt(row.get("created")));
-			result.put("in_progress", this.toInt(row.get("in_progress")));
-			result.put("completed", this.toInt(row.get("completed")));
-			result.put("label_printed", this.toInt(row.get("label_printed")));
-			result.put("manifested", this.toInt(row.get("manifested")));
-			result.put("shipped", this.toInt(row.get("shipped")));
-			result.put("cancelled", this.toInt(row.get("cancelled")));
-			result.put("total", this.toInt(row.get("total")));
+			result.put("created", ValueUtil.toInteger(row.get("created")));
+			result.put("in_progress", ValueUtil.toInteger(row.get("in_progress")));
+			result.put("completed", ValueUtil.toInteger(row.get("completed")));
+			result.put("label_printed", ValueUtil.toInteger(row.get("label_printed")));
+			result.put("manifested", ValueUtil.toInteger(row.get("manifested")));
+			result.put("shipped", ValueUtil.toInteger(row.get("shipped")));
+			result.put("cancelled", ValueUtil.toInteger(row.get("cancelled")));
+			result.put("total", ValueUtil.toInteger(row.get("total")));
 		} else {
 			result.put("created", 0);
 			result.put("in_progress", 0);
@@ -127,7 +127,8 @@ public class FulfillmentDashboardService extends AbstractQueryService {
 	 * 총 출하 건수, 박스 수, 중량, 미출하 건수, 시간대별 통계를 포함한다.
 	 *
 	 * @param orderDate 작업 일자 (YYYY-MM-DD, null이면 당일)
-	 * @return { order_date, total_shipped, total_box, total_wt, pending_shipment, hourly_stats }
+	 * @return { order_date, total_shipped, total_box, total_wt, pending_shipment,
+	 *         hourly_stats }
 	 */
 	public Map<String, Object> getShippingStatus(String orderDate) {
 		Long domainId = Domain.currentDomainId();
@@ -144,15 +145,14 @@ public class FulfillmentDashboardService extends AbstractQueryService {
 		Map<String, Object> shippedParams = ValueUtil.newMap("domainId,orderDate", domainId, date);
 		List<Map> shippedRows = this.queryManager.selectListBySql(shippedSql, shippedParams, Map.class, 0, 1);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("order_date", date);
+		Map<String, Object> result = ValueUtil.newMap("order_date", date);
 
 		if (!shippedRows.isEmpty()) {
 			Map row = shippedRows.get(0);
-			result.put("total_shipped", this.toInt(row.get("total_shipped")));
-			result.put("total_box", this.toInt(row.get("total_box")));
-			result.put("total_wt", this.toDouble(row.get("total_wt")));
-			result.put("pending_shipment", this.toInt(row.get("pending_shipment")));
+			result.put("total_shipped", ValueUtil.toInteger(row.get("total_shipped")));
+			result.put("total_box", ValueUtil.toInteger(row.get("total_box")));
+			result.put("total_wt", ValueUtil.toDouble(row.get("total_wt")));
+			result.put("pending_shipment", ValueUtil.toInteger(row.get("pending_shipment")));
 		} else {
 			result.put("total_shipped", 0);
 			result.put("total_box", 0);
@@ -171,7 +171,6 @@ public class FulfillmentDashboardService extends AbstractQueryService {
 				+ " ORDER BY hour";
 		List<Map> hourlyStats = this.queryManager.selectListBySql(hourlySql, shippedParams, Map.class, 0, 0);
 		result.put("hourly_stats", hourlyStats);
-
 		return result;
 	}
 
@@ -181,7 +180,8 @@ public class FulfillmentDashboardService extends AbstractQueryService {
 	 * 지정 일자의 작업자별 피킹/패킹 실적을 반환한다.
 	 *
 	 * @param orderDate 작업 일자 (YYYY-MM-DD, null이면 당일)
-	 * @return 작업자 실적 목록 [ { worker_id, worker_nm, pick_count, pick_qty, pack_count } ]
+	 * @return 작업자 실적 목록 [ { worker_id, worker_nm, pick_count, pick_qty, pack_count
+	 *         } ]
 	 */
 	public List<Map> getWorkerPerformance(String orderDate) {
 		Long domainId = Domain.currentDomainId();
@@ -219,13 +219,14 @@ public class FulfillmentDashboardService extends AbstractQueryService {
 	 * 지정 웨이브의 피킹/패킹/출하 진행률을 반환한다.
 	 *
 	 * @param waveNo 웨이브 번호
-	 * @return { wave_no, total_orders, pick_completed, pack_completed, shipped, pick_rate, pack_rate, ship_rate }
+	 * @return { wave_no, total_orders, pick_completed, pack_completed, shipped,
+	 *         pick_rate, pack_rate, ship_rate }
 	 */
 	public Map<String, Object> getWaveProgress(String waveNo) {
 		Long domainId = Domain.currentDomainId();
 
 		if (ValueUtil.isEmpty(waveNo)) {
-			throw new RuntimeException("wave_no는 필수 파라미터입니다");
+			throw new ElidomValidationException("wave_no는 필수 파라미터입니다");
 		}
 
 		// 웨이브의 총 주문 수 조회
@@ -254,8 +255,7 @@ public class FulfillmentDashboardService extends AbstractQueryService {
 		double packRate = total > 0 ? Math.round((double) packComp / total * 10000.0) / 100.0 : 0;
 		double shipRate = total > 0 ? Math.round((double) shipComp / total * 10000.0) / 100.0 : 0;
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("wave_no", waveNo);
+		Map<String, Object> result = ValueUtil.newMap("wave_no", waveNo);
 		result.put("total_orders", total);
 		result.put("pick_completed", pickComp);
 		result.put("pack_completed", packComp);
@@ -289,31 +289,5 @@ public class FulfillmentDashboardService extends AbstractQueryService {
 				+ " ORDER BY dock_cd, carrier_cd";
 		Map<String, Object> params = ValueUtil.newMap("domainId,orderDate", domainId, date);
 		return this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
-	}
-
-	/*
-	 * ============================================================
-	 * 내부 유틸리티
-	 * ============================================================
-	 */
-
-	/**
-	 * Object를 int로 변환
-	 */
-	private int toInt(Object value) {
-		if (value == null) {
-			return 0;
-		}
-		return Integer.parseInt(value.toString());
-	}
-
-	/**
-	 * Object를 double로 변환
-	 */
-	private double toDouble(Object value) {
-		if (value == null) {
-			return 0.0;
-		}
-		return Double.parseDouble(value.toString());
 	}
 }

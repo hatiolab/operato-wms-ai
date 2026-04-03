@@ -18,16 +18,19 @@ import org.springframework.web.bind.annotation.RestController;
 
 import operato.wms.oms.entity.ImportShipmentOrder;
 import operato.wms.oms.entity.ShipmentOrder;
-import operato.wms.oms.service.OmsTransactionService;
+import operato.wms.oms.service.OmsImportService;
+import operato.wms.oms.service.OmsReplenishOrderService;
+import operato.wms.oms.service.OmsShipmentOrderService;
+import operato.wms.oms.service.OmsWaveService;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.sys.system.service.AbstractRestService;
-import xyz.elidom.sys.util.ValueUtil;
+import xyz.elidom.util.ValueUtil;
 
 /**
  * OMS 트랜잭션 컨트롤러
  *
- * 출하 주문 임포트(검증/확정) 등 트랜잭션 API를 제공한다.
+ * 출하 주문 임포트, 웨이브 관리, 출하 주문 상태 변경, 보충 지시 등 트랜잭션 API를 제공한다.
  *
  * @author HatioLab
  */
@@ -37,14 +40,37 @@ import xyz.elidom.sys.util.ValueUtil;
 @RequestMapping("/rest/oms_trx")
 @ServiceDesc(description = "OMS Transaction Service API")
 public class OmsTransactionController extends AbstractRestService {
-
+	/**
+	 * OMS Import Service
+	 */
 	@Autowired
-	private OmsTransactionService omsTrxService;
+	private OmsImportService importService;
+	/**
+	 * OMS Wave Service
+	 */
+	@Autowired
+	private OmsWaveService waveService;
+	/**
+	 * OMS Shipment Order Service
+	 */
+	@Autowired
+	private OmsShipmentOrderService orderService;
+	/**
+	 * OMS Replenish Order Service
+	 */
+	@Autowired
+	private OmsReplenishOrderService replenishService;
 
 	@Override
 	protected Class<?> entityClass() {
 		return ShipmentOrder.class;
 	}
+
+	/*
+	 * ============================================================
+	 * 임포트 API
+	 * ============================================================
+	 */
 
 	/**
 	 * B2C 출하 주문 엑셀 임포트 (업로드 + 검증)
@@ -57,7 +83,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "shipment_orders/import/excel/b2c", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Import B2C shipment orders from Excel (validate)")
 	public Map<String, Object> importB2cExcel(@RequestBody List<ImportShipmentOrder> list) {
-		return this.omsTrxService.validateImportData(list, "B2C_OUT");
+		return this.importService.validateImportData(list, "B2C_OUT");
 	}
 
 	/**
@@ -71,7 +97,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "shipment_orders/import/excel/b2b", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Import B2B shipment orders from Excel (validate)")
 	public Map<String, Object> importB2bExcel(@RequestBody List<ImportShipmentOrder> list) {
-		return this.omsTrxService.validateImportData(list, "B2B_OUT");
+		return this.importService.validateImportData(list, "B2B_OUT");
 	}
 
 	/**
@@ -85,8 +111,14 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "shipment_orders/import/confirm", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Confirm and process shipment order import")
 	public Map<String, Object> importConfirm(@RequestBody List<ImportShipmentOrder> list) {
-		return this.omsTrxService.importShipmentOrders(list);
+		return this.importService.importShipmentOrders(list);
 	}
+
+	/*
+	 * ============================================================
+	 * 웨이브 생성 API
+	 * ============================================================
+	 */
 
 	/**
 	 * 자동 웨이브 생성
@@ -99,7 +131,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "waves/create", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Create waves automatically from allocated orders")
 	public Map<String, Object> createAutoWaves(@RequestBody Map<String, Object> params) {
-		return this.omsTrxService.createAutoWaves(params);
+		return this.waveService.createAutoWaves(params);
 	}
 
 	/**
@@ -114,7 +146,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "waves/create_wave", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Create waves from selected allocated orders, other settings later...")
 	public Map<String, Object> createWave(@RequestBody List<ShipmentOrder> list) {
-		return this.omsTrxService.createWave(list, null, null);
+		return this.waveService.createWave(list, null, null);
 	}
 
 	/**
@@ -129,7 +161,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "waves/create_manual", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Create wave manually from selected orders")
 	public Map<String, Object> createManualWave(@RequestBody Map<String, Object> params) {
-		return this.omsTrxService.createManualWave(params);
+		return this.waveService.createManualWave(params);
 	}
 
 	/**
@@ -144,7 +176,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Preview auto wave target order count")
 	public Map<String, Object> previewAutoWaveTargets(
 			@RequestParam(name = "order_date", required = false) String orderDate) {
-		return this.omsTrxService.previewAutoWaveTargets(orderDate);
+		return this.waveService.previewAutoWaveTargets(orderDate);
 	}
 
 	/*
@@ -166,7 +198,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "shipment_orders/{id}/confirm_and_allocate", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Confirm and allocate shipment order (REGISTERED → CONFIRMED → ALLOCATED)")
 	public Map<String, Object> confirmAndAllocateOrder(@PathVariable("id") String id) {
-		return this.omsTrxService.confirmAndAllocateShipmentOrder(id);
+		return this.orderService.confirmAndAllocateShipmentOrder(id);
 	}
 
 	/**
@@ -181,7 +213,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "shipment_orders/confirm", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Confirm shipment orders (REGISTERED → CONFIRMED)")
 	public Map<String, Object> confirmOrders(@RequestBody Map<String, Object> params) {
-		return this.omsTrxService.confirmShipmentOrders((List<String>) params.get("ids"));
+		return this.orderService.confirmShipmentOrders((List<String>) params.get("ids"));
 	}
 
 	/**
@@ -196,7 +228,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Confirm shipment orders (REGISTERED → CONFIRMED)")
 	public Map<String, Object> confirmOrderList(@RequestBody List<ShipmentOrder> list) {
 		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
-		return this.omsTrxService.confirmShipmentOrders(ids);
+		return this.orderService.confirmShipmentOrders(ids);
 	}
 
 	/**
@@ -211,7 +243,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "shipment_orders/allocate", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Allocate inventory for shipment orders (CONFIRMED → ALLOCATED)")
 	public Map<String, Object> allocateOrders(@RequestBody Map<String, Object> params) {
-		return this.omsTrxService.allocateShipmentOrders((List<String>) params.get("ids"));
+		return this.orderService.allocateShipmentOrders((List<String>) params.get("ids"));
 	}
 
 	/**
@@ -226,7 +258,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Allocate inventory for shipment orders (CONFIRMED → ALLOCATED)")
 	public Map<String, Object> allocateOrders(@RequestBody List<ShipmentOrder> list) {
 		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
-		return this.omsTrxService.allocateShipmentOrders(ids);
+		return this.orderService.allocateShipmentOrders(ids);
 	}
 
 	/**
@@ -240,7 +272,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "shipment_orders/deallocate", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Deallocate inventory from shipment order (ALLOCATED → CONFIRMED)")
 	public Map<String, Object> deallocateOrder(@RequestBody Map<String, Object> params) {
-		return this.omsTrxService.deallocateShipmentOrder((String) params.get("id"));
+		return this.orderService.deallocateShipmentOrder((String) params.get("id"));
 	}
 
 	/**
@@ -257,7 +289,7 @@ public class OmsTransactionController extends AbstractRestService {
 		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
 		Map<String, Object> result = ValueUtil.newMap("success,released_count", true, 0);
 		for (String id : ids) {
-			Map<String, Object> itemResult = this.omsTrxService.deallocateShipmentOrder(id);
+			Map<String, Object> itemResult = this.orderService.deallocateShipmentOrder(id);
 			if ((Boolean) itemResult.get("success")) {
 				result.put("released_count",
 						(Integer) result.get("released_count") + (Integer) itemResult.get("released_count"));
@@ -281,7 +313,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "shipment_orders/cancel", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Cancel shipment orders")
 	public Map<String, Object> cancelOrders(@RequestBody Map<String, Object> params) {
-		return this.omsTrxService.cancelShipmentOrders((List<String>) params.get("ids"));
+		return this.orderService.cancelShipmentOrders((List<String>) params.get("ids"));
 	}
 
 	/**
@@ -296,7 +328,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Cancel shipment orders")
 	public Map<String, Object> cancelOrdersList(@RequestBody List<ShipmentOrder> list) {
 		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
-		return this.omsTrxService.cancelShipmentOrders(ids);
+		return this.orderService.cancelShipmentOrders(ids);
 	}
 
 	/**
@@ -310,7 +342,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "shipment_orders/{id}/close", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Close shipment order (SHIPPED → CLOSED)")
 	public Map<String, Object> closeOrder(@PathVariable("id") String id) {
-		return this.omsTrxService.closeShipmentOrder(id);
+		return this.orderService.closeShipmentOrder(id);
 	}
 
 	/**
@@ -326,7 +358,7 @@ public class OmsTransactionController extends AbstractRestService {
 	public Map<String, Object> closeOrderList(@RequestBody List<ShipmentOrder> list) {
 		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
 		for (String id : ids) {
-			this.omsTrxService.closeShipmentOrder(id);
+			this.orderService.closeShipmentOrder(id);
 		}
 
 		return ValueUtil.newMap("success", true);
@@ -349,7 +381,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "waves/{id}/orders", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Get orders in wave")
 	public List<Map> getWaveOrders(@PathVariable("id") String id) {
-		return this.omsTrxService.getWaveOrders(id);
+		return this.waveService.getWaveOrders(id);
 	}
 
 	/**
@@ -363,7 +395,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "waves/{id}/summary", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Get wave SKU summary")
 	public List<Map> getWaveSummary(@PathVariable("id") String id) {
-		return this.omsTrxService.getWaveSummary(id);
+		return this.waveService.getWaveSummary(id);
 	}
 
 	/**
@@ -379,7 +411,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "waves/{id}/add_orders", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Add orders to wave")
 	public Map<String, Object> addOrdersToWave(@PathVariable("id") String id, @RequestBody Map<String, Object> params) {
-		return this.omsTrxService.addOrdersToWave(id, (List<String>) params.get("ids"));
+		return this.waveService.addOrdersToWave(id, (List<String>) params.get("ids"));
 	}
 
 	/**
@@ -396,7 +428,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Remove orders from wave")
 	public Map<String, Object> removeOrdersFromWave(@PathVariable("id") String id,
 			@RequestBody Map<String, Object> params) {
-		return this.omsTrxService.removeOrdersFromWave(id, (List<String>) params.get("ids"));
+		return this.waveService.removeOrdersFromWave(id, (List<String>) params.get("ids"));
 	}
 
 	/*
@@ -416,7 +448,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "waves/{id}/release", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Release wave (CREATED → RELEASED)")
 	public Map<String, Object> releaseWave(@PathVariable("id") String id) {
-		return this.omsTrxService.releaseWave(id);
+		return this.waveService.releaseWave(id);
 	}
 
 	/**
@@ -436,7 +468,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "waves/{id}/cancel_release", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Cancel wave release (RELEASED → CREATED)")
 	public Map<String, Object> cancelWaveRelease(@PathVariable("id") String id) {
-		return this.omsTrxService.cancelWaveRelease(id);
+		return this.waveService.cancelWaveRelease(id);
 	}
 
 	/**
@@ -450,7 +482,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "waves/{id}/cancel", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Cancel wave (CREATED → CANCELLED)")
 	public Map<String, Object> cancelWave(@PathVariable("id") String id) {
-		return this.omsTrxService.cancelWave(id);
+		return this.waveService.cancelWave(id);
 	}
 
 	/*
@@ -470,7 +502,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "replenish_orders/{id}/start", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Start replenish order (CREATED → IN_PROGRESS)")
 	public Map<String, Object> startReplenishOrder(@PathVariable("id") String id) {
-		return this.omsTrxService.startReplenishOrder(id);
+		return this.replenishService.startReplenishOrder(id);
 	}
 
 	/**
@@ -484,7 +516,7 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "replenish_orders/{id}/complete", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Complete replenish order (IN_PROGRESS → COMPLETED)")
 	public Map<String, Object> completeReplenishOrder(@PathVariable("id") String id) {
-		return this.omsTrxService.completeReplenishOrder(id);
+		return this.replenishService.completeReplenishOrder(id);
 	}
 
 	/**
@@ -498,6 +530,6 @@ public class OmsTransactionController extends AbstractRestService {
 	@RequestMapping(value = "replenish_orders/{id}/cancel", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Cancel replenish order (→ CANCELLED)")
 	public Map<String, Object> cancelReplenishOrder(@PathVariable("id") String id) {
-		return this.omsTrxService.cancelReplenishOrder(id);
+		return this.replenishService.cancelReplenishOrder(id);
 	}
 }
