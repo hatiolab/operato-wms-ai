@@ -45,6 +45,17 @@ class OmsHome extends localize(i18next)(PageView) {
           display: flex;
           align-items: center;
           gap: 8px;
+          flex: 1;
+        }
+
+        .section-header {
+          display: flex;
+          align-items: center;
+          margin-bottom: var(--spacing-medium, 16px);
+        }
+
+        .section-header .section-title {
+          margin-bottom: 0;
         }
 
         /* 상태 카드 그리드 */
@@ -288,6 +299,27 @@ class OmsHome extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface-variant);
         }
 
+        .btn-refresh {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: var(--md-sys-color-surface);
+          color: var(--md-sys-color-primary);
+          border: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
+          border-radius: 8px;
+          padding: 8px 16px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .btn-refresh:hover {
+          background: var(--md-sys-color-primary);
+          color: var(--md-sys-color-on-primary);
+          box-shadow: var(--box-shadow-light, 0 2px 4px rgba(0, 0, 0, 0.1));
+        }
+
         /* 반응형 */
         @media screen and (max-width: 1024px) {
           .charts-row {
@@ -319,7 +351,7 @@ class OmsHome extends localize(i18next)(PageView) {
     return {
       loading: Boolean,
       statusCounts: Object,
-      bizTypeStats: Object,
+      shipTypeStats: Array,
       channelStats: Array,
       waveStats: Object,
       allocationStats: Object,
@@ -333,7 +365,7 @@ class OmsHome extends localize(i18next)(PageView) {
     super()
     this.loading = true
     this.statusCounts = {}
-    this.bizTypeStats = { B2C_OUT: 0, B2B_OUT: 0, B2C_RTN: 0, B2B_RTN: 0 }
+    this.shipTypeStats = []
     this.channelStats = []
     this.waveStats = { CREATED: 0, RELEASED: 0, COMPLETED: 0, CANCELLED: 0 }
     this.allocationStats = { total_orders: 0, allocated_orders: 0, back_orders: 0, alloc_rate: 0, soft_alloc_expiring_soon: 0 }
@@ -375,7 +407,17 @@ class OmsHome extends localize(i18next)(PageView) {
             <div class="dashboard-container">
               <!-- ① 오늘의 주문 현황 (상태별 카드) -->
               <section>
-                <h3 class="section-title">오늘의 주문 현황</h3>
+                <div class="section-header">
+                  <h3 class="section-title">오늘의 주문 현황</h3>
+                  <div class="header-actions">
+                    <button @click="${() => this._fetchDashboardData()}">${i18next.t('button.refresh', { defaultValue: '새로고침' })}</button>
+                    <button @click="${() => this._navigateTo('shipment-orders')}">주문 목록</button>
+                    <button @click="${() => this._openWaveNewPopup()}">웨이브 생성</button>
+                    <button @click="${() => this._navigateTo('shipment-order-import')}">임포트</button>
+                    <button @click="${() => this._navigateTo('replenish-orders')}">보충 현황</button>
+                    <button @click="${() => this._navigateTo('inventories')}">재고 조회</button>
+                  </div>
+                </div>
                 <div class="status-cards">
                   <div class="status-card registered" @click="${() => this._navigateTo('shipment-orders', { status: 'REGISTERED', order_date: ValueUtil.todayFormatted() })}">
                     <div class="label">등록</div>
@@ -410,17 +452,17 @@ class OmsHome extends localize(i18next)(PageView) {
                 </div>
               </section>
 
-              <!-- ② 업무유형별 현황 + ③ 채널별 현황 -->
+              <!-- ② 출하유형별 현황 + ③ 채널별 현황 -->
               <div class="charts-row">
                 <section class="chart-section">
-                  <h3 class="section-title">업무 유형별 현황</h3>
+                  <h3 class="section-title">출하 유형별 현황</h3>
                   <div class="chart-container">
-                    <canvas id="bizTypeChart"></canvas>
+                    <canvas id="shipTypeChart"></canvas>
                   </div>
                 </section>
 
                 <section class="chart-section">
-                  <h3 class="section-title">고객(채널)별 현황</h3>
+                  <h3 class="section-title">판매채널별 현황</h3>
                   <div class="chart-container">
                     <canvas id="channelChart"></canvas>
                   </div>
@@ -452,28 +494,7 @@ class OmsHome extends localize(i18next)(PageView) {
                   `
             : ''}
 
-              <!-- ⑥ 바로가기 -->
-              <section>
-                <div class="quick-actions">
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('shipment-orders')}">
-                    <span class="icon">📋</span>주문 목록
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._openWaveNewPopup()}">
-                    <span class="icon">🌊</span>웨이브 생성
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('shipment-order-import')}">
-                    <span class="icon">📥</span>임포트
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('replenish-orders')}">
-                    <span class="icon">🔄</span>보충 현황
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('inventories')}">
-                    <span class="icon">📊</span>재고 조회
-                  </button>
-                </div>
-              </section>
-
-              <!-- ⑦ 최근 주문 내역 -->
+              <!-- ⑥ 최근 주문 내역 -->
               ${this.recentOrders && this.recentOrders.length > 0
             ? html`
                     <section class="recent-orders-section">
@@ -482,9 +503,11 @@ class OmsHome extends localize(i18next)(PageView) {
                         <thead>
                           <tr>
                             <th>출하번호</th>
-                            <th>고객</th>
-                            <th class="center">업무유형</th>
-                            <th class="right">수량</th>
+                            <th>고객사</th>
+                            <th>판매채널</th>
+                            <th class="center">우선순위</th>
+                            <th class="right">품목수</th>
+                            <th class="right">주문수량</th>
                             <th class="center">상태</th>
                             <th>주문일</th>
                           </tr>
@@ -494,8 +517,10 @@ class OmsHome extends localize(i18next)(PageView) {
               order => html`
                               <tr>
                                 <td><span class="link" @click="${() => this._navigateToDetail(order)}">${order.shipment_no}</span></td>
-                                <td>${order.cust_nm || ''}</td>
-                                <td class="center"><span class="biz-badge">${order.biz_type || ''}</span></td>
+                                <td>${order.com_cd || ''}</td>
+                                <td>${order.cust_nm || order.cust_cd || ''}</td>
+                                <td class="center"><span class="biz-badge">${order.priority_cd || ''}</span></td>
+                                <td class="right">${order.total_item || 0}</td>
                                 <td class="right">${order.total_order || 0}</td>
                                 <td class="center"><span class="status-badge ${order.status}">${this._statusLabel(order.status)}</span></td>
                                 <td>${order.order_date || ''}</td>
@@ -525,9 +550,9 @@ class OmsHome extends localize(i18next)(PageView) {
     try {
       this.loading = true
 
-      const [statusCounts, bizTypeStats, channelStats, waveStats, cutoffAlerts, recentOrders] = await Promise.all([
+      const [statusCounts, shipTypeStats, channelStats, waveStats, cutoffAlerts, recentOrders] = await Promise.all([
         this._fetchStatusCounts(),
-        this._fetchBizTypeStats(),
+        this._fetchShipTypeStats(),
         this._fetchChannelStats(),
         this._fetchWaveStats(),
         this._fetchCutoffAlerts(),
@@ -535,7 +560,7 @@ class OmsHome extends localize(i18next)(PageView) {
       ])
 
       this.statusCounts = statusCounts
-      this.bizTypeStats = bizTypeStats
+      this.shipTypeStats = shipTypeStats
       this.channelStats = channelStats
       this.waveStats = waveStats
       this.cutoffAlerts = cutoffAlerts
@@ -561,14 +586,14 @@ class OmsHome extends localize(i18next)(PageView) {
     }
   }
 
-  /** 업무 유형별 통계 조회 */
-  async _fetchBizTypeStats() {
+  /** 출하 유형별 통계 조회 */
+  async _fetchShipTypeStats() {
     try {
-      const data = await ServiceUtil.restGet('oms_dashboard/biz_type_stats')
-      return data || { B2C_OUT: 0, B2B_OUT: 0, B2C_RTN: 0, B2B_RTN: 0 }
+      const data = await ServiceUtil.restGet('oms_dashboard/ship_type_stats')
+      return data || []
     } catch (error) {
-      console.error('업무유형별 통계 조회 실패:', error)
-      return { B2C_OUT: 0, B2B_OUT: 0, B2C_RTN: 0, B2B_RTN: 0 }
+      console.error('출하유형별 통계 조회 실패:', error)
+      return []
     }
   }
 
@@ -619,33 +644,32 @@ class OmsHome extends localize(i18next)(PageView) {
 
   /** 차트 일괄 렌더링 */
   _renderCharts() {
-    this._renderBizTypeChart()
+    this._renderShipTypeChart()
     this._renderChannelChart()
     this._renderWaveChart()
   }
 
-  /** ② 업무유형별 도넛 차트 렌더링 */
-  _renderBizTypeChart() {
-    const canvas = this.shadowRoot.querySelector('#bizTypeChart')
+  /** ② 출하유형별 도넛 차트 렌더링 */
+  _renderShipTypeChart() {
+    const canvas = this.shadowRoot.querySelector('#shipTypeChart')
     if (!canvas) return
 
-    if (this._bizTypeChart) {
-      this._bizTypeChart.destroy()
+    if (this._shipTypeChart) {
+      this._shipTypeChart.destroy()
     }
 
+    const colors = ['#03A9F4', '#1976D2', '#F44336', '#FF9800', '#4CAF50', '#9C27B0']
+    const labels = this.shipTypeStats.map(s => s.type_nm || s.ship_type || '미지정')
+    const data = this.shipTypeStats.map(s => s.count || 0)
+
     const ctx = canvas.getContext('2d')
-    this._bizTypeChart = new Chart(ctx, {
+    this._shipTypeChart = new Chart(ctx, {
       type: 'doughnut',
       data: {
-        labels: ['B2C 출고', 'B2B 출고', 'B2C 반품', 'B2B 반품'],
+        labels: labels,
         datasets: [{
-          data: [
-            this.bizTypeStats.B2C_OUT || 0,
-            this.bizTypeStats.B2B_OUT || 0,
-            this.bizTypeStats.B2C_RTN || 0,
-            this.bizTypeStats.B2B_RTN || 0
-          ],
-          backgroundColor: ['#03A9F4', '#1976D2', '#F44336', '#D32F2F']
+          data: data,
+          backgroundColor: colors.slice(0, labels.length)
         }]
       },
       options: {
@@ -786,9 +810,9 @@ class OmsHome extends localize(i18next)(PageView) {
 
   /** 페이지 해제 시 Chart 인스턴스 정리 */
   pageDisposed(lifecycle) {
-    if (this._bizTypeChart) {
-      this._bizTypeChart.destroy()
-      this._bizTypeChart = null
+    if (this._shipTypeChart) {
+      this._shipTypeChart.destroy()
+      this._shipTypeChart = null
     }
     if (this._channelChart) {
       this._channelChart.destroy()

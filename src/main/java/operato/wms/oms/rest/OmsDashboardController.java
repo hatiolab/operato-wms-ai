@@ -50,22 +50,22 @@ public class OmsDashboardController {
 	}
 
 	/**
-	 * 업무 유형별 통계 조회
+	 * 출하 유형별 통계 조회
 	 *
-	 * GET /rest/oms_dashboard/biz_type_stats
+	 * GET /rest/oms_dashboard/ship_type_stats
 	 *
 	 * @param orderDate 기준일 (optional, 기본값: 오늘)
-	 * @return 업무유형별 건수 Map (B2C_OUT, B2B_OUT, B2C_RTN, B2B_RTN)
+	 * @return 출하유형별 건수 리스트 [{ ship_type, type_nm, count }]
 	 */
-	@GetMapping(value = "/biz_type_stats", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description = "Get Business Type Statistics")
-	public Map<String, Object> getBizTypeStats(
+	@GetMapping(value = "/ship_type_stats", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get Ship Type Statistics")
+	public List<Map<String, Object>> getShipTypeStats(
 			@RequestParam(name = "order_date", required = false) String orderDate) {
-		return this.omsDashboardService.getBizTypeStats(orderDate);
+		return this.omsDashboardService.getShipTypeStats(orderDate);
 	}
 
 	/**
-	 * 채널(고객)별 통계 조회
+	 * 판매 채널별 통계 조회
 	 *
 	 * GET /rest/oms_dashboard/channel_stats
 	 *
@@ -99,7 +99,8 @@ public class OmsDashboardController {
 	 *
 	 * GET /rest/oms_dashboard/allocation_stats
 	 *
-	 * @return 할당 현황 Map (total_orders, allocated_orders, back_orders, alloc_rate, soft_alloc_expiring_soon)
+	 * @return 할당 현황 Map (total_orders, allocated_orders, back_orders, alloc_rate,
+	 *         soft_alloc_expiring_soon)
 	 */
 	@GetMapping(value = "/allocation_stats", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Get Allocation Statistics")

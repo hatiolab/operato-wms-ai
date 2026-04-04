@@ -71,21 +71,26 @@ public class OmsDashboardService extends AbstractQueryService {
 	}
 
 	/**
-	 * 업무 유형별 통계 조회
+	 * 출하 유형별 통계 조회
+	 *
+	 * ship_type을 출하 유형 코드로 사용하고, 유형명은 공통코드 SHIP_TYPE에서 참조한다.
 	 *
 	 * @param orderDate 기준일 (optional, 기본값: 오늘)
-	 * @return 업무유형별 건수 Map (B2C_OUT, B2B_OUT, B2C_RTN, B2B_RTN)
+	 * @return 출하유형별 건수 리스트 [{ ship_type, type_nm, count }]
 	 */
-	public Map<String, Object> getBizTypeStats(String orderDate) {
+	public List<Map<String, Object>> getShipTypeStats(String orderDate) {
 		String date = ValueUtil.isNotEmpty(orderDate) ? orderDate : DateUtil.todayStr();
 		Long domainId = Domain.currentDomainId();
 
-		String sql = "SELECT biz_type, COUNT(*) as count " +
-				"FROM shipment_orders " +
-				"WHERE domain_id = :domainId " +
-				"AND order_date = :orderDate " +
-				"AND status != :cancelStatus " +
-				"GROUP BY biz_type";
+		String sql = "SELECT so.ship_type, COALESCE(ccd.description, so.ship_type) as type_nm, COUNT(*) as count " +
+				"FROM shipment_orders so " +
+				"LEFT JOIN common_codes cc ON cc.domain_id = so.domain_id AND cc.name = 'SHIP_TYPE' " +
+				"LEFT JOIN common_code_details ccd ON ccd.parent_id = cc.id AND ccd.domain_id = so.domain_id AND ccd.name = so.ship_type " +
+				"WHERE so.domain_id = :domainId " +
+				"AND so.order_date = :orderDate " +
+				"AND so.status != :cancelStatus " +
+				"GROUP BY so.ship_type, ccd.description " +
+				"ORDER BY count DESC";
 
 		Map<String, Object> params = ValueUtil.newMap("domainId,orderDate,cancelStatus",
 				domainId, date, ShipmentOrder.STATUS_CANCELLED);
@@ -94,39 +99,40 @@ public class OmsDashboardService extends AbstractQueryService {
 		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
 				sql, params, Map.class, 0, 0);
 
-		Map<String, Object> bizTypeStats = ValueUtil.newMap("B2C_OUT", 0);
-		bizTypeStats.put("B2B_OUT", 0);
-		bizTypeStats.put("B2C_RTN", 0);
-		bizTypeStats.put("B2B_RTN", 0);
-
+		List<Map<String, Object>> shipTypeStats = new ArrayList<>();
 		for (Map<String, Object> row : results) {
-			String bizType = (String) row.get("biz_type");
+			Map<String, Object> item = ValueUtil.newMap("ship_type", row.get("ship_type"));
+			item.put("type_nm", row.get("type_nm"));
 			Object countObj = row.get("count");
 			int count = countObj instanceof Long ? ((Long) countObj).intValue() : ((Number) countObj).intValue();
-			if (bizType != null) {
-				bizTypeStats.put(bizType, count);
-			}
+			item.put("count", count);
+			shipTypeStats.add(item);
 		}
 
-		return bizTypeStats;
+		return shipTypeStats;
 	}
 
 	/**
-	 * 채널(고객)별 통계 조회
+	 * 판매채널별 통계 조회
+	 *
+	 * cust_cd를 판매채널 코드로 사용하고, 채널명은 공통코드 SALES_CHANNEL에서 참조한다.
 	 *
 	 * @param orderDate 기준일 (optional, 기본값: 오늘)
-	 * @return 채널별 건수 리스트 [{ cust_cd, cust_nm, count }]
+	 * @return 채널별 건수 리스트 [{ cust_cd, channel_nm, count }]
 	 */
 	public List<Map<String, Object>> getChannelStats(String orderDate) {
 		String date = ValueUtil.isNotEmpty(orderDate) ? orderDate : DateUtil.todayStr();
 		Long domainId = Domain.currentDomainId();
 
-		String sql = "SELECT cust_cd, cust_nm, COUNT(*) as count " +
-				"FROM shipment_orders " +
-				"WHERE domain_id = :domainId " +
-				"AND order_date = :orderDate " +
-				"AND status != :cancelStatus " +
-				"GROUP BY cust_cd, cust_nm " +
+		String sql = "SELECT so.cust_cd, COALESCE(ccd.description, so.cust_cd) as channel_nm, COUNT(*) as count " +
+				"FROM shipment_orders so " +
+				"LEFT JOIN common_codes cc ON cc.domain_id = so.domain_id AND cc.name = 'SALES_CHANNEL' " +
+				"LEFT JOIN common_code_details ccd ON ccd.parent_id = cc.id AND ccd.domain_id = so.domain_id AND ccd.name = so.cust_cd "
+				+
+				"WHERE so.domain_id = :domainId " +
+				"AND so.order_date = :orderDate " +
+				"AND so.status != :cancelStatus " +
+				"GROUP BY so.cust_cd, ccd.description " +
 				"ORDER BY count DESC " +
 				"LIMIT 10";
 
@@ -140,7 +146,7 @@ public class OmsDashboardService extends AbstractQueryService {
 		List<Map<String, Object>> channelStats = new ArrayList<>();
 		for (Map<String, Object> row : results) {
 			Map<String, Object> channel = ValueUtil.newMap("cust_cd", row.get("cust_cd"));
-			channel.put("cust_nm", row.get("cust_nm"));
+			channel.put("cust_nm", row.get("channel_nm"));
 			Object countObj = row.get("count");
 			int count = countObj instanceof Long ? ((Long) countObj).intValue() : ((Number) countObj).intValue();
 			channel.put("count", count);
