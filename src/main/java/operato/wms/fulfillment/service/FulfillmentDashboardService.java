@@ -28,7 +28,7 @@ public class FulfillmentDashboardService extends AbstractQueryService {
 	 * 지정 일자의 피킹 지시 상태별 건수를 반환한다.
 	 *
 	 * @param orderDate 작업 일자 (YYYY-MM-DD, null이면 당일)
-	 * @return { order_date, created, in_progress, completed, cancelled, total }
+	 * @return { order_date, created, in_progress, completed, cancelled, total, individual, total_pick, zone }
 	 */
 	public Map<String, Object> getPickingStatus(String orderDate) {
 		Long domainId = Domain.currentDomainId();
@@ -60,6 +60,26 @@ public class FulfillmentDashboardService extends AbstractQueryService {
 			result.put("completed", 0);
 			result.put("cancelled", 0);
 			result.put("total", 0);
+		}
+
+		// 피킹 유형별 건수 조회
+		String typeSql = "SELECT"
+				+ " COALESCE(SUM(CASE WHEN pick_type = 'INDIVIDUAL' THEN 1 ELSE 0 END), 0) AS individual,"
+				+ " COALESCE(SUM(CASE WHEN pick_type = 'TOTAL' THEN 1 ELSE 0 END), 0) AS total_pick,"
+				+ " COALESCE(SUM(CASE WHEN pick_type = 'ZONE' THEN 1 ELSE 0 END), 0) AS zone"
+				+ " FROM picking_tasks"
+				+ " WHERE domain_id = :domainId AND order_date = :orderDate";
+		List<Map> typeRows = this.queryManager.selectListBySql(typeSql, params, Map.class, 0, 1);
+
+		if (!typeRows.isEmpty()) {
+			Map typeRow = typeRows.get(0);
+			result.put("individual", ValueUtil.toInteger(typeRow.get("individual")));
+			result.put("total_pick", ValueUtil.toInteger(typeRow.get("total_pick")));
+			result.put("zone", ValueUtil.toInteger(typeRow.get("zone")));
+		} else {
+			result.put("individual", 0);
+			result.put("total_pick", 0);
+			result.put("zone", 0);
 		}
 
 		return result;

@@ -15,22 +15,52 @@ class RwaHome extends localize(i18next)(PageView) {
           padding: var(--padding-wide);
           overflow: auto;
         }
-        h2 {
-          margin: var(--title-margin);
-          font: var(--title-font);
-          color: var(--title-text-color);
-        }
-        [page-description] {
-          margin: var(--page-description-margin);
-          font: var(--page-description-font);
-          color: var(--page-description-color);
-        }
-
         /* 대시보드 레이아웃 */
         .dashboard-container {
           display: flex;
           flex-direction: column;
           gap: var(--spacing-large, 24px);
+        }
+
+        /* 페이지 헤더 */
+        .page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: var(--spacing-medium, 16px);
+        }
+
+        .page-header h2 {
+          margin: 0;
+          font: var(--title-font);
+          color: var(--title-text-color);
+        }
+
+        .header-actions {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .btn {
+          padding: 8px 16px;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .btn-outline {
+          background: transparent;
+          color: var(--md-sys-color-primary);
+          border: 1px solid var(--md-sys-color-primary);
+        }
+
+        .btn-outline:hover {
+          background: var(--md-sys-color-primary);
+          color: var(--md-sys-color-on-primary);
         }
 
         /* 섹션 타이틀 */
@@ -141,36 +171,6 @@ class RwaHome extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface);
         }
 
-        /* 바로가기 버튼 */
-        .quick-actions {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: var(--spacing-medium, 16px);
-        }
-
-        .quick-action-btn {
-          background: var(--md-sys-color-primary);
-          color: var(--md-sys-color-on-primary);
-          border: none;
-          border-radius: 8px;
-          padding: 16px 24px;
-          font-size: 16px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          text-align: center;
-        }
-
-        .quick-action-btn:hover {
-          background: var(--md-sys-color-primary-container);
-          box-shadow: var(--box-shadow-normal, 0 4px 8px rgba(0, 0, 0, 0.15));
-          transform: translateY(-2px);
-        }
-
-        .quick-action-btn .icon {
-          margin-right: 8px;
-        }
-
         /* 로딩 상태 */
         .loading {
           display: flex;
@@ -187,8 +187,8 @@ class RwaHome extends localize(i18next)(PageView) {
             grid-template-columns: repeat(2, 1fr);
           }
 
-          .quick-actions {
-            grid-template-columns: 1fr;
+          .header-actions {
+            flex-wrap: wrap;
           }
         }
       `
@@ -230,16 +230,24 @@ class RwaHome extends localize(i18next)(PageView) {
 
   render() {
     return html`
-      <!--h2>🏠 반품 대시보드</h2>
-      <p page-description>이 메뉴는 Operato WES 반품을 관리하는 메뉴입니다.</p-->
-
       ${this.loading
         ? html`<div class="loading">데이터 로딩 중...</div>`
         : html`
             <div class="dashboard-container">
+              <!-- 페이지 헤더 -->
+              <div class="page-header">
+                <h2>${TermsUtil.tMenu('RwaHome')}</h2>
+                <div class="header-actions">
+                  <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">${i18next.t('button.refresh', { defaultValue: '새로고침' })}</button>
+                  <button class="btn btn-outline" @click="${this._openRwaOrderNew}">${i18next.t('button.rwa_request', { defaultValue: '반품 요청' })}</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('rwa-receive-list')}">${i18next.t('button.rwa_receive', { defaultValue: '입고 처리' })}</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('rwa-inspection-list')}">${i18next.t('button.rwa_inspection', { defaultValue: '검수 작업' })}</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('rwa-disposition-list')}">${i18next.t('button.rwa_disposition', { defaultValue: '처분 결정' })}</button>
+                </div>
+              </div>
+
               <!-- 오늘의 반품 현황 -->
               <section>
-                <h3 class="section-title">📊 오늘의 반품 현황</h3>
                 <div class="status-cards">
                   <div class="status-card request" @click="${() => this._navigateTo('rwa-orders', 'REQUEST')}">
                     <div class="label">요청대기</div>
@@ -266,7 +274,7 @@ class RwaHome extends localize(i18next)(PageView) {
 
               <!-- 반품 유형별 현황 -->
               <section class="chart-section">
-                <h3 class="section-title">📈 반품 유형별 현황</h3>
+                <h3 class="section-title">${i18next.t('title.rwa_type_stats', { defaultValue: '반품 유형별 현황' })}</h3>
                 <div class="chart-container">
                   <canvas id="typeChart"></canvas>
                 </div>
@@ -276,7 +284,7 @@ class RwaHome extends localize(i18next)(PageView) {
               ${this.alerts && this.alerts.length > 0
             ? html`
                     <section class="alerts-section">
-                      <h3 class="section-title">⚠️ 주의 항목</h3>
+                      <h3 class="section-title">${i18next.t('title.alerts', { defaultValue: '주의 항목' })}</h3>
                       ${this.alerts.map(
               alert => html`
                           <div class="alert-item ${alert.type}">
@@ -289,24 +297,6 @@ class RwaHome extends localize(i18next)(PageView) {
                   `
             : ''}
 
-              <!-- 바로가기 -->
-              <section>
-                <!--h3 class="section-title">🎯 바로가기</h3-->
-                <div class="quick-actions">
-                  <button class="quick-action-btn" @click="${this._openRwaOrderNew}">
-                    <span class="icon">📝</span>반품 요청
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-receive-list')}">
-                    <span class="icon">📥</span>입고 처리
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-inspection-list')}">
-                    <span class="icon">🔍</span>검수 작업
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('rwa-disposition-list')}">
-                    <span class="icon">🗂️</span>처분 결정
-                  </button>
-                </div>
-              </section>
             </div>
           `}
     `

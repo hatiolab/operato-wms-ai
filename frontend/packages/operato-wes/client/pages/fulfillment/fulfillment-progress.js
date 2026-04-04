@@ -437,15 +437,12 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
                         <th>${i18next.t('label.wave_no', { defaultValue: '웨이브' })}</th>
                         <th>${i18next.t('label.shipment_no', { defaultValue: '출하번호' })}</th>
                         <th class="center">${i18next.t('label.pick_type', { defaultValue: '피킹유형' })}</th>
-                        <th class="center">${i18next.t('label.worker_id', { defaultValue: '작업자' })}</th>
                         <th class="right">${i18next.t('label.plan_total', { defaultValue: '계획수량' })}</th>
                         <th class="right">${i18next.t('label.pick_result_qty', { defaultValue: '피킹실적' })}</th>
                         <th class="right">${i18next.t('label.short_total', { defaultValue: '부족수량' })}</th>
                         <th class="center">${i18next.t('label.pick_status', { defaultValue: '피킹상태' })}</th>
                         <th>${i18next.t('label.pack_order_no', { defaultValue: '포장번호' })}</th>
-                        <th class="center">${i18next.t('label.insp_type', { defaultValue: '검수유형' })}</th>
                         <th class="right">${i18next.t('label.total_box', { defaultValue: '박스수' })}</th>
-                        <th class="center">${i18next.t('label.carrier_cd', { defaultValue: '택배사' })}</th>
                         <th class="center">${i18next.t('label.dock_cd', { defaultValue: '도크' })}</th>
                         <th class="center">${i18next.t('label.pack_status', { defaultValue: '포장상태' })}</th>
                         <th class="center">${i18next.t('label.shipped_at', { defaultValue: '출하일시' })}</th>
@@ -462,7 +459,6 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
                           <td class="center">
                             <span class="badge type-badge">${row.pick_type || '-'}</span>
                           </td>
-                          <td class="center">${row.worker_id || '-'}</td>
                           <td class="right">${this._formatNumber(row.plan_total)}</td>
                           <td class="right">${this._formatNumber(row.pick_result_qty)}</td>
                           <td class="right">
@@ -482,13 +478,7 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
                 ? html`<span class="empty-hint">${i18next.t('label.pack_not_created', { defaultValue: '포장 미생성' })}</span>`
                 : '-'}
                           </td>
-                          <td class="center">
-                            ${row.insp_type
-              ? html`<span class="badge type-badge">${row.insp_type}</span>`
-              : '-'}
-                          </td>
                           <td class="right">${this._formatNumber(row.total_box)}</td>
-                          <td class="center">${row.carrier_cd || '-'}</td>
                           <td class="center">${row.dock_cd || '-'}</td>
                           <td class="center">
                             ${row.pack_status

@@ -5,6 +5,8 @@ import { PageView } from '@operato/shell'
 import { ServiceUtil, UiUtil, ValueUtil } from '@operato-app/metapage/dist-client'
 import Chart from 'chart.js/auto'
 
+import './picking-task-detail'
+
 class FulfillmentHome extends localize(i18next)(PageView) {
   /** 컴포넌트 스타일 정의 */
   static get styles() {
@@ -514,7 +516,9 @@ class FulfillmentHome extends localize(i18next)(PageView) {
                         <thead>
                           <tr>
                             <th>피킹번호</th>
+                            <th>출하주문번호</th>
                             <th>웨이브번호</th>
+                            <th class="center">화주사</th>
                             <th class="center">피킹유형</th>
                             <th>작업자</th>
                             <th class="right">예정수량</th>
@@ -527,7 +531,9 @@ class FulfillmentHome extends localize(i18next)(PageView) {
               task => html`
                               <tr>
                                 <td><span class="link" @click="${() => this._navigateToPickingDetail(task)}">${task.pick_task_no || ''}</span></td>
+                                <td>${task.shipment_no || ''}</td>
                                 <td>${task.wave_no || ''}</td>
+                                <td>${task.com_cd || ''}</td>
                                 <td class="center"><span class="pick-type-badge ${task.pick_type || ''}">${this._pickTypeLabel(task.pick_type)}</span></td>
                                 <td>${task.worker_id || ''}</td>
                                 <td class="right">${task.plan_total || 0}</td>
@@ -833,10 +839,13 @@ class FulfillmentHome extends localize(i18next)(PageView) {
     UiUtil.pageNavigate(page, filter ? filter : {})
   }
 
-  /** 피킹 작업 상세 페이지로 이동 */
+  /** 피킹 작업 상세 팝업 열기 */
   _navigateToPickingDetail(task) {
     if (task && task.id) {
-      UiUtil.pageNavigate('picking-task-detail', { id: task.id })
+      const el = document.createElement('picking-task-detail')
+      el.pickingTaskId = task.id
+      el.addEventListener('task-updated', () => this._fetchDashboardData())
+      UiUtil.openPopupByElement(i18next.t('title.picking_task_detail', { defaultValue: '피킹 작업 상세' }), 'large', el, true)
     }
   }
 

@@ -20,22 +20,52 @@ class VasHome extends localize(i18next)(PageView) {
           padding: var(--padding-wide);
           overflow: auto;
         }
-        h2 {
-          margin: var(--title-margin);
-          font: var(--title-font);
-          color: var(--title-text-color);
-        }
-        [page-description] {
-          margin: var(--page-description-margin);
-          font: var(--page-description-font);
-          color: var(--page-description-color);
-        }
-
         /* 대시보드 레이아웃 */
         .dashboard-container {
           display: flex;
           flex-direction: column;
           gap: var(--spacing-large, 24px);
+        }
+
+        /* 페이지 헤더 */
+        .page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: var(--spacing-medium, 16px);
+        }
+
+        .page-header h2 {
+          margin: 0;
+          font: var(--title-font);
+          color: var(--title-text-color);
+        }
+
+        .header-actions {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .btn {
+          padding: 8px 16px;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .btn-outline {
+          background: transparent;
+          color: var(--md-sys-color-primary);
+          border: 1px solid var(--md-sys-color-primary);
+        }
+
+        .btn-outline:hover {
+          background: var(--md-sys-color-primary);
+          color: var(--md-sys-color-on-primary);
         }
 
         /* 섹션 타이틀 */
@@ -146,36 +176,6 @@ class VasHome extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface);
         }
 
-        /* 바로가기 버튼 */
-        .quick-actions {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: var(--spacing-medium, 16px);
-        }
-
-        .quick-action-btn {
-          background: var(--md-sys-color-primary);
-          color: var(--md-sys-color-on-primary);
-          border: none;
-          border-radius: 8px;
-          padding: 16px 24px;
-          font-size: 16px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          text-align: center;
-        }
-
-        .quick-action-btn:hover {
-          background: var(--md-sys-color-primary-container);
-          box-shadow: var(--box-shadow-normal, 0 4px 8px rgba(0, 0, 0, 0.15));
-          transform: translateY(-2px);
-        }
-
-        .quick-action-btn .icon {
-          margin-right: 8px;
-        }
-
         /* 로딩 상태 */
         .loading {
           display: flex;
@@ -192,8 +192,8 @@ class VasHome extends localize(i18next)(PageView) {
             grid-template-columns: repeat(2, 1fr);
           }
 
-          .quick-actions {
-            grid-template-columns: 1fr;
+          .header-actions {
+            flex-wrap: wrap;
           }
         }
       `
@@ -244,9 +244,20 @@ class VasHome extends localize(i18next)(PageView) {
         ? html`<div class="loading">데이터 로딩 중...</div>`
         : html`
             <div class="dashboard-container">
+              <!-- 페이지 헤더 -->
+              <div class="page-header">
+                <h2>${TermsUtil.tMenu('VasHome')}</h2>
+                <div class="header-actions">
+                  <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">${i18next.t('button.refresh', { defaultValue: '새로고침' })}</button>
+                  <button class="btn btn-outline" @click="${this._openOrderNewPopup}">${i18next.t('button.vas_order_new', { defaultValue: '작업 지시 생성' })}</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('vas-work-monitor', { status: 'IN_PROGRESS', vas_req_date: ValueUtil.todayFormatted() })}">${i18next.t('button.vas_work_monitor', { defaultValue: '작업 진행 현황' })}</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('vas-results')}">${i18next.t('button.vas_results', { defaultValue: '실적 조회' })}</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('vas-boms')}">${i18next.t('button.vas_boms', { defaultValue: '세트 상품 관리' })}</button>
+                </div>
+              </div>
+
               <!-- 오늘의 작업 현황 -->
               <section>
-                <h3 class="section-title">📊 오늘의 작업 현황</h3>
                 <div class="status-cards">
                   <div class="status-card plan" @click="${() => this._navigateTo('vas-orders', { status: 'PLAN', vas_req_date: ValueUtil.todayFormatted() })}">
                     <div class="label">등록 중</div>
@@ -273,7 +284,7 @@ class VasHome extends localize(i18next)(PageView) {
 
               <!-- VAS 유형별 현황 -->
               <section class="chart-section">
-                <h3 class="section-title">📈 VAS 유형별 현황</h3>
+                <h3 class="section-title">${i18next.t('title.vas_type_stats', { defaultValue: 'VAS 유형별 현황' })}</h3>
                 <div class="chart-container">
                   <canvas id="typeChart"></canvas>
                 </div>
@@ -283,7 +294,7 @@ class VasHome extends localize(i18next)(PageView) {
               ${this.alerts && this.alerts.length > 0
             ? html`
                     <section class="alerts-section">
-                      <h3 class="section-title">⚠️ 주의 항목</h3>
+                      <h3 class="section-title">${i18next.t('title.alerts', { defaultValue: '주의 항목' })}</h3>
                       ${this.alerts.map(
               alert => html`
                           <div class="alert-item ${alert.type}">
@@ -296,24 +307,6 @@ class VasHome extends localize(i18next)(PageView) {
                   `
             : ''}
 
-              <!-- 바로가기 -->
-              <section>
-                <!--h3 class="section-title">🎯 바로가기</h3-->
-                <div class="quick-actions">
-                  <button class="quick-action-btn" @click="${this._openOrderNewPopup}">
-                    <span class="icon">📝</span>작업 지시 생성
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('vas-work-monitor', { status: 'IN_PROGRESS', vas_req_date: ValueUtil.todayFormatted() })}">
-                    <span class="icon">📊</span>작업 진행 현황
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('vas-results')}">
-                    <span class="icon">📋</span>실적 조회
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('vas-boms')}">
-                    <span class="icon">📦</span>세트 상품 관리
-                  </button>
-                </div>
-              </section>
             </div>
           `}
     `

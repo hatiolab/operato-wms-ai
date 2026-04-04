@@ -25,8 +25,6 @@ class ShipmentTracking extends localize(i18next)(PageView) {
           display: flex;
           flex-direction: column;
           gap: var(--spacing-large, 24px);
-          max-width: 1200px;
-          margin: 0 auto;
         }
 
         .page-header {
@@ -71,47 +69,40 @@ class ShipmentTracking extends localize(i18next)(PageView) {
           box-shadow: var(--box-shadow-light, 0 2px 4px rgba(0, 0, 0, 0.1));
         }
 
-        .search-row {
-          display: flex;
-          gap: 12px;
-          align-items: flex-end;
+        .search-form {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: var(--spacing-medium, 16px);
+          align-items: end;
         }
 
-        .search-field {
+        .form-group {
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 4px;
         }
 
-        .search-field label {
+        .form-group label {
           font-size: 12px;
           font-weight: 500;
           color: var(--md-sys-color-on-surface-variant);
         }
 
-        .search-field select,
-        .search-field input {
-          height: 40px;
-          padding: 0 12px;
+        .form-group input,
+        .form-group select {
+          padding: 8px 12px;
           border: 1px solid var(--md-sys-color-outline-variant);
           border-radius: 8px;
           font-size: 14px;
           background: var(--md-sys-color-surface);
           color: var(--md-sys-color-on-surface);
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
           outline: none;
-        }
-
-        .search-field select {
-          width: 160px;
-        }
-
-        .search-field input {
-          width: 320px;
-        }
-
-        .search-field input:focus,
-        .search-field select:focus {
           border-color: var(--md-sys-color-primary);
+          box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
         }
 
 
@@ -446,12 +437,8 @@ class ShipmentTracking extends localize(i18next)(PageView) {
             grid-template-columns: repeat(2, 1fr);
           }
 
-          .search-row {
-            flex-wrap: wrap;
-          }
-
-          .search-field input {
-            width: 100%;
+          .search-form {
+            grid-template-columns: 1fr;
           }
 
           .info-grid {
@@ -559,8 +546,8 @@ class ShipmentTracking extends localize(i18next)(PageView) {
   _renderSearchSection() {
     return html`
       <div class="search-section">
-        <div class="search-row">
-          <div class="search-field">
+        <div class="search-form">
+          <div class="form-group">
             <label>${i18next.t('label.search_type', { defaultValue: '검색 유형' })}</label>
             <select .value=${this.searchType} @change=${e => (this.searchType = e.target.value)}>
               <option value="auto">${i18next.t('label.auto_detect', { defaultValue: '자동 감지' })}</option>
@@ -572,7 +559,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
               <option value="wave">${i18next.t('label.wave_no', { defaultValue: '웨이브번호' })}</option>
             </select>
           </div>
-          <div class="search-field" style="flex:1">
+          <div class="form-group">
             <label>${i18next.t('label.keyword', { defaultValue: '검색어' })}</label>
             <input
               type="text"

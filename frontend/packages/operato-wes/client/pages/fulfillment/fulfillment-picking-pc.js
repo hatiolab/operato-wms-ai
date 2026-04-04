@@ -38,42 +38,43 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
         /* ===== 페이지 헤더 ===== */
         .page-header {
           display: flex;
-          align-items: center;
           justify-content: space-between;
+          align-items: center;
           padding: 12px 24px;
-          background: var(--md-sys-color-surface, white);
           border-bottom: 1px solid var(--md-sys-color-outline-variant, #E0E0E0);
-          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
         .page-header h2 {
-          font-size: 18px;
-          font-weight: 700;
-          color: var(--md-sys-color-on-surface, #212121);
           margin: 0;
+          font: var(--title-font);
+          color: var(--title-text-color);
         }
 
         .header-actions {
           display: flex;
           gap: 8px;
-        }
-
-        .btn-icon {
-          background: var(--md-sys-color-surface, #fff);
-          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
-          border-radius: 6px;
-          padding: 6px 14px;
-          font-size: 13px;
-          cursor: pointer;
-          display: flex;
           align-items: center;
-          gap: 6px;
-          transition: all 0.15s;
-          color: var(--md-sys-color-on-surface, #333);
         }
 
-        .btn-icon:hover {
-          background: var(--md-sys-color-surface-variant, #f5f5f5);
+        .btn {
+          padding: 8px 16px;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .btn-outline {
+          background: transparent;
+          color: var(--md-sys-color-primary);
+          border: 1px solid var(--md-sys-color-primary);
+        }
+
+        .btn-outline:hover {
+          background: var(--md-sys-color-primary);
+          color: var(--md-sys-color-on-primary);
         }
 
         /* ===== 메인 컨텐츠 (2패널) ===== */
@@ -804,9 +805,9 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
 
     return html`
       <div class="page-header">
-        <h2>피킹 작업 (웨이브)</h2>
+        <h2>${TermsUtil.tMenu('FulfillmentPickingPc')}</h2>
         <div class="header-actions">
-          <button class="btn-icon" @click="${this._refresh}">↻ 새로고침</button>
+          <button class="btn btn-outline" @click="${this._refresh}">${TermsUtil.tButton('refresh')}</button>
         </div>
       </div>
 

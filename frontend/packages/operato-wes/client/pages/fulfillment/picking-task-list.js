@@ -648,10 +648,10 @@ class PickingTaskList extends localize(i18next)(PageView) {
       const data = await ServiceUtil.restGet('ful_trx/dashboard/picking_status')
       if (data) {
         this.statusSummary = {
-          CREATED: data.CREATED || 0,
-          IN_PROGRESS: data.IN_PROGRESS || 0,
-          COMPLETED: data.COMPLETED || 0,
-          CANCELLED: data.CANCELLED || 0
+          CREATED: data.created || 0,
+          IN_PROGRESS: data.in_progress || 0,
+          COMPLETED: data.completed || 0,
+          CANCELLED: data.cancelled || 0
         }
       }
     } catch (error) {

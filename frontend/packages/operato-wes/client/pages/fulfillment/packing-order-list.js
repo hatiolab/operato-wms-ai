@@ -572,7 +572,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
                         <th>${i18next.t('label.pick_task_no', { defaultValue: '피킹번호' })}</th>
                         <th>${i18next.t('label.shipment_no', { defaultValue: '출하번호' })}</th>
                         <th>${i18next.t('label.wave_no', { defaultValue: '웨이브' })}</th>
-                        <th class="center">${i18next.t('label.insp_type', { defaultValue: '검수유형' })}</th>
+                        <!--th class="center">${i18next.t('label.insp_type', { defaultValue: '검수유형' })}</th-->
                         <th class="center">${i18next.t('label.carrier_cd', { defaultValue: '택배사' })}</th>
                         <th class="right">${i18next.t('label.total_box', { defaultValue: '박스수' })}</th>
                         <th class="right">${i18next.t('label.total_wt', { defaultValue: '총중량(kg)' })}</th>
@@ -594,9 +594,9 @@ class PackingOrderList extends localize(i18next)(PageView) {
                           <td>${order.pick_task_no || '-'}</td>
                           <td>${order.shipment_no || '-'}</td>
                           <td>${order.wave_no || '-'}</td>
-                          <td class="center">
+                          <!--td class="center">
                             <span class="badge ${(order.insp_type || '').toLowerCase()}">${order.insp_type || '-'}</span>
-                          </td>
+                          </td-->
                           <td class="center">${order.carrier_cd || '-'}</td>
                           <td class="right">${this._formatNumber(order.total_box)}</td>
                           <td class="right">${this._formatWeight(order.total_wt)}</td>
@@ -703,13 +703,13 @@ class PackingOrderList extends localize(i18next)(PageView) {
       const data = await ServiceUtil.restGet('ful_trx/dashboard/packing_status')
       if (data) {
         this.statusSummary = {
-          CREATED: data.CREATED || 0,
-          IN_PROGRESS: data.IN_PROGRESS || 0,
-          COMPLETED: data.COMPLETED || 0,
-          LABEL_PRINTED: data.LABEL_PRINTED || 0,
-          MANIFESTED: data.MANIFESTED || 0,
-          SHIPPED: data.SHIPPED || 0,
-          CANCELLED: data.CANCELLED || 0
+          CREATED: data.created || 0,
+          IN_PROGRESS: data.in_progress || 0,
+          COMPLETED: data.completed || 0,
+          LABEL_PRINTED: data.label_printed || 0,
+          MANIFESTED: data.manifested || 0,
+          SHIPPED: data.shipped || 0,
+          CANCELLED: data.cancelled || 0
         }
       }
     } catch (error) {
