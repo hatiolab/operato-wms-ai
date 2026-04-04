@@ -109,6 +109,14 @@
 - 상태관리: Redux (actions/reducers 패턴)
 - 빌드 산출물: `frontend/packages/operato-wes/dist-app/` → `src/main/resources/static/` (자동 복사)
 
+### 프론트엔드 필수 규칙 (`docs/development/frontend-dev-guide.md` 요약)
+- **한글 JSDoc 주석 필수**: 모든 메서드에 `/** 한글 설명 */` 작성 (static get, render, _renderXxx, _fetchXxx, _onXxx, 유틸리티 등 예외 없음)
+- **TermsUtil 사용 필수**: UI 텍스트는 `TermsUtil.tLabel()`, `tButton()`, `tText()` 등 사용 — 문자열 하드코딩 금지
+- **ServiceUtil 사용 필수**: API 호출은 `ServiceUtil.restGet/restPost` 사용 — `fetch()` 직접 사용 금지
+- **페이지 자체 헤더 금지**: 타이틀은 `get context()` 에서 설정 — `render()` 내 자체 헤더(`<h2>` 등) 금지
+- **데이터 바인딩은 snake_case**: 백엔드 응답 속성은 `order.shipment_no` (camelCase 접근 시 undefined)
+- **참고 예시**: `fulfillment-picking-pc.js` (100% 준수 파일)
+
 
 ## Claude Skills (`.claude/commands/`)
 

@@ -125,7 +125,7 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
         /* 수평 상태 타임라인 */
         .status-timeline {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           gap: 0;
           padding: 4px 0;
           overflow-x: auto;
@@ -136,23 +136,34 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
           flex-direction: column;
           align-items: center;
           gap: 4px;
-          min-width: 64px;
+          min-width: 56px;
+          flex: 1;
         }
 
         .timeline-step .dot {
-          width: 12px;
-          height: 12px;
+          width: 26px;
+          height: 26px;
           border-radius: 50%;
-          background: var(--md-sys-color-outline-variant);
+          background: var(--md-sys-color-surface-variant);
+          border: 2px solid var(--md-sys-color-outline-variant);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant);
           transition: all 0.2s;
         }
 
         .timeline-step.completed .dot {
-          background: var(--md-sys-color-primary);
+          background: #4CAF50;
+          border-color: #4CAF50;
+          color: #fff;
         }
 
         .timeline-step.active .dot {
           background: var(--md-sys-color-primary);
+          border-color: var(--md-sys-color-primary);
+          color: var(--md-sys-color-on-primary);
           box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.2);
         }
 
@@ -164,20 +175,28 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
         .timeline-step.completed .label,
         .timeline-step.active .label {
-          color: var(--md-sys-color-primary);
+          color: var(--md-sys-color-on-surface);
           font-weight: 600;
+        }
+
+        .timeline-step .time {
+          font-size: 10px;
+          color: var(--md-sys-color-on-surface-variant);
+          text-align: center;
+          line-height: 1.3;
+          min-height: 14px;
         }
 
         .timeline-connector {
           flex: 1;
           height: 2px;
-          min-width: 16px;
+          min-width: 12px;
           background: var(--md-sys-color-outline-variant);
-          margin-bottom: 18px;
+          margin-top: 14px;
         }
 
         .timeline-connector.completed {
-          background: var(--md-sys-color-primary);
+          background: #4CAF50;
         }
 
         /* 탭 바 */
@@ -492,16 +511,17 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
 
   /** 수평 상태 타임라인 렌더링 (6단계) */
   _renderTimeline() {
+    const o = this.order
     const steps = [
-      { key: 'CREATED', label: '생성' },
-      { key: 'IN_PROGRESS', label: '진행중' },
-      { key: 'COMPLETED', label: '완료' },
-      { key: 'LABEL_PRINTED', label: '라벨출력' },
-      { key: 'MANIFESTED', label: '매니페스트' },
-      { key: 'SHIPPED', label: '출하' }
+      { key: 'CREATED', label: '생성', time: o?.created_at },
+      { key: 'IN_PROGRESS', label: '진행중', time: o?.started_at },
+      { key: 'COMPLETED', label: '완료', time: o?.completed_at },
+      { key: 'LABEL_PRINTED', label: '라벨출력', time: null },
+      { key: 'MANIFESTED', label: '매니페스트', time: o?.manifested_at },
+      { key: 'SHIPPED', label: '출하', time: o?.shipped_at }
     ]
 
-    const status = this.order?.status
+    const status = o?.status
     if (status === 'CANCELLED') {
       return html``
     }
@@ -514,8 +534,9 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
         ${steps.map((step, idx) => html`
           ${idx > 0 ? html`<div class="timeline-connector ${idx <= currentIdx ? 'completed' : ''}"></div>` : ''}
           <div class="timeline-step ${idx < currentIdx ? 'completed' : ''} ${idx === currentIdx ? 'active' : ''}">
-            <div class="dot"></div>
+            <div class="dot">${idx < currentIdx ? '✓' : idx + 1}</div>
             <span class="label">${step.label}</span>
+            <span class="time">${this._formatTimelineTime(step.time)}</span>
           </div>
         `)}
       </div>
@@ -1110,6 +1131,18 @@ class PackingOrderDetail extends localize(i18next)(LitElement) {
     const d = new Date(dateValue)
     if (isNaN(d.getTime())) return '-'
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
+
+  /** 타임라인용 짧은 날짜/시간 포맷 (MM-DD HH:mm) */
+  _formatTimelineTime(dateValue) {
+    if (!dateValue) return ''
+    const d = new Date(dateValue)
+    if (isNaN(d.getTime())) return ''
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mi = String(d.getMinutes()).padStart(2, '0')
+    return `${mm}-${dd} ${hh}:${mi}`
   }
 }
 

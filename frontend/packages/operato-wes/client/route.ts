@@ -68,6 +68,9 @@ import './pages/pda/pda-stocktake-page'
 import './pages/pda/pda-wms-peer-to-peer'
 import './pages/pda/pda-wms-peer-to-peer-popup'
 import './pages/pda/pda-wms-shipment-barcode-manually'
+import './pages/pda/pda-fulfillment-shipping'
+import './pages/pda/pda-fulfillment-packing'
+import './pages/pda/pda-fulfillment-picking'
 
 export default function route(page, module) {
   let route = module.routes?.find(mapping => mapping.page == page)

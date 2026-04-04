@@ -484,7 +484,43 @@ public class FulfillmentTransactionController {
 		return this.shippingService.updateBoxInvoice(boxId, invoiceNo);
 	}
 
-	// ==================== 9.4 출고 추적 API ====================
+	// ==================== 9.4 PDA 출하 확정 API ====================
+
+	/**
+	 * 도크 목록 조회 (공통코드 DOCK_CODE + 대기 건수)
+	 * GET /rest/ful_trx/shipping/dock_list
+	 */
+	@GetMapping(value = "shipping/dock_list", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get dock list with waiting count")
+	@SuppressWarnings("rawtypes")
+	public List<Map> getDockList() {
+		return this.shippingService.getDockList();
+	}
+
+	/**
+	 * 도크별 출하 대기 목록 조회
+	 * GET /rest/ful_trx/shipping/waiting_list?dock_cd={dockCd}
+	 */
+	@GetMapping(value = "shipping/waiting_list", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get shipping waiting list by dock")
+	public Map<String, Object> getWaitingList(
+			@org.springframework.web.bind.annotation.RequestParam(name = "dock_cd") String dockCd) {
+		return this.shippingService.getWaitingList(dockCd);
+	}
+
+	/**
+	 * 송장번호로 출하 확정 (PDA 스캔)
+	 * POST /rest/ful_trx/shipping/confirm_by_invoice
+	 */
+	@PostMapping(value = "shipping/confirm_by_invoice", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Confirm shipping by invoice scan")
+	public Map<String, Object> confirmShippingByInvoice(@RequestBody Map<String, Object> params) {
+		String dockCd = (String) params.get("dock_cd");
+		String invoiceNo = (String) params.get("invoice_no");
+		return this.shippingService.confirmShippingByInvoice(dockCd, invoiceNo);
+	}
+
+	// ==================== 9.5 출고 추적 API ====================
 
 	/**
 	 * 출고 추적 조회

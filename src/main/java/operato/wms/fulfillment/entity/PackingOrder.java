@@ -14,14 +14,14 @@ import xyz.elidom.util.ValueUtil;
  * @author HatioLab
  */
 @Table(name = "packing_orders", idStrategy = GenerationRule.UUID, uniqueFields = "domainId,packOrderNo", indexes = {
-	@Index(name = "ix_packing_orders_0", columnList = "domain_id,pack_order_no", unique = true),
-	@Index(name = "ix_packing_orders_1", columnList = "domain_id,shipment_order_id"),
-	@Index(name = "ix_packing_orders_2", columnList = "domain_id,wave_no"),
-	@Index(name = "ix_packing_orders_3", columnList = "domain_id,pick_task_no"),
-	@Index(name = "ix_packing_orders_4", columnList = "domain_id,order_date,status"),
-	@Index(name = "ix_packing_orders_5", columnList = "domain_id,station_cd,status"),
-	@Index(name = "ix_packing_orders_6", columnList = "domain_id,carrier_cd,status"),
-	@Index(name = "ix_packing_orders_7", columnList = "domain_id,dock_cd,status")
+		@Index(name = "ix_packing_orders_0", columnList = "domain_id,pack_order_no", unique = true),
+		@Index(name = "ix_packing_orders_1", columnList = "domain_id,shipment_order_id"),
+		@Index(name = "ix_packing_orders_2", columnList = "domain_id,wave_no"),
+		@Index(name = "ix_packing_orders_3", columnList = "domain_id,pick_task_no"),
+		@Index(name = "ix_packing_orders_4", columnList = "domain_id,order_date,status"),
+		@Index(name = "ix_packing_orders_5", columnList = "domain_id,station_cd,status"),
+		@Index(name = "ix_packing_orders_6", columnList = "domain_id,carrier_cd,status"),
+		@Index(name = "ix_packing_orders_7", columnList = "domain_id,dock_cd,status")
 })
 public class PackingOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	/**
@@ -255,21 +255,6 @@ public class PackingOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	public PackingOrder(Long domainId, String packOrderNo) {
 		this.domainId = domainId;
 		this.packOrderNo = packOrderNo;
-	}
-
-	@Override
-	public void beforeCreate() {
-		super.beforeCreate();
-
-		// 상태 기본값 설정
-		if (ValueUtil.isEmpty(this.status)) {
-			this.status = STATUS_CREATED;
-		}
-
-		// 작업일자 기본값 설정 (당일)
-		if (ValueUtil.isEmpty(this.orderDate)) {
-			this.orderDate = DateUtil.todayStr();
-		}
 	}
 
 	public String getId() {
@@ -518,5 +503,20 @@ public class PackingOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setAttr05(String attr05) {
 		this.attr05 = attr05;
+	}
+
+	@Override
+	public void beforeCreate() {
+		super.beforeCreate();
+
+		// 상태 기본값 설정
+		if (ValueUtil.isEmpty(this.status)) {
+			this.status = STATUS_CREATED;
+		}
+
+		// 작업일자 기본값 설정 (당일)
+		if (ValueUtil.isEmpty(this.orderDate)) {
+			this.orderDate = DateUtil.todayStr();
+		}
 	}
 }

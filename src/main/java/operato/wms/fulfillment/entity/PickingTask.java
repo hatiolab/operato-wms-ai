@@ -19,13 +19,13 @@ import xyz.elidom.util.ValueUtil;
  * @author HatioLab
  */
 @Table(name = "picking_tasks", idStrategy = GenerationRule.UUID, uniqueFields = "domainId,pickTaskNo", indexes = {
-	@Index(name = "ix_picking_tasks_0", columnList = "domain_id,pick_task_no", unique = true),
-	@Index(name = "ix_picking_tasks_1", columnList = "domain_id,wave_no"),
-	@Index(name = "ix_picking_tasks_2", columnList = "domain_id,shipment_order_id"),
-	@Index(name = "ix_picking_tasks_3", columnList = "domain_id,order_date,status"),
-	@Index(name = "ix_picking_tasks_4", columnList = "domain_id,com_cd,wh_cd"),
-	@Index(name = "ix_picking_tasks_5", columnList = "domain_id,worker_id,status"),
-	@Index(name = "ix_picking_tasks_6", columnList = "domain_id,pick_type,status")
+		@Index(name = "ix_picking_tasks_0", columnList = "domain_id,pick_task_no", unique = true),
+		@Index(name = "ix_picking_tasks_1", columnList = "domain_id,wave_no"),
+		@Index(name = "ix_picking_tasks_2", columnList = "domain_id,shipment_order_id"),
+		@Index(name = "ix_picking_tasks_3", columnList = "domain_id,order_date,status"),
+		@Index(name = "ix_picking_tasks_4", columnList = "domain_id,com_cd,wh_cd"),
+		@Index(name = "ix_picking_tasks_5", columnList = "domain_id,worker_id,status"),
+		@Index(name = "ix_picking_tasks_6", columnList = "domain_id,pick_type,status")
 })
 public class PickingTask extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	/**
@@ -241,46 +241,6 @@ public class PickingTask extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	public PickingTask(Long domainId, String pickTaskNo) {
 		this.domainId = domainId;
 		this.pickTaskNo = pickTaskNo;
-	}
-
-	@Override
-	public void beforeCreate() {
-		super.beforeCreate();
-
-		// 상태 기본값 설정
-		if (ValueUtil.isEmpty(this.status)) {
-			this.status = STATUS_CREATED;
-		}
-
-		// 작업일자 기본값 설정 (당일)
-		if (ValueUtil.isEmpty(this.orderDate)) {
-			this.orderDate = DateUtil.todayStr();
-		}
-
-		// pick_task_no 자동 채번
-		if (ValueUtil.isEmpty(this.pickTaskNo)) {
-			IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
-			String sql = "SELECT COALESCE(MAX(CAST(SUBSTRING(pick_task_no FROM '[0-9]+$') AS INTEGER)), 0) + 1"
-					+ " FROM picking_tasks WHERE domain_id = :domainId AND order_date = :orderDate";
-			Integer nextSeq = queryMgr.selectBySql(sql,
-					ValueUtil.newMap("domainId,orderDate", this.domainId, this.orderDate),
-					Integer.class);
-			this.pickTaskNo = "PICK-" + this.orderDate.replace("-", "") + "-" + String.format("%04d", nextSeq != null ? nextSeq : 1);
-		}
-
-		// 실적 수량 기본값 초기화
-		if (this.resultOrder == null) {
-			this.resultOrder = 0;
-		}
-		if (this.resultItem == null) {
-			this.resultItem = 0;
-		}
-		if (this.resultTotal == null) {
-			this.resultTotal = 0.0;
-		}
-		if (this.shortTotal == null) {
-			this.shortTotal = 0.0;
-		}
 	}
 
 	public String getId() {
@@ -521,5 +481,46 @@ public class PickingTask extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setAttr05(String attr05) {
 		this.attr05 = attr05;
+	}
+
+	@Override
+	public void beforeCreate() {
+		super.beforeCreate();
+
+		// 상태 기본값 설정
+		if (ValueUtil.isEmpty(this.status)) {
+			this.status = STATUS_CREATED;
+		}
+
+		// 작업일자 기본값 설정 (당일)
+		if (ValueUtil.isEmpty(this.orderDate)) {
+			this.orderDate = DateUtil.todayStr();
+		}
+
+		// pick_task_no 자동 채번
+		if (ValueUtil.isEmpty(this.pickTaskNo)) {
+			IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
+			String sql = "SELECT COALESCE(MAX(CAST(SUBSTRING(pick_task_no FROM '[0-9]+$') AS INTEGER)), 0) + 1"
+					+ " FROM picking_tasks WHERE domain_id = :domainId AND order_date = :orderDate";
+			Integer nextSeq = queryMgr.selectBySql(sql,
+					ValueUtil.newMap("domainId,orderDate", this.domainId, this.orderDate),
+					Integer.class);
+			this.pickTaskNo = "PICK-" + this.orderDate.replace("-", "") + "-"
+					+ String.format("%04d", nextSeq != null ? nextSeq : 1);
+		}
+
+		// 실적 수량 기본값 초기화
+		if (this.resultOrder == null) {
+			this.resultOrder = 0;
+		}
+		if (this.resultItem == null) {
+			this.resultItem = 0;
+		}
+		if (this.resultTotal == null) {
+			this.resultTotal = 0.0;
+		}
+		if (this.shortTotal == null) {
+			this.shortTotal = 0.0;
+		}
 	}
 }

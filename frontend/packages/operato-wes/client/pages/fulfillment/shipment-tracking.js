@@ -10,6 +10,7 @@ import { ServiceUtil, ValueUtil } from '@operato-app/metapage/dist-client'
  * 주문 → 웨이브 → 피킹 → 포장 → 박스/출하 전체 이력을 한 화면에서 조회한다.
  */
 class ShipmentTracking extends localize(i18next)(PageView) {
+  /** 컴포넌트 스타일 정의 */
   static get styles() {
     return [
       css`
@@ -440,6 +441,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
     ]
   }
 
+  /** 컴포넌트 상태 속성 정의 */
   static get properties() {
     return {
       searchKeyword: String,
@@ -460,6 +462,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
     }
   }
 
+  /** 생성자 — 상태 초기화 */
   constructor() {
     super()
     this.searchKeyword = ''
@@ -479,17 +482,17 @@ class ShipmentTracking extends localize(i18next)(PageView) {
     this.packingBoxes = []
   }
 
+  /** 페이지 컨텍스트 — 타이틀 설정 */
   get context() {
     return {
       title: i18next.t('menu.ShipmentTracking', { defaultValue: '출고 추적' })
     }
   }
 
+  /** 화면 렌더링 — 검색, 요약 카드, 타임라인, 탭 영역 */
   render() {
     return html`
       <div class="page-container">
-        <h2>${i18next.t('menu.ShipmentTracking', { defaultValue: '출고 추적' })}</h2>
-
         <!-- 검색 섹션 -->
         ${this._renderSearchSection()}
 
@@ -519,8 +522,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
     `
   }
 
-  // ==================== 검색 섹션 ====================
-
+  /** 검색 섹션 렌더링 — 유형 셀렉트, 키워드 입력, 조회 버튼 */
   _renderSearchSection() {
     return html`
       <div class="search-section">
@@ -555,8 +557,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
     `
   }
 
-  // ==================== 요약 카드 ====================
-
+  /** 요약 카드 렌더링 — 원주문/출고/웨이브/송장 정보 4개 카드 */
   _renderSummaryCards() {
     const order = this.shipmentOrder || {}
     const wave = this.wave
@@ -593,8 +594,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
     `
   }
 
-  // ==================== 타임라인 ====================
-
+  /** 타임라인 렌더링 — 주문접수→할당→웨이브→피킹→포장→출하 6단계 진행 흐름 */
   _renderTimeline() {
     const order = this.shipmentOrder || {}
     const wave = this.wave
@@ -661,8 +661,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
     `
   }
 
-  // ==================== 탭 ====================
-
+  /** 탭 영역 렌더링 — 주문정보/피킹/포장/박스송장 4개 탭 전환 */
   _renderTabs() {
     const tabs = [
       i18next.t('label.order_info', { defaultValue: '주문 정보' }),
@@ -694,8 +693,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
     `
   }
 
-  // ==================== 탭1: 주문 정보 ====================
-
+  /** 주문 정보 탭 렌더링 — 출고주문 상세, 주문 아이템, 재고 할당 내역 */
   _renderOrderTab() {
     const order = this.shipmentOrder || {}
     const items = this.shipmentOrderItems || []
@@ -828,8 +826,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
     `
   }
 
-  // ==================== 탭2: 피킹 ====================
-
+  /** 피킹 탭 렌더링 — 피킹 지시 상세 정보 및 피킹 아이템 목록 */
   _renderPickingTab() {
     const task = this.pickingTask
     const items = this.pickingTaskItems || []
@@ -922,8 +919,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
     `
   }
 
-  // ==================== 탭3: 포장 ====================
-
+  /** 포장 탭 렌더링 — 포장 지시 상세 정보 및 포장 아이템 목록 */
   _renderPackingTab() {
     const packing = this.packingOrder
     const items = this.packingOrderItems || []
@@ -1026,8 +1022,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
     `
   }
 
-  // ==================== 탭4: 박스/송장 ====================
-
+  /** 박스/송장 탭 렌더링 — 박스 목록 및 송장번호 조회 */
   _renderBoxTab() {
     const boxes = this.packingBoxes || []
 
@@ -1072,8 +1067,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
     `
   }
 
-  // ==================== 검색 ====================
-
+  /** 출고 추적 검색 API 호출 — 키워드와 유형으로 전체 이력 조회 */
   async _search() {
     const keyword = (this.searchKeyword || '').trim()
     if (!keyword) return
@@ -1109,8 +1103,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
     }
   }
 
-  // ==================== 유틸리티 ====================
-
+  /** 상태 코드를 다국어 라벨로 변환 */
   _statusLabel(status) {
     if (!status) return '-'
     const labels = {
@@ -1132,6 +1125,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
     return labels[status] || status
   }
 
+  /** 피킹 유형 코드를 다국어 라벨로 변환 */
   _pickTypeLabel(pickType) {
     if (!pickType) return '-'
     const labels = {
@@ -1141,11 +1135,13 @@ class ShipmentTracking extends localize(i18next)(PageView) {
     return labels[pickType] || pickType
   }
 
+  /** 숫자를 천 단위 콤마 포맷으로 변환 */
   _formatNumber(value) {
     if (value == null) return '-'
     return Number(value).toLocaleString()
   }
 
+  /** 날짜/시간 값을 YYYY-MM-DD HH:mm 포맷으로 변환 */
   _formatDateTime(dateValue) {
     if (!dateValue) return ''
     const d = new Date(dateValue)
