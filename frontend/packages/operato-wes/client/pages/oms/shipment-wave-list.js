@@ -24,15 +24,23 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
           padding: var(--padding-wide);
           overflow: auto;
         }
-        h2 {
-          margin: var(--title-margin);
+        .page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: var(--spacing-medium, 16px);
+        }
+
+        .page-header h2 {
+          margin: 0;
           font: var(--title-font);
           color: var(--title-text-color);
         }
-        [page-description] {
-          margin: var(--page-description-margin);
-          font: var(--page-description-font);
-          color: var(--page-description-color);
+
+        .header-actions {
+          display: flex;
+          gap: 8px;
+          align-items: center;
         }
 
         .page-container {
@@ -85,12 +93,6 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
           box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
         }
 
-        .search-actions {
-          display: flex;
-          gap: 8px;
-          align-items: end;
-        }
-
         .btn {
           padding: 8px 16px;
           border: none;
@@ -99,34 +101,6 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
           font-weight: 500;
           cursor: pointer;
           transition: all 0.2s ease;
-        }
-
-        .btn-primary {
-          background: var(--md-sys-color-primary);
-          color: var(--md-sys-color-on-primary);
-        }
-
-        .btn-primary:hover {
-          opacity: 0.9;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .btn-secondary {
-          background: var(--md-sys-color-surface-variant);
-          color: var(--md-sys-color-on-surface-variant);
-        }
-
-        .btn-secondary:hover {
-          background: var(--md-sys-color-outline-variant);
-        }
-
-        .btn-success {
-          background: #7B1FA2;
-          color: white;
-        }
-
-        .btn-success:hover {
-          opacity: 0.9;
         }
 
         .btn-outline {
@@ -178,13 +152,6 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
         .summary-card.released { border-left: 4px solid #303F9F; }
         .summary-card.completed { border-left: 4px solid #4CAF50; }
         .summary-card.cancelled { border-left: 4px solid #D32F2F; }
-
-        /* 액션 버튼 영역 */
-        .action-bar {
-          display: flex;
-          gap: 12px;
-          flex-wrap: wrap;
-        }
 
         /* 데이터 테이블 */
         .table-section {
@@ -370,6 +337,9 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
           .search-form {
             grid-template-columns: 1fr;
           }
+          .header-actions {
+            flex-wrap: wrap;
+          }
         }
       `
     ]
@@ -415,7 +385,20 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
   render() {
     return html`
       <div class="page-container">
-        <h2>${i18next.t('title.shipment-wave-list', { defaultValue: '웨이브 관리' })}</h2>
+        <div class="page-header">
+          <h2>${i18next.t('title.shipment-wave-list', { defaultValue: '웨이브 관리' })}</h2>
+          <div class="header-actions">
+            <button class="btn btn-outline" @click="${this._resetSearch}">
+              ${i18next.t('button.reset', { defaultValue: '초기화' })}
+            </button>
+            <button class="btn btn-outline" @click="${this._search}">
+              ${i18next.t('button.search', { defaultValue: '조회' })}
+            </button>
+            <button class="btn btn-outline" @click="${this._openCreateModal}">
+              ${i18next.t('button.auto_wave_create', { defaultValue: '자동 웨이브 생성' })}
+            </button>
+          </div>
+        </div>
 
         <!-- 검색 조건 -->
         <section class="search-section">
@@ -457,14 +440,6 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
                 .value="${this.searchParams.carrier_cd}"
                 @change="${e => this._updateSearch('carrier_cd', e.target.value)}" />
             </div>
-            <div class="search-actions">
-              <button class="btn btn-secondary" @click="${this._resetSearch}">
-                ${i18next.t('button.reset', { defaultValue: '초기화' })}
-              </button>
-              <button class="btn btn-primary" @click="${this._search}">
-                ${i18next.t('button.search', { defaultValue: '조회' })}
-              </button>
-            </div>
           </div>
         </section>
 
@@ -486,13 +461,6 @@ class ShipmentWaveList extends localize(i18next)(PageView) {
             <div class="label">${i18next.t('label.cancelled', { defaultValue: '취소' })}</div>
             <div class="count">${this.statusSummary.CANCELLED || 0}</div>
           </div>
-        </section>
-
-        <!-- 액션 버튼 -->
-        <section class="action-bar">
-          <button class="btn btn-success" @click="${this._openCreateModal}">
-            ${i18next.t('button.auto_wave_create', { defaultValue: '자동 웨이브 생성' })}
-          </button>
         </section>
 
         <!-- 데이터 테이블 -->

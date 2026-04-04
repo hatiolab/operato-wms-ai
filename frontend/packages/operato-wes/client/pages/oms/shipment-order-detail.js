@@ -176,10 +176,23 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
           white-space: nowrap;
         }
 
+        .timeline-step .time {
+          font-size: 10px;
+          color: var(--md-sys-color-on-surface-variant);
+          white-space: nowrap;
+          opacity: 0.7;
+        }
+
         .timeline-step.completed .label,
         .timeline-step.active .label {
           color: var(--md-sys-color-primary);
           font-weight: 600;
+        }
+
+        .timeline-step.completed .time,
+        .timeline-step.active .time {
+          color: var(--md-sys-color-primary);
+          opacity: 0.8;
         }
 
         .timeline-connector {
@@ -187,7 +200,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
           height: 2px;
           min-width: 16px;
           background: var(--md-sys-color-outline-variant);
-          margin-bottom: 18px;
+          margin-bottom: 32px;
         }
 
         .timeline-connector.completed {
@@ -538,21 +551,22 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     `
   }
 
-  /** 수평 상태 타임라인 렌더링 - 등록부터 마감까지 9단계 */
+  /** 수평 상태 타임라인 렌더링 - 등록부터 마감까지 9단계 + 시간 표시 */
   _renderTimeline() {
+    const o = this.order
     const steps = [
-      { key: 'REGISTERED', label: '등록' },
-      { key: 'CONFIRMED', label: '확정' },
-      { key: 'ALLOCATED', label: '할당' },
+      { key: 'REGISTERED', label: '등록', time: o.created_at },
+      { key: 'CONFIRMED', label: '확정', time: o.confirmed_at },
+      { key: 'ALLOCATED', label: '할당', time: o.allocated_at },
       { key: 'WAVED', label: '웨이브' },
-      { key: 'RELEASED', label: '인계' },
+      { key: 'RELEASED', label: '인계', time: o.released_at },
       { key: 'PICKING', label: '피킹' },
       { key: 'PACKING', label: '패킹' },
-      { key: 'SHIPPED', label: '출하' },
-      { key: 'CLOSED', label: '마감' }
+      { key: 'SHIPPED', label: '출하', time: o.shipped_at },
+      { key: 'CLOSED', label: '마감', time: o.closed_at }
     ]
 
-    const status = this.order?.status
+    const status = o?.status
     if (status === 'CANCELLED' || status === 'BACK_ORDER') {
       return html``
     }
@@ -567,6 +581,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
           <div class="timeline-step ${idx < currentIdx ? 'completed' : ''} ${idx === currentIdx ? 'active' : ''}">
             <div class="dot"></div>
             <span class="label">${step.label}</span>
+            ${step.time ? html`<span class="time">${this._formatShortTime(step.time)}</span>` : ''}
           </div>
         `)}
       </div>
@@ -1257,6 +1272,14 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     const d = new Date(dateValue)
     if (isNaN(d.getTime())) return '-'
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
+
+  /** 타임라인용 간략 시간 포맷팅 (MM/DD HH:mm) */
+  _formatShortTime(dateValue) {
+    if (!dateValue) return ''
+    const d = new Date(dateValue)
+    if (isNaN(d.getTime())) return ''
+    return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   }
 }
 

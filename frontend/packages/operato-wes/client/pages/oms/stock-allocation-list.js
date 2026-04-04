@@ -23,12 +23,6 @@ class StockAllocationList extends localize(i18next)(PageView) {
           padding: var(--padding-wide);
           overflow: auto;
         }
-        h2 {
-          margin: var(--title-margin);
-          font: var(--title-font);
-          color: var(--title-text-color);
-        }
-
         .page-container {
           display: flex;
           flex-direction: column;
@@ -40,10 +34,19 @@ class StockAllocationList extends localize(i18next)(PageView) {
           display: flex;
           justify-content: space-between;
           align-items: center;
+          margin-bottom: var(--spacing-medium, 16px);
         }
 
         .page-header h2 {
           margin: 0;
+          font: var(--title-font);
+          color: var(--title-text-color);
+        }
+
+        .header-actions {
+          display: flex;
+          gap: 8px;
+          align-items: center;
         }
 
         /* 상태 요약 카드 */
@@ -130,12 +133,6 @@ class StockAllocationList extends localize(i18next)(PageView) {
           box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
         }
 
-        .search-actions {
-          display: flex;
-          gap: 8px;
-          align-items: end;
-        }
-
         .btn {
           padding: 8px 16px;
           border: none;
@@ -144,25 +141,6 @@ class StockAllocationList extends localize(i18next)(PageView) {
           font-weight: 500;
           cursor: pointer;
           transition: all 0.2s ease;
-        }
-
-        .btn-primary {
-          background: var(--md-sys-color-primary);
-          color: var(--md-sys-color-on-primary);
-        }
-
-        .btn-primary:hover {
-          opacity: 0.9;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .btn-secondary {
-          background: var(--md-sys-color-surface-variant);
-          color: var(--md-sys-color-on-surface-variant);
-        }
-
-        .btn-secondary:hover {
-          background: var(--md-sys-color-outline-variant);
         }
 
         .btn-outline {
@@ -362,6 +340,9 @@ class StockAllocationList extends localize(i18next)(PageView) {
           .search-form {
             grid-template-columns: 1fr;
           }
+          .header-actions {
+            flex-wrap: wrap;
+          }
         }
       `
     ]
@@ -410,9 +391,14 @@ class StockAllocationList extends localize(i18next)(PageView) {
         <!-- 페이지 헤더 -->
         <div class="page-header">
           <h2>${i18next.t('title.stock-allocation-list', { defaultValue: '재고 할당 현황' })}</h2>
-          <button class="btn btn-outline" @click="${this._refresh}">
-            ${i18next.t('button.refresh', { defaultValue: '새로고침' })}
-          </button>
+          <div class="header-actions">
+            <button class="btn btn-outline" @click="${this._resetSearch}">
+              ${i18next.t('button.reset', { defaultValue: '초기화' })}
+            </button>
+            <button class="btn btn-outline" @click="${this._search}">
+              ${i18next.t('button.search', { defaultValue: '조회' })}
+            </button>
+          </div>
         </div>
 
         <!-- 상태 요약 카드 -->
@@ -483,29 +469,21 @@ class StockAllocationList extends localize(i18next)(PageView) {
                 .value="${this.searchParams.loc_cd}"
                 @change="${e => this._updateSearch('loc_cd', e.target.value)}" />
             </div>
-            <div class="search-actions">
-              <button class="btn btn-secondary" @click="${this._resetSearch}">
-                ${i18next.t('button.reset', { defaultValue: '초기화' })}
-              </button>
-              <button class="btn btn-primary" @click="${this._search}">
-                ${i18next.t('button.search', { defaultValue: '조회' })}
-              </button>
-            </div>
           </div>
         </section>
 
         <!-- 데이터 테이블 -->
         <section class="table-section">
           ${this.loading
-            ? html`<div class="loading">${i18next.t('label.loading', { defaultValue: '데이터 로딩 중...' })}</div>`
-            : this.allocations.length === 0
-              ? html`
+        ? html`<div class="loading">${i18next.t('label.loading', { defaultValue: '데이터 로딩 중...' })}</div>`
+        : this.allocations.length === 0
+          ? html`
                   <div class="empty-state">
                     <div class="icon">📦</div>
                     <div class="message">${i18next.t('label.no_data', { defaultValue: '조회 결과가 없습니다' })}</div>
                   </div>
                 `
-              : html`
+          : html`
                   <table class="data-table">
                     <thead>
                       <tr>
@@ -536,8 +514,8 @@ class StockAllocationList extends localize(i18next)(PageView) {
                           <td class="right">${this._formatNumber(alloc.alloc_qty)}</td>
                           <td class="center">
                             ${alloc.alloc_strategy
-                              ? html`<span class="strategy-badge">${alloc.alloc_strategy}</span>`
-                              : '-'}
+              ? html`<span class="strategy-badge">${alloc.alloc_strategy}</span>`
+              : '-'}
                           </td>
                           <td class="center">
                             <span class="badge ${(alloc.status || '').toLowerCase()}">${this._statusLabel(alloc.status)}</span>
@@ -545,8 +523,8 @@ class StockAllocationList extends localize(i18next)(PageView) {
                           <td class="center">${this._formatDateTime(alloc.allocated_at)}</td>
                           <td class="center">
                             ${alloc.status === 'SOFT' && alloc.expired_at
-                              ? html`<span class="${this._isSoftExpiringSoon(alloc) ? 'expiring-text' : ''}">${this._formatDateTime(alloc.expired_at)}</span>`
-                              : '-'}
+              ? html`<span class="${this._isSoftExpiringSoon(alloc) ? 'expiring-text' : ''}">${this._formatDateTime(alloc.expired_at)}</span>`
+              : '-'}
                           </td>
                         </tr>
                       `)}
@@ -568,7 +546,7 @@ class StockAllocationList extends localize(i18next)(PageView) {
                     </div>
                   </div>
                 `
-          }
+      }
         </section>
       </div>
     `

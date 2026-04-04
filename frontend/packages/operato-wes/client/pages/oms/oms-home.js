@@ -6,6 +6,7 @@ import { openPopup } from '@operato/layout'
 import { ServiceUtil, UiUtil, ValueUtil } from '@operato-app/metapage/dist-client'
 import Chart from 'chart.js/auto'
 import './auto-wave-create-popup'
+import './shipment-order-detail'
 
 class OmsHome extends localize(i18next)(PageView) {
   /** 컴포넌트 스타일 정의 */
@@ -415,7 +416,7 @@ class OmsHome extends localize(i18next)(PageView) {
                   </div>
                   <div class="status-card released" @click="${() => this._navigateTo('shipment-orders', { status: 'RELEASED', order_date: ValueUtil.todayFormatted() })}">
                     <div class="label">인계 (RELEASED)</div>
-                    <div class="count">${this.statusCounts.RELEASED || 0}</div>
+                    <div class="count">${this.statusCounts.RELEASED + this.statusCounts.PICKING + this.statusCounts.PACKING + this.statusCounts.SHIPPED + this.statusCounts.CLOSED || 0}</div>
                   </div>
                   <div class="status-card back-order" @click="${() => this._navigateTo('shipment-orders', { status: 'BACK_ORDER' })}">
                     <div class="label">부족 (BACK_ORDER)</div>
@@ -773,10 +774,13 @@ class OmsHome extends localize(i18next)(PageView) {
     UiUtil.pageNavigate(page, filter ? filter : {})
   }
 
-  /** 주문 상세 페이지로 이동 */
+  /** 출하 주문 상세 팝업 열기 */
   _navigateToDetail(order) {
     if (order && order.id) {
-      UiUtil.pageNavigate('shipment-order-item', { id: order.id })
+      const el = document.createElement('shipment-order-detail')
+      el.shipmentOrderId = order.id
+      el.addEventListener('order-updated', () => this._fetchDashboardData())
+      UiUtil.openPopupByElement(i18next.t('title.shipment_order_detail', { defaultValue: '출하 주문 상세' }), 'large', el, true)
     }
   }
 
