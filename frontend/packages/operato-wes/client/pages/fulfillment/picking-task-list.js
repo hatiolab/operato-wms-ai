@@ -83,10 +83,22 @@ class PickingTaskList extends localize(i18next)(PageView) {
           box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
         }
 
-        .search-actions {
+        /* 페이지 헤더 */
+        .page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: var(--spacing-medium, 16px);
+        }
+
+        .page-header h2 {
+          margin: 0;
+        }
+
+        .header-actions {
           display: flex;
           gap: 8px;
-          align-items: end;
+          align-items: center;
         }
 
         .btn {
@@ -99,34 +111,6 @@ class PickingTaskList extends localize(i18next)(PageView) {
           transition: all 0.2s ease;
         }
 
-        .btn-primary {
-          background: var(--md-sys-color-primary);
-          color: var(--md-sys-color-on-primary);
-        }
-
-        .btn-primary:hover {
-          opacity: 0.9;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .btn-secondary {
-          background: var(--md-sys-color-surface-variant);
-          color: var(--md-sys-color-on-surface-variant);
-        }
-
-        .btn-secondary:hover {
-          background: var(--md-sys-color-outline-variant);
-        }
-
-        .btn-danger {
-          background: #D32F2F;
-          color: white;
-        }
-
-        .btn-danger:hover {
-          opacity: 0.9;
-        }
-
         .btn-outline {
           background: transparent;
           color: var(--md-sys-color-primary);
@@ -136,6 +120,17 @@ class PickingTaskList extends localize(i18next)(PageView) {
         .btn-outline:hover {
           background: var(--md-sys-color-primary);
           color: var(--md-sys-color-on-primary);
+        }
+
+        .btn-danger {
+          background: transparent;
+          color: #D32F2F;
+          border: 1px solid #D32F2F;
+        }
+
+        .btn-danger:hover {
+          background: #D32F2F;
+          color: white;
         }
 
         /* 상태 요약 카드 */
@@ -176,13 +171,6 @@ class PickingTaskList extends localize(i18next)(PageView) {
         .summary-card.in_progress { border-left: 4px solid #FF9800; }
         .summary-card.completed { border-left: 4px solid #4CAF50; }
         .summary-card.cancelled { border-left: 4px solid #D32F2F; }
-
-        /* 액션 버튼 영역 */
-        .action-bar {
-          display: flex;
-          gap: 12px;
-          flex-wrap: wrap;
-        }
 
         /* 데이터 테이블 */
         .table-section {
@@ -350,6 +338,9 @@ class PickingTaskList extends localize(i18next)(PageView) {
           .search-form {
             grid-template-columns: 1fr;
           }
+          .header-actions {
+            flex-wrap: wrap;
+          }
         }
       `
     ]
@@ -398,7 +389,20 @@ class PickingTaskList extends localize(i18next)(PageView) {
   render() {
     return html`
       <div class="page-container">
-        <h2>${i18next.t('menu.PickingTaskWork', { defaultValue: '피킹 지시 목록' })}</h2>
+        <div class="page-header">
+          <h2>${i18next.t('menu.PickingTaskWork', { defaultValue: '피킹 지시 목록' })}</h2>
+          <div class="header-actions">
+            <button class="btn btn-outline" @click="${this._resetSearch}">
+              ${i18next.t('button.reset', { defaultValue: '초기화' })}
+            </button>
+            <button class="btn btn-outline" @click="${this._search}">
+              ${i18next.t('button.search', { defaultValue: '조회' })}
+            </button>
+            <button class="btn btn-danger" @click="${this._batchCancel}">
+              ${i18next.t('button.batch_cancel', { defaultValue: '일괄 취소' })}
+            </button>
+          </div>
+        </div>
 
         <!-- 검색 조건 -->
         <section class="search-section">
@@ -463,14 +467,6 @@ class PickingTaskList extends localize(i18next)(PageView) {
                 .value="${this.searchParams.shipment_no}"
                 @change="${e => this._updateSearch('shipment_no', e.target.value)}" />
             </div>
-            <div class="search-actions">
-              <button class="btn btn-secondary" @click="${this._resetSearch}">
-                ${i18next.t('button.reset', { defaultValue: '초기화' })}
-              </button>
-              <button class="btn btn-primary" @click="${this._search}">
-                ${i18next.t('button.search', { defaultValue: '조회' })}
-              </button>
-            </div>
           </div>
         </section>
 
@@ -492,13 +488,6 @@ class PickingTaskList extends localize(i18next)(PageView) {
             <div class="label">${i18next.t('label.cancelled', { defaultValue: '취소' })}</div>
             <div class="count">${this.statusSummary.CANCELLED || 0}</div>
           </div>
-        </section>
-
-        <!-- 액션 버튼 -->
-        <section class="action-bar">
-          <button class="btn btn-danger" @click="${this._batchCancel}">
-            ${i18next.t('button.batch_cancel', { defaultValue: '일괄 취소' })}
-          </button>
         </section>
 
         <!-- 데이터 테이블 -->

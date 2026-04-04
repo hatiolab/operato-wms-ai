@@ -48,14 +48,22 @@ class OmsHome extends localize(i18next)(PageView) {
           flex: 1;
         }
 
-        .section-header {
+        /* 페이지 헤더 */
+        .page-header {
           display: flex;
+          justify-content: space-between;
           align-items: center;
           margin-bottom: var(--spacing-medium, 16px);
         }
 
-        .section-header .section-title {
-          margin-bottom: 0;
+        .page-header h2 {
+          margin: 0;
+        }
+
+        .header-actions {
+          display: flex;
+          gap: 8px;
+          align-items: center;
         }
 
         /* 상태 카드 그리드 */
@@ -175,36 +183,6 @@ class OmsHome extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface);
         }
 
-        /* 바로가기 버튼 */
-        .quick-actions {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-          gap: var(--spacing-medium, 16px);
-        }
-
-        .quick-action-btn {
-          background: var(--md-sys-color-primary);
-          color: var(--md-sys-color-on-primary);
-          border: none;
-          border-radius: 8px;
-          padding: 16px 24px;
-          font-size: 16px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          text-align: center;
-        }
-
-        .quick-action-btn:hover {
-          background: var(--md-sys-color-primary-container);
-          box-shadow: var(--box-shadow-normal, 0 4px 8px rgba(0, 0, 0, 0.15));
-          transform: translateY(-2px);
-        }
-
-        .quick-action-btn .icon {
-          margin-right: 8px;
-        }
-
         /* 최근 주문 테이블 */
         .recent-orders-section {
           background: var(--md-sys-color-surface);
@@ -299,25 +277,25 @@ class OmsHome extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface-variant);
         }
 
-        .btn-refresh {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          background: var(--md-sys-color-surface);
-          color: var(--md-sys-color-primary);
-          border: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
-          border-radius: 8px;
+        .btn {
           padding: 8px 16px;
+          border: none;
+          border-radius: 8px;
           font-size: 14px;
           font-weight: 500;
           cursor: pointer;
           transition: all 0.2s ease;
         }
 
-        .btn-refresh:hover {
+        .btn-outline {
+          background: transparent;
+          color: var(--md-sys-color-primary);
+          border: 1px solid var(--md-sys-color-primary);
+        }
+
+        .btn-outline:hover {
           background: var(--md-sys-color-primary);
           color: var(--md-sys-color-on-primary);
-          box-shadow: var(--box-shadow-light, 0 2px 4px rgba(0, 0, 0, 0.1));
         }
 
         /* 반응형 */
@@ -332,8 +310,8 @@ class OmsHome extends localize(i18next)(PageView) {
             grid-template-columns: repeat(3, 1fr);
           }
 
-          .quick-actions {
-            grid-template-columns: 1fr;
+          .header-actions {
+            flex-wrap: wrap;
           }
         }
 
@@ -407,47 +385,41 @@ class OmsHome extends localize(i18next)(PageView) {
             <div class="dashboard-container">
               <!-- ① 오늘의 주문 현황 (상태별 카드) -->
               <section>
-                <div class="section-header">
-                  <h3 class="section-title">오늘의 주문 현황</h3>
+                <div class="page-header">
+                  <h2>오늘의 주문 현황</h2>
                   <div class="header-actions">
-                    <button @click="${() => this._fetchDashboardData()}">${i18next.t('button.refresh', { defaultValue: '새로고침' })}</button>
-                    <button @click="${() => this._navigateTo('shipment-orders')}">주문 목록</button>
-                    <button @click="${() => this._openWaveNewPopup()}">웨이브 생성</button>
-                    <button @click="${() => this._navigateTo('shipment-order-import')}">임포트</button>
-                    <button @click="${() => this._navigateTo('replenish-orders')}">보충 현황</button>
-                    <button @click="${() => this._navigateTo('inventories')}">재고 조회</button>
+                    <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">${i18next.t('button.refresh', { defaultValue: '새로고침' })}</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('shipment-orders')}">주문 목록</button>
+                    <button class="btn btn-outline" @click="${() => this._openWaveNewPopup()}">웨이브 생성</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('shipment-order-import')}">임포트</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('replenish-orders')}">보충 현황</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('inventories')}">재고 조회</button>
                   </div>
                 </div>
                 <div class="status-cards">
                   <div class="status-card registered" @click="${() => this._navigateTo('shipment-orders', { status: 'REGISTERED', order_date: ValueUtil.todayFormatted() })}">
-                    <div class="label">등록</div>
+                    <div class="label">등록 (REGISTERED)</div>
                     <div class="count">${this.statusCounts.REGISTERED || 0}</div>
-                    <div class="subtitle">REGISTERED</div>
                   </div>
                   <div class="status-card confirmed" @click="${() => this._navigateTo('shipment-orders', { status: 'CONFIRMED', order_date: ValueUtil.todayFormatted() })}">
-                    <div class="label">확정</div>
+                    <div class="label">확정 (CONFIRMED)</div>
                     <div class="count">${this.statusCounts.CONFIRMED || 0}</div>
-                    <div class="subtitle">CONFIRMED</div>
                   </div>
                   <div class="status-card allocated" @click="${() => this._navigateTo('shipment-orders', { status: 'ALLOCATED', order_date: ValueUtil.todayFormatted() })}">
-                    <div class="label">할당</div>
+                    <div class="label">할당 (ALLOCATED)</div>
                     <div class="count">${this.statusCounts.ALLOCATED || 0}</div>
-                    <div class="subtitle">ALLOCATED</div>
                   </div>
                   <div class="status-card waved" @click="${() => this._navigateTo('shipment-waves', { wave_date: ValueUtil.todayFormatted() })}">
-                    <div class="label">웨이브</div>
+                    <div class="label">웨이브 (WAVED)</div>
                     <div class="count">${this.statusCounts.WAVED || 0}</div>
-                    <div class="subtitle">WAVED</div>
                   </div>
                   <div class="status-card released" @click="${() => this._navigateTo('shipment-orders', { status: 'RELEASED', order_date: ValueUtil.todayFormatted() })}">
-                    <div class="label">인계</div>
+                    <div class="label">인계 (RELEASED)</div>
                     <div class="count">${this.statusCounts.RELEASED || 0}</div>
-                    <div class="subtitle">RELEASED</div>
                   </div>
                   <div class="status-card back-order" @click="${() => this._navigateTo('shipment-orders', { status: 'BACK_ORDER' })}">
-                    <div class="label">부족</div>
+                    <div class="label">부족 (BACK_ORDER)</div>
                     <div class="count">${this.statusCounts.BACK_ORDER || 0}</div>
-                    <div class="subtitle">BACK_ORDER</div>
                   </div>
                 </div>
               </section>

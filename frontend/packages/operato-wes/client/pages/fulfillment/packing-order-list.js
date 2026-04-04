@@ -22,15 +22,20 @@ class PackingOrderList extends localize(i18next)(PageView) {
           padding: var(--padding-wide);
           overflow: auto;
         }
-        h2 {
-          margin: var(--title-margin);
+        .page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .page-header h2 {
+          margin: 0;
           font: var(--title-font);
           color: var(--title-text-color);
         }
-        [page-description] {
-          margin: var(--page-description-margin);
-          font: var(--page-description-font);
-          color: var(--page-description-color);
+        .header-actions {
+          display: flex;
+          gap: 8px;
+          align-items: center;
         }
 
         .page-container {
@@ -83,12 +88,6 @@ class PackingOrderList extends localize(i18next)(PageView) {
           box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
         }
 
-        .search-actions {
-          display: flex;
-          gap: 8px;
-          align-items: end;
-        }
-
         .btn {
           padding: 8px 16px;
           border: none;
@@ -97,25 +96,6 @@ class PackingOrderList extends localize(i18next)(PageView) {
           font-weight: 500;
           cursor: pointer;
           transition: all 0.2s ease;
-        }
-
-        .btn-primary {
-          background: var(--md-sys-color-primary);
-          color: var(--md-sys-color-on-primary);
-        }
-
-        .btn-primary:hover {
-          opacity: 0.9;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .btn-secondary {
-          background: var(--md-sys-color-surface-variant);
-          color: var(--md-sys-color-on-surface-variant);
-        }
-
-        .btn-secondary:hover {
-          background: var(--md-sys-color-outline-variant);
         }
 
         .btn-success {
@@ -372,6 +352,14 @@ class PackingOrderList extends localize(i18next)(PageView) {
 
         /* 반응형 */
         @media screen and (max-width: 768px) {
+          .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+          }
+          .header-actions {
+            flex-wrap: wrap;
+          }
           .status-summary {
             grid-template-columns: repeat(2, 1fr);
           }
@@ -436,7 +424,17 @@ class PackingOrderList extends localize(i18next)(PageView) {
   render() {
     return html`
       <div class="page-container">
-        <h2>${i18next.t('menu.PackingOrderWork', { defaultValue: '포장 주문 관리' })}</h2>
+        <div class="page-header">
+          <h2>${i18next.t('menu.PackingOrderWork', { defaultValue: '포장 주문 관리' })}</h2>
+          <div class="header-actions">
+            <button class="btn btn-outline" @click="${this._resetSearch}">
+              ${i18next.t('button.reset', { defaultValue: '초기화' })}
+            </button>
+            <button class="btn btn-outline" @click="${this._search}">
+              ${i18next.t('button.search', { defaultValue: '조회' })}
+            </button>
+          </div>
+        </div>
 
         <!-- 검색 조건 -->
         <section class="search-section">
@@ -498,14 +496,6 @@ class PackingOrderList extends localize(i18next)(PageView) {
               <input type="text" placeholder="${i18next.t('label.wave_no', { defaultValue: '웨이브번호' })}"
                 .value="${this.searchParams.wave_no}"
                 @change="${e => this._updateSearch('wave_no', e.target.value)}" />
-            </div>
-            <div class="search-actions">
-              <button class="btn btn-secondary" @click="${this._resetSearch}">
-                ${i18next.t('button.reset', { defaultValue: '초기화' })}
-              </button>
-              <button class="btn btn-primary" @click="${this._search}">
-                ${i18next.t('button.search', { defaultValue: '조회' })}
-              </button>
             </div>
           </div>
         </section>

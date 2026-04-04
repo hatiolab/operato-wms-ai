@@ -45,6 +45,45 @@ class OutboundHome extends localize(i18next)(PageView) {
           gap: 8px;
         }
 
+        /* 페이지 헤더 */
+        .page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: var(--spacing-medium, 16px);
+        }
+
+        .page-header h2 {
+          margin: 0;
+        }
+
+        .header-actions {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .btn {
+          padding: 8px 16px;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .btn-outline {
+          background: transparent;
+          color: var(--md-sys-color-primary);
+          border: 1px solid var(--md-sys-color-primary);
+        }
+
+        .btn-outline:hover {
+          background: var(--md-sys-color-primary);
+          color: var(--md-sys-color-on-primary);
+        }
+
         /* 상태 카드 그리드 */
         .status-cards {
           display: grid;
@@ -181,36 +220,6 @@ class OutboundHome extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface);
         }
 
-        /* 바로가기 버튼 */
-        .quick-actions {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: var(--spacing-medium, 16px);
-        }
-
-        .quick-action-btn {
-          background: var(--md-sys-color-primary);
-          color: var(--md-sys-color-on-primary);
-          border: none;
-          border-radius: 8px;
-          padding: 16px 24px;
-          font-size: 16px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          text-align: center;
-        }
-
-        .quick-action-btn:hover {
-          background: var(--md-sys-color-primary-container);
-          box-shadow: var(--box-shadow-normal, 0 4px 8px rgba(0, 0, 0, 0.15));
-          transform: translateY(-2px);
-        }
-
-        .quick-action-btn .icon {
-          margin-right: 8px;
-        }
-
         /* 로딩 상태 */
         .loading {
           display: flex;
@@ -227,8 +236,8 @@ class OutboundHome extends localize(i18next)(PageView) {
             grid-template-columns: repeat(2, 1fr);
           }
 
-          .quick-actions {
-            grid-template-columns: 1fr;
+          .header-actions {
+            flex-wrap: wrap;
           }
         }
       `
@@ -292,7 +301,16 @@ class OutboundHome extends localize(i18next)(PageView) {
             <div class="dashboard-container">
               <!-- 오늘의 출고 현황 -->
               <section>
-                <h3 class="section-title">📊 오늘의 출고 현황</h3>
+                <div class="page-header">
+                  <h2>오늘의 출고 현황</h2>
+                  <div class="header-actions">
+                    <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">${i18next.t('button.refresh', { defaultValue: '새로고침' })}</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('release-orders')}">출고 지시 관리</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('picking-orders')}">피킹 작업</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('release-orders', { status: 'END' })}">출고 실적 조회</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('inventories')}">재고 조회</button>
+                  </div>
+                </div>
                 <div class="status-cards">
                   <div class="status-card reg" @click="${() => this._navigateTo('release-orders', { status: 'REG', rls_ord_date: ValueUtil.todayFormatted() })}">
                     <div class="label">작성중</div>
@@ -319,7 +337,7 @@ class OutboundHome extends localize(i18next)(PageView) {
 
               <!-- 출고 유형별 현황 -->
               <section class="chart-section">
-                <h3 class="section-title">📈 출고 유형별 현황</h3>
+                <h3 class="section-title">출고 유형별 현황</h3>
                 <div class="chart-container">
                   <canvas id="typeChart"></canvas>
                 </div>
@@ -327,7 +345,7 @@ class OutboundHome extends localize(i18next)(PageView) {
 
               <!-- 피킹 현황 -->
               <section>
-                <h3 class="section-title">📦 피킹 현황</h3>
+                <h3 class="section-title">피킹 현황</h3>
                 <div class="stat-cards">
                   <div class="stat-card wait">
                     <div class="label">피킹 대기</div>
@@ -346,7 +364,7 @@ class OutboundHome extends localize(i18next)(PageView) {
 
               <!-- 사업 유형별 현황 -->
               <section>
-                <h3 class="section-title">🏢 사업 유형별 현황</h3>
+                <h3 class="section-title">사업 유형별 현황</h3>
                 <div class="stat-cards">
                   <div class="stat-card b2b">
                     <div class="label">B2B 출고</div>
@@ -363,7 +381,7 @@ class OutboundHome extends localize(i18next)(PageView) {
               ${this.alerts && this.alerts.length > 0
             ? html`
                     <section class="alerts-section">
-                      <h3 class="section-title">⚠️ 주의 항목</h3>
+                      <h3 class="section-title">주의 항목</h3>
                       ${this.alerts.map(
               alert => html`
                           <div class="alert-item ${alert.type}">
@@ -376,23 +394,6 @@ class OutboundHome extends localize(i18next)(PageView) {
                   `
             : ''}
 
-              <!-- 바로가기 -->
-              <section>
-                <div class="quick-actions">
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('release-orders')}">
-                    <span class="icon">📝</span>출고 지시 관리
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('picking-orders')}">
-                    <span class="icon">📦</span>피킹 작업
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('release-orders', { status: 'END' })}">
-                    <span class="icon">📋</span>출고 실적 조회
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('inventories')}">
-                    <span class="icon">🔍</span>재고 조회
-                  </button>
-                </div>
-              </section>
             </div>
           `}
     `

@@ -34,6 +34,48 @@ class FulfillmentHome extends localize(i18next)(PageView) {
           gap: var(--spacing-large, 24px);
         }
 
+        /* 페이지 헤더 */
+        .page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: var(--spacing-medium, 16px);
+        }
+
+        .page-header h2 {
+          margin: 0;
+          font-size: 20px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-background);
+        }
+
+        .header-actions {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .btn {
+          padding: 8px 16px;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .btn-outline {
+          background: transparent;
+          color: var(--md-sys-color-primary);
+          border: 1px solid var(--md-sys-color-primary);
+        }
+
+        .btn-outline:hover {
+          background: var(--md-sys-color-primary);
+          color: var(--md-sys-color-on-primary);
+        }
+
         /* 섹션 타이틀 */
         .section-title {
           font-size: 18px;
@@ -169,36 +211,6 @@ class FulfillmentHome extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface);
         }
 
-        /* 바로가기 버튼 */
-        .quick-actions {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-          gap: var(--spacing-medium, 16px);
-        }
-
-        .quick-action-btn {
-          background: var(--md-sys-color-primary);
-          color: var(--md-sys-color-on-primary);
-          border: none;
-          border-radius: 8px;
-          padding: 16px 24px;
-          font-size: 16px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          text-align: center;
-        }
-
-        .quick-action-btn:hover {
-          background: var(--md-sys-color-primary-container);
-          box-shadow: var(--box-shadow-normal, 0 4px 8px rgba(0, 0, 0, 0.15));
-          transform: translateY(-2px);
-        }
-
-        .quick-action-btn .icon {
-          margin-right: 8px;
-        }
-
         /* 최근 피킹 작업 테이블 */
         .recent-orders-section {
           background: var(--md-sys-color-surface);
@@ -305,8 +317,8 @@ class FulfillmentHome extends localize(i18next)(PageView) {
             grid-template-columns: repeat(3, 1fr);
           }
 
-          .quick-actions {
-            grid-template-columns: 1fr;
+          .header-actions {
+            flex-wrap: wrap;
           }
         }
 
@@ -382,29 +394,36 @@ class FulfillmentHome extends localize(i18next)(PageView) {
         ? html`<div class="loading">데이터 로딩 중...</div>`
         : html`
             <div class="dashboard-container">
+              <!-- 페이지 헤더 -->
+              <div class="page-header">
+                <h2>피킹 현황</h2>
+                <div class="header-actions">
+                  <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">${i18next.t('button.refresh', { defaultValue: '새로고침' })}</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('picking-task-list')}">피킹 목록</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('packing-order-list')}">포장 목록</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('fulfillment-progress')}">진행 현황</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('oms-home')}">OMS 대시보드</button>
+                </div>
+              </div>
+
               <!-- 1 피킹 현황 (상태별 카드) -->
               <section>
-                <h3 class="section-title">피킹 현황</h3>
                 <div class="status-cards">
                   <div class="status-card created" @click="${() => this._navigateTo('picking-task-list', { status: 'CREATED' })}">
-                    <div class="label">생성</div>
+                    <div class="label">생성 (CREATED)</div>
                     <div class="count">${this.pickingStatus.created || 0}</div>
-                    <div class="subtitle">CREATED</div>
                   </div>
                   <div class="status-card in-progress" @click="${() => this._navigateTo('picking-task-list', { status: 'IN_PROGRESS' })}">
-                    <div class="label">진행중</div>
+                    <div class="label">진행 중 (IN_PROGRESS)</div>
                     <div class="count">${this.pickingStatus.in_progress || 0}</div>
-                    <div class="subtitle">IN_PROGRESS</div>
                   </div>
                   <div class="status-card completed" @click="${() => this._navigateTo('picking-task-list', { status: 'COMPLETED' })}">
-                    <div class="label">완료</div>
+                    <div class="label">완료 (COMPLETED)</div>
                     <div class="count">${this.pickingStatus.completed || 0}</div>
-                    <div class="subtitle">COMPLETED</div>
                   </div>
                   <div class="status-card cancelled" @click="${() => this._navigateTo('picking-task-list', { status: 'CANCELLED' })}">
-                    <div class="label">취소</div>
+                    <div class="label">취소 (CANCELLED)</div>
                     <div class="count">${this.pickingStatus.cancelled || 0}</div>
-                    <div class="subtitle">CANCELLED</div>
                   </div>
                 </div>
               </section>
@@ -414,39 +433,32 @@ class FulfillmentHome extends localize(i18next)(PageView) {
                 <h3 class="section-title">패킹/출하 현황</h3>
                 <div class="status-cards">
                   <div class="status-card pack-created" @click="${() => this._navigateTo('packing-order-list', { status: 'CREATED' })}">
-                    <div class="label">생성</div>
+                    <div class="label">생성 (CREATED)</div>
                     <div class="count">${this.packingStatus.created || 0}</div>
-                    <div class="subtitle">CREATED</div>
                   </div>
                   <div class="status-card pack-in-progress" @click="${() => this._navigateTo('packing-order-list', { status: 'IN_PROGRESS' })}">
-                    <div class="label">진행중</div>
+                    <div class="label">진행중 (IN_PROGRESS)</div>
                     <div class="count">${this.packingStatus.in_progress || 0}</div>
-                    <div class="subtitle">IN_PROGRESS</div>
                   </div>
                   <div class="status-card pack-completed" @click="${() => this._navigateTo('packing-order-list', { status: 'COMPLETED' })}">
-                    <div class="label">완료</div>
+                    <div class="label">완료 (COMPLETED)</div>
                     <div class="count">${this.packingStatus.completed || 0}</div>
-                    <div class="subtitle">COMPLETED</div>
                   </div>
                   <div class="status-card label-printed" @click="${() => this._navigateTo('packing-order-list', { status: 'LABEL_PRINTED' })}">
-                    <div class="label">라벨출력</div>
+                    <div class="label">라벨출력 (LABEL_PRINTED)</div>
                     <div class="count">${this.packingStatus.label_printed || 0}</div>
-                    <div class="subtitle">LABEL_PRINTED</div>
                   </div>
                   <div class="status-card manifested" @click="${() => this._navigateTo('packing-order-list', { status: 'MANIFESTED' })}">
-                    <div class="label">적하목록</div>
+                    <div class="label">적하목록 (MANIFESTED)</div>
                     <div class="count">${this.packingStatus.manifested || 0}</div>
-                    <div class="subtitle">MANIFESTED</div>
                   </div>
                   <div class="status-card shipped" @click="${() => this._navigateTo('packing-order-list', { status: 'SHIPPED' })}">
-                    <div class="label">출하완료</div>
+                    <div class="label">출하완료 (SHIPPED)</div>
                     <div class="count">${this.packingStatus.shipped || 0}</div>
-                    <div class="subtitle">SHIPPED</div>
                   </div>
                   <div class="status-card pack-cancelled" @click="${() => this._navigateTo('packing-order-list', { status: 'CANCELLED' })}">
-                    <div class="label">취소</div>
+                    <div class="label">취소 (CANCELLED)</div>
                     <div class="count">${this.packingStatus.cancelled || 0}</div>
-                    <div class="subtitle">CANCELLED</div>
                   </div>
                 </div>
               </section>
@@ -493,25 +505,7 @@ class FulfillmentHome extends localize(i18next)(PageView) {
                   `
             : ''}
 
-              <!-- 7 바로가기 -->
-              <section>
-                <div class="quick-actions">
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('picking-task-list')}">
-                    피킹 목록
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('packing-order-list')}">
-                    포장 목록
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('fulfillment-progress')}">
-                    진행 현황
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('oms-home')}">
-                    OMS 대시보드
-                  </button>
-                </div>
-              </section>
-
-              <!-- 8 최근 피킹 작업 내역 -->
+              <!-- 7 최근 피킹 작업 내역 -->
               ${this.recentPickingTasks && this.recentPickingTasks.length > 0
             ? html`
                     <section class="recent-orders-section">

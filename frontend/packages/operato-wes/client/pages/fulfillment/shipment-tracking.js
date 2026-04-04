@@ -29,10 +29,38 @@ class ShipmentTracking extends localize(i18next)(PageView) {
           margin: 0 auto;
         }
 
-        h2 {
-          margin: var(--title-margin);
+        .page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .page-header h2 {
+          margin: 0;
           font: var(--title-font);
           color: var(--title-text-color);
+        }
+        .header-actions {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+        .btn {
+          padding: 8px 16px;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .btn-outline {
+          background: transparent;
+          color: var(--md-sys-color-primary);
+          border: 1px solid var(--md-sys-color-primary);
+        }
+        .btn-outline:hover {
+          background: var(--md-sys-color-primary);
+          color: var(--md-sys-color-on-primary);
         }
 
         /* ==================== 검색 섹션 ==================== */
@@ -86,21 +114,6 @@ class ShipmentTracking extends localize(i18next)(PageView) {
           border-color: var(--md-sys-color-primary);
         }
 
-        .btn-search {
-          height: 40px;
-          padding: 0 24px;
-          background: var(--md-sys-color-primary);
-          color: var(--md-sys-color-on-primary);
-          border: none;
-          border-radius: 8px;
-          font-size: 14px;
-          font-weight: 500;
-          cursor: pointer;
-        }
-
-        .btn-search:hover {
-          opacity: 0.9;
-        }
 
         /* ==================== 결과 없음 / 로딩 ==================== */
         .empty-state {
@@ -421,6 +434,14 @@ class ShipmentTracking extends localize(i18next)(PageView) {
 
         /* ==================== 반응형 ==================== */
         @media (max-width: 768px) {
+          .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+          }
+          .header-actions {
+            flex-wrap: wrap;
+          }
           .summary-cards {
             grid-template-columns: repeat(2, 1fr);
           }
@@ -493,6 +514,18 @@ class ShipmentTracking extends localize(i18next)(PageView) {
   render() {
     return html`
       <div class="page-container">
+        <div class="page-header">
+          <h2>${i18next.t('menu.ShipmentTracking', { defaultValue: '출고 추적' })}</h2>
+          <div class="header-actions">
+            <button class="btn btn-outline" @click="${this._resetSearch}">
+              ${i18next.t('button.reset', { defaultValue: '초기화' })}
+            </button>
+            <button class="btn btn-outline" @click="${this._search}">
+              ${i18next.t('button.search', { defaultValue: '조회' })}
+            </button>
+          </div>
+        </div>
+
         <!-- 검색 섹션 -->
         ${this._renderSearchSection()}
 
@@ -549,9 +582,6 @@ class ShipmentTracking extends localize(i18next)(PageView) {
               @keyup=${e => e.key === 'Enter' && this._search()}
             />
           </div>
-          <button class="btn-search" @click=${this._search}>
-            ${i18next.t('button.search', { defaultValue: '조회' })}
-          </button>
         </div>
       </div>
     `
@@ -1065,6 +1095,24 @@ class ShipmentTracking extends localize(i18next)(PageView) {
         </tbody>
       </table>
     `
+  }
+
+  /** 검색 조건 초기화 — 키워드/유형/결과 상태 모두 리셋 */
+  _resetSearch() {
+    this.searchKeyword = ''
+    this.searchType = 'auto'
+    this.searched = false
+    this.notFound = false
+    this.shipmentOrder = null
+    this.shipmentOrderItems = []
+    this.stockAllocations = []
+    this.wave = null
+    this.pickingTask = null
+    this.pickingTaskItems = []
+    this.packingOrder = null
+    this.packingOrderItems = []
+    this.packingBoxes = []
+    this.activeTab = 0
   }
 
   /** 출고 추적 검색 API 호출 — 키워드와 유형으로 전체 이력 조회 */
