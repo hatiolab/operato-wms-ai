@@ -1,7 +1,6 @@
 package operato.wms.fulfillment.service;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -100,9 +99,6 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		if ("INDIVIDUAL".equals(pickType)) {
 			// 개별 피킹: 주문 1건 = 피킹 지시 1건
 			for (ShipmentOrder order : orders) {
-				String pickTaskNo = "PICK-" + today.replace("-", "").substring(2) + "-"
-						+ String.format("%04d", nextSeq);
-
 				// 주문별 할당 정보 조회
 				String allocSql = "SELECT sa.*, soi.sku_cd, soi.sku_nm FROM stock_allocations sa"
 						+ " INNER JOIN shipment_order_items soi ON soi.domain_id = sa.domain_id AND soi.id = sa.shipment_order_item_id"
@@ -114,7 +110,6 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				// PickingTask 헤더 생성
 				PickingTask task = new PickingTask();
 				task.setDomainId(domainId);
-				task.setPickTaskNo(pickTaskNo);
 				task.setWaveNo(waveNo);
 				task.setShipmentOrderId(order.getId());
 				task.setShipmentNo(order.getShipmentNo());
@@ -182,11 +177,8 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 						ShipmentOrder.STATUS_PICKING, domainId, order.getId());
 				this.queryManager.executeBySql(updOrderSql, updOrderParams);
 
-				Map<String, Object> taskInfo = new HashMap<>();
-				taskInfo.put("pick_task_no", pickTaskNo);
-				taskInfo.put("shipment_no", order.getShipmentNo());
-				taskInfo.put("item_count", items.size());
-				taskInfo.put("plan_total", planTotal);
+				Map<String, Object> taskInfo = ValueUtil.newMap("pick_task_no,shipment_no,item_count,plan_total",
+						task.getPickTaskNo(), order.getShipmentNo(), items.size(), planTotal);
 				pickTaskResults.add(taskInfo);
 
 				pickTaskCount++;
@@ -194,8 +186,6 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			}
 		} else {
 			// 총량 피킹(TOTAL): 웨이브 전체를 하나의 피킹 지시로 생성
-			String pickTaskNo = "PICK-" + today.replace("-", "") + "-" + String.format("%04d", nextSeq);
-
 			// 웨이브 내 전체 할당 정보를 SKU+로케이션 기준으로 합산 조회
 			String allocSql = "SELECT sa.inventory_id, sa.loc_cd, sa.lot_no, sa.expired_date, sa.barcode,"
 					+ " soi.sku_cd, soi.sku_nm, SUM(sa.alloc_qty) AS alloc_qty"
@@ -211,7 +201,6 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			// PickingTask 헤더 생성
 			PickingTask task = new PickingTask();
 			task.setDomainId(domainId);
-			task.setPickTaskNo(pickTaskNo);
 			task.setWaveNo(waveNo);
 			task.setOrderDate(today);
 			task.setComCd(orders.get(0).getComCd());
@@ -271,21 +260,15 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				this.queryManager.executeBySql(updOrderSql, updOrderParams);
 			}
 
-			Map<String, Object> taskInfo = new HashMap<>();
-			taskInfo.put("pick_task_no", pickTaskNo);
-			taskInfo.put("order_count", orders.size());
-			taskInfo.put("item_count", items.size());
-			taskInfo.put("plan_total", planTotal);
+			Map<String, Object> taskInfo = ValueUtil.newMap("pick_task_no,order_count,item_count,plan_total",
+					task.getPickTaskNo(), orders.size(), items.size(), planTotal);
 			pickTaskResults.add(taskInfo);
 
 			pickTaskCount = 1;
 		}
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("pick_task_count", pickTaskCount);
-		result.put("item_count", totalItemCount);
-		result.put("pick_tasks", pickTaskResults);
-		return result;
+		return ValueUtil.newMap("pick_task_count,item_count,pick_tasks", pickTaskCount, totalItemCount,
+				pickTaskResults);
 	}
 
 	/**
@@ -320,12 +303,12 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		Map<String, Object> seqParams = ValueUtil.newMap("domainId,orderDate", domainId, today);
 		Integer existCount = this.queryManager.selectBySql(seqSql, seqParams, Integer.class);
 		int nextSeq = (existCount != null ? existCount : 0) + 1;
-		String packOrderNo = "PACK-" + today.replace("-", "") + "-" + String.format("%04d", nextSeq);
+		// String packOrderNo = "PACK-" + today.replace("-", "") + "-" +
+		// String.format("%04d", nextSeq);
 
 		// PackingOrder 생성
 		PackingOrder packOrder = new PackingOrder();
 		packOrder.setDomainId(domainId);
-		packOrder.setPackOrderNo(packOrderNo);
 		packOrder.setPickTaskNo(task.getPickTaskNo());
 		packOrder.setShipmentOrderId(task.getShipmentOrderId());
 		packOrder.setShipmentNo(task.getShipmentNo());
@@ -376,10 +359,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			this.queryManager.executeBySql(updOrderSql, updOrderParams);
 		}
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("pack_order_no", packOrderNo);
-		result.put("item_count", packItems.size());
-		return result;
+		return ValueUtil.newMap("pack_order_no,item_count", packOrder.getPackOrderNo(), packItems.size());
 	}
 
 	/**
@@ -423,7 +403,8 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		List<Map<String, Object>> packOrderResults = new ArrayList<>();
 
 		for (ShipmentOrder order : orders) {
-			String packOrderNo = "PACK-" + today.replace("-", "") + "-" + String.format("%04d", nextSeq);
+			// String packOrderNo = "PACK-" + today.replace("-", "") + "-" +
+			// String.format("%04d", nextSeq);
 
 			// 주문별 할당 정보 조회
 			String allocSql = "SELECT sa.*, soi.sku_cd, soi.sku_nm, soi.id AS soi_id"
@@ -437,7 +418,6 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			// PackingOrder 생성
 			PackingOrder packOrder = new PackingOrder();
 			packOrder.setDomainId(domainId);
-			packOrder.setPackOrderNo(packOrderNo);
 			packOrder.setPickTaskNo(task.getPickTaskNo());
 			packOrder.setShipmentOrderId(order.getId());
 			packOrder.setShipmentNo(order.getShipmentNo());
@@ -483,21 +463,16 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 					domainId, order.getId());
 			this.queryManager.executeBySql(updOrderSql, updOrderParams);
 
-			Map<String, Object> packInfo = new HashMap<>();
-			packInfo.put("pack_order_no", packOrderNo);
-			packInfo.put("shipment_no", order.getShipmentNo());
-			packInfo.put("item_count", packItems.size());
+			Map<String, Object> packInfo = ValueUtil.newMap("pack_order_no,shipment_no,item_count",
+					packOrder.getPackOrderNo(), order.getShipmentNo(), packItems.size());
 			packOrderResults.add(packInfo);
 
 			packOrderCount++;
 			nextSeq++;
 		}
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("pack_order_count", packOrderCount);
-		result.put("total_item_count", totalItemCount);
-		result.put("pack_orders", packOrderResults);
-		return result;
+		return ValueUtil.newMap("pack_order_count,total_item_count,pack_orders", packOrderCount,
+				totalItemCount, packOrderResults);
 	}
 
 	/**
@@ -527,10 +502,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 
 		if (tasks.isEmpty()) {
 			// 피킹 지시가 없으면 정상 처리 (이미 삭제되었거나 아직 생성 전)
-			Map<String, Object> result = new HashMap<>();
-			result.put("deleted_task_count", 0);
-			result.put("deleted_item_count", 0);
-			return result;
+			return ValueUtil.newMap("deleted_task_count,deleted_item_count", 0, 0);
 		}
 
 		// 2. 모든 피킹 지시가 WAIT 상태인지 확인
@@ -568,10 +540,9 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				ShipmentOrder.STATUS_WAVED);
 		this.queryManager.executeBySql(updOrdersSql, updOrdersParams);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("deleted_task_count", tasks.size());
-		result.put("deleted_item_count", itemCount != null ? itemCount : 0);
-		return result;
+		// 7. 결과 반환
+		return ValueUtil.newMap("deleted_task_count,deleted_item_count", tasks.size(),
+				itemCount != null ? itemCount : 0);
 	}
 
 	/**

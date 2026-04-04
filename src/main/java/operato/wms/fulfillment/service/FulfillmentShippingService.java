@@ -1,7 +1,6 @@
 package operato.wms.fulfillment.service;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -58,11 +57,9 @@ public class FulfillmentShippingService extends AbstractQueryService {
 				now, domainId, packingOrderId, PackingBox.STATUS_CLOSED);
 		this.queryManager.executeBySql(boxSql, boxParams);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		result.put("pack_order_no", order.getPackOrderNo());
-		result.put("status", PackingOrder.STATUS_LABEL_PRINTED);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success,pack_order_no,status", true, order.getPackOrderNo(),
+				PackingOrder.STATUS_LABEL_PRINTED);
 	}
 
 	/**
@@ -89,11 +86,9 @@ public class FulfillmentShippingService extends AbstractQueryService {
 				PackingOrder.STATUS_MANIFESTED, now, domainId, packingOrderId);
 		this.queryManager.executeBySql(sql, params);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		result.put("pack_order_no", order.getPackOrderNo());
-		result.put("status", PackingOrder.STATUS_MANIFESTED);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success,pack_order_no,status", true, order.getPackOrderNo(),
+				PackingOrder.STATUS_MANIFESTED);
 	}
 
 	/**
@@ -141,11 +136,9 @@ public class FulfillmentShippingService extends AbstractQueryService {
 			this.queryManager.executeBySql(updOrderSql, updOrderParams);
 		}
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		result.put("pack_order_no", order.getPackOrderNo());
-		result.put("status", PackingOrder.STATUS_SHIPPED);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success,pack_order_no,status", true, order.getPackOrderNo(),
+				PackingOrder.STATUS_SHIPPED);
 	}
 
 	/**
@@ -162,8 +155,7 @@ public class FulfillmentShippingService extends AbstractQueryService {
 		List<Map<String, Object>> results = new ArrayList<>();
 
 		for (String id : ids) {
-			Map<String, Object> itemResult = new HashMap<>();
-			itemResult.put("id", id);
+			Map<String, Object> itemResult = ValueUtil.newMap("id", id);
 			try {
 				Map<String, Object> shipResult = this.confirmShipping(id);
 				itemResult.put("success", true);
@@ -178,11 +170,8 @@ public class FulfillmentShippingService extends AbstractQueryService {
 			results.add(itemResult);
 		}
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success_count", successCount);
-		result.put("fail_count", failCount);
-		result.put("results", results);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success_count,fail_count,results", successCount, failCount, results);
 	}
 
 	/**
@@ -258,11 +247,9 @@ public class FulfillmentShippingService extends AbstractQueryService {
 			this.queryManager.executeBySql(updOrderSql, updOrderParams);
 		}
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		result.put("pack_order_no", order.getPackOrderNo());
-		result.put("restored_box_count", restoredBoxCount != null ? restoredBoxCount : 0);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success,pack_order_no,restored_box_count", true, order.getPackOrderNo(),
+				restoredBoxCount != null ? restoredBoxCount : 0);
 	}
 
 	/**
@@ -285,11 +272,8 @@ public class FulfillmentShippingService extends AbstractQueryService {
 		Map<String, Object> params = ValueUtil.newMap("invoiceNo,domainId,id", invoiceNo, domainId, boxId);
 		this.queryManager.executeBySql(sql, params);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		result.put("box_seq", box.getBoxSeq());
-		result.put("invoice_no", invoiceNo);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success,box_seq,invoice_no", true, box.getBoxSeq(), invoiceNo);
 	}
 
 	// ==================== PDA 출하 확정 API ====================
@@ -354,14 +338,9 @@ public class FulfillmentShippingService extends AbstractQueryService {
 			totalBoxCount += boxes.size();
 		}
 
-		Map<String, Object> summary = new HashMap<>();
-		summary.put("waiting_count", orders.size());
-		summary.put("total_box_count", totalBoxCount);
-
-		Map<String, Object> result = new HashMap<>();
-		result.put("summary", summary);
-		result.put("items", orders);
-		return result;
+		Map<String, Object> summary = ValueUtil.newMap("waiting_count,total_box_count", orders.size(),
+				totalBoxCount);
+		return ValueUtil.newMap("summary,items", summary, orders);
 	}
 
 	/**
@@ -374,7 +353,8 @@ public class FulfillmentShippingService extends AbstractQueryService {
 	 *
 	 * @param dockCd    도크 코드
 	 * @param invoiceNo 송장 번호
-	 * @return { success, pack_order_no, shipment_no, carrier_cd, status, scanned_box, remaining_boxes,
+	 * @return { success, pack_order_no, shipment_no, carrier_cd, status,
+	 *         scanned_box, remaining_boxes,
 	 *         all_boxes_scanned }
 	 */
 	@SuppressWarnings("rawtypes")
@@ -439,12 +419,9 @@ public class FulfillmentShippingService extends AbstractQueryService {
 		}
 
 		// 6. 결과 반환
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		result.put("pack_order_no", order.getPackOrderNo());
-		result.put("shipment_no", order.getShipmentNo());
-		result.put("carrier_cd", order.getCarrierCd());
-		result.put("status", allBoxesScanned ? PackingOrder.STATUS_SHIPPED : orderStatus);
+		Map<String, Object> result = ValueUtil.newMap("success,pack_order_no,shipment_no,carrier_cd,status", true,
+				order.getPackOrderNo(), order.getShipmentNo(), order.getCarrierCd(),
+				allBoxesScanned ? PackingOrder.STATUS_SHIPPED : orderStatus);
 		result.put("scanned_box", ValueUtil.newMap("box_seq,invoice_no", box.get("box_seq"), invoiceNo));
 		result.put("remaining_boxes", remainingBoxes != null ? remainingBoxes : 0);
 		result.put("all_boxes_scanned", allBoxesScanned);

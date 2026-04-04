@@ -59,7 +59,7 @@ public class FulfillmentEventListener {
 			// 결과 로깅
 			int taskCount = (int) result.getOrDefault("pick_task_count", 0);
 			int itemCount = (int) result.getOrDefault("item_count", 0);
-			System.out.println(String.format(
+			this.logger.info(String.format(
 					"[Fulfillment] 웨이브 릴리스 이벤트 처리 완료 - wave_no: %s, pick_type: %s, task_count: %d, item_count: %d",
 					event.getWaveNo(), event.getPickType(), taskCount, itemCount));
 		} catch (Exception e) {
@@ -94,7 +94,7 @@ public class FulfillmentEventListener {
 			// 결과 로깅
 			int deletedTaskCount = (int) result.getOrDefault("deleted_task_count", 0);
 			int deletedItemCount = (int) result.getOrDefault("deleted_item_count", 0);
-			System.out.println(String.format(
+			this.logger.info(String.format(
 					"[Fulfillment] 웨이브 확정 취소 이벤트 처리 완료 - wave_no: %s, deleted_task_count: %d, deleted_item_count: %d",
 					event.getWaveNo(), deletedTaskCount, deletedItemCount));
 		} catch (Exception e) {

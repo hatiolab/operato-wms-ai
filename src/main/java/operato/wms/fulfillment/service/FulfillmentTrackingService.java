@@ -97,11 +97,11 @@ public class FulfillmentTrackingService extends AbstractQueryService {
 	private String detectType(Long domainId, String keyword) {
 		if (keyword.startsWith("W-"))
 			return "wave";
-		if (keyword.startsWith("PICK-"))
+		if (keyword.startsWith("PT-"))
 			return "picking";
-		if (keyword.startsWith("PACK-"))
+		if (keyword.startsWith("PO-"))
 			return "packing";
-		if (keyword.startsWith("SH-"))
+		if (keyword.startsWith("SO-"))
 			return "shipment";
 
 		// 순차 fallback: invoice → shipment → ref_order

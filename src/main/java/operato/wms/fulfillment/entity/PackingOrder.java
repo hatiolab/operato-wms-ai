@@ -1,10 +1,14 @@
 package operato.wms.fulfillment.entity;
 
+import org.apache.commons.lang.StringUtils;
+
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
 import xyz.elidom.dbist.annotation.Index;
 import xyz.elidom.dbist.annotation.PrimaryKey;
 import xyz.elidom.dbist.annotation.Table;
+import xyz.elidom.dev.entity.RangedSeq;
+import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -517,6 +521,16 @@ public class PackingOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		// 작업일자 기본값 설정 (당일)
 		if (ValueUtil.isEmpty(this.orderDate)) {
 			this.orderDate = DateUtil.todayStr();
+		}
+
+		// pick_task_no 자동 채번
+		if (ValueUtil.isEmpty(this.packOrderNo)) {
+			Integer seq = RangedSeq.increaseSequence(Domain.currentDomainId(), "PACK_ORDER_NO", "DATE",
+					this.orderDate,
+					null,
+					null, null);
+			String serialNo = StringUtils.leftPad(String.valueOf(seq), 5, "0");
+			this.packOrderNo = "PO-" + this.orderDate.replaceAll("-", "").substring(2) + "-" + serialNo;
 		}
 	}
 }

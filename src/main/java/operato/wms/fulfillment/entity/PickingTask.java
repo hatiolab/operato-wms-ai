@@ -1,11 +1,15 @@
 package operato.wms.fulfillment.entity;
 
+import org.apache.commons.lang.StringUtils;
+
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
 import xyz.elidom.dbist.annotation.Index;
 import xyz.elidom.dbist.annotation.PrimaryKey;
 import xyz.elidom.dbist.annotation.Table;
+import xyz.elidom.dev.entity.RangedSeq;
 import xyz.elidom.orm.IQueryManager;
+import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.util.BeanUtil;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
@@ -499,14 +503,11 @@ public class PickingTask extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 		// pick_task_no 자동 채번
 		if (ValueUtil.isEmpty(this.pickTaskNo)) {
-			IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
-			String sql = "SELECT COALESCE(MAX(CAST(SUBSTRING(pick_task_no FROM '[0-9]+$') AS INTEGER)), 0) + 1"
-					+ " FROM picking_tasks WHERE domain_id = :domainId AND order_date = :orderDate";
-			Integer nextSeq = queryMgr.selectBySql(sql,
-					ValueUtil.newMap("domainId,orderDate", this.domainId, this.orderDate),
-					Integer.class);
-			this.pickTaskNo = "PICK-" + this.orderDate.replace("-", "") + "-"
-					+ String.format("%04d", nextSeq != null ? nextSeq : 1);
+			Integer seq = RangedSeq.increaseSequence(Domain.currentDomainId(), "PICK_TASK_NO", "DATE", this.orderDate,
+					null,
+					null, null);
+			String serialNo = StringUtils.leftPad(String.valueOf(seq), 5, "0");
+			this.pickTaskNo = "PT-" + this.orderDate.replaceAll("-", "").substring(2) + "-" + serialNo;
 		}
 
 		// 실적 수량 기본값 초기화

@@ -139,6 +139,9 @@ export class PdaFulfillmentShipping extends connect(store)(PageView) {
 
         /* 스캔 섹션 */
         .scan-section {
+          display: flex;
+          align-items: center;
+          gap: 8px;
           padding: 8px 12px;
           background: var(--md-sys-color-primary-container, #e3f2fd);
           border-radius: 8px;
@@ -146,15 +149,16 @@ export class PdaFulfillmentShipping extends connect(store)(PageView) {
         }
 
         .scan-section label {
-          display: block;
           font-size: 13px;
           font-weight: bold;
           color: var(--md-sys-color-on-primary-container, #1565c0);
-          margin-bottom: 4px;
+          white-space: nowrap;
+          flex-shrink: 0;
         }
 
         .scan-section ox-input-barcode {
-          width: 100%;
+          flex: 1;
+          min-width: 0;
         }
 
         /* 탭 바 */

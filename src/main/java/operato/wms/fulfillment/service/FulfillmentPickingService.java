@@ -1,6 +1,5 @@
 package operato.wms.fulfillment.service;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -52,11 +51,9 @@ public class FulfillmentPickingService extends AbstractQueryService {
 				PickingTaskItem.STATUS_RUN, domainId, id, PickingTaskItem.STATUS_WAIT);
 		this.queryManager.executeBySql(itemSql, itemParams);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		result.put("pick_task_no", task.getPickTaskNo());
-		result.put("status", PickingTask.STATUS_IN_PROGRESS);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success,pick_task_no,status", true, task.getPickTaskNo(),
+				PickingTask.STATUS_IN_PROGRESS);
 	}
 
 	/**
@@ -118,13 +115,8 @@ public class FulfillmentPickingService extends AbstractQueryService {
 				PickingTask.STATUS_COMPLETED, now, resultOrder, resultItem, resultTotal, shortTotal, domainId, id);
 		this.queryManager.executeBySql(updSql, updParams);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		result.put("pick_task_no", task.getPickTaskNo());
-		result.put("status", PickingTask.STATUS_COMPLETED);
-		result.put("result_total", resultTotal);
-		result.put("short_total", shortTotal);
-		return result;
+		return ValueUtil.newMap("success,pick_task_no,status,result_total,short_total", true, task.getPickTaskNo(),
+				PickingTask.STATUS_COMPLETED, resultTotal, shortTotal);
 	}
 
 	/**
@@ -159,10 +151,8 @@ public class FulfillmentPickingService extends AbstractQueryService {
 				PickingTask.STATUS_CANCELLED, domainId, id);
 		this.queryManager.executeBySql(sql, params);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		result.put("pick_task_no", task.getPickTaskNo());
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success,pick_task_no", true, task.getPickTaskNo());
 	}
 
 	/**
@@ -333,13 +323,8 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		}
 		this.queryManager.executeBySql(sql, updParams);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		result.put("item_id", itemId);
-		result.put("sku_cd", item.getSkuCd());
-		result.put("pick_qty", pickQty);
-		result.put("status", PickingTaskItem.STATUS_PICKED);
-		return result;
+		return ValueUtil.newMap("success,item_id,sku_cd,pick_qty,status", true, itemId, item.getSkuCd(), pickQty,
+				PickingTaskItem.STATUS_PICKED);
 	}
 
 	/**
@@ -372,14 +357,9 @@ public class FulfillmentPickingService extends AbstractQueryService {
 				pickQty, shortQty, PickingTaskItem.STATUS_SHORT, now, domainId, itemId);
 		this.queryManager.executeBySql(sql, updParams);
 
-		Map<String, Object> result = new HashMap<>();
-		result.put("success", true);
-		result.put("item_id", itemId);
-		result.put("sku_cd", item.getSkuCd());
-		result.put("pick_qty", pickQty);
-		result.put("short_qty", shortQty);
-		result.put("status", PickingTaskItem.STATUS_SHORT);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success,item_id,sku_cd,pick_qty,short_qty,status", true, itemId, item.getSkuCd(),
+				pickQty, shortQty, PickingTaskItem.STATUS_SHORT);
 	}
 
 	/*
