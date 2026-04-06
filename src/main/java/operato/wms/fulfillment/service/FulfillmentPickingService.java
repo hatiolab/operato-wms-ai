@@ -3,11 +3,19 @@ package operato.wms.fulfillment.service;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import operato.wms.base.service.RuntimeConfigService;
+import operato.wms.base.service.WmsBaseService;
+import operato.wms.fulfillment.WmsFulfillmentConfigConstants;
 import operato.wms.fulfillment.entity.PickingTask;
 import operato.wms.fulfillment.entity.PickingTaskItem;
+import xyz.anythings.sys.event.EventPublisher;
+import xyz.anythings.sys.event.model.PrintEvent;
+import xyz.anythings.sys.model.BaseResponse;
 import xyz.anythings.sys.service.AbstractQueryService;
+import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.util.DateUtil;
@@ -22,6 +30,64 @@ import xyz.elidom.util.ValueUtil;
  */
 @Component
 public class FulfillmentPickingService extends AbstractQueryService {
+	/**
+	 * 화주사 - 창고별 설정 조회 서비스
+	 */
+	@Autowired
+	protected RuntimeConfigService runtimeConfSvc;
+	/**
+	 * WMS 기본 서비스
+	 */
+	@Autowired
+	protected WmsBaseService wmsBaseSvc;
+	/**
+	 * 이벤트 퍼블리셔
+	 */
+	@Autowired
+	protected EventPublisher eventPublisher;
+
+	/**
+	 * 피킹지시서 템플릿 이름 조회
+	 * 
+	 * @param comCd
+	 * @param whCd
+	 * @param exceptionWhenEmpty
+	 * @return
+	 */
+	public String getPickingSheetTemplateName(String comCd, String whCd, boolean exceptionWhenEmpty) {
+		String templateName = this.runtimeConfSvc.getRuntimeConfigValue(comCd, whCd,
+				WmsFulfillmentConfigConstants.PICKING_TASK_SHEET_TEMPLATE);
+
+		if (exceptionWhenEmpty && ValueUtil.isEmpty(templateName)) {
+			throw new ElidomRuntimeException("피킹지시서 템플릿이 화주사-창고별 설정에 설정되지 않았습니다.");
+		}
+
+		return templateName;
+	}
+
+	/**
+	 * 피킹지시로 피킹지시서 출력
+	 * 
+	 * @param pickingTask
+	 * @param templateName
+	 * @param printerId
+	 * @return
+	 */
+	public BaseResponse printPickingSheet(PickingTask pickingTask, String templateName, String printerId) {
+		if (ValueUtil.isEmpty(templateName)) {
+			templateName = this.getPickingSheetTemplateName(pickingTask.getComCd(), pickingTask.getWhCd(), true);
+		}
+
+		if (ValueUtil.isEmpty(printerId)) {
+			printerId = this.wmsBaseSvc.getDefaultNormalPrinter(pickingTask.getDomainId());
+		}
+
+		Map<String, Object> templateParams = ValueUtil.newMap("pickingTask", pickingTask);
+		PrintEvent event = new PrintEvent(pickingTask.getDomainId(), "WMS", printerId, templateName, templateParams);
+		event.setPrintType("normal");
+		this.eventPublisher.publishEvent(event);
+		return new BaseResponse(true, "ok");
+	}
 
 	/**
 	 * 피킹 지시 시작 (CREATED -> IN_PROGRESS)

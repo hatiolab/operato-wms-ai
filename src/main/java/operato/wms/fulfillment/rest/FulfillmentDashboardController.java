@@ -48,6 +48,18 @@ public class FulfillmentDashboardController {
 	}
 
 	/**
+	 * 기간별 피킹 상태별 건수 조회
+	 * GET /rest/ful_trx/dashboard/picking_status_by_period
+	 */
+	@GetMapping(value = "/picking_status_by_period", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get picking status counts by period")
+	public Map<String, Object> getPickingStatusByPeriod(
+			@RequestParam(name = "order_date_from", required = false) String orderDateFrom,
+			@RequestParam(name = "order_date_to", required = false) String orderDateTo) {
+		return this.dashboardService.getPickingStatusByPeriod(orderDateFrom, orderDateTo);
+	}
+
+	/**
 	 * 포장 상태별 건수 조회
 	 * GET /rest/ful_trx/dashboard/packing_status
 	 */
@@ -56,6 +68,18 @@ public class FulfillmentDashboardController {
 	public Map<String, Object> getPackingStatus(
 			@RequestParam(name = "order_date", required = false) String orderDate) {
 		return this.dashboardService.getPackingStatus(orderDate);
+	}
+
+	/**
+	 * 기간별 포장 상태별 건수 조회
+	 * GET /rest/ful_trx/dashboard/packing_status_by_period
+	 */
+	@GetMapping(value = "/packing_status_by_period", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get packing status counts by period")
+	public Map<String, Object> getPackingStatusByPeriod(
+			@RequestParam(name = "order_date_from", required = false) String orderDateFrom,
+			@RequestParam(name = "order_date_to", required = false) String orderDateTo) {
+		return this.dashboardService.getPackingStatusByPeriod(orderDateFrom, orderDateTo);
 	}
 
 	/**

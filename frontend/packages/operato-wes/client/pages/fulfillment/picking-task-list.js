@@ -392,14 +392,14 @@ class PickingTaskList extends localize(i18next)(PageView) {
         <div class="page-header">
           <h2>${i18next.t('menu.PickingTaskWork', { defaultValue: '피킹 지시 목록' })}</h2>
           <div class="header-actions">
-            <button class="btn btn-outline" @click="${this._resetSearch}">
-              ${i18next.t('button.reset', { defaultValue: '초기화' })}
-            </button>
             <button class="btn btn-outline" @click="${this._search}">
               ${i18next.t('button.search', { defaultValue: '조회' })}
             </button>
             <button class="btn btn-danger" @click="${this._batchCancel}">
               ${i18next.t('button.batch_cancel', { defaultValue: '일괄 취소' })}
+            </button>
+            <button class="btn btn-outline" @click="${this._resetSearch}">
+              ${i18next.t('button.reset', { defaultValue: '초기화' })}
             </button>
           </div>
         </div>
@@ -645,7 +645,7 @@ class PickingTaskList extends localize(i18next)(PageView) {
   /** 피킹 상태 요약 조회 */
   async _fetchStatusSummary() {
     try {
-      const data = await ServiceUtil.restGet('ful_trx/dashboard/picking_status')
+      const data = await ServiceUtil.restGet('ful_trx/dashboard/picking_status_by_period', { order_date_from: this.searchParams.order_date_from, order_date_to: this.searchParams.order_date_to })
       if (data) {
         this.statusSummary = {
           CREATED: data.created || 0,

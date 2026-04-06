@@ -1,8 +1,11 @@
 import { css, html } from 'lit-element'
 
 import { i18next, localize } from '@operato/i18n'
+import { openPopup } from '@operato/layout'
 import { PageView } from '@operato/shell'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
+
+import './packing-order-detail'
 
 /**
  * 풀필먼트 검수/포장 PC 화면
@@ -1264,6 +1267,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
             </div>
 
             <div class="complete-actions">
+              <button class="btn-action" @click="${this._popupPackingDetail}">상세</button>
               <button class="btn-action" @click="${this._printPackingLabel}">배송 라벨 출력</button>
               <button class="btn-action primary" @click="${this._startNextInspection}">다음 검수 시작 →</button>
             </div>
@@ -1593,6 +1597,21 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
   /* ==============================================================
    * 우측 패널: 완료
    * ============================================================== */
+
+  /** 포장 상세 조회 팝업 */
+  async _popupPackingDetail() {
+    openPopup(
+      html`<packing-order-detail
+        .packingOrderId="${this.selectedOrder.id}"
+        @order-updated="${() => this._refresh()}"
+      ></packing-order-detail>`,
+      {
+        backdrop: true,
+        size: 'large',
+        title: i18next.t('title.packing_order_detail', { defaultValue: '검수/포장/출하 상세' })
+      }
+    )
+  }
 
   /** 배송 라벨 출력 요청 - 백엔드 API 호출 */
   async _printPackingLabel() {

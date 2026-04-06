@@ -27,8 +27,48 @@ public class FulfillmentDashboardService extends AbstractQueryService {
 	 *
 	 * 지정 일자의 피킹 지시 상태별 건수를 반환한다.
 	 *
+	 * @param orderDateFrom 작업 일자 (YYYY-MM-DD, null이면 당일)
+	 * @param orderDateTo   작업 일자 (YYYY-MM-DD, null이면 당일)
+	 * @return { order_date, created, in_progress, completed, cancelled, total,
+	 *         individual, total_pick, zone }
+	 */
+	public Map<String, Object> getPickingStatusByPeriod(String orderDateFrom, String orderDateTo) {
+		Long domainId = Domain.currentDomainId();
+		String dateFrom = ValueUtil.isNotEmpty(orderDateFrom) ? orderDateFrom : DateUtil.todayStr();
+		String dateTo = ValueUtil.isNotEmpty(orderDateTo) ? orderDateTo : DateUtil.todayStr();
+
+		String sql = "SELECT"
+				+ " COALESCE(SUM(CASE WHEN status = 'CREATED' THEN 1 ELSE 0 END), 0) AS created,"
+				+ " COALESCE(SUM(CASE WHEN status = 'IN_PROGRESS' THEN 1 ELSE 0 END), 0) AS in_progress,"
+				+ " COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END), 0) AS completed,"
+				+ " COALESCE(SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END), 0) AS cancelled,"
+				+ " COUNT(*) AS total"
+				+ " FROM picking_tasks"
+				+ " WHERE domain_id = :domainId AND (order_date >= :orderDateFrom AND order_date <= :orderDateTo)";
+		Map<String, Object> params = ValueUtil.newMap("domainId,orderDateFrom,orderDateTo", domainId, dateFrom, dateTo);
+		List<Map> rows = this.queryManager.selectListBySql(sql, params, Map.class, 0, 1);
+
+		Map<String, Object> result = ValueUtil.newMap("created,in_progress,completed,cancelled,total", 0, 0, 0, 0, 0);
+		if (!rows.isEmpty()) {
+			Map row = rows.get(0);
+			result.put("created", ValueUtil.toInteger(row.get("created")));
+			result.put("in_progress", ValueUtil.toInteger(row.get("in_progress")));
+			result.put("completed", ValueUtil.toInteger(row.get("completed")));
+			result.put("cancelled", ValueUtil.toInteger(row.get("cancelled")));
+			result.put("total", ValueUtil.toInteger(row.get("total")));
+		}
+
+		return result;
+	}
+
+	/**
+	 * 피킹 현황 조회
+	 *
+	 * 지정 일자의 피킹 지시 상태별 건수를 반환한다.
+	 *
 	 * @param orderDate 작업 일자 (YYYY-MM-DD, null이면 당일)
-	 * @return { order_date, created, in_progress, completed, cancelled, total, individual, total_pick, zone }
+	 * @return { order_date, created, in_progress, completed, cancelled, total,
+	 *         individual, total_pick, zone }
 	 */
 	public Map<String, Object> getPickingStatus(String orderDate) {
 		Long domainId = Domain.currentDomainId();
@@ -80,6 +120,55 @@ public class FulfillmentDashboardService extends AbstractQueryService {
 			result.put("individual", 0);
 			result.put("total_pick", 0);
 			result.put("zone", 0);
+		}
+
+		return result;
+	}
+
+	/**
+	 * 기간별 패킹 현황 조회
+	 *
+	 * 지정 일자의 패킹 지시 상태별 건수를 반환한다.
+	 * 7가지 상태: CREATED, IN_PROGRESS, COMPLETED, LABEL_PRINTED, MANIFESTED, SHIPPED,
+	 * CANCELLED
+	 *
+	 * @param orderDateFrom 작업 일자 (YYYY-MM-DD, null이면 당일)
+	 * @param orderDateTo   작업 일자 (YYYY-MM-DD, null이면 당일)
+	 * @return { order_date, created, in_progress, completed, label_printed,
+	 *         manifested, shipped, cancelled, total }
+	 */
+	public Map<String, Object> getPackingStatusByPeriod(String orderDateFrom, String orderDateTo) {
+		Long domainId = Domain.currentDomainId();
+		String dateFrom = ValueUtil.isNotEmpty(orderDateFrom) ? orderDateFrom : DateUtil.todayStr();
+		String dateTo = ValueUtil.isNotEmpty(orderDateTo) ? orderDateTo : DateUtil.todayStr();
+
+		String sql = "SELECT"
+				+ " COALESCE(SUM(CASE WHEN status = 'CREATED' THEN 1 ELSE 0 END), 0) AS created,"
+				+ " COALESCE(SUM(CASE WHEN status = 'IN_PROGRESS' THEN 1 ELSE 0 END), 0) AS in_progress,"
+				+ " COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END), 0) AS completed,"
+				+ " COALESCE(SUM(CASE WHEN status = 'LABEL_PRINTED' THEN 1 ELSE 0 END), 0) AS label_printed,"
+				+ " COALESCE(SUM(CASE WHEN status = 'MANIFESTED' THEN 1 ELSE 0 END), 0) AS manifested,"
+				+ " COALESCE(SUM(CASE WHEN status = 'SHIPPED' THEN 1 ELSE 0 END), 0) AS shipped,"
+				+ " COALESCE(SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END), 0) AS cancelled,"
+				+ " COUNT(*) AS total"
+				+ " FROM packing_orders"
+				+ " WHERE domain_id = :domainId AND (order_date >= :orderDateFrom AND order_date <= :orderDateTo)";
+		Map<String, Object> params = ValueUtil.newMap("domainId,orderDateFrom,orderDateTo", domainId, dateFrom, dateTo);
+		List<Map> rows = this.queryManager.selectListBySql(sql, params, Map.class, 0, 1);
+
+		Map<String, Object> result = ValueUtil.newMap(
+				"created,in_progress,completed,label_printed,manifested,shipped,cancelled,total", 0, 0, 0, 0, 0, 0, 0,
+				0);
+		if (!rows.isEmpty()) {
+			Map row = rows.get(0);
+			result.put("created", ValueUtil.toInteger(row.get("created")));
+			result.put("in_progress", ValueUtil.toInteger(row.get("in_progress")));
+			result.put("completed", ValueUtil.toInteger(row.get("completed")));
+			result.put("label_printed", ValueUtil.toInteger(row.get("label_printed")));
+			result.put("manifested", ValueUtil.toInteger(row.get("manifested")));
+			result.put("shipped", ValueUtil.toInteger(row.get("shipped")));
+			result.put("cancelled", ValueUtil.toInteger(row.get("cancelled")));
+			result.put("total", ValueUtil.toInteger(row.get("total")));
 		}
 
 		return result;

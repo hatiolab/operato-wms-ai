@@ -1,8 +1,11 @@
 import { css, html } from 'lit-element'
 
 import { i18next, localize } from '@operato/i18n'
+import { openPopup } from '@operato/layout'
 import { PageView } from '@operato/shell'
 import { ServiceUtil, UiUtil, ValueUtil } from '@operato-app/metapage/dist-client'
+
+import './picking-task-detail'
 
 /**
  * 풀필먼트 진행 현황 화면
@@ -346,11 +349,11 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
         <div class="page-header">
           <h2>${i18next.t('title.FulfillmentProgress', { defaultValue: '피킹/검수/포장 진행 현황' })}</h2>
           <div class="header-actions">
-            <button class="btn btn-outline" @click="${this._resetSearch}">
-              ${i18next.t('button.reset', { defaultValue: '초기화' })}
-            </button>
             <button class="btn btn-outline" @click="${this._search}">
               ${i18next.t('button.search', { defaultValue: '조회' })}
+            </button>
+            <button class="btn btn-outline" @click="${this._resetSearch}">
+              ${i18next.t('button.reset', { defaultValue: '초기화' })}
             </button>
           </div>
         </div>
@@ -452,7 +455,7 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
                       ${this.items.map(row => html`
                         <tr>
                           <td>
-                            <span class="link">${row.pick_task_no || '-'}</span>
+                            <span class="link" @click="${() => this._openTaskDetail(row.id)}">${row.pick_task_no}</span>
                           </td>
                           <td>${row.wave_no || '-'}</td>
                           <td>${row.shipment_no || '-'}</td>
@@ -597,6 +600,21 @@ class FulfillmentProgress extends localize(i18next)(PageView) {
   _search() {
     this.currentPage = 1
     this._fetchData()
+  }
+
+  /** 피킹 상세 팝업 열기 */
+  _openTaskDetail(id) {
+    openPopup(
+      html`<picking-task-detail
+        .pickingTaskId="${id}"
+        @task-updated="${() => this._fetchData()}"
+      ></picking-task-detail>`,
+      {
+        backdrop: true,
+        size: 'large',
+        title: i18next.t('title.picking_task_detail', { defaultValue: '피킹 지시 상세' })
+      }
+    )
   }
 
   /** 피킹 상태 한글 라벨 반환 */

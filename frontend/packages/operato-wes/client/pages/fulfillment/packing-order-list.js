@@ -427,11 +427,11 @@ class PackingOrderList extends localize(i18next)(PageView) {
         <div class="page-header">
           <h2>${i18next.t('menu.PackingOrderWork', { defaultValue: '포장 주문 관리' })}</h2>
           <div class="header-actions">
-            <button class="btn btn-outline" @click="${this._resetSearch}">
-              ${i18next.t('button.reset', { defaultValue: '초기화' })}
-            </button>
             <button class="btn btn-outline" @click="${this._search}">
               ${i18next.t('button.search', { defaultValue: '조회' })}
+            </button>
+            <button class="btn btn-outline" @click="${this._resetSearch}">
+              ${i18next.t('button.reset', { defaultValue: '초기화' })}
             </button>
           </div>
         </div>
@@ -700,7 +700,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
   /** 포장 상태 요약 조회 */
   async _fetchStatusSummary() {
     try {
-      const data = await ServiceUtil.restGet('ful_trx/dashboard/packing_status')
+      const data = await ServiceUtil.restGet('ful_trx/dashboard/packing_status_by_period', { order_date_from: this.searchParams.order_date_from, order_date_to: this.searchParams.order_date_to })
       if (data) {
         this.statusSummary = {
           CREATED: data.created || 0,

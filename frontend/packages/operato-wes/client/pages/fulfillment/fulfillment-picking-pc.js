@@ -1,8 +1,11 @@
 import { css, html } from 'lit-element'
 
 import { i18next, localize } from '@operato/i18n'
+import { openPopup } from '@operato/layout'
 import { PageView } from '@operato/shell'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
+
+import './picking-task-detail'
 
 /**
  * Fulfillment 피킹 작업 PC 화면 (웨이브 기반)
@@ -910,7 +913,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
           <span class="action-label">${isRun ? '계속 →' : '시작 →'}</span>
         </div>
         <div class="meta">
-          주문: ${task.plan_order || 0}건 | SKU: ${task.plan_item || 0}종 | 수량: ${task.plan_total || 0}EA
+          주문: ${task.plan_order || 0}건 | 상품: ${task.plan_item || 0}종 | 수량: ${task.plan_total || 0}EA
         </div>
         ${task.wave_no ? html`<span class="wave-badge">wave: ${task.wave_no}</span>` : ''}
         ${isRun && progressPct > 0 ? html`
@@ -968,7 +971,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
         <div class="right-panel-header">
           <div class="task-info">
             📋 ${task.pick_task_no || '-'}
-            <span>주문 ${task.plan_order || 0}건 | SKU ${task.plan_item || 0}종</span>
+            <span>주문 ${task.plan_order || 0}건 | 상품 ${task.plan_item || 0}종</span>
           </div>
           <button class="btn-close" @click="${this._confirmBackToList}">닫기</button>
         </div>
@@ -999,7 +1002,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
         <div class="location-display">${item.from_loc_cd || '미지정'}</div>
 
         <div class="item-info-grid">
-          <span class="label">SKU</span>
+          <span class="label">상품 코드</span>
           <span class="value mono">${item.sku_cd || '-'}</span>
           <span class="label">상품명</span>
           <span class="value">${item.sku_nm || '-'}</span>
@@ -1016,7 +1019,6 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
         </div>
 
         <div class="barcode-area">
-          <label>🔍 바코드 스캔</label>
           <input
             id="barcodeInput"
             type="text"

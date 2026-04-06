@@ -645,18 +645,15 @@ export class PdaFulfillmentShipping extends connect(store)(PageView) {
   /** 바코드 입력 필드에 포커스 설정 (딜레이 적용) */
   _focusBarcodeInput() {
     setTimeout(() => {
-      if (this._oxInputBarCode) {
-        this._oxInputBarCode.value = ''
-        this._oxInputBarCode.focus()
-      }
+      this._resetBarcodeInput()
     }, 200)
   }
 
   /** 바코드 입력 필드 초기화 및 포커스 복귀 */
   _resetBarcodeInput() {
     if (this._oxInputBarCode) {
-      this._oxInputBarCode.value = ''
-      this._oxInputBarCode.focus()
+      this._oxInputBarCode.input.value = ''
+      this._oxInputBarCode.input.focus()
     }
   }
 

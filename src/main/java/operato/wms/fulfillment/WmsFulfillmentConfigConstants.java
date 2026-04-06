@@ -7,4 +7,8 @@ package operato.wms.fulfillment;
  */
 public class WmsFulfillmentConfigConstants {
 
+    /**
+     * 피킹지시서 템플릿
+     */
+    public static final String PICKING_TASK_SHEET_TEMPLATE = "out.picking.order.sheet.template";
 }
