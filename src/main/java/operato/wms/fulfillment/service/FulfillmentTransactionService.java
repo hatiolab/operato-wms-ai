@@ -86,6 +86,27 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			throw new ElidomValidationException("웨이브 [" + waveNo + "]에 릴리스된 주문이 없습니다");
 		}
 
+		// 웨이브의 택배사 코드로 주문 carrier_cd 일괄 업데이트
+		String waveSql = "SELECT carrier_cd FROM shipment_waves WHERE domain_id = :domainId AND wave_no = :waveNo";
+		Map<String, Object> waveParams = ValueUtil.newMap("domainId,waveNo", domainId, waveNo);
+		String waveCarrierCd = this.queryManager.selectBySql(waveSql, waveParams, String.class);
+
+		if (ValueUtil.isNotEmpty(waveCarrierCd)) {
+			String updCarrierSql = "UPDATE shipment_orders SET carrier_cd = :carrierCd, updated_at = now()"
+					+ " WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status"
+					+ " AND (carrier_cd IS NULL OR carrier_cd != :carrierCd)";
+			Map<String, Object> updCarrierParams = ValueUtil.newMap("carrierCd,domainId,waveNo,status",
+					waveCarrierCd, domainId, waveNo, ShipmentOrder.STATUS_RELEASED);
+			this.queryManager.executeBySql(updCarrierSql, updCarrierParams);
+
+			// 메모리의 주문 객체에도 carrier_cd 반영
+			for (ShipmentOrder order : orders) {
+				if (ValueUtil.isEmpty(order.getCarrierCd()) || !waveCarrierCd.equals(order.getCarrierCd())) {
+					order.setCarrierCd(waveCarrierCd);
+				}
+			}
+		}
+
 		// 당일 최대 pick_task_no 시퀀스 조회
 		String seqSql = "SELECT COUNT(*) FROM picking_tasks WHERE domain_id = :domainId AND order_date = :orderDate";
 		Map<String, Object> seqParams = ValueUtil.newMap("domainId,orderDate", domainId, today);
@@ -298,15 +319,10 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		// 출하 주문 조회
 		ShipmentOrder order = this.findShipmentOrder(domainId, task.getShipmentOrderId());
 
-		// 패킹 지시 번호 채번
-		String seqSql = "SELECT COUNT(*) FROM packing_orders WHERE domain_id = :domainId AND order_date = :orderDate";
-		Map<String, Object> seqParams = ValueUtil.newMap("domainId,orderDate", domainId, today);
-		Integer existCount = this.queryManager.selectBySql(seqSql, seqParams, Integer.class);
-		int nextSeq = (existCount != null ? existCount : 0) + 1;
-		// String packOrderNo = "PACK-" + today.replace("-", "") + "-" +
-		// String.format("%04d", nextSeq);
-
 		// PackingOrder 생성
+		String carrierCd = order != null ? order.getCarrierCd() : null;
+		String dockCd = this.findDockCdByCarrierCd(domainId, carrierCd);
+
 		PackingOrder packOrder = new PackingOrder();
 		packOrder.setDomainId(domainId);
 		packOrder.setPickTaskNo(task.getPickTaskNo());
@@ -316,7 +332,9 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		packOrder.setOrderDate(today);
 		packOrder.setComCd(task.getComCd());
 		packOrder.setWhCd(task.getWhCd());
-		packOrder.setCarrierCd(order != null ? order.getCarrierCd() : null);
+		packOrder.setCarrierCd(carrierCd);
+		packOrder.setCarrierServiceType(order != null ? order.getCarrierServiceType() : null);
+		packOrder.setDockCd(dockCd);
 		packOrder.setTotalBox(0);
 		packOrder.setStatus(PackingOrder.STATUS_CREATED);
 		this.queryManager.insert(packOrder);
@@ -416,6 +434,9 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			List<Map> allocations = this.queryManager.selectListBySql(allocSql, allocParams, Map.class, 0, 0);
 
 			// PackingOrder 생성
+			String batchCarrierCd = order.getCarrierCd();
+			String batchDockCd = this.findDockCdByCarrierCd(domainId, batchCarrierCd);
+
 			PackingOrder packOrder = new PackingOrder();
 			packOrder.setDomainId(domainId);
 			packOrder.setPickTaskNo(task.getPickTaskNo());
@@ -425,7 +446,9 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			packOrder.setOrderDate(today);
 			packOrder.setComCd(order.getComCd());
 			packOrder.setWhCd(ValueUtil.isNotEmpty(order.getWhCd()) ? order.getWhCd() : "DEFAULT");
-			packOrder.setCarrierCd(order.getCarrierCd());
+			packOrder.setCarrierCd(batchCarrierCd);
+			packOrder.setCarrierServiceType(order.getCarrierServiceType());
+			packOrder.setDockCd(batchDockCd);
 			packOrder.setTotalBox(0);
 			packOrder.setStatus(PackingOrder.STATUS_CREATED);
 			this.queryManager.insert(packOrder);
@@ -767,5 +790,31 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
 		List<ShipmentOrder> list = this.queryManager.selectListBySql(sql, params, ShipmentOrder.class, 0, 1);
 		return list.isEmpty() ? null : list.get(0);
+	}
+
+	/**
+	 * 택배사 코드로 도크 코드 조회 (DOCK_CODE 공통코드의 data_1 = carrier_cd)
+	 *
+	 * @param domainId  도메인 ID
+	 * @param carrierCd 택배사 코드
+	 * @return 매핑된 dock_cd (없으면 null)
+	 */
+	@SuppressWarnings("rawtypes")
+	private String findDockCdByCarrierCd(Long domainId, String carrierCd) {
+		if (ValueUtil.isEmpty(carrierCd)) {
+			return null;
+		}
+
+		String sql = "SELECT ccd.name AS dock_cd FROM common_code_details ccd"
+				+ " JOIN common_codes cc ON cc.id = ccd.parent_id AND cc.domain_id = ccd.domain_id"
+				+ " WHERE cc.domain_id = :domainId AND cc.name = 'DOCK_CODE' AND ccd.data_1 = :carrierCd";
+		Map<String, Object> params = ValueUtil.newMap("domainId,carrierCd", domainId, carrierCd);
+		Map data = this.queryManager.selectBySql(sql, params, Map.class);
+
+		if (data != null && data.get("dock_cd") != null) {
+			return data.get("dock_cd").toString();
+		}
+
+		return null;
 	}
 }

@@ -941,7 +941,7 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
 
         <div class="btn-group">
           <button class="btn-next" @click=${this._selectNextTask}>
-            ${TermsUtil.tButton('next_picking') || '다음 피킹 작업'}
+            ${TermsUtil.tLabel('next_picking') || '다음 피킹 작업'}
           </button>
           <button class="btn-list" @click=${this._goBack}>
             ${TermsUtil.tButton('go_list') || '목록으로'}

@@ -513,15 +513,31 @@ export class PdaFulfillmentShipping extends connect(store)(PageView) {
     }
   }
 
-  /** 도크 변경 이벤트 — 대기 목록 재조회 및 스캔 입력 포커스 */
+  /** 도크 변경 이벤트 — 미배정 포장 지시에 도크 배정 후 대기 목록 재조회 */
   async _onDockChange(dockCd) {
     this.dockCd = dockCd
     this.scannedList = []
     if (dockCd) {
+      await this._assignDock(dockCd)
       await this._loadWaitingList()
       this._focusBarcodeInput()
     } else {
       this.waitingList = []
+    }
+  }
+
+  /** 미배정 포장 지시에 선택한 도크를 일괄 배정 */
+  async _assignDock(dockCd) {
+    try {
+      const result = await ServiceUtil.restPost('ful_trx/shipping/assign_dock', { dock_cd: dockCd })
+      if (result?.assigned_count > 0) {
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: { level: 'info', message: `${result.assigned_count}건의 포장 지시에 도크(${dockCd})를 배정했습니다` }
+        }))
+        await this._loadDockList()
+      }
+    } catch (error) {
+      console.error('도크 배정 실패:', error)
     }
   }
 

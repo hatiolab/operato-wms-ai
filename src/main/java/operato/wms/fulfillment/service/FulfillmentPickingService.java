@@ -18,6 +18,7 @@ import xyz.anythings.sys.service.AbstractQueryService;
 import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
+import xyz.elidom.sys.entity.User;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -172,13 +173,17 @@ public class FulfillmentPickingService extends AbstractQueryService {
 			resultOrder = task.getPlanOrder() != null ? task.getPlanOrder() : 0;
 		}
 
+		// 로그인 사용자를 작업자로 기록
+		String workerId = User.currentUser() != null ? User.currentUser().getId() : null;
+
 		// 피킹 지시 헤더 업데이트
-		String updSql = "UPDATE picking_tasks SET status = :status, completed_at = :now,"
+		String updSql = "UPDATE picking_tasks SET status = :status, completed_at = :now, worker_id = :workerId,"
 				+ " result_order = :resultOrder, result_item = :resultItem, result_total = :resultTotal, short_total = :shortTotal,"
 				+ " updated_at = now() WHERE domain_id = :domainId AND id = :id";
 		Map<String, Object> updParams = ValueUtil.newMap(
-				"status,now,resultOrder,resultItem,resultTotal,shortTotal,domainId,id",
-				PickingTask.STATUS_COMPLETED, now, resultOrder, resultItem, resultTotal, shortTotal, domainId, id);
+				"status,now,workerId,resultOrder,resultItem,resultTotal,shortTotal,domainId,id",
+				PickingTask.STATUS_COMPLETED, now, workerId, resultOrder, resultItem, resultTotal, shortTotal, domainId,
+				id);
 		this.queryManager.executeBySql(updSql, updParams);
 
 		return ValueUtil.newMap("success,pick_task_no,status,result_total,short_total", true, task.getPickTaskNo(),

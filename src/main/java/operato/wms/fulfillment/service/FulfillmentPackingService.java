@@ -11,6 +11,7 @@ import operato.wms.fulfillment.entity.PackingOrderItem;
 import xyz.anythings.sys.service.AbstractQueryService;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
+import xyz.elidom.sys.entity.User;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -142,12 +143,14 @@ public class FulfillmentPackingService extends AbstractQueryService {
 			this.queryManager.executeBySql(boxAssignSql, boxAssignParams);
 		}
 
-		// 3. 패킹 지시 완료 처리
+		// 3. 패킹 지시 완료 처리 (로그인 사용자를 작업자로 기록)
+		String workerId = User.currentUser() != null ? User.currentUser().getId() : null;
+
 		String sql = "UPDATE packing_orders SET status = :status, completed_at = :now,"
-				+ " total_box = :totalBox, total_wt = :totalWt, updated_at = now()"
+				+ " total_box = :totalBox, total_wt = :totalWt, worker_id = :workerId, updated_at = now()"
 				+ " WHERE domain_id = :domainId AND id = :id";
-		Map<String, Object> updParams = ValueUtil.newMap("status,now,totalBox,totalWt,domainId,id",
-				PackingOrder.STATUS_COMPLETED, now, boxCount, boxWeight, domainId, id);
+		Map<String, Object> updParams = ValueUtil.newMap("status,now,totalBox,totalWt,workerId,domainId,id",
+				PackingOrder.STATUS_COMPLETED, now, boxCount, boxWeight, workerId, domainId, id);
 		this.queryManager.executeBySql(sql, updParams);
 
 		Map<String, Object> results = ValueUtil.newMap("success", true);
@@ -310,10 +313,10 @@ public class FulfillmentPackingService extends AbstractQueryService {
 
 		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
 
-		// if (orderDate != null && !orderDate.isEmpty()) {
-		// sql.append(" AND po.order_date = :orderDate");
-		// params.put("orderDate", orderDate);
-		// }
+		if (orderDate != null && !orderDate.isEmpty()) {
+			sql.append(" AND po.order_date = :orderDate");
+			params.put("orderDate", orderDate);
+		}
 
 		// sql.append(
 		// " ORDER BY CASE po.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN
@@ -347,10 +350,10 @@ public class FulfillmentPackingService extends AbstractQueryService {
 
 		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
 
-		// if (orderDate != null && !orderDate.isEmpty()) {
-		// sql.append(" AND po.order_date = :orderDate");
-		// params.put("orderDate", orderDate);
-		// }
+		if (orderDate != null && !orderDate.isEmpty()) {
+			sql.append(" AND po.order_date = :orderDate");
+			params.put("orderDate", orderDate);
+		}
 
 		// sql.append(
 		// " ORDER BY CASE po.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN
@@ -390,10 +393,10 @@ public class FulfillmentPackingService extends AbstractQueryService {
 			params.put("status", status);
 		}
 
-		// if (orderDate != null && !orderDate.isEmpty()) {
-		// sql.append(" AND po.order_date = :orderDate");
-		// params.put("orderDate", orderDate);
-		// }
+		if (orderDate != null && !orderDate.isEmpty()) {
+			sql.append(" AND po.order_date = :orderDate");
+			params.put("orderDate", orderDate);
+		}
 
 		// sql.append(
 		// " ORDER BY CASE po.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN

@@ -487,6 +487,17 @@ public class FulfillmentTransactionController {
 	// ==================== 9.4 PDA 출하 확정 API ====================
 
 	/**
+	 * 도크 배정 — 미배정 포장 지시에 선택한 도크 일괄 배정
+	 * POST /rest/ful_trx/shipping/assign_dock
+	 */
+	@PostMapping(value = "shipping/assign_dock", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Assign dock to unassigned packing orders")
+	public Map<String, Object> assignDock(@RequestBody Map<String, Object> params) {
+		String dockCd = (String) params.get("dock_cd");
+		return this.shippingService.assignDock(dockCd);
+	}
+
+	/**
 	 * 도크 목록 조회 (공통코드 DOCK_CODE + 대기 건수)
 	 * GET /rest/ful_trx/shipping/dock_list
 	 */

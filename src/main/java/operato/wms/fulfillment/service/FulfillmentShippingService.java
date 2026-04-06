@@ -279,6 +279,25 @@ public class FulfillmentShippingService extends AbstractQueryService {
 	// ==================== PDA 출하 확정 API ====================
 
 	/**
+	 * 도크 배정 — dock_cd가 미배정(NULL)인 출하 대기 포장 지시에 선택한 도크를 일괄 배정
+	 *
+	 * @param dockCd 배정할 도크 코드
+	 * @return { success, assigned_count }
+	 */
+	public Map<String, Object> assignDock(String dockCd) {
+		Long domainId = Domain.currentDomainId();
+
+		String sql = "UPDATE packing_orders SET dock_cd = :dockCd, updated_at = now()"
+				+ " WHERE domain_id = :domainId"
+				+ " AND dock_cd IS NULL"
+				+ " AND status IN ('COMPLETED', 'LABEL_PRINTED', 'MANIFESTED')";
+		Map<String, Object> params = ValueUtil.newMap("dockCd,domainId", dockCd, domainId);
+		int count = this.queryManager.executeBySql(sql, params);
+
+		return ValueUtil.newMap("success,assigned_count", true, count);
+	}
+
+	/**
 	 * 도크 목록 조회 (공통코드 DOCK_CODE 기반 + 대기 건수)
 	 *
 	 * @return [{ dock_cd, dock_nm, waiting_count, total_box_count }]
