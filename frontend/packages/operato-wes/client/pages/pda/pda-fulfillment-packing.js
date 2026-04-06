@@ -144,6 +144,14 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
           border-radius: 8px;
           background: var(--md-sys-color-surface-container-lowest, #fff);
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          cursor: pointer;
+          transition: all 0.15s;
+          border: 2px solid transparent;
+        }
+
+        .summary-card[active] {
+          border-color: var(--md-sys-color-primary, #1976D2);
+          box-shadow: 0 2px 6px rgba(25, 118, 210, 0.25);
         }
 
         .summary-card .count {
@@ -164,52 +172,6 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
 
         .summary-card.done .count {
           color: #4CAF50;
-        }
-
-        /* 필터 칩 */
-        .filter-chips {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 4px 12px 8px;
-          overflow-x: auto;
-        }
-
-        .filter-chips .spacer {
-          flex: 1;
-        }
-
-        .filter-chips .btn-refresh {
-          flex-shrink: 0;
-          padding: 4px 10px;
-          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
-          border-radius: 6px;
-          background: var(--md-sys-color-surface-container-lowest, #fff);
-          color: var(--md-sys-color-primary, #1976D2);
-          font-size: 12px;
-          font-weight: 600;
-          cursor: pointer;
-        }
-
-        .filter-chips .btn-refresh:active {
-          background: var(--md-sys-color-primary-container, #e3f2fd);
-        }
-
-        .filter-chip {
-          padding: 6px 14px;
-          border-radius: 16px;
-          font-size: 13px;
-          cursor: pointer;
-          white-space: nowrap;
-          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
-          background: var(--md-sys-color-surface, #fff);
-          color: var(--md-sys-color-on-surface, #333);
-        }
-
-        .filter-chip[active] {
-          background: var(--md-sys-color-primary, #1976D2);
-          color: var(--md-sys-color-on-primary, #fff);
-          border-color: var(--md-sys-color-primary, #1976D2);
         }
 
         /* 포장 지시 카드 목록 */
@@ -261,6 +223,11 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
           color: #1976d2;
         }
 
+        .order-card .status-badge.completed {
+          background: #e8f5e9;
+          color: #4CAF50;
+        }
+
         .order-card .sub-info {
           font-size: 12px;
           color: var(--md-sys-color-on-surface-variant, #666);
@@ -282,7 +249,7 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
           transition: width 0.3s;
         }
 
-        /* 포장번호 스캔 입력 */
+        /* 포장번호 스캔 입력 + 새로고침 */
         .scan-pack-order {
           padding: 8px 12px 12px;
         }
@@ -295,8 +262,31 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
           margin-bottom: 4px;
         }
 
-        .scan-pack-order ox-input-barcode {
-          width: 100%;
+        .scan-pack-order .scan-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .scan-pack-order .scan-row ox-input-barcode {
+          flex: 1;
+        }
+
+        .scan-pack-order .btn-refresh {
+          flex-shrink: 0;
+          padding: 8px 12px;
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 6px;
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          color: var(--md-sys-color-primary, #1976D2);
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .scan-pack-order .btn-refresh:active {
+          background: var(--md-sys-color-primary-container, #e3f2fd);
         }
 
         /* 진행률 바 */
@@ -718,38 +708,34 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
       return html`<div class="loading-overlay">${TermsUtil.tLabel('loading') || '로딩 중...'}</div>`
     }
 
-    const todo = this.packingOrders.filter(o => ['CREATED', 'IN_PROGRESS'].includes(o.status))
+    const waiting = this.packingOrders.filter(o => o.status === 'CREATED')
+    const inProgress = this.packingOrders.filter(o => o.status === 'IN_PROGRESS')
     const done = this.packingOrders.filter(o => !['CREATED', 'IN_PROGRESS', 'CANCELLED'].includes(o.status))
-    const filtered = this.filterStatus === 'ALL' ? this.packingOrders
-      : this.filterStatus === 'TODO' ? todo : done
+    const filtered = this.filterStatus === 'CREATED' ? waiting
+      : this.filterStatus === 'IN_PROGRESS' ? inProgress
+        : this.filterStatus === 'DONE' ? done
+          : this.packingOrders
 
     return html`
       <div class="summary-cards">
-        <div class="summary-card waiting">
-          <div class="count">${todo.filter(o => o.status === 'CREATED').length}</div>
+        <div class="summary-card waiting"
+          ?active=${this.filterStatus === 'CREATED'}
+          @click=${() => this._toggleFilter('CREATED')}>
+          <div class="count">${waiting.length}</div>
           <div class="card-label">${TermsUtil.tLabel('wait') || '대기'}</div>
         </div>
-        <div class="summary-card">
-          <div class="count">${todo.filter(o => o.status === 'IN_PROGRESS').length}</div>
+        <div class="summary-card"
+          ?active=${this.filterStatus === 'IN_PROGRESS'}
+          @click=${() => this._toggleFilter('IN_PROGRESS')}>
+          <div class="count">${inProgress.length}</div>
           <div class="card-label">${TermsUtil.tLabel('in_progress') || '진행중'}</div>
         </div>
-        <div class="summary-card done">
+        <div class="summary-card done"
+          ?active=${this.filterStatus === 'DONE'}
+          @click=${() => this._toggleFilter('DONE')}>
           <div class="count">${done.length}</div>
           <div class="card-label">${TermsUtil.tLabel('completed') || '완료'}</div>
         </div>
-      </div>
-
-      <div class="filter-chips">
-        ${['ALL', 'TODO', 'DONE'].map(f => html`
-          <span class="filter-chip" ?active=${this.filterStatus === f}
-            @click=${() => (this.filterStatus = f)}>
-            ${f === 'ALL' ? (TermsUtil.tLabel('all') || '전체')
-        : f === 'TODO' ? (TermsUtil.tLabel('wait') || '대기')
-          : (TermsUtil.tLabel('completed') || '완료')}
-          </span>
-        `)}
-        <span class="spacer"></span>
-        <button class="btn-refresh" @click=${this._refresh}>${TermsUtil.tButton('refresh') || '새로고침'}</button>
       </div>
 
       <div class="order-list">
@@ -760,10 +746,13 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
 
       <div class="scan-pack-order">
         <label>${TermsUtil.tLabel('pack_order_no') || '포장번호 스캔'}</label>
-        <ox-input-barcode id="packOrderScanInput"
-          placeholder="포장번호 스캔"
-          @change=${e => this._onScanPackingOrder(e.target.value)}>
-        </ox-input-barcode>
+        <div class="scan-row">
+          <ox-input-barcode id="packOrderScanInput"
+            placeholder="포장번호 스캔"
+            @change=${e => this._onScanPackingOrder(e.target.value)}>
+          </ox-input-barcode>
+          <button class="btn-refresh" @click=${this._refresh}>${TermsUtil.tButton('refresh') || '새로고침'}</button>
+        </div>
       </div>
     `
   }
@@ -780,13 +769,13 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
         <div class="card-header">
           <span class="pack-no">${order.pack_order_no}</span>
           <span class="status-badge ${(order.status || '').toLowerCase()}">
-            ${order.status === 'CREATED' ? (TermsUtil.tLabel('created') || '대기')
+            ${order.status === 'CREATED' ? (TermsUtil.tLabel('wait') || '대기')
         : order.status === 'IN_PROGRESS' ? (TermsUtil.tLabel('in_progress') || '진행중')
           : (TermsUtil.tLabel('completed') || '완료')}
           </span>
         </div>
         <div class="sub-info">
-          ${order.shipment_no || ''} · ${order.carrier_cd || ''} · ${order.total_item || 0}종 ${order.total_order || 0}EA
+          ${order.shipment_no || ''} · ${order.carrier_cd || ''} · ${order.total_items || 0}종 ${order.total_qty || 0}EA
         </div>
         ${isInProgress ? html`
           <div class="progress-bar">
@@ -947,10 +936,18 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
 
   /** complete 모드 렌더링 — 완료 통계 + 다음작업/목록 버튼 */
   _renderCompleteMode() {
-    const elapsed = this.startedAt ? Math.round((Date.now() - this.startedAt) / 1000) : 0
-    const min = Math.floor(elapsed / 60)
-    const sec = elapsed % 60
-    const totalQty = this.packingItems.reduce((s, i) => s + (i.insp_qty || i.order_qty || 0), 0)
+    const isViewMode = !this.startedAt
+    const totalQty = this.packingItems.reduce((s, i) => s + (i.insp_qty || i.pack_qty || i.order_qty || 0), 0)
+
+    let timeInfo = ''
+    if (isViewMode) {
+      timeInfo = this.selectedOrder?.completed_at || '-'
+    } else {
+      const elapsed = Math.round((Date.now() - this.startedAt) / 1000)
+      const min = Math.floor(elapsed / 60)
+      const sec = elapsed % 60
+      timeInfo = `${min}분 ${sec}초`
+    }
 
     return html`
       <div class="complete-section">
@@ -959,17 +956,19 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
 
         <div class="result-card">
           <div><span class="label">${TermsUtil.tLabel('pack_order_no') || '포장지시'}:</span> ${this.selectedOrder?.pack_order_no}</div>
-          <div><span class="label">${TermsUtil.tLabel('insp_qty') || '검수 수량'}:</span> ${totalQty} EA (${this.totalCount}종)</div>
+          <div><span class="label">${TermsUtil.tLabel('pack_qty') || '포장 수량'}:</span> ${totalQty} EA (${this.totalCount}종)</div>
           <div><span class="label">${TermsUtil.tLabel('box_type_cd') || '박스유형'}:</span> ${this.boxType} × ${this.boxCount}</div>
           <div><span class="label">${TermsUtil.tLabel('invoice_no') || '운송장'}:</span> ${this.trackingNo}</div>
           <div><span class="label">${TermsUtil.tLabel('carrier_cd') || '택배사'}:</span> ${this.selectedOrder?.carrier_cd || '-'}</div>
-          <div><span class="label">${TermsUtil.tLabel('elapsed_time') || '소요시간'}:</span> ${min}분 ${sec}초</div>
+          <div><span class="label">${isViewMode ? (TermsUtil.tLabel('completed_at') || '완료시각') : (TermsUtil.tLabel('elapsed_time') || '소요시간')}:</span> ${timeInfo}</div>
         </div>
 
         <div class="btn-group">
-          <button class="btn-next" @click=${this._selectNextOrder}>
-            ${TermsUtil.tButton('next_packing') || '다음 포장 작업'}
-          </button>
+          ${!isViewMode ? html`
+            <button class="btn-next" @click=${this._selectNextOrder}>
+              ${TermsUtil.tButton('next_packing') || '다음 포장 작업'}
+            </button>
+          ` : ''}
           <button class="btn-list" @click=${this._goBack}>
             ${TermsUtil.tButton('go_list') || '목록으로'}
           </button>
@@ -1018,14 +1017,49 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
     }
   }
 
+  /** 포장 박스 목록 조회 → 박스/운송장 상태 변수에 반영 */
+  async _loadPackingBoxes(orderId) {
+    try {
+      const boxes = await ServiceUtil.restGet(`ful_trx/packing_orders/${orderId}/boxes`)
+      if (boxes && boxes.length > 0) {
+        const firstBox = boxes[0]
+        this.boxType = firstBox.box_type_cd || '-'
+        this.boxCount = boxes.length
+        this.boxWeight = firstBox.box_wt || 0
+        this.trackingNo = firstBox.invoice_no || '-'
+      } else {
+        this.boxType = '-'
+        this.boxCount = 0
+        this.boxWeight = 0
+        this.trackingNo = '-'
+      }
+    } catch (error) {
+      console.error('포장 박스 조회 실패:', error)
+      this.boxType = '-'
+      this.boxCount = 0
+      this.boxWeight = 0
+      this.trackingNo = '-'
+    }
+  }
+
   /* ==================== Event Handlers ==================== */
 
-  /** 포장 지시 선택 → 시작 → 항목 로드 → inspection 모드 전환 */
+  /** 포장 지시 선택 → 완료 주문은 상세 보기, 미완료 주문은 작업 시작 */
   async _selectOrder(order) {
     if (this.processing) return
     this.processing = true
 
     try {
+      // 완료된 주문 → 상세 보기 (complete 모드)
+      if (!['CREATED', 'IN_PROGRESS'].includes(order.status)) {
+        this.selectedOrder = order
+        this.startedAt = null
+        await this._loadPackingItems(order.id)
+        await this._loadPackingBoxes(order.id)
+        this.mode = 'complete'
+        return
+      }
+
       if (order.status === 'CREATED') {
         await ServiceUtil.restPost(`ful_trx/packing_orders/${order.id}/start`, {})
         order.status = 'IN_PROGRESS'
@@ -1206,6 +1240,11 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
     this._focusBarcodeInput()
   }
 
+  /** 요약 카드 필터 토글 — 동일 카드 재클릭 시 전체(ALL)로 복귀 */
+  _toggleFilter(status) {
+    this.filterStatus = this.filterStatus === status ? 'ALL' : status
+  }
+
   /** 목록 새로고침 */
   async _refresh() {
     await this._loadPackingOrders()
@@ -1254,18 +1293,15 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
   /** 바코드 입력 필드에 포커스 설정 */
   _focusBarcodeInput() {
     setTimeout(() => {
-      if (this._barcodeInput) {
-        this._barcodeInput.value = ''
-        this._barcodeInput.focus()
-      }
+      this._resetBarcodeInput();
     }, 100)
   }
 
   /** 바코드 입력 필드 초기화 및 포커스 복귀 */
   _resetBarcodeInput() {
     if (this._barcodeInput) {
-      this._barcodeInput.value = ''
-      this._barcodeInput.focus()
+      this._barcodeInput.input.value = ''
+      this._barcodeInput.input.focus()
     }
   }
 }

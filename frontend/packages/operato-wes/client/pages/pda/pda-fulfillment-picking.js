@@ -21,6 +21,8 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
 
   /** 피킹 지시 목록 */
   @state() taskList = []
+  /** 필터 상태 */
+  @state() filterStatus = 'ALL'
   /** 로딩 상태 */
   @state() loading = false
   /** API 처리 중 */
@@ -46,6 +48,7 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
   @state() startedAt = null
 
   @query('#barcodeInput') _barcodeInput
+  @query('#taskScanInput') _taskScanInput
 
   /** 컴포넌트 스타일 정의 */
   static get styles() {
@@ -125,16 +128,76 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
           background: var(--md-sys-color-surface-container-lowest, #fff);
         }
 
-        /* 목록 상단 액션 */
-        .list-actions {
-          display: flex;
-          align-items: center;
-          justify-content: flex-end;
-          padding: 6px 12px 0;
+        /* 현황 요약 카드 */
+        .summary-cards {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 8px;
+          padding: 8px 12px;
         }
 
-        .list-actions .btn-refresh {
-          padding: 4px 10px;
+        .summary-card {
+          text-align: center;
+          padding: 10px 4px;
+          border-radius: 8px;
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          cursor: pointer;
+          transition: all 0.15s;
+          border: 2px solid transparent;
+        }
+
+        .summary-card[active] {
+          border-color: var(--md-sys-color-primary, #1976D2);
+          box-shadow: 0 2px 6px rgba(25, 118, 210, 0.25);
+        }
+
+        .summary-card .count {
+          font-size: 22px;
+          font-weight: bold;
+          color: var(--md-sys-color-primary, #1976D2);
+        }
+
+        .summary-card .card-label {
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          margin-top: 4px;
+        }
+
+        .summary-card.waiting .count {
+          color: var(--md-sys-color-error, #d32f2f);
+        }
+
+        .summary-card.done .count {
+          color: #4CAF50;
+        }
+
+        /* 피킹번호 스캔 입력 + 새로고침 */
+        .scan-task-order {
+          padding: 8px 12px 12px;
+        }
+
+        .scan-task-order label {
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-surface, #333);
+          display: block;
+          margin-bottom: 4px;
+        }
+
+        .scan-task-order .scan-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .scan-task-order .scan-row ox-input-barcode {
+          flex: 1;
+        }
+
+        .scan-task-order .btn-refresh {
+          flex-shrink: 0;
+          padding: 8px 12px;
           border: 1px solid var(--md-sys-color-outline-variant, #ccc);
           border-radius: 6px;
           background: var(--md-sys-color-surface-container-lowest, #fff);
@@ -142,9 +205,10 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
           font-size: 12px;
           font-weight: 600;
           cursor: pointer;
+          white-space: nowrap;
         }
 
-        .list-actions .btn-refresh:active {
+        .scan-task-order .btn-refresh:active {
           background: var(--md-sys-color-primary-container, #e3f2fd);
         }
 
@@ -197,6 +261,12 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
           color: #1976d2;
         }
 
+        .task-card .status-badge.end,
+        .task-card .status-badge.completed {
+          background: #e8f5e9;
+          color: #4CAF50;
+        }
+
         .task-card .sub-info {
           font-size: 12px;
           color: var(--md-sys-color-on-surface-variant, #666);
@@ -247,14 +317,14 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
         /* 현재 피킹 항목 */
         .current-item-section {
           margin: 4px 12px;
-          padding: 12px;
+          padding: 0px 12px 8px 12px;
           background: var(--md-sys-color-primary-container, #e3f2fd);
           border-radius: 8px;
         }
 
         .location-display {
           text-align: center;
-          padding: 12px 0;
+          padding: 6px 0;
           font-size: 28px;
           font-weight: bold;
           color: var(--md-sys-color-on-primary-container, #1565c0);
@@ -305,10 +375,11 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
           display: flex;
           align-items: center;
           gap: 8px;
-          margin-top: 10px;
+          margin-top: 8px;
         }
 
         .qty-input-row label {
+          flex: 0.3;
           font-size: 13px;
           font-weight: bold;
           color: var(--md-sys-color-on-primary-container, #1565c0);
@@ -316,8 +387,8 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
         }
 
         .qty-input-row input {
-          flex: 1;
-          height: 40px;
+          flex: 0.4;
+          height: 30px;
           padding: 0 12px;
           border: 1px solid var(--md-sys-color-outline-variant, #ccc);
           border-radius: 8px;
@@ -341,6 +412,7 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
         }
 
         .qty-input-row .btn-pick {
+          flex: 0.2;
           padding: 8px 20px;
           background: var(--md-sys-color-primary, #1976D2);
           color: var(--md-sys-color-on-primary, #fff);
@@ -619,33 +691,75 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
           ${taskNo}
         </span>
         <div class="actions">
-          <button class="danger" @click=${this._shortCurrentItem}
-            ?disabled=${this.processing || this.currentItemIndex < 0}>
-            ${TermsUtil.tButton('short') || '부족'}
+          <button class="primary" ?disabled=${this.processing || !this.pickQty}
+            @click=${this._confirmPick}>
+            ${TermsUtil.tButton('confirm') || '확인'}
           </button>
           <button class="primary" @click=${this._completeTask}
             ?disabled=${this.processing}>
             ${TermsUtil.tButton('complete') || '작업완료'}
+          </button>
+          <button class="danger" @click=${this._shortCurrentItem}
+            ?disabled=${this.processing || this.currentItemIndex < 0}>
+            ${TermsUtil.tButton('short') || '부족'}
           </button>
         </div>
       </div>
     `
   }
 
-  /** list 모드 렌더링 — 피킹 지시 카드 목록 */
+  /** list 모드 렌더링 — 현황 요약, 필터, 피킹 지시 목록, 피킹번호 스캔 */
   _renderListMode() {
     if (this.loading) {
       return html`<div class="loading-overlay">${TermsUtil.tLabel('loading') || '로딩 중...'}</div>`
     }
 
+    const waiting = this.taskList.filter(t => t.status === 'CREATED')
+    const inProgress = this.taskList.filter(t => t.status === 'IN_PROGRESS')
+    const done = this.taskList.filter(t => !['CREATED', 'IN_PROGRESS', 'CANCELLED'].includes(t.status))
+    const filtered = this.filterStatus === 'CREATED' ? waiting
+      : this.filterStatus === 'IN_PROGRESS' ? inProgress
+        : this.filterStatus === 'DONE' ? done
+          : this.taskList
+
     return html`
-      <div class="list-actions">
-        <button class="btn-refresh" @click=${this._refresh}>${TermsUtil.tButton('refresh') || '새로고침'}</button>
+      <div class="summary-cards">
+        <div class="summary-card waiting"
+          ?active=${this.filterStatus === 'CREATED'}
+          @click=${() => this._toggleFilter('CREATED')}>
+          <div class="count">${waiting.length}</div>
+          <div class="card-label">${TermsUtil.tLabel('wait') || '대기'}</div>
+        </div>
+        <div class="summary-card"
+          ?active=${this.filterStatus === 'IN_PROGRESS'}
+          @click=${() => this._toggleFilter('IN_PROGRESS')}>
+          <div class="count">${inProgress.length}</div>
+          <div class="card-label">${TermsUtil.tLabel('in_progress') || '진행중'}</div>
+        </div>
+        <div class="summary-card done"
+          ?active=${this.filterStatus === 'DONE'}
+          @click=${() => this._toggleFilter('DONE')}>
+          <div class="count">${done.length}</div>
+          <div class="card-label">${TermsUtil.tLabel('completed') || '완료'}</div>
+        </div>
       </div>
-      ${!this.taskList.length
+
+      <div class="task-list">
+        ${filtered.length === 0
         ? html`<div class="empty-message">${TermsUtil.tText('no_picking_data') || '할당된 피킹 작업이 없습니다'}</div>`
-        : html`<div class="task-list">${this.taskList.map(task => this._renderTaskCard(task))}</div>`
-      }
+        : filtered.map(task => this._renderTaskCard(task))}
+      </div>
+
+      <div class="scan-task-order">
+        <label>${TermsUtil.tLabel('pick_task_no') || '피킹지시번호 스캔'}</label>
+        <div class="scan-row">
+          <ox-input-barcode id="taskScanInput"
+            placeholder="피킹지시번호 스캔"
+            @change=${e => this._onScanPickingTask(e.target.value)}>
+          </ox-input-barcode>
+          <button class="btn-refresh" @click=${this._refresh}>${TermsUtil.tButton('refresh') || '새로고침'}</button>
+        </div>
+      </div>
     `
   }
 
@@ -667,8 +781,9 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
         <div class="card-header">
           <span class="task-no">${task.pick_task_no}</span>
           <span class="status-badge ${(task.status || '').toLowerCase()}">
-            ${task.status === 'CREATED' ? (TermsUtil.tLabel('created') || '대기')
-        : (TermsUtil.tLabel('in_progress') || '진행중')}
+            ${task.status === 'CREATED' ? (TermsUtil.tLabel('wait') || '대기')
+        : task.status === 'IN_PROGRESS' ? (TermsUtil.tLabel('in_progress') || '진행중')
+          : (TermsUtil.tLabel('completed') || '완료')}
           </span>
         </div>
         <div class="sub-info">
@@ -703,12 +818,10 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
         <div class="current-item-section">
           <div class="location-display">${currentItem.from_loc_cd}</div>
           <div class="item-info">
-            <div class="sku">${currentItem.sku_cd} ${currentItem.sku_nm ? `(${currentItem.sku_nm})` : ''}</div>
-            <div class="qty">${currentItem.order_qty || 0} EA</div>
+            <div class="sku">상품 : ${currentItem.sku_cd} ${currentItem.sku_nm ? `(${currentItem.sku_nm})` : ''} / 예정 수량 : ${currentItem.order_qty || 0} EA</div>
             ${currentItem.lot_no ? html`<div class="lot">LOT: ${currentItem.lot_no} ${currentItem.expired_date ? `· ${currentItem.expired_date}` : ''}</div>` : ''}
           </div>
           <div class="barcode-input">
-            <label>${TermsUtil.tLabel('barcode') || '바코드 스캔'}</label>
             <ox-input-barcode id="barcodeInput"
               placeholder="상품 바코드 스캔"
               ?disabled=${this.processing}
@@ -716,14 +829,13 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
             </ox-input-barcode>
           </div>
           <div class="qty-input-row">
-            <label>${TermsUtil.tLabel('pick_qty') || '피킹수량'}</label>
+            <label>피킹수량 (EA)</label>
             <input type="number" min="1" .value=${String(this.pickQty)}
               @input=${e => (this.pickQty = parseInt(e.target.value) || 0)} />
-            <span class="unit">EA</span>
-            <button class="btn-pick" ?disabled=${this.processing || !this.pickQty}
+            <!--button class="btn-pick" ?disabled=${this.processing || !this.pickQty}
               @click=${this._confirmPick}>
               ${TermsUtil.tButton('confirm') || '확인'}
-            </button>
+            </button-->
           </div>
           ${this.lastFeedback ? html`
             <div class="scan-feedback ${this.lastFeedback.type}">
@@ -788,9 +900,9 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
             <div class="item-card">
               <span class="icon">${icon}</span>
               <div class="info">
-                <div class="loc">#${item.rank} ${item.from_loc_cd}</div>
-                <div class="sku">${item.sku_cd}</div>
-                <div class="name">${item.sku_nm || '-'}</div>
+                <div class="loc">#${item.rank} 로케이션 : ${item.from_loc_cd}</div>
+                <div class="sku">상품 : ${item.sku_cd} ${item.sku_nm || '-'}</div>
+                <!--div class="name">${item.sku_nm || '-'}</div-->
               </div>
               <span class="qty-badge ${qtyClass}">
                 ${item.status === 'PICKED' ? `${item.pick_qty || 0}/${item.order_qty || 0}`
@@ -821,9 +933,9 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
 
         <div class="result-card">
           <div><span class="label">${TermsUtil.tLabel('pick_task_no') || '피킹지시'}:</span> ${this.currentTask?.pick_task_no}</div>
-          <div><span class="label">${TermsUtil.tLabel('pick_qty') || '피킹수량'}:</span> ${pickedQty} EA</div>
+          <div><span class="label">${TermsUtil.tLabel('picked_qty') || '피킹수량'}:</span> ${pickedQty} EA</div>
           <div><span class="label">${TermsUtil.tLabel('short_qty') || '부족수량'}:</span> ${shortQty} EA</div>
-          <div><span class="label">${TermsUtil.tLabel('result_count') || '처리건수'}:</span> ${this.totalCount}건 (완료 ${pickedCount} / 부족 ${shortCount})</div>
+          <div><span class="label">${TermsUtil.tText('processed') || '처리건수'}:</span> ${this.totalCount}건 (완료 ${pickedCount} / 부족 ${shortCount})</div>
           <div><span class="label">${TermsUtil.tLabel('elapsed_time') || '소요시간'}:</span> ${min}분 ${sec}초</div>
         </div>
 
@@ -844,12 +956,15 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
     this._loadTaskList()
   }
 
-  /** 피킹 지시 목록 조회 (todo) */
+  /** 피킹 지시 목록 조회 (todo + done) */
   async _loadTaskList() {
     this.loading = true
     try {
-      const tasks = await ServiceUtil.restGet('ful_trx/picking_tasks/todo')
-      this.taskList = tasks || []
+      const [todo, done] = await Promise.all([
+        ServiceUtil.restGet('ful_trx/picking_tasks/todo'),
+        ServiceUtil.restGet('ful_trx/picking_tasks/done')
+      ])
+      this.taskList = [...(todo || []), ...(done || [])]
     } catch (error) {
       console.error('피킹 지시 목록 조회 실패:', error)
       this.taskList = []
@@ -869,6 +984,23 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
     } catch (error) {
       console.error('피킹 항목 조회 실패:', error)
       this.taskItems = []
+    }
+  }
+
+  /** 피킹지시번호 바코드 스캔으로 빠른 선택 */
+  _onScanPickingTask(barcode) {
+    if (!barcode) return
+    const task = this.taskList.find(t => t.pick_task_no === barcode)
+    if (task) {
+      this._selectTask(task)
+    } else {
+      document.dispatchEvent(new CustomEvent('notify', {
+        detail: { level: 'error', message: `피킹지시번호를 찾을 수 없습니다: ${barcode}` }
+      }))
+      navigator.vibrate?.(200)
+    }
+    if (this._taskScanInput) {
+      this._taskScanInput.value = ''
     }
   }
 
@@ -1096,6 +1228,11 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
     await this._completeTask()
   }
 
+  /** 요약 카드 필터 토글 — 동일 카드 재클릭 시 전체(ALL)로 복귀 */
+  _toggleFilter(status) {
+    this.filterStatus = this.filterStatus === status ? 'ALL' : status
+  }
+
   /** 목록 새로고침 */
   async _refresh() {
     await this._loadTaskList()
@@ -1145,18 +1282,15 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
   /** 바코드 입력 필드에 포커스 설정 */
   _focusBarcodeInput() {
     setTimeout(() => {
-      if (this._barcodeInput) {
-        this._barcodeInput.value = ''
-        this._barcodeInput.focus()
-      }
+      this._resetBarcodeInput();
     }, 100)
   }
 
   /** 바코드 입력 필드 초기화 및 포커스 복귀 */
   _resetBarcodeInput() {
     if (this._barcodeInput) {
-      this._barcodeInput.value = ''
-      this._barcodeInput.focus()
+      this._barcodeInput.input.value = ''
+      this._barcodeInput.input.focus()
     }
   }
 }
