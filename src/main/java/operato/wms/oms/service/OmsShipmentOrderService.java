@@ -388,8 +388,10 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 	/**
 	 * 출하 주문 마감 (SHIPPED → CLOSED)
 	 *
+	 * 재고 최종 차감: inv_qty 감소 + reserved_qty 해제 + stock_allocations RELEASED 처리
+	 *
 	 * @param id 주문 ID
-	 * @return { success }
+	 * @return { success, released_count }
 	 */
 	public Map<String, Object> closeShipmentOrder(String id) {
 		Long domainId = Domain.currentDomainId();
@@ -404,13 +406,45 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 			throw new ElidomValidationException("주문 상태가 [" + order.getStatus() + "]이므로 마감할 수 없습니다");
 		}
 
+		// 할당 레코드 조회 후 재고 최종 차감
+		String allocSql = "SELECT * FROM stock_allocations WHERE domain_id = :domainId AND shipment_order_id = :orderId AND status IN (:s1, :s2)";
+		Map<String, Object> allocParams = ValueUtil.newMap("domainId,orderId,s1,s2",
+				domainId, id, StockAllocation.STATUS_SOFT, StockAllocation.STATUS_HARD);
+		List<StockAllocation> allocations = this.queryManager.selectListBySql(allocSql, allocParams,
+				StockAllocation.class, 0, 0);
+
+		for (StockAllocation alloc : allocations) {
+			double allocQty = alloc.getAllocQty() != null ? alloc.getAllocQty() : 0;
+			if (allocQty <= 0 || alloc.getInventoryId() == null) continue;
+
+			// inv_qty 차감 + reserved_qty 해제
+			String updInvSql = "UPDATE inventories"
+					+ " SET inv_qty = GREATEST(inv_qty - :allocQty, 0),"
+					+ "     reserved_qty = GREATEST(COALESCE(reserved_qty, 0) - :allocQty, 0),"
+					+ "     last_tran_cd = 'OUT',"
+					+ "     updated_at = now()"
+					+ " WHERE domain_id = :domainId AND id = :invId";
+			Map<String, Object> updInvParams = ValueUtil.newMap("allocQty,domainId,invId",
+					allocQty, domainId, alloc.getInventoryId());
+			this.queryManager.executeBySql(updInvSql, updInvParams);
+
+			// stock_allocations 상태 RELEASED로 변경
+			String updAllocSql = "UPDATE stock_allocations SET status = :status, released_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :allocId";
+			Map<String, Object> updAllocParams = ValueUtil.newMap("status,now,domainId,allocId",
+					StockAllocation.STATUS_RELEASED, now, domainId, alloc.getId());
+			this.queryManager.executeBySql(updAllocSql, updAllocParams);
+		}
+
+		// 주문 상태 마감으로 변경
 		String sql = "UPDATE shipment_orders SET status = :status, closed_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :id";
 		Map<String, Object> params = ValueUtil.newMap("status,now,domainId,id",
 				ShipmentOrder.STATUS_CLOSED, now, domainId, id);
 		this.queryManager.executeBySql(sql, params);
 
 		// 결과 리턴
-		return ValueUtil.newMap("success", true);
+		Map<String, Object> result = ValueUtil.newMap("success", true);
+		result.put("released_count", allocations.size());
+		return result;
 	}
 
 	/*

@@ -19,7 +19,7 @@
 update-shipment-order-import <파일경로>
 ```
 
-- `<파일경로>`: 업데이트할 엑셀 파일 경로 (기본값: `templates/B2C-출고주문-AVNET-임포트.xlsx`)
+- `<파일경로>`: 업데이트할 엑셀 파일 경로 (기본값: `templates/B2C-출고주문-O1-임포트.xlsx`)
 
 ## 처리 절차
 
@@ -152,7 +152,7 @@ wb.save(file_path)
 ## 실행 결과 예시
 
 ```
-📂 파일: templates/B2C-출고주문-AVNET-임포트.xlsx
+📂 파일: templates/B2C-출고주문-O1-임포트.xlsx
 
 현재 '원주문 번호' 값들:
   행 2: DO-260329-0010

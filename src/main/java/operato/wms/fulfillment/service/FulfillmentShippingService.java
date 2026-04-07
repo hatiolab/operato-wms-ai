@@ -127,13 +127,32 @@ public class FulfillmentShippingService extends AbstractQueryService {
 				PackingBox.STATUS_CLOSED);
 		this.queryManager.executeBySql(boxSql, boxParams);
 
-		// 연결된 출하 주문 상태를 SHIPPED로 갱신
+		// 연결된 출하 주문 상태를 SHIPPED로 갱신 + ShipmentOrderItem shipped_qty 반영
 		if (ValueUtil.isNotEmpty(order.getShipmentOrderId())) {
 			String updOrderSql = "UPDATE shipment_orders SET status = :status, shipped_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :id AND status != :shippedStatus";
 			Map<String, Object> updOrderParams = ValueUtil.newMap("status,now,domainId,id,shippedStatus",
 					ShipmentOrder.STATUS_SHIPPED, now, domainId, order.getShipmentOrderId(),
 					ShipmentOrder.STATUS_SHIPPED);
 			this.queryManager.executeBySql(updOrderSql, updOrderParams);
+
+			// 할당 레코드를 item 기준으로 집계하여 shipped_qty 업데이트
+			String itemAllocSql = "SELECT shipment_order_item_id, SUM(alloc_qty) AS shipped_qty"
+					+ " FROM stock_allocations"
+					+ " WHERE domain_id = :domainId AND shipment_order_id = :orderId AND status IN ('SOFT', 'HARD')"
+					+ " GROUP BY shipment_order_item_id";
+			Map<String, Object> itemAllocParams = ValueUtil.newMap("domainId,orderId", domainId, order.getShipmentOrderId());
+			List<Map> itemAllocs = this.queryManager.selectListBySql(itemAllocSql, itemAllocParams, Map.class, 0, 0);
+
+			for (Map row : itemAllocs) {
+				String itemId = row.get("shipment_order_item_id") != null ? row.get("shipment_order_item_id").toString() : null;
+				Object shippedQty = row.get("shipped_qty");
+				if (itemId == null || shippedQty == null) continue;
+
+				String updItemSql = "UPDATE shipment_order_items SET shipped_qty = :shippedQty, updated_at = now() WHERE domain_id = :domainId AND id = :itemId";
+				Map<String, Object> updItemParams = ValueUtil.newMap("shippedQty,domainId,itemId",
+						Double.parseDouble(shippedQty.toString()), domainId, itemId);
+				this.queryManager.executeBySql(updItemSql, updItemParams);
+			}
 		}
 
 		// 결과 리턴
@@ -211,10 +230,10 @@ public class FulfillmentShippingService extends AbstractQueryService {
 				PackingOrder.STATUS_CANCELLED, domainId, packingOrderId);
 		this.queryManager.executeBySql(sql, params);
 
-		// 연결된 출하 주문의 재고 복원 처리
+		// 연결된 출하 주문의 재고 복원 처리 (마감 전 취소이므로 reserved_qty만 해제)
 		if (ValueUtil.isNotEmpty(order.getShipmentOrderId())) {
-			// 재고 할당의 reserved_qty 복원 (stock_allocations 기반)
-			String allocSql = "SELECT * FROM stock_allocations WHERE domain_id = :domainId AND shipment_order_id = :orderId AND status IN ('SOFT','HARD')";
+			// 아직 마감(CLOSED) 전이므로 SOFT/HARD 상태 할당 레코드 조회
+			String allocSql = "SELECT * FROM stock_allocations WHERE domain_id = :domainId AND shipment_order_id = :orderId AND status IN ('SOFT', 'HARD')";
 			Map<String, Object> allocParams = ValueUtil.newMap("domainId,orderId", domainId,
 					order.getShipmentOrderId());
 			List<Map> allocations = this.queryManager.selectListBySql(allocSql, allocParams, Map.class, 0, 0);
@@ -223,10 +242,14 @@ public class FulfillmentShippingService extends AbstractQueryService {
 				Object allocQty = alloc.get("alloc_qty");
 				String inventoryId = alloc.get("inventory_id") != null ? alloc.get("inventory_id").toString() : null;
 				if (allocQty != null && inventoryId != null) {
-					// 재고 복원 (inv_qty 증가, reserved_qty 해제)
-					String updInvSql = "UPDATE inventories SET reserved_qty = GREATEST(COALESCE(reserved_qty, 0) - :allocQty, 0), updated_at = now() WHERE domain_id = :domainId AND id = :invId";
-					Map<String, Object> updInvParams = ValueUtil.newMap("allocQty,domainId,invId",
-							Double.parseDouble(allocQty.toString()), domainId, inventoryId);
+					double qty = Double.parseDouble(allocQty.toString());
+					// reserved_qty만 해제 (inv_qty는 마감 시점에 차감되므로 복원 불필요)
+					String updInvSql = "UPDATE inventories"
+							+ " SET reserved_qty = GREATEST(COALESCE(reserved_qty, 0) - :allocQty, 0),"
+							+ "     updated_at = now()"
+							+ " WHERE domain_id = :domainId AND id = :invId";
+					Map<String, Object> updInvParams = ValueUtil.newMap("allocQty,domainId,invId", qty, domainId,
+							inventoryId);
 					this.queryManager.executeBySql(updInvSql, updInvParams);
 				}
 
@@ -245,6 +268,11 @@ public class FulfillmentShippingService extends AbstractQueryService {
 			Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id",
 					ShipmentOrder.STATUS_CANCELLED, domainId, order.getShipmentOrderId());
 			this.queryManager.executeBySql(updOrderSql, updOrderParams);
+
+			// ShipmentOrderItem shipped_qty 초기화
+			String resetItemSql = "UPDATE shipment_order_items SET shipped_qty = 0, updated_at = now() WHERE domain_id = :domainId AND shipment_order_id = :orderId";
+			Map<String, Object> resetItemParams = ValueUtil.newMap("domainId,orderId", domainId, order.getShipmentOrderId());
+			this.queryManager.executeBySql(resetItemSql, resetItemParams);
 		}
 
 		// 결과 리턴
