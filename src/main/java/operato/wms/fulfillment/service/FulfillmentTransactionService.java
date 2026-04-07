@@ -14,7 +14,9 @@ import operato.wms.fulfillment.entity.PackingOrderItem;
 import operato.wms.fulfillment.entity.PickingTask;
 import operato.wms.fulfillment.entity.PickingTaskItem;
 import operato.wms.oms.entity.ShipmentOrder;
+import operato.wms.oms.entity.ShipmentWave;
 import xyz.anythings.sys.service.AbstractQueryService;
+import xyz.anythings.sys.service.ICustomService;
 import xyz.anythings.sys.util.AnyOrmUtil;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
@@ -34,6 +36,11 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 	 * Logger
 	 */
 	private Logger logger = LoggerFactory.getLogger(FulfillmentTransactionService.class);
+	/**
+	 * 커스텀 서비스
+	 */
+	@Autowired
+	private ICustomService customSvc;
 	/**
 	 * Picking Transaction Service
 	 */
@@ -496,6 +503,95 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 
 		return ValueUtil.newMap("pack_order_count,total_item_count,pack_orders", packOrderCount,
 				totalItemCount, packOrderResults);
+	}
+
+	/**
+	 * WCS 위임 처리 (WCS 위임 모드 웨이브 릴리스에서 호출)
+	 *
+	 * 피킹 지시를 생성하지 않고, 주문에 웨이브 택배사 정보만 반영한 후
+	 * 주문 상태를 PICKING으로 변경한다.
+	 * 실제 피킹은 WCS 시스템이 수행하며, WCS 완료 콜백 시 후속 처리를 진행한다.
+	 *
+	 * @param params { wave_no }
+	 * @return { order_count }
+	 */
+	public Map<String, Object> delegateToWcs(Map<String, Object> params) {
+		Long domainId = Domain.currentDomainId();
+
+		String waveNo = params.get("wave_no") != null ? params.get("wave_no").toString() : null;
+		if (ValueUtil.isEmpty(waveNo)) {
+			throw new ElidomValidationException("wave_no는 필수 파라미터입니다");
+		}
+
+		// 웨이브의 택배사 코드로 주문 carrier_cd 일괄 업데이트
+		if (!"TOTAL".equalsIgnoreCase(params.get("pick_type").toString())) {
+			// 1. 웨이브에 포함된 RELEASED 상태의 주문 조회
+			String orderSql = "SELECT * FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status ORDER BY priority_cd, shipment_no";
+			Map<String, Object> orderParams = ValueUtil.newMap("domainId,waveNo,status", domainId, waveNo,
+					ShipmentOrder.STATUS_RELEASED);
+			List<ShipmentOrder> orders = this.queryManager.selectListBySql(orderSql, orderParams, ShipmentOrder.class,
+					0,
+					0);
+
+			if (orders.isEmpty()) {
+				throw new ElidomValidationException("웨이브 [" + waveNo + "]에 릴리스된 주문이 없습니다");
+			}
+
+			// 2. 웨이브의 택배사 코드 조회
+			String waveSql = "SELECT carrier_cd FROM shipment_waves WHERE domain_id = :domainId AND wave_no = :waveNo";
+			Map<String, Object> waveParams = ValueUtil.newMap("domainId,waveNo", domainId, waveNo);
+			String waveCarrierCd = this.queryManager.selectBySql(waveSql, waveParams, String.class);
+
+			if (ValueUtil.isNotEmpty(waveCarrierCd)) {
+				// 3. 택배사 코드와 주문 상태 PICKING으로 변경
+				String updCarrierSql = "UPDATE shipment_orders SET status = :status, carrier_cd = :carrierCd, updated_at = now()"
+						+ " WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :oldStatus"
+						+ " AND (carrier_cd IS NULL OR carrier_cd != :carrierCd)";
+				Map<String, Object> updCarrierParams = ValueUtil.newMap("status,carrierCd,domainId,waveNo,oldStatus",
+						ShipmentOrder.STATUS_PICKING, waveCarrierCd, domainId, waveNo, ShipmentOrder.STATUS_RELEASED);
+				this.queryManager.executeBySql(updCarrierSql, updCarrierParams);
+
+			} else {
+				// 3. 주문 상태를 PICKING으로 변경
+				String updOrderSql = "UPDATE shipment_orders SET status = :status, updated_at = now()"
+						+ " WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :oldStatus";
+				Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,waveNo,oldStatus",
+						ShipmentOrder.STATUS_PICKING, domainId, waveNo, ShipmentOrder.STATUS_RELEASED);
+				this.queryManager.executeBySql(updOrderSql, updOrderParams);
+			}
+		}
+
+		// 3. WCS 시스템 연동 처리
+		this.sendToWcs(domainId, waveNo);
+
+		this.logger.info(String.format("[Fulfillment] WCS 위임 처리 완료 - wave_no: %s", waveNo));
+
+		// 4. 결과 리턴
+		return ValueUtil.newMap("success", true);
+	}
+
+	/**
+	 * WCS 시스템에 피킹 지시 전달
+	 *
+	 * WCS 연동 시 이 메서드에 실제 통신 로직을 구현한다.
+	 * (예: WCS API 호출, 메시지 큐 발행 등)
+	 *
+	 * @param domainId 도메인 ID
+	 * @param waveNo   웨이브 번호
+	 */
+	protected void sendToWcs(Long domainId, String waveNo) {
+		// 커스텀 서비스 처리용 파라미터 생성
+		Map<String, Object> waveCond = ValueUtil.newMap("domainId,waveNo", domainId, waveNo);
+		ShipmentWave wave = this.queryManager.selectByCondition(ShipmentWave.class, waveCond);
+
+		// 커스텀 서비스 파라미터 생성
+		Map<String, Object> params = ValueUtil.newMap("domainId,wave", domainId, wave);
+
+		// 커스텀 서비스 전 처리
+		this.customSvc.doCustomService(domainId, "diy-ful-pre-wave-delegate-to-wcs", params);
+
+		// 커스텀 서비스 후 처리
+		this.customSvc.doCustomService(domainId, "diy-ful-post-wave-delegate-to-wcs", params);
 	}
 
 	/**

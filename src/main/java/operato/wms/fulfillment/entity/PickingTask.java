@@ -8,9 +8,7 @@ import xyz.elidom.dbist.annotation.Index;
 import xyz.elidom.dbist.annotation.PrimaryKey;
 import xyz.elidom.dbist.annotation.Table;
 import xyz.elidom.dev.entity.RangedSeq;
-import xyz.elidom.orm.IQueryManager;
 import xyz.elidom.sys.entity.Domain;
-import xyz.elidom.util.BeanUtil;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 

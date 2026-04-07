@@ -186,22 +186,6 @@ public class OmsTransactionController extends AbstractRestService {
 	 */
 
 	/**
-	 * 출하 주문 확정 + 재고 할당 (단건)
-	 *
-	 * POST /rest/oms_trx/shipment_orders/{id}/confirm_and_allocate
-	 *
-	 * REGISTERED → CONFIRMED → ALLOCATED (또는 BACK_ORDER)를 한 번에 수행한다.
-	 *
-	 * @param id 주문 ID
-	 * @return { success, status, allocated_qty, back_order }
-	 */
-	@RequestMapping(value = "shipment_orders/{id}/confirm_and_allocate", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description = "Confirm and allocate shipment order (REGISTERED → CONFIRMED → ALLOCATED)")
-	public Map<String, Object> confirmAndAllocateOrder(@PathVariable("id") String id) {
-		return this.orderService.confirmAndAllocateShipmentOrder(id);
-	}
-
-	/**
 	 * 출하 주문 확정
 	 *
 	 * POST /rest/oms_trx/shipment_orders/confirm
@@ -229,6 +213,22 @@ public class OmsTransactionController extends AbstractRestService {
 	public Map<String, Object> confirmOrderList(@RequestBody List<ShipmentOrder> list) {
 		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
 		return this.orderService.confirmShipmentOrders(ids);
+	}
+
+	/**
+	 * 출하 주문 확정 + 재고 할당 (단건)
+	 *
+	 * POST /rest/oms_trx/shipment_orders/{id}/confirm_and_allocate
+	 *
+	 * REGISTERED → CONFIRMED → ALLOCATED (또는 BACK_ORDER)를 한 번에 수행한다.
+	 *
+	 * @param id 주문 ID
+	 * @return { success, status, allocated_qty, back_order }
+	 */
+	@RequestMapping(value = "shipment_orders/{id}/confirm_and_allocate", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Confirm and allocate shipment order (REGISTERED → CONFIRMED → ALLOCATED)")
+	public Map<String, Object> confirmAndAllocateOrder(@PathVariable("id") String id) {
+		return this.orderService.confirmAndAllocateShipmentOrder(id);
 	}
 
 	/**

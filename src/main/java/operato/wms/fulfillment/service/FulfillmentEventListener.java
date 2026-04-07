@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import operato.wms.common.event.WaveCancelledEvent;
 import operato.wms.common.event.WaveReleasedEvent;
+import xyz.elidom.sys.util.ValueUtil;
 
 /**
  * Fulfillment 이벤트 리스너
@@ -43,30 +44,42 @@ public class FulfillmentEventListener {
 	 */
 	@EventListener
 	public void onWaveReleased(WaveReleasedEvent event) {
+		boolean isWcs = event.getWcsFlag() != null && event.getWcsFlag();
+
 		try {
-			// 피킹 지시 생성 파라미터 구성
-			Map<String, Object> params = new HashMap<>();
-			params.put("wave_no", event.getWaveNo());
-			params.put("pick_type", event.getPickType());
+			if (isWcs) {
+				// WCS 위임: 피킹 지시를 생성하지 않고 WCS 시스템에 위임
+				Map<String, Object> params = ValueUtil.newMap("wave_no,pick_type", event.getWaveNo(),
+						event.getPickType());
 
-			// WCS 위임 여부에 따라 피킹 방식 결정
-			String pickMethod = (event.getWcsFlag() != null && event.getWcsFlag()) ? "WCS" : "PICK";
-			params.put("pick_method", pickMethod);
+				// 토털 피킹인 경우에만 피킹 지시를 생성
+				if ("TOTAL".equalsIgnoreCase(event.getPickType())) {
+					this.fulfillmentTrxService.createPickingTasks(params);
+				}
 
-			// 피킹 지시 생성
-			Map<String, Object> result = this.fulfillmentTrxService.createPickingTasks(params);
+				// 나머지는 WCS 위임
+				Map<String, Object> result = this.fulfillmentTrxService.delegateToWcs(params);
 
-			// 결과 로깅
-			int taskCount = (int) result.getOrDefault("pick_task_count", 0);
-			int itemCount = (int) result.getOrDefault("item_count", 0);
-			this.logger.info(String.format(
-					"[Fulfillment] 웨이브 릴리스 이벤트 처리 완료 - wave_no: %s, pick_type: %s, task_count: %d, item_count: %d",
-					event.getWaveNo(), event.getPickType(), taskCount, itemCount));
+				this.logger.info(
+						String.format("[Fulfillment] WCS 위임 처리 완료 - wave_no: %s", event.getWaveNo()));
+			} else {
+				// 일반 피킹: 피킹 지시 생성
+				Map<String, Object> params = ValueUtil.newMap("wave_no,pick_type", event.getWaveNo(),
+						event.getPickType());
+				Map<String, Object> result = this.fulfillmentTrxService.createPickingTasks(params);
+
+				int taskCount = (int) result.getOrDefault("pick_task_count", 0);
+				int itemCount = (int) result.getOrDefault("item_count", 0);
+				this.logger.info(String.format(
+						"[Fulfillment] 웨이브 릴리스 이벤트 처리 완료 - wave_no: %s, pick_type: %s, task_count: %d, item_count: %d",
+						event.getWaveNo(), event.getPickType(), taskCount, itemCount));
+			}
 		} catch (Exception e) {
+			e.printStackTrace();
 			// 에러 발생 시 로깅 (트랜잭션 롤백되지 않도록 예외를 상위로 전파하지 않음)
 			this.logger.error(String.format(
-					"[Fulfillment] 웨이브 릴리스 이벤트 처리 실패 - wave_no: %s, error: %s",
-					event.getWaveNo(), e.getMessage()));
+					"[Fulfillment] 웨이브 릴리스 이벤트 처리 실패 - wave_no: %s, wcs: %s, error: %s",
+					event.getWaveNo(), isWcs, e.getMessage()));
 		}
 	}
 
