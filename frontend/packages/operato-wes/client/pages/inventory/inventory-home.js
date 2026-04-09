@@ -476,7 +476,7 @@ class InventoryHome extends localize(i18next)(PageView) {
   /** 재고 현황 조회 (전체/가용/할당/부족) */
   async _fetchStatusCounts() {
     try {
-      const data = await ServiceUtil.restGet('inventory_trx/dashboard/status-counts')
+      const data = await ServiceUtil.restGet('inv_dashboard/status-counts')
       return data || {
         total_sku: 0,
         total_qty: 0,
@@ -505,7 +505,7 @@ class InventoryHome extends localize(i18next)(PageView) {
   /** 재고 상태별 통계 조회 */
   async _fetchStatusStats() {
     try {
-      const data = await ServiceUtil.restGet('inventory_trx/dashboard/status-stats')
+      const data = await ServiceUtil.restGet('inv_dashboard/status-stats')
       return data || { STORED: 0, RESERVED: 0, PICKING: 0, LOCKED: 0, BAD: 0 }
     } catch (error) {
       console.error('재고 상태별 통계 조회 실패:', error)
@@ -516,7 +516,7 @@ class InventoryHome extends localize(i18next)(PageView) {
   /** 유효기한 상태별 통계 조회 */
   async _fetchExpireStats() {
     try {
-      const data = await ServiceUtil.restGet('inventory_trx/dashboard/expire-stats')
+      const data = await ServiceUtil.restGet('inv_dashboard/expire-stats')
       return (
         data || {
           NORMAL: { sku_count: 0, qty: 0 },
@@ -537,7 +537,7 @@ class InventoryHome extends localize(i18next)(PageView) {
   /** 로케이션 유형별 통계 조회 */
   async _fetchLocationStats() {
     try {
-      const data = await ServiceUtil.restGet('inventory_trx/dashboard/location-stats')
+      const data = await ServiceUtil.restGet('inv_dashboard/location-stats')
       return (
         data || {
           STORAGE: { total: 0, used: 0, usage_rate: 0 },
@@ -558,7 +558,7 @@ class InventoryHome extends localize(i18next)(PageView) {
   /** 대시보드 알림 데이터 조회 */
   async _fetchAlerts() {
     try {
-      const data = await ServiceUtil.restGet('inventory_trx/dashboard/alerts')
+      const data = await ServiceUtil.restGet('inv_dashboard/alerts')
       return data || []
     } catch (error) {
       console.error('알림 데이터 조회 실패:', error)

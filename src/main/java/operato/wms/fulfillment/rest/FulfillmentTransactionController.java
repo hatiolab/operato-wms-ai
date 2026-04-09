@@ -15,21 +15,26 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import operato.wms.fulfillment.WmsFulfillmentConstants;
 import operato.wms.fulfillment.entity.PickingTask;
 import operato.wms.fulfillment.service.FulfillmentPackingService;
 import operato.wms.fulfillment.service.FulfillmentPickingService;
 import operato.wms.fulfillment.service.FulfillmentShippingService;
 import operato.wms.fulfillment.service.FulfillmentTrackingService;
 import operato.wms.fulfillment.service.FulfillmentTransactionService;
+import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
+import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.util.ValueUtil;
 
 /**
  * 풀필먼트 트랜잭션 컨트롤러
  *
  * 피킹/포장/출하 트랜잭션 API를 제공한다.
+ * 각 API는 전 처리(pre) → 본 로직 → 후 처리(post) 패턴으로 실행되며,
+ * ICustomService를 통해 등록된 DIY 커스텀 서비스를 호출한다.
  * Base URL: /rest/ful_trx
  *
  * @author HatioLab
@@ -40,6 +45,7 @@ import xyz.elidom.sys.util.ValueUtil;
 @RequestMapping("/rest/ful_trx")
 @ServiceDesc(description = "Fulfillment Transaction Service API")
 public class FulfillmentTransactionController {
+
 	/**
 	 * Fulfillment Transaction Service
 	 */
@@ -65,6 +71,11 @@ public class FulfillmentTransactionController {
 	 */
 	@Autowired
 	private FulfillmentTrackingService trackingService;
+	/**
+	 * 커스텀 서비스
+	 */
+	@Autowired
+	private ICustomService customSvc;
 
 	// ==================== 9.1 피킹 트랜잭션 API ====================
 
@@ -107,7 +118,19 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "picking_tasks/create", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Create picking tasks from OMS wave release")
 	public Map<String, Object> createPickingTasks(@RequestBody Map<String, Object> params) {
-		return this.fulTrxService.createPickingTasks(params);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_PICKING, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.fulTrxService.createPickingTasks(params);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_PICKING, params);
+
+		return result;
 	}
 
 	/**
@@ -117,7 +140,20 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "picking_tasks/{id}/start", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Start picking task")
 	public Map<String, Object> startPickingTask(@PathVariable("id") String id) {
-		return this.pickingService.startPickingTask(id);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("id", id);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_START_PICKING, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.pickingService.startPickingTask(id);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_START_PICKING, params);
+
+		return result;
 	}
 
 	/**
@@ -130,7 +166,21 @@ public class FulfillmentTransactionController {
 			@PathVariable("id") String id,
 			@PathVariable("item_id") String itemId,
 			@RequestBody Map<String, Object> params) {
-		return this.pickingService.pickItem(itemId, params);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		params.put("id", id);
+		params.put("item_id", itemId);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_PICK_ITEM, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.pickingService.pickItem(itemId, params);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_PICK_ITEM, params);
+
+		return result;
 	}
 
 	/**
@@ -143,7 +193,21 @@ public class FulfillmentTransactionController {
 			@PathVariable("id") String id,
 			@PathVariable("item_id") String itemId,
 			@RequestBody Map<String, Object> params) {
-		return this.pickingService.shortItem(itemId, params);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		params.put("id", id);
+		params.put("item_id", itemId);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_SHORT_ITEM, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.pickingService.shortItem(itemId, params);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_SHORT_ITEM, params);
+
+		return result;
 	}
 
 	/**
@@ -155,7 +219,20 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "picking_tasks/{id}/complete", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Complete picking task and auto-create packing orders if insp_flag is true")
 	public Map<String, Object> completePickingTask(@PathVariable("id") String id) {
-		return this.fulTrxService.completePickingTaskWithPacking(id);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("id", id);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_COMPLETE_PICKING, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.fulTrxService.completePickingTaskWithPacking(id);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_COMPLETE_PICKING, params);
+
+		return result;
 	}
 
 	/**
@@ -169,11 +246,23 @@ public class FulfillmentTransactionController {
 			throw new ElidomValidationException("피킹 지시 목록이 없습니다");
 		}
 
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("list", list);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CANCEL_PICKING, params);
+
+		// 2. 본 로직 실행
 		for (PickingTask task : list) {
 			this.fulTrxService.cancelCompletedPickingTask(task.getId());
 		}
 
-		return ValueUtil.newMap("success", true);
+		// 3. 커스텀 서비스 - 후 처리
+		Map<String, Object> result = ValueUtil.newMap("success", true);
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CANCEL_PICKING, params);
+
+		return result;
 	}
 
 	/**
@@ -186,14 +275,27 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "picking_tasks/{id}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Cancel picking task (supports both in-progress and completed cancellation)")
 	public Map<String, Object> cancelPickingTask(@PathVariable("id") String id) {
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("id", id);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CANCEL_PICKING, params);
+
+		// 2. 본 로직 실행
 		Map<String, Object> taskInfo = this.pickingService.getPickingTask(id);
 		String status = taskInfo.get("status") != null ? taskInfo.get("status").toString() : "";
-
+		Map<String, Object> result;
 		if ("COMPLETED".equals(status)) {
-			return this.fulTrxService.cancelCompletedPickingTask(id);
+			result = this.fulTrxService.cancelCompletedPickingTask(id);
 		} else {
-			return this.pickingService.cancelPickingTask(id);
+			result = this.pickingService.cancelPickingTask(id);
 		}
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CANCEL_PICKING, params);
+
+		return result;
 	}
 
 	/**
@@ -205,8 +307,21 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "picking_tasks/{id}/start_and_complete", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Start and complete picking task at once")
 	public Map<String, Object> startAndCompletePickingTask(@PathVariable("id") String id) {
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("id", id);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_COMPLETE_PICKING, params);
+
+		// 2. 본 로직 실행
 		this.pickingService.startPickingTask(id);
-		return this.fulTrxService.completePickingTaskWithPacking(id);
+		Map<String, Object> result = this.fulTrxService.completePickingTaskWithPacking(id);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_COMPLETE_PICKING, params);
+
+		return result;
 	}
 
 	/**
@@ -289,8 +404,20 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "packing_orders/create", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Create packing order from individual picking task")
 	public Map<String, Object> createPackingOrder(@RequestBody Map<String, Object> params) {
+		Long domainId = Domain.currentDomainId();
 		String pickTaskId = (String) params.get("pick_task_id");
-		return this.fulTrxService.createPackingOrders(pickTaskId);
+
+		// 1. 커스텀 서비스 - 전 처리
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_PACKING, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.fulTrxService.createPackingOrders(pickTaskId);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_PACKING, params);
+
+		return result;
 	}
 
 	/**
@@ -300,8 +427,20 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "packing_orders/create_from_batch", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Create packing orders from batch picking task")
 	public Map<String, Object> createPackingOrdersFromBatch(@RequestBody Map<String, Object> params) {
+		Long domainId = Domain.currentDomainId();
 		String pickTaskId = (String) params.get("pick_task_id");
-		return this.fulTrxService.createPackingOrdersFromBatch(pickTaskId);
+
+		// 1. 커스텀 서비스 - 전 처리
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_PACKING, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.fulTrxService.createPackingOrdersFromBatch(pickTaskId);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_PACKING, params);
+
+		return result;
 	}
 
 	/**
@@ -311,7 +450,20 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "packing_orders/{id}/start", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Start packing order")
 	public Map<String, Object> startPackingOrder(@PathVariable("id") String id) {
-		return this.packingService.startPackingOrder(id);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("id", id);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_START_PACKING, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.packingService.startPackingOrder(id);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_START_PACKING, params);
+
+		return result;
 	}
 
 	/**
@@ -324,7 +476,21 @@ public class FulfillmentTransactionController {
 			@PathVariable("id") String id,
 			@PathVariable("item_id") String itemId,
 			@RequestBody Map<String, Object> params) {
-		return this.packingService.inspectItem(itemId, params);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		params.put("id", id);
+		params.put("item_id", itemId);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_INSPECT_ITEM, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.packingService.inspectItem(itemId, params);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_INSPECT_ITEM, params);
+
+		return result;
 	}
 
 	/**
@@ -336,7 +502,20 @@ public class FulfillmentTransactionController {
 	public Map<String, Object> finishPackingItem(
 			@PathVariable("id") String itemId,
 			@RequestBody Map<String, Object> params) {
-		return this.packingService.finishPackingItem(itemId, params);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		params.put("item_id", itemId);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_INSPECT_ITEM, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.packingService.finishPackingItem(itemId, params);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_INSPECT_ITEM, params);
+
+		return result;
 	}
 
 	/**
@@ -349,7 +528,21 @@ public class FulfillmentTransactionController {
 			@PathVariable("id") String id,
 			@PathVariable("item_id") String itemId,
 			@RequestBody Map<String, Object> params) {
-		return this.packingService.packItem(itemId, params);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		params.put("id", id);
+		params.put("item_id", itemId);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_PACK_ITEM, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.packingService.packItem(itemId, params);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_PACK_ITEM, params);
+
+		return result;
 	}
 
 	/**
@@ -359,7 +552,20 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "packing_orders/{id}/boxes/create", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Create new packing box")
 	public Map<String, Object> createBox(@PathVariable("id") String packingOrderId) {
-		return this.packingService.createBox(packingOrderId);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("packing_order_id", packingOrderId);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_BOX, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.packingService.createBox(packingOrderId);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_BOX, params);
+
+		return result;
 	}
 
 	/**
@@ -371,7 +577,20 @@ public class FulfillmentTransactionController {
 	public Map<String, Object> closeBox(
 			@PathVariable("id") String packingOrderId,
 			@PathVariable("box_id") String boxId) {
-		return this.packingService.closeBox(boxId);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("packing_order_id,box_id", packingOrderId, boxId);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CLOSE_BOX, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.packingService.closeBox(boxId);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CLOSE_BOX, params);
+
+		return result;
 	}
 
 	/**
@@ -382,7 +601,20 @@ public class FulfillmentTransactionController {
 	@ApiDesc(description = "Complete packing order")
 	public Map<String, Object> completePackingOrder(@PathVariable("id") String id,
 			@RequestBody Map<String, Object> params) {
-		return this.packingService.completePackingOrder(id, params);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		params.put("id", id);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_COMPLETE_PACKING, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.packingService.completePackingOrder(id, params);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_COMPLETE_PACKING, params);
+
+		return result;
 	}
 
 	/**
@@ -392,7 +624,20 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "packing_orders/{id}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Cancel packing order")
 	public Map<String, Object> cancelPackingOrder(@PathVariable("id") String id) {
-		return this.packingService.cancelPackingOrder(id);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("id", id);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CANCEL_PACKING, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.packingService.cancelPackingOrder(id);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CANCEL_PACKING, params);
+
+		return result;
 	}
 
 	/**
@@ -426,7 +671,20 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "packing_orders/{id}/print_label", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Print shipping label")
 	public Map<String, Object> printLabel(@PathVariable("id") String id) {
-		return this.shippingService.printLabel(id);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("id", id);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_PRINT_LABEL, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.shippingService.printLabel(id);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_PRINT_LABEL, params);
+
+		return result;
 	}
 
 	/**
@@ -436,7 +694,20 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "packing_orders/{id}/manifest", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Create manifest")
 	public Map<String, Object> createManifest(@PathVariable("id") String id) {
-		return this.shippingService.createManifest(id);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("id", id);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_MANIFEST, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.shippingService.createManifest(id);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_MANIFEST, params);
+
+		return result;
 	}
 
 	/**
@@ -446,7 +717,20 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "packing_orders/{id}/confirm_shipping", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Confirm shipping")
 	public Map<String, Object> confirmShipping(@PathVariable("id") String id) {
-		return this.shippingService.confirmShipping(id);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("id", id);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CONFIRM_SHIPPING, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.shippingService.confirmShipping(id);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CONFIRM_SHIPPING, params);
+
+		return result;
 	}
 
 	/**
@@ -457,8 +741,20 @@ public class FulfillmentTransactionController {
 	@ApiDesc(description = "Batch confirm shipping")
 	@SuppressWarnings("unchecked")
 	public Map<String, Object> confirmShippingBatch(@RequestBody Map<String, Object> params) {
+		Long domainId = Domain.currentDomainId();
 		List<String> ids = (List<String>) params.get("ids");
-		return this.shippingService.confirmShippingBatch(ids);
+
+		// 1. 커스텀 서비스 - 전 처리
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CONFIRM_SHIPPING, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.shippingService.confirmShippingBatch(ids);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CONFIRM_SHIPPING, params);
+
+		return result;
 	}
 
 	/**
@@ -468,7 +764,20 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "packing_orders/{id}/cancel_shipping", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Cancel shipping (with inventory restoration)")
 	public Map<String, Object> cancelShipping(@PathVariable("id") String id) {
-		return this.shippingService.cancelShipping(id);
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("id", id);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CANCEL_SHIPPING, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.shippingService.cancelShipping(id);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CANCEL_SHIPPING, params);
+
+		return result;
 	}
 
 	/**
@@ -480,8 +789,21 @@ public class FulfillmentTransactionController {
 	public Map<String, Object> updateBoxInvoice(
 			@PathVariable("id") String boxId,
 			@RequestBody Map<String, Object> params) {
+		Long domainId = Domain.currentDomainId();
 		String invoiceNo = (String) params.get("invoice_no");
-		return this.shippingService.updateBoxInvoice(boxId, invoiceNo);
+
+		// 1. 커스텀 서비스 - 전 처리
+		params.put("box_id", boxId);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_UPDATE_BOX_INVOICE, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.shippingService.updateBoxInvoice(boxId, invoiceNo);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_UPDATE_BOX_INVOICE, params);
+
+		return result;
 	}
 
 	// ==================== 9.4 PDA 출하 확정 API ====================
@@ -493,8 +815,20 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "shipping/assign_dock", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Assign dock to unassigned packing orders")
 	public Map<String, Object> assignDock(@RequestBody Map<String, Object> params) {
+		Long domainId = Domain.currentDomainId();
 		String dockCd = (String) params.get("dock_cd");
-		return this.shippingService.assignDock(dockCd);
+
+		// 1. 커스텀 서비스 - 전 처리
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_ASSIGN_DOCK, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.shippingService.assignDock(dockCd);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_ASSIGN_DOCK, params);
+
+		return result;
 	}
 
 	/**
@@ -526,9 +860,21 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "shipping/confirm_by_invoice", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Confirm shipping by invoice scan")
 	public Map<String, Object> confirmShippingByInvoice(@RequestBody Map<String, Object> params) {
+		Long domainId = Domain.currentDomainId();
 		String dockCd = (String) params.get("dock_cd");
 		String invoiceNo = (String) params.get("invoice_no");
-		return this.shippingService.confirmShippingByInvoice(dockCd, invoiceNo);
+
+		// 1. 커스텀 서비스 - 전 처리
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CONFIRM_BY_INVOICE, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.shippingService.confirmShippingByInvoice(dockCd, invoiceNo);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CONFIRM_BY_INVOICE, params);
+
+		return result;
 	}
 
 	// ==================== 9.5 출고 추적 API ====================
@@ -547,4 +893,5 @@ public class FulfillmentTransactionController {
 			@org.springframework.web.bind.annotation.RequestParam(name = "type", required = false, defaultValue = "auto") String type) {
 		return this.trackingService.trackByKeyword(keyword, type);
 	}
+
 }
