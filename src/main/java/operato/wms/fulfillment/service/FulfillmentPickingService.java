@@ -102,6 +102,11 @@ public class FulfillmentPickingService extends AbstractQueryService {
 
 		PickingTask task = this.findPickingTask(domainId, id);
 
+		if (PickingTask.STATUS_IN_PROGRESS.equals(task.getStatus())) {
+			return ValueUtil.newMap("success,pick_task_no,status", true, task.getPickTaskNo(),
+					PickingTask.STATUS_IN_PROGRESS);
+		}
+
 		if (!PickingTask.STATUS_CREATED.equals(task.getStatus())) {
 			throw new ElidomValidationException("피킹 지시 상태가 [" + task.getStatus() + "]이므로 시작할 수 없습니다 (CREATED 상태만 가능)");
 		}
