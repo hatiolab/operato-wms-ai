@@ -1,6 +1,6 @@
 {
   "name": "@operato-app/operato-wes",
-  "version": "7.0.49",
+  "version": "7.0.50",
   "main": "dist-server/index.js",
   "browser": "dist-client/index.js",
   "things-factory": true,
@@ -37,9 +37,9 @@
     "migration:revert": "node ../../node_modules/typeorm/cli.js migration:revert",
     "stop:dev": "kill $(lsof -t -i:3000,3001)",
     "stop": "things-factory-stop operato-wes",
-    "docker": "npm run build:app && things-factory-dockerize hatiolab/operato-wes:latest  hatiolab/operato-wes:$npm_package_version linux/amd64",
-    "docker:run": "docker run --platform linux/amd64 -p 4000:5907 hatiolab/operato-wes:latest",
-    "docker:push": "docker image push hatiolab/operato-wes:latest && docker image push hatiolab/operato-wes:$npm_package_version"
+    "docker": "npm run build:app && things-factory-dockerize hatiolab/wms-client:latest  hatiolab/wms-client:$npm_package_version linux/amd64",
+    "docker:run": "docker run --platform linux/amd64 -p 4000:5907 hatiolab/wms-client:latest",
+    "docker:push": "docker image push hatiolab/wms-client:latest && docker image push hatiolab/wms-client:$npm_package_version"
   },
   "dependencies": {
     "@material/web": "^2.0.0",
