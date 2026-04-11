@@ -1,7 +1,7 @@
 import { css, html } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { PageView, store } from '@operato/shell'
-import { ServiceUtil, UiUtil, ValueUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, TermsUtil, UiUtil, ValueUtil } from '@operato-app/metapage/dist-client'
 
 import '@things-factory/import-ui-excel'
 import { IMPORT } from '@things-factory/import-base'
@@ -223,6 +223,9 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
           color: #424242;
           border-bottom: 2px solid #e0e0e0;
           white-space: nowrap;
+          position: sticky;
+          top: 0;
+          z-index: 1;
         }
         .preview-table td {
           padding: 8px 12px;
@@ -405,13 +408,13 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
 
   /** 페이지 컨텍스트 반환 - 브라우저 타이틀 설정 */
   get context() {
-    return { title: i18next.t('menu.ImportShipmentOrder', { defaultValue: '주문 임포트' }) }
+    return { title: TermsUtil.tMenu('ImportShipmentOrder') }
   }
 
   /** 화면 렌더링 - 3단계 마법사 (파일 업로드 → 검증 → 결과) */
   render() {
     return html`
-      <h2>${i18next.t('menu.ImportShipmentOrder', { defaultValue: '주문 임포트' })}</h2>
+      <h2>${TermsUtil.tMenu('ImportShipmentOrder')}</h2>
 
       <div class="wizard-container">
         <!-- 스텝 인디케이터 -->
@@ -524,25 +527,61 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
           <thead>
             <tr>
               <th class="center">행</th>
-              <th>참조번호</th>
-              <th>SKU</th>
-              <th>상품명</th>
-              <th class="right">수량</th>
               <th class="center">상태</th>
               <th>오류 내용</th>
+              <th>원 주문번호</th>
+              <th>상품코드</th>
+              <th>상품명</th>
+              <th class="right">수량</th>
+              <th>주문일</th>
+              <th>출하기한</th>
+              <th>창고</th>
+              <th>화주사</th>
+              <th>판매채널</th>
+              <th>배송 유형</th>
+              <th>택배 서비스 유형</th>
+              <th>우선순위</th>
+              <th>송신자 명</th>
+              <th>송신자 연락처</th>
+              <th>송신자 우편번호</th>
+              <th>송신자 주소</th>
+              <th>주문자 명</th>
+              <th>수신자 명</th>
+              <th>수신자 연락처</th>
+              <th>수신자 우편번호</th>
+              <th>수신자 주소</th>
+              <th>배송 메모</th>
             </tr>
           </thead>
           <tbody>
             ${rows.map(
       row => html`
                 <tr class="${row.valid ? '' : 'error-row'}">
-                  <td class="center">${row.row_no}</td>
+                  <td class="center">${row.row_no}</td>  
+                  <td class="center"><span class="status-icon">${row.valid ? '✅' : '❌'}</span></td>
+                  <td class="error-text">${row.error_messages ? row.error_messages.join(', ') : ''}</td>
                   <td>${row.ref_order_no || ''}</td>
                   <td>${row.sku_cd || ''}</td>
                   <td>${row.sku_nm || ''}</td>
                   <td class="right">${row.order_qty || 0}</td>
-                  <td class="center"><span class="status-icon">${row.valid ? '✅' : '❌'}</span></td>
-                  <td class="error-text">${row.error_messages ? row.error_messages.join(', ') : ''}</td>
+                  <td>${row.order_date || ''}</td>
+                  <td>${row.ship_by_date || ''}</td>
+                  <td>${row.wh_cd || ''}</td>
+                  <td>${row.com_cd || ''}</td>
+                  <td>${row.cust_cd || ''}</td>
+                  <td>${row.dlv_type || ''}</td>
+                  <td>${row.carrier_service_type || ''}</td>
+                  <td>${row.priority_cd || ''}</td>
+                  <td>${row.sender_nm || ''}</td>
+                  <td>${row.sender_phone || ''}</td>
+                  <td>${row.sender_zip_cd || ''}</td>
+                  <td>${row.sender_addr || ''}</td>
+                  <td>${row.cust_nm || ''}</td>
+                  <td>${row.receiver_nm || ''}</td>
+                  <td>${row.receiver_phone || ''}</td>
+                  <td>${row.receiver_zip_cd || ''}</td>
+                  <td>${row.receiver_addr || ''}</td>
+                  <td>${row.delivery_memo || ''}</td>
                 </tr>
               `
     )}

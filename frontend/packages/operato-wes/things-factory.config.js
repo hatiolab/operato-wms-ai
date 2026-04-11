@@ -4,6 +4,8 @@ import bootstrap from './dist-client/bootstrap'
 export default {
   route,
   routes: [
+    { tagname: 'storage-browser', page: 'storage-browser' },
+
     { tagname: 'oms-home', page: 'oms-home' },
     { tagname: 'shipment-order-import', page: 'shipment-order-import' },
     { tagname: 'shipment-wave-list', page: 'shipment-wave-list' },

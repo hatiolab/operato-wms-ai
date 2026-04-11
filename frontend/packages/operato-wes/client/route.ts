@@ -1,3 +1,5 @@
+import './pages/base/storage-browser'
+
 import './pages/oms/oms-home'
 import './pages/oms/shipment-order-import'
 import './pages/oms/shipment-wave-list'
