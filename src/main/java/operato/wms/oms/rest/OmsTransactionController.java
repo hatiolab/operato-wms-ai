@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import operato.wms.oms.WmsOmsConfigConstants;
 import operato.wms.oms.WmsOmsConstants;
 import operato.wms.oms.entity.ImportShipmentOrder;
 import operato.wms.oms.entity.ShipmentOrder;
@@ -97,11 +98,13 @@ public class OmsTransactionController extends AbstractRestService {
 		Long domainId = Domain.currentDomainId();
 
 		// 1. 커스텀 서비스 - 전 처리
-		Map<String, Object> params = ValueUtil.newMap("biz_type,list", "B2C_OUT", list);
+		Map<String, Object> params = ValueUtil.newMap("biz_type,list",
+				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2C_OUT, list);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_IMPORT_SHIPMENT, params);
 
 		// 2. 본 로직 실행
-		Map<String, Object> result = this.importService.validateImportData(list, "B2C_OUT");
+		Map<String, Object> result = this.importService.validateImportData(list,
+				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2C_OUT);
 
 		// 3. 커스텀 서비스 - 후 처리
 		params.put("result", result);
@@ -124,11 +127,13 @@ public class OmsTransactionController extends AbstractRestService {
 		Long domainId = Domain.currentDomainId();
 
 		// 1. 커스텀 서비스 - 전 처리
-		Map<String, Object> params = ValueUtil.newMap("biz_type,list", "B2B_OUT", list);
+		Map<String, Object> params = ValueUtil.newMap("biz_type,list",
+				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT, list);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_IMPORT_SHIPMENT, params);
 
 		// 2. 본 로직 실행
-		Map<String, Object> result = this.importService.validateImportData(list, "B2B_OUT");
+		Map<String, Object> result = this.importService.validateImportData(list,
+				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT);
 
 		// 3. 커스텀 서비스 - 후 처리
 		params.put("result", result);
@@ -202,7 +207,8 @@ public class OmsTransactionController extends AbstractRestService {
 	 * POST /rest/oms_trx/waves/create_wave
 	 *
 	 * @param list [{ id: 'id1', ... }, {id : 'id2', ...}, ...]
-	 * @return { wave_no, wave_seq, order_count, sku_count, total_qty, skipped_count, errors }
+	 * @return { wave_no, wave_seq, order_count, sku_count, total_qty,
+	 *         skipped_count, errors }
 	 */
 	@RequestMapping(value = "waves/create_wave", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Create waves from selected allocated orders, other settings later...")
@@ -229,7 +235,8 @@ public class OmsTransactionController extends AbstractRestService {
 	 * POST /rest/oms_trx/waves/create_manual
 	 *
 	 * @param params { orders: [{ id, ... }], pick_type, pick_method }
-	 * @return { wave_no, wave_seq, order_count, sku_count, total_qty, skipped_count, errors }
+	 * @return { wave_no, wave_seq, order_count, sku_count, total_qty,
+	 *         skipped_count, errors }
 	 */
 	@RequestMapping(value = "waves/create_manual", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Create wave manually from selected orders")

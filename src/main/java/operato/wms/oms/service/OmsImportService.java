@@ -101,7 +101,23 @@ public class OmsImportService extends AbstractQueryService {
 			resultRow.put("ship_by_date", row.getShipByDate());
 			resultRow.put("cust_cd", row.getCustCd()); // B2C : 판매처 코드
 			resultRow.put("cust_nm", row.getOrdererNm()); // B2C : 주문자 명
+			resultRow.put("orderer_nm", row.getOrdererNm());
 			resultRow.put("receiver_nm", row.getReceiverNm());
+
+			resultRow.put("wh_cd", row.getWhCd());
+			resultRow.put("com_cd", row.getComCd());
+			resultRow.put("dlv_type", row.getDlvType());
+			resultRow.put("priority_cd", row.getPriorityCd());
+			resultRow.put("sender_nm", row.getSenderNm());
+			resultRow.put("sender_phone", row.getSenderPhone());
+			resultRow.put("sender_zip_cd", row.getSenderZipCd());
+			resultRow.put("sender_addr", row.getSenderAddr());
+			resultRow.put("receiver_phone", row.getReceiverPhone());
+			resultRow.put("receiver_zip_cd", row.getReceiverZipCd());
+			resultRow.put("receiver_addr", row.getReceiverAddr());
+			resultRow.put("receiver_addr2", row.getReceiverAddr2());
+			resultRow.put("delivery_memo", row.getDeliveryMemo());
+
 			resultRow.put("biz_type", ValueUtil.isNotEmpty(row.getBizType()) ? row.getBizType() : bizType);
 
 			if (errors.isEmpty()) {
