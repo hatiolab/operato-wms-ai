@@ -1,70 +1,72 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>Operato WMS</title>
-    <meta name="generator" content="Things Factory Starter Kit" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <meta name="description" content="Empower Your Warehouse: Optimize, Simplify, Succeed" />
-    <meta name="google" content="notranslate" />
 
-    <base href="/" />
+<head>
+  <meta charset="utf-8" />
+  <title>Operato WMS</title>
+  <meta name="generator" content="Things Factory Starter Kit" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="description" content="Empower Your Warehouse: Optimize, Simplify, Succeed" />
+  <meta name="google" content="notranslate" />
 
-    <link rel="icon" href="/assets/favicon.ico" />
+  <base href="/" />
 
-    <!-- See https://goo.gl/OOhYW5 -->
-    <link rel="manifest" href="/assets/manifest.json" />
+  <link rel="icon" href="/assets/favicon.ico" />
 
-    <!-- See https://goo.gl/qRE0vM -->
-    <meta name="theme-color" content="rgb(46 121 190)" />
+  <!-- See https://goo.gl/OOhYW5 -->
+  <link rel="manifest" href="/assets/manifest.json" />
 
-    <!-- Add to homescreen for Chrome on Android. Fallback for manifest.json -->
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="application-name" content="Operato WMS" />
-    <meta name="application-description" content="Empower Your Warehouse: Optimize, Simplify, Succeed" />
-    <meta name="application-copyright" content="Copyright © hatiolab.com. All Rights Reserved." />
-    <link rel="application-icon" href="/assets/manifest/icon-96x96.png" />
+  <!-- See https://goo.gl/qRE0vM -->
+  <meta name="theme-color" content="rgb(46 121 190)" />
 
-    <!-- Add to homescreen for Safari on iOS -->
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Operato WMS" />
+  <!-- Add to homescreen for Chrome on Android. Fallback for manifest.json -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="application-name" content="Operato WMS" />
+  <meta name="application-description" content="Empower Your Warehouse: Optimize, Simplify, Succeed" />
+  <meta name="application-copyright" content="Copyright © hatiolab.com. All Rights Reserved." />
+  <link rel="application-icon" href="/assets/manifest/icon-96x96.png" />
 
-    <!-- Homescreen icons -->
-    <link rel="apple-touch-icon" href="/assets/manifest/icon-48x48.png" />
-    <link rel="apple-touch-icon" sizes="72x72" href="/assets/manifest/icon-72x72.png" />
-    <link rel="apple-touch-icon" sizes="96x96" href="/assets/manifest/icon-96x96.png" />
-    <link rel="apple-touch-icon" sizes="144x144" href="/assets/manifest/icon-144x144.png" />
-    <link rel="apple-touch-icon" sizes="192x192" href="/assets/manifest/icon-192x192.png" />
+  <!-- Add to homescreen for Safari on iOS -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Operato WMS" />
 
-    <!-- Tile icon for Windows 8 (144x144 + tile color) -->
-    <meta name="msapplication-TileImage" content="/assets/manifest/icon-144x144.png" />
-    <meta name="msapplication-TileColor" content="#3f51b5" />
-    <meta name="msapplication-tap-highlight" content="no" />
+  <!-- Homescreen icons -->
+  <link rel="apple-touch-icon" href="/assets/manifest/icon-48x48.png" />
+  <link rel="apple-touch-icon" sizes="72x72" href="/assets/manifest/icon-72x72.png" />
+  <link rel="apple-touch-icon" sizes="96x96" href="/assets/manifest/icon-96x96.png" />
+  <link rel="apple-touch-icon" sizes="144x144" href="/assets/manifest/icon-144x144.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="/assets/manifest/icon-192x192.png" />
 
-    <!-- Default twitter cards -->
-    <meta name="twitter:card" content="summary" />
-    <meta name="twitter:site" content="@username" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Operato WMS, Empower Your Warehouse: Optimize, Simplify, Succeed." />
-    <meta property="og:image" content="/assets/manifest/image-metaog.png" />
+  <!-- Tile icon for Windows 8 (144x144 + tile color) -->
+  <meta name="msapplication-TileImage" content="/assets/manifest/icon-144x144.png" />
+  <meta name="msapplication-TileColor" content="#3f51b5" />
+  <meta name="msapplication-tap-highlight" content="no" />
 
-    <!-- Performance tip: hint to the browser to start the handshake for the fonts site -->
-    <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin />
-    <link href="/node_modules/material-symbols/index.css" rel="stylesheet" />
-    <link href="/node_modules/@fontsource/roboto/index.css" rel="stylesheet" />
-    <link rel="stylesheet" href="/theme.css" />
+  <!-- Default twitter cards -->
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:site" content="@username" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Operato WMS, Empower Your Warehouse: Optimize, Simplify, Succeed." />
+  <meta property="og:image" content="/assets/manifest/image-metaog.png" />
 
-    <script src="/static/index.js" defer></script>
-  </head>
+  <!-- Performance tip: hint to the browser to start the handshake for the fonts site -->
+  <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin />
+  <link href="/node_modules/material-symbols/index.css" rel="stylesheet" />
+  <link href="/node_modules/@fontsource/roboto/index.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/theme.css" />
 
-  <body class="light">
-    <things-app></things-app>
-    <noscript> Please enable JavaScript to view this website. </noscript>
-    <!-- Load webcomponents-loader.js to check and load any polyfills your browser needs -->
-    <script src="/node_modules/@webcomponents/webcomponentsjs/webcomponents-loader.js"></script>
-    <script src="/node_modules/web-animations-js/web-animations-next.min.js"></script>
-    <script src="/node_modules/@hatiolab/things-scene/things-scene-min.js"></script>
-    <!-- Built with love using PWA Starter Kit -->
-  </body>
+  <script src="/static/index.js" defer></script>
+</head>
+
+<body class="light" style="margin: 0;">
+  <things-app></things-app>
+  <noscript> Please enable JavaScript to view this website. </noscript>
+  <!-- Load webcomponents-loader.js to check and load any polyfills your browser needs -->
+  <script src="/node_modules/@webcomponents/webcomponentsjs/webcomponents-loader.js"></script>
+  <script src="/node_modules/web-animations-js/web-animations-next.min.js"></script>
+  <script src="/node_modules/@hatiolab/things-scene/things-scene-min.js"></script>
+  <!-- Built with love using PWA Starter Kit -->
+</body>
+
 </html>
