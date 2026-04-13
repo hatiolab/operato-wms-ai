@@ -2,15 +2,16 @@ import { css, html } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
 import { ServiceUtil, TermsUtil, UiUtil } from '@operato-app/metapage/dist-client'
-import '@operato-app/metapage/dist-client/components/popup/ox-storage-folder-upload-popup.js'
+import '@operato-app/metapage/dist-client/components/popup/ox-storage-upload-popup.js'
 
 /**
- * 스토리지 파일 브라우저 화면
+ * 도메인 스토리지 파일 브라우저 화면
  *
- * - 좌측: 디렉토리 트리 (lazy load)
- * - 우측: 선택 경로의 파일/폴더 목록
+ * - storage-browser.js 와 동일한 기능이나 로그인한 도메인 하위 경로만 접근 가능
+ * - 업로드 경로: {storage.path}/{domainId}/[dirRule]/ (백엔드 buildBasePath 자동 적용)
+ * - 브라우징 루트: GET /rest/storage/domain-root 로 받은 domain_root (= domainId 문자열)
  */
-class StorageBrowser extends localize(i18next)(PageView) {
+class DomainStorageBrowser extends localize(i18next)(PageView) {
   static get styles() {
     return [
       css`
@@ -173,7 +174,7 @@ class StorageBrowser extends localize(i18next)(PageView) {
         .btn-default:hover { background: #eeeeee; }
         .btn:disabled { background: #e0e0e0; color: #9e9e9e; cursor: not-allowed; }
 
-        /* 액션 메뉴 */
+        /* 액션 버튼 */
         .action-btn {
           background: none;
           border: 1px solid #e0e0e0;
@@ -362,6 +363,7 @@ class StorageBrowser extends localize(i18next)(PageView) {
       treeNodes: Array,
       selectedPaths: Array,
       loading: Boolean,
+      _domainRoot: String,
       _mkdirDialogOpen: Boolean,
       _mkdirName: String,
       _uploadOpen: Boolean,
@@ -378,6 +380,7 @@ class StorageBrowser extends localize(i18next)(PageView) {
     this.treeNodes = []
     this.selectedPaths = []
     this.loading = false
+    this._domainRoot = ''
     this._mkdirDialogOpen = false
     this._mkdirName = ''
     this._uploadOpen = false
@@ -386,14 +389,14 @@ class StorageBrowser extends localize(i18next)(PageView) {
   }
 
   get context() {
-    return { title: TermsUtil.tMenu('storage-browser') }
+    return { title: TermsUtil.tMenu('domain-storage-browser') }
   }
 
   /** 전체 화면 렌더링 */
   render() {
     return html`
       <div class="page-header">
-        <h2>${TermsUtil.tMenu('storage-browser')}</h2>
+        <h2>${TermsUtil.tMenu('domain-storage-browser')}</h2>
         <div class="header-actions">
           <button class="btn btn-primary" @click="${() => { this._uploadOpen = true; this.requestUpdate() }}">⬆ ${TermsUtil.tButton('upload')}</button>
           <button class="btn btn-default" @click="${this._openMkdirDialog}">📁+ ${TermsUtil.tButton('add_folder')}</button>
@@ -419,26 +422,34 @@ class StorageBrowser extends localize(i18next)(PageView) {
         </div>
       </div>
 
-      <ox-storage-folder-upload-popup
+      <ox-storage-upload-popup
         ?open="${this._uploadOpen}"
         @upload-complete="${this._onUploadComplete}"
         @close="${() => { this._uploadOpen = false; this.requestUpdate() }}">
-      </ox-storage-folder-upload-popup>
+      </ox-storage-upload-popup>
       ${this._mkdirDialogOpen ? this._renderMkdirDialog() : ''}
       ${this._actionMenu ? this._renderActionMenu() : ''}
       ${this._imagePreview ? this._renderImagePreview() : ''}
     `
   }
 
-  /** 브레드크럼 렌더링 */
+  /**
+   * 브레드크럼 렌더링 — 도메인 루트를 '/'로 표시하고 하위 경로만 세그먼트로 표시
+   *
+   * currentPath 예시: "11" → "/" / "11/folder" → "/folder" / "11/folder/sub" → "/folder/sub"
+   */
   _renderBreadcrumb() {
-    const segments = this.currentPath ? this.currentPath.split('/').filter(Boolean) : []
+    if (!this._domainRoot) return html``
+    const relativePath = this.currentPath === this._domainRoot
+      ? ''
+      : this.currentPath.substring(this._domainRoot.length + 1)
+    const segments = relativePath ? relativePath.split('/').filter(Boolean) : []
     return html`
       <div class="breadcrumb">
         <span class="crumb ${segments.length === 0 ? 'current' : ''}"
-              @click="${() => this._navigateTo('')}">📁 /</span>
+              @click="${() => this._navigateTo(this._domainRoot)}">📁 /</span>
         ${segments.map((seg, idx) => {
-      const path = segments.slice(0, idx + 1).join('/')
+      const path = this._domainRoot + '/' + segments.slice(0, idx + 1).join('/')
       const isCurrent = idx === segments.length - 1
       return html`
             <span class="sep">›</span>
@@ -452,7 +463,7 @@ class StorageBrowser extends localize(i18next)(PageView) {
 
   /** 트리 노드 렌더링 (재귀) */
   _renderTreeNode(node, depth) {
-    const isSelected = node.path === this.currentPath || (node.path === '' && this.currentPath === '')
+    const isSelected = node.path === this.currentPath
     const indent = depth * 16
     return html`
       <div>
@@ -464,7 +475,7 @@ class StorageBrowser extends localize(i18next)(PageView) {
             ${node.has_children ? (node._open ? '▼' : '▶') : ''}
           </span>
           <span class="icon">📁</span>
-          ${node.name || '/'}
+          ${node.name}
         </div>
         ${node._open && node._children
         ? html`<div class="tree-children open">
@@ -537,23 +548,28 @@ class StorageBrowser extends localize(i18next)(PageView) {
     `
   }
 
-  /** 페이지 활성화 시 초기 로드 */
+  /** 페이지 활성화 시 도메인 루트 조회 후 초기 로드 */
   async pageUpdated(_changes, _lifecycle) {
     if (this.active) {
-      await this._loadTree('')
-      await this._fetchList('')
+      await this._initDomainRoot()
     }
   }
 
-  /** 트리 루트 또는 특정 경로 하위 폴더 로드 */
-  async _loadTree(path) {
-    let newPath = path ? (path.endsWith('/') ? path.substring(0, path.length - 1) : path) : ''
-    const data = await ServiceUtil.restGet(`storage/browse?path=${newPath}&folders_only=true`)
+  /** 현재 도메인 루트 경로를 조회하고 초기 트리/목록을 로드 */
+  async _initDomainRoot() {
+    const data = await ServiceUtil.restGet('storage/domain-root')
     if (!data) return
+    this._domainRoot = data.domain_root   // e.g. "11"
+    this.currentPath = this._domainRoot
+    await this._loadTree(this._domainRoot)
+    await this._fetchList(this._domainRoot)
+  }
 
-    if (!path) {
-      this.treeNodes = data.items.map(item => ({ ...item, _open: false, _children: null }))
-    }
+  /** 지정 경로 하위 폴더 목록을 트리에 로드 */
+  async _loadTree(path) {
+    const data = await ServiceUtil.restGet(`storage/browse?path=${encodeURIComponent(path)}&folders_only=true`)
+    if (!data) return
+    this.treeNodes = data.items.map(item => ({ ...item, _open: false, _children: null }))
     this.requestUpdate()
   }
 
@@ -570,8 +586,9 @@ class StorageBrowser extends localize(i18next)(PageView) {
     this.requestUpdate()
   }
 
-  /** 경로 이동 */
+  /** 경로 이동 — 도메인 루트 상위로는 이동 불가 */
   async _navigateTo(path) {
+    if (!path.startsWith(this._domainRoot)) return
     this.currentPath = path
     await this._fetchList(path)
   }
@@ -770,7 +787,6 @@ class StorageBrowser extends localize(i18next)(PageView) {
     this._mkdirName = ''
     this._mkdirDialogOpen = true
     this.requestUpdate()
-    // 다이얼로그가 렌더된 후 input에 포커스
     this.updateComplete.then(() => {
       const input = this.shadowRoot.querySelector('.mkdir-dialog input')
       if (input) input.focus()
@@ -784,9 +800,12 @@ class StorageBrowser extends localize(i18next)(PageView) {
     this.requestUpdate()
   }
 
-  /** 새 폴더 다이얼로그 렌더링 */
+  /** 새 폴더 다이얼로그 렌더링 — 생성 위치를 도메인 루트 기준 상대경로로 표시 */
   _renderMkdirDialog() {
-    const currentLabel = this.currentPath ? `/${this.currentPath}` : '/'
+    const relativePath = this.currentPath === this._domainRoot
+      ? ''
+      : this.currentPath.substring(this._domainRoot.length + 1)
+    const currentLabel = relativePath ? `/${relativePath}` : '/'
     return html`
       <div class="mkdir-overlay" @click="${e => { if (e.target === e.currentTarget) this._closeMkdirDialog() }}">
         <div class="mkdir-dialog">
@@ -820,7 +839,9 @@ class StorageBrowser extends localize(i18next)(PageView) {
       return
     }
 
-    const newPath = this.currentPath ? (this.currentPath.endsWith('/') ? this.currentPath + name : this.currentPath + '/' + name) : name
+    const newPath = this.currentPath.endsWith('/')
+      ? this.currentPath + name
+      : this.currentPath + '/' + name
     try {
       await ServiceUtil.restPost('storage/mkdir', { path: newPath })
       this._closeMkdirDialog()
@@ -831,9 +852,9 @@ class StorageBrowser extends localize(i18next)(PageView) {
     }
   }
 
-  /** 새로고침 */
+  /** 새로고침 — 트리는 도메인 루트부터, 목록은 현재 경로 */
   async _refresh() {
-    await this._loadTree('')
+    await this._loadTree(this._domainRoot)
     await this._fetchList(this.currentPath)
   }
 
@@ -846,4 +867,4 @@ class StorageBrowser extends localize(i18next)(PageView) {
   }
 }
 
-window.customElements.define('storage-browser', StorageBrowser)
+window.customElements.define('domain-storage-browser', DomainStorageBrowser)

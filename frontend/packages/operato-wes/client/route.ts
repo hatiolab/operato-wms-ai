@@ -1,4 +1,5 @@
 import './pages/base/storage-browser'
+import './pages/base/domain-storage-browser'
 
 import './pages/oms/oms-home'
 import './pages/oms/shipment-order-import'

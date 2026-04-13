@@ -2,25 +2,30 @@ import { OxGristEditor } from '@operato/data-grist'
 import { customElement, property, state } from 'lit/decorators.js'
 import { css, html } from 'lit'
 import { ScrollbarStyles } from '@operato/styles'
-import '../popup/ox-storage-image-selector-popup.js'
+import '../popup/ox-storage-file-selector-popup.js'
 import '../popup/ox-storage-upload-popup.js'
 
-const IMAGE_FALLBACK = new URL('../../../assets/images/no-image.png', import.meta.url).href
-
 /**
- * 이미지 Attachment ID를 값으로 저장하는 Grist 셀 에디터.
+ * 파일 경로를 값으로 저장하는 Grist 셀 에디터.
  *
  * 더블클릭 또는 Enter 키로 열리는 패널에서
- * - 스토리지 이미지 브라우저로 기존 이미지 선택 (ox-storage-image-selector-popup)
- * - 새 이미지 업로드 (ox-storage-upload-popup)
- * 두 가지 방식 중 하나로 이미지를 지정할 수 있다.
+ * - 스토리지 파일 브라우저로 기존 파일 선택 (ox-storage-file-selector-popup)
+ * - 새 파일 업로드 (ox-storage-upload-popup)
+ * 두 가지 방식 중 하나로 파일을 지정할 수 있다.
  *
- * 저장 값: Attachment ID (예: "abc123-uuid")
- * 표시 이름: 선택/업로드 시 캡처한 원본 파일명.
- * 썸네일: GET /rest/attachments/{id} → path → /rest/storage/download?path=... 로 표시
+ * 저장 값: 스토리지 기준 상대 경로 (예: "16/uploads/abc123.pdf")
+ *
+ * 컬럼 설정 예:
+ * ```js
+ * {
+ *   type: 'string',
+ *   name: 'file_path',
+ *   editor: { type: 'file-selector', domainMode: true }
+ * }
+ * ```
  */
-@customElement('ox-grist-editor-image-selector')
-export class OxGristEditorImageSelector extends OxGristEditor {
+@customElement('ox-grist-editor-file-selector')
+export class OxGristEditorFileSelector extends OxGristEditor {
   static styles = [
     ScrollbarStyles,
     css`
@@ -29,11 +34,10 @@ export class OxGristEditorImageSelector extends OxGristEditor {
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
-        align-items: center;
         justify-content: center;
         border-radius: var(--border-radius);
-        padding: var(--padding-default, 9px);
-        min-height: 100px;
+        padding: 6px 10px;
+        min-height: 48px;
         border: var(--file-uploader-border);
         background-color: var(--md-sys-color-background);
         font: var(--file-uploader-font) !important;
@@ -43,36 +47,28 @@ export class OxGristEditorImageSelector extends OxGristEditor {
         user-select: none;
       }
 
-      /* ── 썸네일 이미지 ── */
-      .thumb-wrap {
-        width: 100%;
-        flex: 1;
+      /* ── 파일 표시 영역 ── */
+      .file-display {
         display: flex;
         align-items: center;
-        justify-content: center;
+        gap: 6px;
+        flex: 1;
         overflow: hidden;
       }
 
-      img {
-        max-width: 100%;
-        max-height: 80px;
-        object-fit: contain;
-        margin: auto;
-        display: block;
-      }
-
-      /* ── 파일명 표시 ── */
       .file-name {
-        font-size: 11px;
-        color: #616161;
-        text-align: center;
-        width: 100%;
+        font-size: 13px;
+        color: #212121;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        margin-top: 4px;
-        padding: 0 4px;
-        box-sizing: border-box;
+        flex: 1;
+      }
+
+      .placeholder {
+        font-size: 13px;
+        color: #9e9e9e;
+        font-style: italic;
       }
 
       /* ── 버튼 그룹 ── */
@@ -80,7 +76,7 @@ export class OxGristEditorImageSelector extends OxGristEditor {
         display: flex;
         align-items: center;
         gap: 4px;
-        margin-top: 6px;
+        margin-top: 4px;
         flex-shrink: 0;
       }
 
@@ -113,7 +109,7 @@ export class OxGristEditorImageSelector extends OxGristEditor {
 
       .action-btn.danger:hover { background: #fdecea; border-color: #d32f2f; }
 
-      /* ── 호버 오버레이 ── */
+      /* ── 오버레이 힌트 ── */
       [overlay] {
         position: absolute;
         left: 0;
@@ -134,30 +130,25 @@ export class OxGristEditorImageSelector extends OxGristEditor {
   ]
 
   /**
-   * 도메인 모드 — true 이면 이미지 셀렉터를 현재 도메인 하위로 제한.
+   * 도메인 모드 — true 이면 파일 셀렉터를 현재 도메인 하위로 제한.
+   * 컬럼 설정에서 `editor: { domainMode: true }` 로 지정.
    */
   @property({ type: Boolean, attribute: 'domain-mode' }) domainMode: boolean = true
 
-  /** 이미지 셀렉터 팝업 열림 여부 */
+  /** 파일 셀렉터 팝업 열림 여부 */
   @state() private _selectorOpen: boolean = false
 
   /** 업로드 팝업 열림 여부 */
   @state() private _uploadOpen: boolean = false
 
-  /**
-   * 화면에 표시할 원본 파일명.
-   * 선택/업로드 이벤트에서 캡처하며, 재진입 시 path에서 추출한 값으로 폴백한다.
-   */
-  @state() private _displayName: string = ''
-
-  /** 더블클릭 — 이미지 셀렉터 열기 */
+  /** 더블클릭 — 파일 셀렉터 열기 */
   _ondblclick(e: MouseEvent) {
     e.stopPropagation()
     this._selectorOpen = true
     this.requestUpdate()
   }
 
-  /** Enter 키 — 이미지 셀렉터 열기 */
+  /** Enter 키 — 파일 셀렉터 열기 */
   _onkeydown(e: KeyboardEvent) {
     if (e.key === 'Enter') {
       e.stopPropagation()
@@ -166,20 +157,18 @@ export class OxGristEditorImageSelector extends OxGristEditor {
     }
   }
 
-  /** 이미지 셀렉터에서 이미지 선택 완료 */
-  private _onImageSelected(e: CustomEvent) {
-    const { attachment_id, name, path } = e.detail
-    this._displayName = name || this._nameFromPath(path)
-    this._emitChange(attachment_id)
+  /** 파일 셀렉터에서 파일 선택 완료 */
+  private _onFileSelected(e: CustomEvent) {
+    const { path } = e.detail
+    this._emitChange(path)
     this._selectorOpen = false
     this.requestUpdate()
   }
 
-  /** 업로드 완료 — attachment_id를 값으로 저장 */
+  /** 업로드 완료 — 업로드된 파일 경로를 값으로 저장 */
   private _onUploadComplete(e: CustomEvent) {
-    const { attachment_id, name } = e.detail
-    this._displayName = name || ''
-    this._emitChange(attachment_id)
+    const { path } = e.detail
+    this._emitChange(path)
     this._uploadOpen = false
     this.requestUpdate()
   }
@@ -201,57 +190,72 @@ export class OxGristEditorImageSelector extends OxGristEditor {
     )
   }
 
-  /** 선택 이미지 초기화 */
+  /** 선택 파일 초기화 */
   private _clear(e: MouseEvent) {
     e.stopPropagation()
-    this._displayName = ''
     this._emitChange('')
   }
 
   /**
    * 에디터 셀 템플릿.
    *
-   * 현재 이미지 썸네일과 파일명을 표시하고,
-   * 두 팝업 컴포넌트를 함께 렌더링하여 버튼으로 각각 열 수 있도록 한다.
+   * 두 팝업 컴포넌트를 함께 렌더링하고 버튼으로 각각 열 수 있도록 한다.
    */
   get editorTemplate() {
-    const attachmentId = this.value as string
-    const thumbSrc = attachmentId
-      ? `/rest/attachments/${encodeURIComponent(attachmentId)}/download`
-      : IMAGE_FALLBACK
-    const displayName = this._displayName
+    const fileName = this._extractFileName(this.value as string)
 
     return html`
-      <!-- 썸네일 -->
-      <div class="thumb-wrap">
-        <img
-          src="${thumbSrc}"
-          alt="${displayName}"
-          @error="${(e: Event) => { (e.target as HTMLImageElement).src = IMAGE_FALLBACK }}"
-        />
+      <!-- 현재 선택된 파일 표시 -->
+      <div class="file-display">
+        ${fileName
+          ? html`<span class="file-name" title="${this.value}">📄 ${fileName}</span>`
+          : html`<span class="placeholder">파일을 선택하세요</span>`}
       </div>
 
-      <!-- 파일명 -->
-      ${displayName
-        ? html`<div class="file-name" title="${displayName}">${displayName}</div>`
-        : html``}
+      <!-- 액션 버튼 -->
+      <div class="btn-group">
+        <button
+          class="action-btn primary"
+          @click="${(e: MouseEvent) => { e.stopPropagation(); this._selectorOpen = true; this.requestUpdate() }}"
+        >📂 선택</button>
+        <button
+          class="action-btn"
+          @click="${(e: MouseEvent) => { e.stopPropagation(); this._uploadOpen = true; this.requestUpdate() }}"
+        >⬆ 업로드</button>
+        ${fileName
+          ? html`
+              <button
+                class="action-btn danger"
+                @click="${this._clear}"
+              >✕</button>
+            `
+          : html``}
+      </div>
 
-
-
-      <!-- 이미지 셀렉터 팝업 -->
-      <ox-storage-image-selector-popup
+      <!-- 파일 셀렉터 팝업 -->
+      <ox-storage-file-selector-popup
         ?open="${this._selectorOpen}"
         ?domain-mode="${this.domainMode}"
-        @image-selected="${this._onImageSelected}"
+        @file-selected="${this._onFileSelected}"
         @close="${() => { this._selectorOpen = false; this.requestUpdate() }}"
-      ></ox-storage-image-selector-popup>
-      
+      ></ox-storage-file-selector-popup>
+
+      <!-- 업로드 팝업 -->
+      <ox-storage-upload-popup
+        ?open="${this._uploadOpen}"
+        @upload-complete="${this._onUploadComplete}"
+        @close="${() => { this._uploadOpen = false; this.requestUpdate() }}"
+      ></ox-storage-upload-popup>
+
       <div overlay></div>
     `
   }
 
-  /** 스토리지 경로에서 파일명만 추출한다 */
-  private _nameFromPath(path: string): string {
+  /**
+   * 스토리지 경로에서 파일명만 추출한다.
+   * 예: "16/uploads/abc123.pdf" → "abc123.pdf"
+   */
+  private _extractFileName(path: string): string {
     if (!path) return ''
     return path.split('/').pop() || path
   }

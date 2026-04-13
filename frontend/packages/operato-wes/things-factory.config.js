@@ -5,6 +5,7 @@ export default {
   route,
   routes: [
     { tagname: 'storage-browser', page: 'storage-browser' },
+    { tagname: 'domain-storage-browser', page: 'domain-storage-browser' },
 
     { tagname: 'oms-home', page: 'oms-home' },
     { tagname: 'shipment-order-import', page: 'shipment-order-import' },
