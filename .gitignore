@@ -57,3 +57,6 @@ frontend/packages/*/config/config.development.js
 *.jar
 *.war
 !gradle/wrapper/gradle-wrapper.jar
+
+# Docker
+scripts/operato-wms-docker
