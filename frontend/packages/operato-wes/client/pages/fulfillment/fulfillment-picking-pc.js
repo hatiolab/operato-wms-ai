@@ -810,7 +810,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
       <div class="page-header">
         <h2>${TermsUtil.tMenu('FulfillmentPickingPc')}</h2>
         <div class="header-actions">
-          <button class="btn btn-outline" @click="${this._refresh}">${TermsUtil.tButton('refresh')}</button>
+          <button class="btn btn-outline" @click="${this._refresh}">🔍 ${TermsUtil.tButton('refresh')}</button>
         </div>
       </div>
 

@@ -685,8 +685,7 @@ class RwaDispositionList extends localize(i18next)(PageView) {
       <div class="page-header">
         <h2>🗂️ ${i18next.t('menu.RwaDispositionList')}</h2>
         <button class="btn-icon" @click="${this._refresh}">
-          <mwc-icon>refresh</mwc-icon>
-          ${TermsUtil.tButton('refresh')}
+          🔍 ${TermsUtil.tButton('refresh')}
         </button>
       </div>
 
@@ -741,14 +740,14 @@ class RwaDispositionList extends localize(i18next)(PageView) {
       ${this.loading
         ? html`<div class="loading">데이터 로딩 중...</div>`
         : this.filteredOrders.length === 0
-        ? html`
+          ? html`
             <div class="empty-state">
               <mwc-icon>inventory_2</mwc-icon>
               <div class="empty-state-message">처분 대기 항목이 없습니다</div>
               <div class="empty-state-hint">검수 완료된 반품이 여기에 표시됩니다</div>
             </div>
           `
-        : html`
+          : html`
             <div class="order-cards">
               ${this.filteredOrders.map(order => this._renderOrderCard(order))}
             </div>
@@ -799,8 +798,8 @@ class RwaDispositionList extends localize(i18next)(PageView) {
 
         <!-- 검수 결과 또는 처분 결과 -->
         ${order.status === 'INSPECTED'
-          ? this._renderInspectionResults(order)
-          : this._renderDispositionResults(order)}
+        ? this._renderInspectionResults(order)
+        : this._renderDispositionResults(order)}
 
         <!-- 진행 바 -->
         <div class="progress-bar-container">
@@ -815,18 +814,18 @@ class RwaDispositionList extends localize(i18next)(PageView) {
         <!-- 액션 -->
         <div class="card-actions">
           ${order.status === 'INSPECTED'
-            ? html`
+        ? html`
                 <button class="card-action-btn primary" @click="${() => this._startDisposition(order)}">
                   처분 결정
                 </button>
                 <button class="card-action-btn" @click="${() => this._openDetail(order)}">상세 조회</button>
               `
-            : order.status === 'DISPOSED'
-            ? html`
+        : order.status === 'DISPOSED'
+          ? html`
                 <button class="card-action-btn complete" @click="${() => this._completeOrder(order)}">완료</button>
                 <button class="card-action-btn" @click="${() => this._openDetail(order)}">처분 조회</button>
               `
-            : html`
+          : html`
                 <button class="card-action-btn close-btn" @click="${() => this._closeOrder(order)}">마감</button>
                 <button class="card-action-btn" @click="${() => this._openDetail(order)}">상세 조회</button>
               `}
@@ -840,7 +839,7 @@ class RwaDispositionList extends localize(i18next)(PageView) {
       <div class="inspection-results">
         <div class="section-title">📊 검수 결과 (${order._itemCount}개 항목)</div>
         ${order.items?.map(
-          item => html`
+      item => html`
             <div class="inspection-item">
               • <span class="sku-cd">${item.skuCd}</span> (${item.skuNm}): 양품
               <span style="color: #4CAF50; font-weight: 600;">${item.goodQty || 0}</span> / 불량
@@ -848,7 +847,7 @@ class RwaDispositionList extends localize(i18next)(PageView) {
               ${item.defectType ? html`<span class="defect-type-badge">${this._getDefectTypeLabel(item.defectType)}</span>` : ''}
             </div>
           `
-        )}
+    )}
       </div>
     `
   }
@@ -858,9 +857,9 @@ class RwaDispositionList extends localize(i18next)(PageView) {
       <div class="disposition-results">
         <div class="section-title">🗂️ 처분 결과 (${order._disposedCount}개 항목)</div>
         ${order.items
-          ?.filter(item => item.dispositionType)
-          .map(
-            item => html`
+        ?.filter(item => item.dispositionType)
+        .map(
+          item => html`
               <div class="disposition-item">
                 • <span class="sku-cd">${item.skuCd}</span> (${item.skuNm}):
                 <span class="disposition-type-badge ${item.dispositionType}">
@@ -868,11 +867,11 @@ class RwaDispositionList extends localize(i18next)(PageView) {
                 </span>
                 ${item.disposedQty || 0}개
                 ${item.dispositionType === 'SCRAP' && item.scrapMethod
-                  ? html`<span style="font-size: 11px; color: #999;">(${item.scrapMethod})</span>`
-                  : ''}
+              ? html`<span style="font-size: 11px; color: #999;">(${item.scrapMethod})</span>`
+              : ''}
               </div>
             `
-          )}
+        )}
       </div>
     `
   }

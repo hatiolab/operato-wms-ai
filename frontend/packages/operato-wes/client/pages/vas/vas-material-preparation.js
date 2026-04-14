@@ -508,7 +508,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
     return html`
       <div class="page-header">
         <h2>유통 가공 자재 준비 관리</h2>
-        <button class="btn-icon" @click="${this._refresh}">새로고침</button>
+        <button class="btn-icon" @click="${this._refresh}">🔍 새로고침</button>
       </div>
 
       ${this._renderFilterBar()}

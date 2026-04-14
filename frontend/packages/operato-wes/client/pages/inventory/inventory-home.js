@@ -43,6 +43,46 @@ class InventoryHome extends localize(i18next)(PageView) {
           display: flex;
           align-items: center;
           gap: 8px;
+          flex: 1;
+        }
+
+        /* 페이지 헤더 */
+        .page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: var(--spacing-medium, 16px);
+        }
+
+        .page-header h2 {
+          margin: 0;
+        }
+
+        .header-actions {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .btn {
+          padding: 8px 16px;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .btn-outline {
+          background: transparent;
+          color: var(--md-sys-color-primary);
+          border: 1px solid var(--md-sys-color-primary);
+        }
+
+        .btn-outline:hover {
+          background: var(--md-sys-color-primary);
+          color: var(--md-sys-color-on-primary);
         }
 
         /* 재고 현황 카드 그리드 */
@@ -196,36 +236,6 @@ class InventoryHome extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface);
         }
 
-        /* 바로가기 버튼 */
-        .quick-actions {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: var(--spacing-medium, 16px);
-        }
-
-        .quick-action-btn {
-          background: var(--md-sys-color-primary);
-          color: var(--md-sys-color-on-primary);
-          border: none;
-          border-radius: 8px;
-          padding: 16px 24px;
-          font-size: 16px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          text-align: center;
-        }
-
-        .quick-action-btn:hover {
-          background: var(--md-sys-color-primary-container);
-          box-shadow: var(--box-shadow-normal, 0 4px 8px rgba(0, 0, 0, 0.15));
-          transform: translateY(-2px);
-        }
-
-        .quick-action-btn .icon {
-          margin-right: 8px;
-        }
-
         /* 로딩 상태 */
         .loading {
           display: flex;
@@ -246,9 +256,6 @@ class InventoryHome extends localize(i18next)(PageView) {
             grid-template-columns: 1fr;
           }
 
-          .quick-actions {
-            grid-template-columns: 1fr;
-          }
         }
       `
     ]
@@ -316,7 +323,16 @@ class InventoryHome extends localize(i18next)(PageView) {
             <div class="dashboard-container">
               <!-- 재고 현황 카드 -->
               <section>
-                <h3 class="section-title">📦 재고 현황</h3>
+                <div class="page-header">
+                  <h2>재고 현황</h2>
+                  <div class="header-actions">
+                    <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">🔍 새로고침</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('inventories')}">📦 재고 조회</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('stock-adjust')}">⚙️ 재고 조정</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('inventories-by-expired')}">🔄 유통기한별 재고</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('stocktakes')}">📋 실사 작업</button>
+                  </div>
+                </div>
                 <div class="status-cards">
                   <div class="status-card total" @click="${() => this._navigateTo('inventories')}">
                     <div class="label">전체 재고</div>
@@ -409,24 +425,6 @@ class InventoryHome extends localize(i18next)(PageView) {
                     </section>
                   `
             : ''}
-
-              <!-- 바로가기 -->
-              <section>
-                <div class="quick-actions">
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('inventories')}">
-                    <span class="icon">🔍</span>재고 조회
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('stock-adjustments')}">
-                    <span class="icon">⚙️</span>재고 조정
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('stocktakes')}">
-                    <span class="icon">📋</span>실사 작업
-                  </button>
-                  <button class="quick-action-btn" @click="${() => this._navigateTo('stock-moves')}">
-                    <span class="icon">🔄</span>재고 이동
-                  </button>
-                </div>
-              </section>
             </div>
           `}
     `

@@ -238,11 +238,11 @@ class RwaHome extends localize(i18next)(PageView) {
               <div class="page-header">
                 <h2>${TermsUtil.tMenu('RwaHome')}</h2>
                 <div class="header-actions">
-                  <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">${i18next.t('button.refresh', { defaultValue: '새로고침' })}</button>
-                  <button class="btn btn-outline" @click="${this._openRwaOrderNew}">${i18next.t('button.rwa_request', { defaultValue: '반품 요청' })}</button>
-                  <button class="btn btn-outline" @click="${() => this._navigateTo('rwa-receive-list')}">${i18next.t('button.rwa_receive', { defaultValue: '입고 처리' })}</button>
-                  <button class="btn btn-outline" @click="${() => this._navigateTo('rwa-inspection-list')}">${i18next.t('button.rwa_inspection', { defaultValue: '검수 작업' })}</button>
-                  <button class="btn btn-outline" @click="${() => this._navigateTo('rwa-disposition-list')}">${i18next.t('button.rwa_disposition', { defaultValue: '처분 결정' })}</button>
+                  <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">🔍 ${i18next.t('button.refresh', { defaultValue: '새로고침' })}</button>
+                  <button class="btn btn-outline" @click="${this._openRwaOrderNew}">📝 ${i18next.t('button.rwa_request', { defaultValue: '반품 요청' })}</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('rwa-receive-list')}">📦 ${i18next.t('button.rwa_receive', { defaultValue: '입고 처리' })}</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('rwa-inspection-list')}">🔬 ${i18next.t('button.rwa_inspection', { defaultValue: '검수 작업' })}</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('rwa-disposition-list')}">⚖️ ${i18next.t('button.rwa_disposition', { defaultValue: '처분 결정' })}</button>
                 </div>
               </div>
 

@@ -393,13 +393,13 @@ class PickingTaskList extends localize(i18next)(PageView) {
           <h2>${i18next.t('menu.PickingTaskWork', { defaultValue: '피킹 지시 목록' })}</h2>
           <div class="header-actions">
             <button class="btn btn-outline" @click="${this._search}">
-              ${i18next.t('button.search', { defaultValue: '조회' })}
+              🔍 ${i18next.t('button.search', { defaultValue: '조회' })}
             </button>
             <button class="btn btn-danger" @click="${this._batchCancel}">
-              ${i18next.t('button.batch_cancel', { defaultValue: '일괄 취소' })}
+              🚫 ${i18next.t('button.batch_cancel', { defaultValue: '일괄 취소' })}
             </button>
             <button class="btn btn-outline" @click="${this._resetSearch}">
-              ${i18next.t('button.reset', { defaultValue: '초기화' })}
+              🔄 ${i18next.t('button.reset', { defaultValue: '초기화' })}
             </button>
           </div>
         </div>

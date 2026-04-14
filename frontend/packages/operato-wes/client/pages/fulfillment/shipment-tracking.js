@@ -504,11 +504,11 @@ class ShipmentTracking extends localize(i18next)(PageView) {
         <div class="page-header">
           <h2>${i18next.t('menu.ShipmentTracking', { defaultValue: '출고 추적' })}</h2>
           <div class="header-actions">
-            <button class="btn btn-outline" @click="${this._resetSearch}">
-              ${i18next.t('button.reset', { defaultValue: '초기화' })}
-            </button>
             <button class="btn btn-outline" @click="${this._search}">
-              ${i18next.t('button.search', { defaultValue: '조회' })}
+              🔍 ${i18next.t('button.search', { defaultValue: '검색' })}
+            </button>
+            <button class="btn btn-outline" @click="${this._resetSearch}">
+              🔄 ${i18next.t('button.reset', { defaultValue: '초기화' })}
             </button>
           </div>
         </div>
@@ -518,22 +518,22 @@ class ShipmentTracking extends localize(i18next)(PageView) {
 
         <!-- 결과 영역 -->
         ${this.loading
-          ? html`<div class="loading">${i18next.t('label.loading', { defaultValue: '데이터 로딩 중...' })}</div>`
-          : this.notFound
-            ? html`
+        ? html`<div class="loading">${i18next.t('label.loading', { defaultValue: '데이터 로딩 중...' })}</div>`
+        : this.notFound
+          ? html`
                 <div class="empty-state">
                   <div class="icon">🔍</div>
                   <div class="message">${i18next.t('label.tracking_not_found', { defaultValue: '검색 결과가 없습니다. 다른 번호로 조회해 주세요.' })}</div>
                 </div>
               `
-            : !this.searched
-              ? html`
+          : !this.searched
+            ? html`
                   <div class="empty-state">
                     <div class="icon">📦</div>
                     <div class="message">${i18next.t('label.tracking_guide', { defaultValue: '송장번호, 출고번호, 원주문번호 등을 입력하고 조회하세요.' })}</div>
                   </div>
                 `
-              : html`
+            : html`
                   ${this._renderSummaryCards()}
                   ${this._renderTimeline()}
                   ${this._renderTabs()}
@@ -664,7 +664,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
         <div class="section-title">${i18next.t('label.process_flow', { defaultValue: '처리 흐름' })}</div>
         <div class="timeline">
           ${steps.map(
-            (step, i) => html`
+      (step, i) => html`
               ${i > 0 ? html`<div class="timeline-connector ${step.done || step.active ? 'passed' : ''}"></div>` : ''}
               <div class="timeline-step ${step.done ? 'passed' : step.active ? 'active' : ''}">
                 <div class="timeline-dot">${step.done ? '✓' : step.icon}</div>
@@ -672,7 +672,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
                 <div class="timeline-time">${step.time || ''}</div>
               </div>
             `
-          )}
+    )}
         </div>
       </div>
     `
@@ -691,20 +691,20 @@ class ShipmentTracking extends localize(i18next)(PageView) {
       <div class="tab-section">
         <div class="tab-bar">
           ${tabs.map(
-            (tab, i) =>
-              html`<div class="tab-item ${this.activeTab === i ? 'active' : ''}" @click=${() => (this.activeTab = i)}>
+      (tab, i) =>
+        html`<div class="tab-item ${this.activeTab === i ? 'active' : ''}" @click=${() => (this.activeTab = i)}>
                 ${tab}
               </div>`
-          )}
+    )}
         </div>
         <div class="tab-content">
           ${this.activeTab === 0
-            ? this._renderOrderTab()
-            : this.activeTab === 1
-              ? this._renderPickingTab()
-              : this.activeTab === 2
-                ? this._renderPackingTab()
-                : this._renderBoxTab()}
+        ? this._renderOrderTab()
+        : this.activeTab === 1
+          ? this._renderPickingTab()
+          : this.activeTab === 2
+            ? this._renderPackingTab()
+            : this._renderBoxTab()}
         </div>
       </div>
     `
@@ -790,7 +790,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
               </thead>
               <tbody>
                 ${items.map(
-                  item => html`
+          item => html`
                     <tr>
                       <td class="center">${item.line_no}</td>
                       <td>${item.sku_cd}</td>
@@ -801,7 +801,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
                       <td class="center">${item.barcode || '-'}</td>
                     </tr>
                   `
-                )}
+        )}
               </tbody>
             </table>
           `}
@@ -823,7 +823,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
               </thead>
               <tbody>
                 ${allocs.map(
-                  a => html`
+          a => html`
                     <tr>
                       <td>${a.sku_cd}</td>
                       <td>${a.loc_cd || '-'}</td>
@@ -835,7 +835,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
                       <td class="center">${this._formatDateTime(a.allocated_at)}</td>
                     </tr>
                   `
-                )}
+        )}
               </tbody>
             </table>
           `
@@ -915,7 +915,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
               </thead>
               <tbody>
                 ${items.map(
-                  item => html`
+          item => html`
                     <tr>
                       <td class="center">${item.rank}</td>
                       <td>${item.sku_cd}</td>
@@ -929,7 +929,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
                       </td>
                     </tr>
                   `
-                )}
+        )}
               </tbody>
             </table>
           `}
@@ -1019,7 +1019,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
               </thead>
               <tbody>
                 ${items.map(
-                  item => html`
+          item => html`
                     <tr>
                       <td>${item.sku_cd}</td>
                       <td>${item.sku_nm || '-'}</td>
@@ -1032,7 +1032,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
                       </td>
                     </tr>
                   `
-                )}
+        )}
               </tbody>
             </table>
           `}
@@ -1064,7 +1064,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
         </thead>
         <tbody>
           ${boxes.map(
-            box => html`
+      box => html`
               <tr>
                 <td class="center">${box.box_seq}</td>
                 <td>${box.box_type_cd || '-'}</td>
@@ -1078,7 +1078,7 @@ class ShipmentTracking extends localize(i18next)(PageView) {
                 </td>
               </tr>
             `
-          )}
+    )}
         </tbody>
       </table>
     `

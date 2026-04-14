@@ -428,10 +428,10 @@ class PackingOrderList extends localize(i18next)(PageView) {
           <h2>${i18next.t('menu.PackingOrderWork', { defaultValue: '포장 주문 관리' })}</h2>
           <div class="header-actions">
             <button class="btn btn-outline" @click="${this._search}">
-              ${i18next.t('button.search', { defaultValue: '조회' })}
+              🔍 ${i18next.t('button.search', { defaultValue: '조회' })}
             </button>
             <button class="btn btn-outline" @click="${this._resetSearch}">
-              ${i18next.t('button.reset', { defaultValue: '초기화' })}
+              🔄 ${i18next.t('button.reset', { defaultValue: '초기화' })}
             </button>
           </div>
         </div>
@@ -535,16 +535,16 @@ class PackingOrderList extends localize(i18next)(PageView) {
         <!-- 액션 버튼 -->
         <section class="action-bar">
           <button class="btn btn-info" @click="${this._printLabelBatch}">
-            ${i18next.t('button.print_label', { defaultValue: '라벨 출력' })}
+            🖨️ ${i18next.t('button.print_label', { defaultValue: '라벨 출력' })}
           </button>
           <button class="btn btn-warning" @click="${this._manifestBatch}">
-            ${i18next.t('button.manifest', { defaultValue: '매니페스트' })}
+            📄 ${i18next.t('button.manifest', { defaultValue: '매니페스트' })}
           </button>
           <button class="btn btn-success" @click="${this._confirmShippingBatch}">
-            ${i18next.t('button.confirm_shipping', { defaultValue: '일괄 출하 확정' })}
+            ✅ ${i18next.t('button.confirm_shipping', { defaultValue: '일괄 출하 확정' })}
           </button>
           <button class="btn btn-danger" @click="${this._cancelBatch}">
-            ${i18next.t('button.cancel_batch', { defaultValue: '일괄 취소' })}
+            🚫 ${i18next.t('button.cancel_batch', { defaultValue: '일괄 취소' })}
           </button>
         </section>
 

@@ -248,11 +248,11 @@ class VasHome extends localize(i18next)(PageView) {
               <div class="page-header">
                 <h2>${TermsUtil.tMenu('VasHome')}</h2>
                 <div class="header-actions">
-                  <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">${i18next.t('button.refresh', { defaultValue: '새로고침' })}</button>
-                  <button class="btn btn-outline" @click="${this._openOrderNewPopup}">${i18next.t('button.vas_order_new', { defaultValue: '작업 지시 생성' })}</button>
-                  <button class="btn btn-outline" @click="${() => this._navigateTo('vas-work-monitor', { status: 'IN_PROGRESS', vas_req_date: ValueUtil.todayFormatted() })}">${i18next.t('button.vas_work_monitor', { defaultValue: '작업 진행 현황' })}</button>
-                  <button class="btn btn-outline" @click="${() => this._navigateTo('vas-results')}">${i18next.t('button.vas_results', { defaultValue: '실적 조회' })}</button>
-                  <button class="btn btn-outline" @click="${() => this._navigateTo('vas-boms')}">${i18next.t('button.vas_boms', { defaultValue: '세트 상품 관리' })}</button>
+                  <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">🔍 ${i18next.t('button.refresh', { defaultValue: '새로고침' })}</button>
+                  <button class="btn btn-outline" @click="${this._openOrderNewPopup}">📝 ${i18next.t('button.vas_order_new', { defaultValue: '작업 지시 생성' })}</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('vas-work-monitor', { status: 'IN_PROGRESS', vas_req_date: ValueUtil.todayFormatted() })}">📊 ${i18next.t('button.vas_work_monitor', { defaultValue: '작업 진행 현황' })}</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('vas-results')}">📋 ${i18next.t('button.vas_results', { defaultValue: '실적 조회' })}</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('vas-boms')}">📦 ${i18next.t('button.vas_boms', { defaultValue: '세트 상품 관리' })}</button>
                 </div>
               </div>
 

@@ -400,11 +400,11 @@ class FulfillmentHome extends localize(i18next)(PageView) {
               <div class="page-header">
                 <h2>피킹 현황</h2>
                 <div class="header-actions">
-                  <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">${i18next.t('button.refresh', { defaultValue: '새로고침' })}</button>
-                  <button class="btn btn-outline" @click="${() => this._navigateTo('picking-task-list')}">피킹 목록</button>
-                  <button class="btn btn-outline" @click="${() => this._navigateTo('packing-order-list')}">포장 목록</button>
-                  <button class="btn btn-outline" @click="${() => this._navigateTo('fulfillment-progress')}">진행 현황</button>
-                  <button class="btn btn-outline" @click="${() => this._navigateTo('oms-home')}">OMS 대시보드</button>
+                  <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">🔍 새로고침</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('picking-task-list')}">🧺 피킹 목록</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('packing-order-list')}">📦 포장 목록</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('fulfillment-progress')}">📊 진행 현황</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('oms-home')}">🏠 OMS 대시보드</button>
                 </div>
               </div>
 
