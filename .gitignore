@@ -60,3 +60,4 @@ frontend/packages/*/config/config.development.js
 
 # Docker
 scripts/operato-wms-docker
+velocity.log.1
