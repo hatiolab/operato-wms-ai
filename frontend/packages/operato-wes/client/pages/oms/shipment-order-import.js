@@ -819,9 +819,28 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
     UiUtil.pageNavigate(page, {})
   }
 
-  /** 템플릿 다운로드 */
-  _downloadTemplate(type) {
-    UiUtil.showToast('info', `${type.toUpperCase()} 템플릿 다운로드는 준비 중입니다.`)
+  /** 템플릿 다운로드 - Settings에서 Attachment ID 조회 후 Storage 다운로드 */
+  async _downloadTemplate(type) {
+    const settingName = type === 'b2c' ? 'template.outbound.b2c.order' : 'template.outbound.b2b.order'
+    try {
+      const query = JSON.stringify([{ name: 'name', value: settingName }])
+      const result = await ServiceUtil.restGet(`settings?query=${encodeURIComponent(query)}`)
+      if (!result || !result.items || result.items.length === 0) {
+        UiUtil.showToast('error', '템플릿 설정을 찾을 수 없습니다.')
+        return
+      }
+      const attachmentId = result.items[0].value
+      if (!attachmentId) {
+        UiUtil.showToast('error', '템플릿 파일이 설정되어 있지 않습니다.')
+        return
+      }
+      const link = document.createElement('a')
+      link.href = `/rest/attachments/${attachmentId}/download`
+      link.click()
+    } catch (error) {
+      console.error('템플릿 다운로드 실패:', error)
+      UiUtil.showToast('error', '템플릿 다운로드에 실패했습니다.')
+    }
   }
 
   /** 파일 크기 포맷 */
