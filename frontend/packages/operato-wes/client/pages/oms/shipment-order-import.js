@@ -507,6 +507,15 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
 
   /** Step 2: 검증/미리보기 */
   _renderStep2() {
+    if (this.importType === 'B2C') {
+      return this._renderB2CStep2()
+    } else {
+      return this._renderB2BStep2()
+    }
+  }
+
+  /** B2C Step 2: 검증/미리보기 */
+  _renderB2CStep2() {
     const result = this.validationResult
     if (!result) return html``
 
@@ -554,8 +563,7 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
             </tr>
           </thead>
           <tbody>
-            ${rows.map(
-      row => html`
+            ${rows.map(row => html`
                 <tr class="${row.valid ? '' : 'error-row'}">
                   <td class="center">${row.row_no}</td>  
                   <td class="center"><span class="status-icon">${row.valid ? '✅' : '❌'}</span></td>
@@ -582,6 +590,90 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
                   <td>${row.receiver_zip_cd || ''}</td>
                   <td>${row.receiver_addr || ''}</td>
                   <td>${row.delivery_memo || ''}</td>
+                </tr>
+              `
+    )}
+          </tbody>
+        </table>
+      </div>
+
+      ${result.error > 0
+        ? html`
+            <div class="exclude-option">
+              <input type="checkbox" id="excludeErrors" ?checked="${this.excludeErrors}" @change="${e => (this.excludeErrors = e.target.checked)}" />
+              <label for="excludeErrors">오류 행 제외하고 등록 (${result.valid}건만 처리)</label>
+            </div>
+          `
+        : ''}
+
+      <div class="button-area">
+        <button class="btn btn-default" @click="${this._goToStep1}">← 이전</button>
+        <button class="btn btn-default" @click="${this._cancel}">취소</button>
+        <button class="btn btn-primary" ?disabled="${result.valid === 0}" @click="${this._executeImport}">임포트 실행</button>
+      </div>
+    `
+  }
+
+  /** B2B Step 2: 검증/미리보기 */
+  _renderB2BStep2() {
+    const result = this.validationResult
+    if (!result) return html``
+
+    const rows = result.rows || []
+    return html`
+      <h3 style="margin-top:0; margin-bottom:20px; font-size:16px; color:#424242;">Step 2: 검증/미리보기</h3>
+
+      <div class="validation-summary">
+        <span class="total">전체 ${result.total}건</span>
+        <span>|</span>
+        <span class="valid">✅ 성공 ${result.valid}건</span>
+        <span>|</span>
+        <span class="error">❌ 오류 ${result.error}건</span>
+      </div>
+
+      <div class="table-scroll">
+        <table class="preview-table">
+          <thead>
+            <tr>
+              <th class="center">행</th>
+              <th class="center">상태</th>
+              <th>오류 내용</th>
+              <th>원 주문번호</th>
+              <th>상품코드</th>
+              <th>상품명</th>
+              <th class="right">수량</th>
+              <th>주문일</th>
+              <th>출하기한</th>
+              <th>창고</th>
+              <th>화주사</th>
+              <th>거래처</th>
+              <th>거래처 명</th>
+              <th>배송 유형</th>
+              <th>택배 서비스 유형</th>
+              <th>우선순위</th>
+              <th>비고</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(row => html`
+                <tr class="${row.valid ? '' : 'error-row'}">
+                  <td class="center">${row.row_no}</td>  
+                  <td class="center"><span class="status-icon">${row.valid ? '✅' : '❌'}</span></td>
+                  <td class="error-text">${row.error_messages ? row.error_messages.join(', ') : ''}</td>
+                  <td>${row.ref_order_no || ''}</td>
+                  <td>${row.sku_cd || ''}</td>
+                  <td>${row.sku_nm || ''}</td>
+                  <td class="right">${row.order_qty || 0}</td>
+                  <td>${row.order_date || ''}</td>
+                  <td>${row.ship_by_date || ''}</td>
+                  <td>${row.wh_cd || ''}</td>
+                  <td>${row.com_cd || ''}</td>
+                  <td>${row.cust_cd || ''}</td>
+                  <td>${row.cust_nm || ''}</td>
+                  <td>${row.dlv_type || ''}</td>
+                  <td>${row.carrier_service_type || ''}</td>
+                  <td>${row.priority_cd || ''}</td>
+                  <td>${row.remarks || ''}</td>
                 </tr>
               `
     )}
@@ -777,7 +869,8 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
       this.processing = true
 
       // 유효한 행만 필터링하여 원본 데이터에서 추출
-      let dataToImport = this.parsedData
+      // let dataToImport = this.parsedData
+      let dataToImport = this.validationResult.rows;
       if (this.excludeErrors && this.validationResult.error > 0) {
         const validRowNos = this.validationResult.rows.filter(r => r.valid).map(r => r.row_no)
         dataToImport = this.parsedData.filter((_, idx) => validRowNos.includes(idx + 1))

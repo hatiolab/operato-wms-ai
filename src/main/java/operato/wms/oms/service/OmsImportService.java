@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
+import operato.wms.base.entity.Customer;
 import operato.wms.base.entity.SKU;
 import operato.wms.oms.entity.ImportShipmentOrder;
 import operato.wms.oms.entity.ShipmentDelivery;
@@ -44,6 +45,7 @@ public class OmsImportService extends AbstractQueryService {
 		int validCount = 0;
 		int errorCount = 0;
 		List<Map<String, Object>> rows = new ArrayList<>();
+		boolean isB2C = "B2C_OUT".equals(bizType);
 
 		for (int i = 0; i < list.size(); i++) {
 			ImportShipmentOrder row = list.get(i);
@@ -91,34 +93,51 @@ public class OmsImportService extends AbstractQueryService {
 				}
 			}
 
+			// 5. B2B인 경우 거래처 존재 여부 검증
+			if (!isB2C) {
+				Query custQuery = new Query();
+				custQuery.addFilter(new Filter("domainId", domainId));
+				custQuery.addFilter(new Filter("custCd", row.getCustCd()));
+				Customer customer = this.queryManager.selectByCondition(Customer.class, custQuery);
+				if (customer == null) {
+					errors.add("거래처 [" + row.getCustCd() + "]가 존재하지 않습니다");
+				} else {
+					row.setCustNm(customer.getCustNm());
+				}
+			}
+
 			// 결과 행 구성
 			Map<String, Object> resultRow = ValueUtil.newMap("row_no", i + 1);
+			resultRow.put("biz_type", ValueUtil.isNotEmpty(row.getBizType()) ? row.getBizType() : bizType);
 			resultRow.put("ref_order_no", row.getRefOrderNo());
 			resultRow.put("sku_cd", row.getSkuCd());
 			resultRow.put("sku_nm", row.getSkuNm());
 			resultRow.put("order_qty", row.getOrderQty());
 			resultRow.put("order_date", row.getOrderDate());
 			resultRow.put("ship_by_date", row.getShipByDate());
-			resultRow.put("cust_cd", row.getCustCd()); // B2C : 판매처 코드
-			resultRow.put("cust_nm", row.getOrdererNm()); // B2C : 주문자 명
-			resultRow.put("orderer_nm", row.getOrdererNm());
-			resultRow.put("receiver_nm", row.getReceiverNm());
-
+			resultRow.put("cust_cd", row.getCustCd()); // B2C : 판매처 코드, B2B : 거래처 코드
 			resultRow.put("wh_cd", row.getWhCd());
 			resultRow.put("com_cd", row.getComCd());
 			resultRow.put("dlv_type", row.getDlvType());
 			resultRow.put("priority_cd", row.getPriorityCd());
-			resultRow.put("sender_nm", row.getSenderNm());
-			resultRow.put("sender_phone", row.getSenderPhone());
-			resultRow.put("sender_zip_cd", row.getSenderZipCd());
-			resultRow.put("sender_addr", row.getSenderAddr());
-			resultRow.put("receiver_phone", row.getReceiverPhone());
-			resultRow.put("receiver_zip_cd", row.getReceiverZipCd());
-			resultRow.put("receiver_addr", row.getReceiverAddr());
-			resultRow.put("receiver_addr2", row.getReceiverAddr2());
-			resultRow.put("delivery_memo", row.getDeliveryMemo());
+			resultRow.put("remarks", row.getRemarks());
 
-			resultRow.put("biz_type", ValueUtil.isNotEmpty(row.getBizType()) ? row.getBizType() : bizType);
+			if (isB2C) {
+				resultRow.put("cust_nm", row.getOrdererNm()); // B2C : 주문자 명
+				resultRow.put("orderer_nm", row.getOrdererNm());
+				resultRow.put("receiver_nm", row.getReceiverNm());
+				resultRow.put("sender_nm", row.getSenderNm());
+				resultRow.put("sender_phone", row.getSenderPhone());
+				resultRow.put("sender_zip_cd", row.getSenderZipCd());
+				resultRow.put("sender_addr", row.getSenderAddr());
+				resultRow.put("receiver_phone", row.getReceiverPhone());
+				resultRow.put("receiver_zip_cd", row.getReceiverZipCd());
+				resultRow.put("receiver_addr", row.getReceiverAddr());
+				resultRow.put("receiver_addr2", row.getReceiverAddr2());
+				resultRow.put("delivery_memo", row.getDeliveryMemo());
+			} else {
+				resultRow.put("cust_nm", row.getCustNm()); // B2B : 거래처 명
+			}
 
 			if (errors.isEmpty()) {
 				resultRow.put("valid", true);
@@ -129,14 +148,11 @@ public class OmsImportService extends AbstractQueryService {
 				resultRow.put("error_messages", errors);
 				errorCount++;
 			}
+
 			rows.add(resultRow);
 		}
 
-		Map<String, Object> result = ValueUtil.newMap("total", total);
-		result.put("valid", validCount);
-		result.put("error", errorCount);
-		result.put("rows", rows);
-		return result;
+		return ValueUtil.newMap("total,valid,error,rows", total, validCount, errorCount, rows);
 	}
 
 	/**
@@ -179,7 +195,7 @@ public class OmsImportService extends AbstractQueryService {
 			order.setShipByDate(firstRow.getShipByDate());
 			order.setComCd(firstRow.getComCd());
 			order.setCustCd(firstRow.getCustCd());
-			order.setCustNm(firstRow.getOrdererNm());
+			order.setCustNm(firstRow.getCustNm());
 			order.setWhCd(ValueUtil.isNotEmpty(firstRow.getWhCd()) ? firstRow.getWhCd() : "DEFAULT");
 			order.setBizType(firstRow.getBizType());
 			order.setShipType(firstRow.getShipType());
@@ -257,10 +273,7 @@ public class OmsImportService extends AbstractQueryService {
 			AnyOrmUtil.insertBatch(newDeliveries, 100);
 		}
 
-		Map<String, Object> result = ValueUtil.newMap("total_rows", list.size());
-		result.put("order_count", orderCount);
-		result.put("item_count", itemCount);
-		result.put("delivery_count", deliveryCount);
-		return result;
+		return ValueUtil.newMap("total_rows,order_count,item_count,delivery_count", list.size(), orderCount, itemCount,
+				deliveryCount);
 	}
 }
