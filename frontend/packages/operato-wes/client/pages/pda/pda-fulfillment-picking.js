@@ -175,24 +175,21 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
         /* 피킹번호 스캔 입력 + 새로고침 */
         .scan-task-order {
           padding: 8px 12px 12px;
-        }
-
-        .scan-task-order label {
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--md-sys-color-on-surface, #333);
-          display: block;
-          margin-bottom: 4px;
-        }
-
-        .scan-task-order .scan-row {
           display: flex;
           align-items: center;
           gap: 8px;
         }
 
-        .scan-task-order .scan-row ox-input-barcode {
+        .scan-task-order label {
+          flex-shrink: 0;
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-surface, #333);
+        }
+
+        .scan-task-order ox-input-barcode {
           flex: 1;
+          min-width: 0;
         }
 
         .scan-task-order .btn-refresh {
@@ -290,10 +287,14 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
 
         /* 진행률 바 */
         .progress-section {
-          padding: 8px 12px;
+          padding: 6px 12px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
         }
 
         .progress-bar-large {
+          flex: 1;
           height: 8px;
           background: var(--md-sys-color-surface-variant, #e0e0e0);
           border-radius: 4px;
@@ -308,10 +309,10 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
         }
 
         .progress-text {
-          font-size: 13px;
+          flex-shrink: 0;
+          font-size: 12px;
           color: var(--md-sys-color-on-surface-variant, #666);
-          margin-top: 4px;
-          text-align: center;
+          white-space: nowrap;
         }
 
         /* 현재 피킹 항목 */
@@ -751,14 +752,12 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
       </div>
 
       <div class="scan-task-order">
-        <label>${TermsUtil.tLabel('pick_task_no') || '피킹지시번호 스캔'}</label>
-        <div class="scan-row">
-          <ox-input-barcode id="taskScanInput"
-            placeholder="피킹지시번호 스캔"
-            @change=${e => this._onScanPickingTask(e.target.value)}>
-          </ox-input-barcode>
-          <button class="btn-refresh" @click=${this._refresh}>${TermsUtil.tButton('refresh') || '새로고침'}</button>
-        </div>
+        <label>${TermsUtil.tLabel('pick_task_no') || '피킹지시번호'}</label>
+        <ox-input-barcode id="taskScanInput"
+          placeholder="피킹지시번호 스캔"
+          @change=${e => this._onScanPickingTask(e.target.value)}>
+        </ox-input-barcode>
+        <button class="btn-refresh" @click=${this._refresh}>${TermsUtil.tButton('refresh') || '새로고침'}</button>
       </div>
     `
   }
@@ -779,7 +778,7 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
     return html`
       <div class="task-card" @click=${() => this._selectTask(task)}>
         <div class="card-header">
-          <span class="task-no">${task.pick_task_no}</span>
+          <span class="task-no">피킹지시번호: ${task.pick_task_no}</span>
           <span class="status-badge ${(task.status || '').toLowerCase()}">
             ${task.status === 'CREATED' ? (TermsUtil.tLabel('wait') || '대기')
         : task.status === 'IN_PROGRESS' ? (TermsUtil.tLabel('in_progress') || '진행중')
@@ -829,7 +828,7 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
             </ox-input-barcode>
           </div>
           <div class="qty-input-row">
-            <label>피킹수량 (EA)</label>
+            <label>피킹수량</label>
             <input type="number" min="1" .value=${String(this.pickQty)}
               @input=${e => (this.pickQty = parseInt(e.target.value) || 0)} />
             <!--button class="btn-pick" ?disabled=${this.processing || !this.pickQty}

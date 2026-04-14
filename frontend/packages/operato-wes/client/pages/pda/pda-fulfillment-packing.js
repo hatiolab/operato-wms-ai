@@ -252,24 +252,21 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
         /* 포장번호 스캔 입력 + 새로고침 */
         .scan-pack-order {
           padding: 8px 12px 12px;
-        }
-
-        .scan-pack-order label {
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--md-sys-color-on-surface, #333);
-          display: block;
-          margin-bottom: 4px;
-        }
-
-        .scan-pack-order .scan-row {
           display: flex;
           align-items: center;
           gap: 8px;
         }
 
-        .scan-pack-order .scan-row ox-input-barcode {
+        .scan-pack-order label {
+          flex-shrink: 0;
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-surface, #333);
+        }
+
+        .scan-pack-order ox-input-barcode {
           flex: 1;
+          min-width: 0;
         }
 
         .scan-pack-order .btn-refresh {
@@ -291,10 +288,14 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
 
         /* 진행률 바 */
         .progress-section {
-          padding: 8px 12px;
+          padding: 6px 12px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
         }
 
         .progress-bar-large {
+          flex: 1;
           height: 8px;
           background: var(--md-sys-color-surface-variant, #e0e0e0);
           border-radius: 4px;
@@ -309,10 +310,10 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
         }
 
         .progress-text {
-          font-size: 13px;
+          flex-shrink: 0;
+          font-size: 12px;
           color: var(--md-sys-color-on-surface-variant, #666);
-          margin-top: 4px;
-          text-align: center;
+          white-space: nowrap;
         }
 
         /* 현재 검수 항목 */
@@ -745,14 +746,12 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
       </div>
 
       <div class="scan-pack-order">
-        <label>${TermsUtil.tLabel('pack_order_no') || '포장번호 스캔'}</label>
-        <div class="scan-row">
-          <ox-input-barcode id="packOrderScanInput"
-            placeholder="포장번호 스캔"
-            @change=${e => this._onScanPackingOrder(e.target.value)}>
-          </ox-input-barcode>
-          <button class="btn-refresh" @click=${this._refresh}>${TermsUtil.tButton('refresh') || '새로고침'}</button>
-        </div>
+        <label>${TermsUtil.tLabel('pack_order_no') || '포장지시번호'}</label>
+        <ox-input-barcode id="packOrderScanInput"
+          placeholder="포장번호 스캔"
+          @change=${e => this._onScanPackingOrder(e.target.value)}>
+        </ox-input-barcode>
+        <button class="btn-refresh" @click=${this._refresh}>${TermsUtil.tButton('refresh') || '새로고침'}</button>
       </div>
     `
   }
@@ -767,7 +766,7 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
     return html`
       <div class="order-card" @click=${() => this._selectOrder(order)}>
         <div class="card-header">
-          <span class="pack-no">${order.pack_order_no}</span>
+          <span class="pack-no">포장지시번호: ${order.pack_order_no}</span>
           <span class="status-badge ${(order.status || '').toLowerCase()}">
             ${order.status === 'CREATED' ? (TermsUtil.tLabel('wait') || '대기')
         : order.status === 'IN_PROGRESS' ? (TermsUtil.tLabel('in_progress') || '진행중')
@@ -1009,7 +1008,7 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
       const items = await ServiceUtil.restGet('ful_trx/packing_order_items', { packing_order_id: orderId })
       this.packingItems = items || []
       this.totalCount = this.packingItems.length
-      this.completedCount = this.packingItems.filter(i => i.status === 'COMPLETED').length
+      this.completedCount = this.packingItems.filter(i => i.status === 'PACKED' || i.status === 'INSPECTED').length
       this._moveToNextItem()
     } catch (error) {
       console.error('포장 항목 조회 실패:', error)
@@ -1171,9 +1170,9 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
       })
 
       this.packingItems = this.packingItems.map((it, idx) =>
-        idx === itemIndex ? { ...it, status: 'COMPLETED' } : it
+        idx === itemIndex ? { ...it, status: 'PACKED' } : it
       )
-      this.completedCount = this.packingItems.filter(i => i.status === 'COMPLETED').length
+      this.completedCount = this.packingItems.filter(i => i.status === 'PACKED' || i.status === 'INSPECTED').length
 
       document.dispatchEvent(new CustomEvent('notify', {
         detail: { level: 'info', message: `검수 완료 (${this.completedCount}/${this.totalCount})` }
