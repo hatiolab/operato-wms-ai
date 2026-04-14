@@ -477,39 +477,7 @@ public class InboundTransactionController extends AbstractRestService {
     public ReceivingItem finishReceivingOrderLine(
             @RequestBody ReceivingItem receivingItem,
             @RequestParam(name = "printerId", required = false) String printerId) {
-
-        // 1. 입고 예정 라인 처리
-        Receiving receiving = this.queryManager.select(Receiving.class, receivingItem.getReceivingId());
-
-        // 2. 전 처리 커스텀 서비스 호출
-        Map<String, Object> custSvcParams = ValueUtil.newMap("receiving,receivingItem", receiving, receivingItem);
-        this.customSvc.doCustomService(receiving.getDomainId(), TRX_INB_PRE_LINE_FINISH_RECEIPT, custSvcParams);
-
-        // 3. 입고 예정 라인 입고 완료 처리
-        ReceivingItem itemToFinish = this.inbTrxService.finishReceivingOrderLine(receiving, receivingItem, printerId);
-        this.queryManager.update(itemToFinish);
-
-        // 4. 입고가 모두 끝났다면 자동 완료 처리
-        String rcvAutoFlag = this.runtimeConfSvc.getRuntimeConfigValue(receiving.getComCd(), receiving.getWhCd(),
-                WmsInboundConfigConstants.RECEIPT_FINISH_AUTO_FLAG);
-        if (ValueUtil.toBoolean(rcvAutoFlag, true)) {
-            String sql = "select count(id) from receiving_items where domain_id = :domainId and receiving_id = :receivingId and (status != :cancelStatus and status != :endStatus)";
-            Map<String, Object> params = ValueUtil.newMap("domainId,receivingId,cancelStatus,endStatus",
-                    receiving.getDomainId(), receiving.getId(), WmsInboundConstants.STATUS_CANCEL,
-                    WmsInboundConstants.STATUS_END);
-            if (this.queryManager.selectBySql(sql, params, Integer.class) == 0) {
-                // 4.1 자동 마감 처리
-                this.closeReceivingOrder(receiving.getId());
-            }
-
-        }
-
-        // 5. 후 처리 커스텀 서비스 호출
-        this.customSvc.doCustomService(receiving.getDomainId(), TRX_INB_POST_LINE_FINISH_RECEIPT,
-                ValueUtil.newMap("receivingItem", itemToFinish));
-
-        // 6. 라인 정보 리턴
-        return itemToFinish;
+        return this.finishReceivingOrderLine(receivingItem.getId(), receivingItem, printerId);
     }
 
     /**
@@ -755,7 +723,7 @@ public class InboundTransactionController extends AbstractRestService {
     }
 
     /********************************************************************************************************
-     * 대 시 보 드   A P I
+     * 대 시 보 드 A P I
      ********************************************************************************************************/
 
     /**

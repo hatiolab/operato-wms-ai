@@ -74,6 +74,7 @@ import './pages/pda/pda-wms-shipment-barcode-manually'
 import './pages/pda/pda-fulfillment-shipping'
 import './pages/pda/pda-fulfillment-packing'
 import './pages/pda/pda-fulfillment-picking'
+import './pages/pda/pda-inbound-receiving'
 
 export default function route(page, module) {
   let route = module.routes?.find(mapping => mapping.page == page)

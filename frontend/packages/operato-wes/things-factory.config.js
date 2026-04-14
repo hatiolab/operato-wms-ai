@@ -60,7 +60,8 @@ export default {
     { tagname: 'putaway-work-page', page: 'put-away-work' },
     { tagname: 'pda-fulfillment-shipping', page: 'pda-fulfillment-shipping' },
     { tagname: 'pda-fulfillment-packing', page: 'pda-fulfillment-packing' },
-    { tagname: 'pda-fulfillment-picking', page: 'pda-fulfillment-picking' }
+    { tagname: 'pda-fulfillment-picking', page: 'pda-fulfillment-picking' },
+    { tagname: 'pda-inbound-receiving', page: 'pda-inbound-receiving' }
   ],
   bootstrap
 }
