@@ -407,6 +407,7 @@ export class OxStorageImageSelectorPopup extends LitElement {
 
       <ox-storage-upload-popup
         ?open="${this._uploadOpen}"
+        storage-info-name="image"
         @upload-complete="${this._onUploadComplete}"
         @close="${() => { this._uploadOpen = false }}"
       ></ox-storage-upload-popup>

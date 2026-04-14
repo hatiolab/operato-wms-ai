@@ -167,6 +167,12 @@ export class OxStorageUploadPopup extends LitElement {
   /** 팝업 열림 여부 */
   @property({ type: Boolean }) open: boolean = false
 
+  /**
+   * 기본 선택할 스토리지 이름. 전달 시 스토리지 목록에서 이름이 일치하는 항목을 자동 선택한다.
+   * 일치하는 항목이 없으면 default_flag 스토리지 또는 첫 번째 스토리지가 자동 선택된다.
+   */
+  @property({ type: String, attribute: 'storage-info-name' }) storageInfoName: string = 'default'
+
   @state() private _storages: any[] = []
   @state() private _selectedStorageId: string = ''
   @state() private _file: File | null = null
@@ -209,7 +215,7 @@ export class OxStorageUploadPopup extends LitElement {
               .value="${this._selectedStorageId}"
               @change="${(e: Event) => { this._selectedStorageId = (e.target as HTMLSelectElement).value }}"
             >
-              <option value="">-- 스토리지 선택 --</option>
+              <option value="">${this.storageInfoName ? `-- ${this.storageInfoName} --` : '-- 스토리지 선택 --'}</option>
               ${this._storages.map(
                 s => html`
                   <option value="${s.id}" ?selected="${s.id === this._selectedStorageId}">
@@ -278,13 +284,18 @@ export class OxStorageUploadPopup extends LitElement {
     this._dragOver = false
   }
 
-  /** 스토리지 목록 로드 — 기본 스토리지 자동 선택 */
+  /** 스토리지 목록 로드 — storageInfoName prop 우선, 없으면 default_flag 스토리지 자동 선택 */
   private async _loadStorages() {
     const data = await (ServiceUtil as any).restGet('storage/storages')
     if (data?.items) {
       this._storages = data.items
-      const def = this._storages.find((s: any) => s.default_flag) || this._storages[0]
-      if (def) this._selectedStorageId = def.id
+      if (this.storageInfoName) {
+        const matched = this._storages.find((s: any) => s.name === this.storageInfoName)
+        this._selectedStorageId = matched ? matched.id : (this._storages.find((s: any) => s.default_flag) || this._storages[0])?.id || ''
+      } else {
+        const def = this._storages.find((s: any) => s.default_flag) || this._storages[0]
+        if (def) this._selectedStorageId = def.id
+      }
     }
   }
 
