@@ -417,7 +417,7 @@ class InboundHome extends localize(i18next)(PageView) {
   /** 입고 상태별 건수 조회 (작성중/대기/작업중/완료) */
   async _fetchStatusCounts() {
     try {
-      const data = await ServiceUtil.restGet('inbound_trx/dashboard/status-counts')
+      const data = await ServiceUtil.restGet('inbound_dashboard/status-counts')
       return data || { INWORK: 0, READY: 0, START: 0, END: 0 }
     } catch (error) {
       console.error('상태별 건수 조회 실패:', error)
@@ -428,7 +428,7 @@ class InboundHome extends localize(i18next)(PageView) {
   /** 입고 유형별 통계 조회 (일반/반품/기타) */
   async _fetchTypeStats() {
     try {
-      const data = await ServiceUtil.restGet('inbound_trx/dashboard/type-stats')
+      const data = await ServiceUtil.restGet('inbound_dashboard/type-stats')
       return data || { NORMAL: 0, RETURN: 0, ETC: 0 }
     } catch (error) {
       console.error('유형별 통계 조회 실패:', error)
@@ -439,7 +439,7 @@ class InboundHome extends localize(i18next)(PageView) {
   /** 검수 현황 통계 조회 (대기/완료/불량) */
   async _fetchInspectionStats() {
     try {
-      const data = await ServiceUtil.restGet('inbound_trx/dashboard/inspection-stats')
+      const data = await ServiceUtil.restGet('inbound_dashboard/inspection-stats')
       return data || { WAIT: 0, PASS: 0, FAIL: 0 }
     } catch (error) {
       console.error('검수 통계 조회 실패:', error)
@@ -450,7 +450,7 @@ class InboundHome extends localize(i18next)(PageView) {
   /** 대시보드 알림 데이터 조회 (지연, 검수 대기 등) */
   async _fetchAlerts() {
     try {
-      const data = await ServiceUtil.restGet('inbound_trx/dashboard/alerts')
+      const data = await ServiceUtil.restGet('inbound_dashboard/alerts')
       return data || []
     } catch (error) {
       console.error('알림 데이터 조회 실패:', error)

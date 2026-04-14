@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -663,6 +662,26 @@ public class InboundTransactionController extends AbstractRestService {
         return this.inbTrxService.getPutawayWorkItems(Domain.currentDomainId(), rcvNo, barcode);
     }
 
+    /**
+     * 적치 작업 화면 - 완료 항목 조회 (rcv_no 기준, inventories status = STORED)
+     *
+     * GET /rest/inbound_trx/putaway/done_items?rcv_no={rcvNo}
+     *
+     * @param rcvNo 입고 지시 번호
+     * @return status = 'STORED' 인 재고 목록
+     */
+    @RequestMapping(value = "/putaway/done_items", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Search Putaway Done Items By Receiving No.")
+    public List<Inventory> getPutawayDoneItems(
+            @RequestParam(name = "rcv_no") String rcvNo) {
+
+        if (ValueUtil.isEmpty(rcvNo)) {
+            return new ArrayList<Inventory>(1);
+        }
+
+        return this.inbTrxService.getPutawayDoneItems(Domain.currentDomainId(), rcvNo);
+    }
+
     /********************************************************************************************************
      * 출 력 물 인 쇄
      ********************************************************************************************************/
@@ -720,85 +739,5 @@ public class InboundTransactionController extends AbstractRestService {
 
         // 3. 피킹지시서 출력을 위한 PDF 다운로드
         this.printoutCtrl.showPdfByPrintTemplateName(req, res, template, ValueUtil.newMap("receiving", ro));
-    }
-
-    /********************************************************************************************************
-     * 대 시 보 드 A P I
-     ********************************************************************************************************/
-
-    /**
-     * 대시보드 - 입고 상태별 건수 조회
-     *
-     * GET /rest/inbound_trx/dashboard/status-counts
-     *
-     * @param comCd      화주사 코드 (optional)
-     * @param whCd       창고 코드 (optional)
-     * @param targetDate 기준일 (optional, 기본값: 오늘)
-     * @return 상태별 건수 Map { status: count }
-     */
-    @GetMapping("/dashboard/status-counts")
-    @ApiDesc(description = "Get Dashboard Status Counts")
-    public Map<String, Object> getDashboardStatusCounts(
-            @RequestParam(name = "com_cd", required = false) String comCd,
-            @RequestParam(name = "wh_cd", required = false) String whCd,
-            @RequestParam(name = "target_date", required = false) String targetDate) {
-        return this.inbTrxService.getDashboardStatusCounts(comCd, whCd, targetDate);
-    }
-
-    /**
-     * 대시보드 - 입고 유형별 통계 조회
-     *
-     * GET /rest/inbound_trx/dashboard/type-stats
-     *
-     * @param comCd     화주사 코드 (optional)
-     * @param whCd      창고 코드 (optional)
-     * @param startDate 시작일 (optional, 기본값: 오늘)
-     * @param endDate   종료일 (optional, 기본값: 오늘)
-     * @return 유형별 건수 Map { rcvType: count }
-     */
-    @GetMapping("/dashboard/type-stats")
-    @ApiDesc(description = "Get Dashboard Type Statistics")
-    public Map<String, Object> getDashboardTypeStats(
-            @RequestParam(name = "com_cd", required = false) String comCd,
-            @RequestParam(name = "wh_cd", required = false) String whCd,
-            @RequestParam(name = "start_date", required = false) String startDate,
-            @RequestParam(name = "end_date", required = false) String endDate) {
-        return this.inbTrxService.getDashboardTypeStats(comCd, whCd, startDate, endDate);
-    }
-
-    /**
-     * 대시보드 - 검수 현황 통계 조회
-     *
-     * GET /rest/inbound_trx/dashboard/inspection-stats
-     *
-     * @param comCd      화주사 코드 (optional)
-     * @param whCd       창고 코드 (optional)
-     * @param targetDate 기준일 (optional, 기본값: 오늘)
-     * @return 검수 상태별 건수 Map { inspStatus: count }
-     */
-    @GetMapping("/dashboard/inspection-stats")
-    @ApiDesc(description = "Get Dashboard Inspection Statistics")
-    public Map<String, Object> getDashboardInspectionStats(
-            @RequestParam(name = "com_cd", required = false) String comCd,
-            @RequestParam(name = "wh_cd", required = false) String whCd,
-            @RequestParam(name = "target_date", required = false) String targetDate) {
-        return this.inbTrxService.getDashboardInspectionStats(comCd, whCd, targetDate);
-    }
-
-    /**
-     * 대시보드 - 알림 데이터 조회
-     *
-     * GET /rest/inbound_trx/dashboard/alerts
-     *
-     * @param comCd 화주사 코드 (optional)
-     * @param whCd  창고 코드 (optional)
-     * @return 알림 목록 List<Map<String, Object>>
-     */
-    @GetMapping("/dashboard/alerts")
-    @ApiDesc(description = "Get Dashboard Alerts")
-    public List<Map<String, Object>> getDashboardAlerts(
-            @RequestParam(name = "com_cd", required = false) String comCd,
-            @RequestParam(name = "wh_cd", required = false) String whCd) {
-        return this.inbTrxService.getDashboardAlerts(comCd, whCd);
     }
 }

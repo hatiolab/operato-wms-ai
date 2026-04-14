@@ -701,8 +701,24 @@ public class InboundTransactionService extends AbstractQueryService {
         return items;
     }
     
+    /**
+     * 적치 작업 화면 - 완료 항목 조회 (rcv_no 기준, inventories status = STORED)
+     *
+     * @param domainId
+     * @param rcvNo    입고 지시 번호
+     * @return status = 'STORED' 인 재고 목록
+     */
+    public List<Inventory> getPutawayDoneItems(Long domainId, String rcvNo) {
+        Query queryObj = AnyOrmUtil.newConditionForExecution(domainId);
+        queryObj.addFilter("rcvNo", rcvNo);
+        queryObj.addFilter("status", Inventory.STATUS_STORED);
+        queryObj.addFilter("delFlag", false);
+        queryObj.addOrder("rcvSeq", true);
+        return this.queryManager.selectList(Inventory.class, queryObj);
+    }
+
     /********************************************************************************************************
-     *                                                  인 쇄  
+     *                                                  인 쇄
      ********************************************************************************************************/
     /**
      * 입고지시 번호로 입고지시서 출력
@@ -859,266 +875,5 @@ public class InboundTransactionService extends AbstractQueryService {
         }
 
         return templateName;
-    }
-
-    /********************************************************************************************************
-     * 대 시 보 드   A P I
-     ********************************************************************************************************/
-
-    /**
-     * 대시보드 - 입고 상태별 건수 조회
-     *
-     * @param comCd      화주사 코드 (optional)
-     * @param whCd       창고 코드 (optional)
-     * @param targetDate 기준일 (optional, 기본값: 오늘)
-     * @return 상태별 건수 Map { status: count }
-     */
-    public Map<String, Object> getDashboardStatusCounts(String comCd, String whCd, String targetDate) {
-        String date = ValueUtil.isNotEmpty(targetDate) ? targetDate : DateUtil.todayStr();
-
-        String sql = "SELECT status, COUNT(*) as count " +
-                "FROM receivings " +
-                "WHERE domain_id = :domainId " +
-                "AND rcv_req_date = :targetDate ";
-
-        Map<String, Object> params = ValueUtil.newMap("domainId,targetDate", Domain.currentDomainId(), date);
-
-        if (ValueUtil.isNotEmpty(comCd)) {
-            sql += "AND com_cd = :comCd ";
-            params.put("comCd", comCd);
-        }
-        if (ValueUtil.isNotEmpty(whCd)) {
-            sql += "AND wh_cd = :whCd ";
-            params.put("whCd", whCd);
-        }
-
-        sql += "GROUP BY status";
-
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
-                sql, params, Map.class, 0, 0);
-
-        // 결과를 Map으로 변환 (모든 상태 초기화)
-        Map<String, Object> statusCounts = new java.util.HashMap<>();
-        statusCounts.put("INWORK", 0);
-        statusCounts.put("REQUEST", 0);
-        statusCounts.put("READY", 0);
-        statusCounts.put("START", 0);
-        statusCounts.put("END", 0);
-        statusCounts.put("CANCEL", 0);
-
-        // 조회 결과를 Map에 반영
-        for (Map<String, Object> row : results) {
-            String status = (String) row.get("status");
-            Object countObj = row.get("count");
-            Integer count = countObj instanceof Long ? ((Long) countObj).intValue() : (Integer) countObj;
-            statusCounts.put(status, count);
-        }
-
-        return statusCounts;
-    }
-
-    /**
-     * 대시보드 - 입고 유형별 통계 조회
-     *
-     * @param comCd     화주사 코드 (optional)
-     * @param whCd      창고 코드 (optional)
-     * @param startDate 시작일 (optional, 기본값: 오늘)
-     * @param endDate   종료일 (optional, 기본값: 오늘)
-     * @return 유형별 건수 Map { rcvType: count }
-     */
-    public Map<String, Object> getDashboardTypeStats(String comCd, String whCd, String startDate, String endDate) {
-        String start = ValueUtil.isNotEmpty(startDate) ? startDate : DateUtil.todayStr();
-        String end = ValueUtil.isNotEmpty(endDate) ? endDate : DateUtil.todayStr();
-
-        String sql = "SELECT rcv_type, COUNT(*) as count " +
-                "FROM receivings " +
-                "WHERE domain_id = :domainId " +
-                "AND rcv_req_date >= :startDate " +
-                "AND rcv_req_date <= :endDate " +
-                "AND status != :cancelStatus ";
-
-        Map<String, Object> params = ValueUtil.newMap("domainId,startDate,endDate,cancelStatus",
-                Domain.currentDomainId(), start, end, WmsInboundConstants.STATUS_CANCEL);
-
-        if (ValueUtil.isNotEmpty(comCd)) {
-            sql += "AND com_cd = :comCd ";
-            params.put("comCd", comCd);
-        }
-        if (ValueUtil.isNotEmpty(whCd)) {
-            sql += "AND wh_cd = :whCd ";
-            params.put("whCd", whCd);
-        }
-
-        sql += "GROUP BY rcv_type";
-
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
-                sql, params, Map.class, 0, 0);
-
-        // 결과를 Map으로 변환 (모든 유형 초기화)
-        Map<String, Object> typeStats = new java.util.HashMap<>();
-        typeStats.put("NORMAL", 0);
-        typeStats.put("RETURN", 0);
-        typeStats.put("ETC", 0);
-
-        // 조회 결과를 Map에 반영
-        for (Map<String, Object> row : results) {
-            String rcvType = (String) row.get("rcv_type");
-            Object countObj = row.get("count");
-            Integer count = countObj instanceof Long ? ((Long) countObj).intValue() : (Integer) countObj;
-            if (rcvType != null) {
-                typeStats.put(rcvType, count);
-            }
-        }
-
-        return typeStats;
-    }
-
-    /**
-     * 대시보드 - 검수 현황 통계 조회
-     *
-     * @param comCd      화주사 코드 (optional)
-     * @param whCd       창고 코드 (optional)
-     * @param targetDate 기준일 (optional, 기본값: 오늘)
-     * @return 검수 상태별 건수 Map { WAIT, PASS, FAIL }
-     */
-    public Map<String, Object> getDashboardInspectionStats(String comCd, String whCd, String targetDate) {
-        String date = ValueUtil.isNotEmpty(targetDate) ? targetDate : DateUtil.todayStr();
-        Long domainId = Domain.currentDomainId();
-
-        Map<String, Object> inspectionStats = new java.util.HashMap<>();
-        inspectionStats.put("WAIT", 0);
-        inspectionStats.put("PASS", 0);
-        inspectionStats.put("FAIL", 0);
-
-        // 1. 검수 대기: inspFlag=true AND insp_qty IS NULL OR insp_qty = 0
-        String sqlWait = "SELECT COUNT(DISTINCT ri.id) as count " +
-                "FROM receiving_items ri " +
-                "INNER JOIN receivings r ON ri.receiving_id = r.id " +
-                "WHERE ri.domain_id = :domainId " +
-                "AND r.rcv_req_date = :targetDate " +
-                "AND r.insp_flag = true " +
-                "AND (ri.insp_qty IS NULL OR ri.insp_qty = 0) ";
-
-        Map<String, Object> paramsWait = ValueUtil.newMap("domainId,targetDate", domainId, date);
-
-        if (ValueUtil.isNotEmpty(comCd)) {
-            sqlWait += "AND r.com_cd = :comCd ";
-            paramsWait.put("comCd", comCd);
-        }
-        if (ValueUtil.isNotEmpty(whCd)) {
-            sqlWait += "AND r.wh_cd = :whCd ";
-            paramsWait.put("whCd", whCd);
-        }
-
-        Integer waitCount = this.queryManager.selectBySql(sqlWait, paramsWait, Integer.class);
-        inspectionStats.put("WAIT", waitCount != null ? waitCount : 0);
-
-        // 2. 검수 합격 (PASS)
-        String sqlPass = "SELECT COUNT(DISTINCT ri.id) as count " +
-                "FROM receiving_items ri " +
-                "INNER JOIN receivings r ON ri.receiving_id = r.id " +
-                "WHERE ri.domain_id = :domainId " +
-                "AND r.rcv_req_date = :targetDate " +
-                "AND ri.insp_qty IS NOT NULL " +
-                "AND ri.insp_qty > 0 ";
-        // 추후 insp_status 컬럼이 추가되면 AND ri.insp_status = 'PASS' 조건 추가
-
-        Map<String, Object> paramsPass = ValueUtil.newMap("domainId,targetDate", domainId, date);
-
-        if (ValueUtil.isNotEmpty(comCd)) {
-            sqlPass += "AND r.com_cd = :comCd ";
-            paramsPass.put("comCd", comCd);
-        }
-        if (ValueUtil.isNotEmpty(whCd)) {
-            sqlPass += "AND r.wh_cd = :whCd ";
-            paramsPass.put("whCd", whCd);
-        }
-
-        Integer passCount = this.queryManager.selectBySql(sqlPass, paramsPass, Integer.class);
-        inspectionStats.put("PASS", passCount != null ? passCount : 0);
-
-        // 3. 검수 불량 (FAIL) - 추후 insp_status 컬럼이 추가되면 구현
-        // 현재는 0으로 반환
-        inspectionStats.put("FAIL", 0);
-
-        return inspectionStats;
-    }
-
-    /**
-     * 대시보드 - 알림 데이터 조회
-     *
-     * @param comCd 화주사 코드 (optional)
-     * @param whCd  창고 코드 (optional)
-     * @return 알림 목록 List<Map<String, Object>>
-     */
-    public List<Map<String, Object>> getDashboardAlerts(String comCd, String whCd) {
-        List<Map<String, Object>> alerts = new java.util.ArrayList<>();
-        Long domainId = Domain.currentDomainId();
-        String today = DateUtil.todayStr();
-
-        // 1. 지연 입고 알림: rcv_exp_date < today AND status != 'END' AND status != 'CANCEL'
-        String sql1 = "SELECT COUNT(*) as count " +
-                "FROM receivings " +
-                "WHERE domain_id = :domainId " +
-                "AND rcv_req_date < :today " +
-                "AND status NOT IN (:completedStatuses) ";
-
-        Map<String, Object> params1 = ValueUtil.newMap("domainId,today", domainId, today);
-        params1.put("completedStatuses", java.util.Arrays.asList(
-                WmsInboundConstants.STATUS_END,
-                WmsInboundConstants.STATUS_CANCEL));
-
-        if (ValueUtil.isNotEmpty(comCd)) {
-            sql1 += "AND com_cd = :comCd ";
-            params1.put("comCd", comCd);
-        }
-        if (ValueUtil.isNotEmpty(whCd)) {
-            sql1 += "AND wh_cd = :whCd ";
-            params1.put("whCd", whCd);
-        }
-
-        Integer delayedCount = this.queryManager.selectBySql(sql1, params1, Integer.class);
-        if (delayedCount != null && delayedCount > 0) {
-            Map<String, Object> alert = new java.util.HashMap<>();
-            alert.put("type", "warning");
-            alert.put("icon", "🚨");
-            alert.put("message", "지연 입고: " + delayedCount + "건 (예정일 초과)");
-            alerts.add(alert);
-        }
-
-        // 2. 검수 대기 긴급건: inspFlag=true AND insp_qty IS NULL
-        String sql2 = "SELECT COUNT(DISTINCT ri.receiving_id) as count " +
-                "FROM receiving_items ri " +
-                "INNER JOIN receivings r ON ri.receiving_id = r.id " +
-                "WHERE ri.domain_id = :domainId " +
-                "AND r.insp_flag = true " +
-                "AND r.rcv_req_date = :today " +
-                "AND (ri.insp_qty IS NULL OR ri.insp_qty = 0) " +
-                "AND r.status = :startStatus ";
-
-        Map<String, Object> params2 = ValueUtil.newMap("domainId,today,startStatus",
-                domainId, today, WmsInboundConstants.STATUS_START);
-
-        if (ValueUtil.isNotEmpty(comCd)) {
-            sql2 += "AND r.com_cd = :comCd ";
-            params2.put("comCd", comCd);
-        }
-        if (ValueUtil.isNotEmpty(whCd)) {
-            sql2 += "AND r.wh_cd = :whCd ";
-            params2.put("whCd", whCd);
-        }
-
-        Integer inspWaitCount = this.queryManager.selectBySql(sql2, params2, Integer.class);
-        if (inspWaitCount != null && inspWaitCount > 0) {
-            Map<String, Object> alert = new java.util.HashMap<>();
-            alert.put("type", "info");
-            alert.put("icon", "⚠️");
-            alert.put("message", "검수 대기 긴급건: " + inspWaitCount + "건");
-            alerts.add(alert);
-        }
-
-        return alerts;
     }
 }

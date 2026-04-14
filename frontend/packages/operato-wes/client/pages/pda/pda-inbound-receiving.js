@@ -287,10 +287,14 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
         /* 진행률 바 */
         .progress-section {
-          padding: 8px 12px;
+          padding: 6px 12px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
         }
 
         .progress-bar-large {
+          flex: 1;
           height: 8px;
           background: var(--md-sys-color-surface-variant, #e0e0e0);
           border-radius: 4px;
@@ -305,10 +309,10 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         }
 
         .progress-text {
-          font-size: 13px;
+          flex-shrink: 0;
+          font-size: 12px;
           color: var(--md-sys-color-on-surface-variant, #666);
-          margin-top: 4px;
-          text-align: center;
+          white-space: nowrap;
         }
 
         /* 현재 입고 항목 */
@@ -665,7 +669,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         <div class="header-bar">
           <span class="title">
             <button class="back-btn" @click=${this._goBack}>◀</button>
-            ${rcvNo}
+            입고번호 : ${rcvNo}
           </span>
         </div>
       `
@@ -675,7 +679,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
       <div class="header-bar">
         <span class="title">
           <button class="back-btn" @click=${this._goBack}>◀</button>
-          ${rcvNo}
+          입고번호 : ${rcvNo}
         </span>
         <div class="actions">
           <button class="primary"
@@ -761,7 +765,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     return html`
       <div class="task-card" @click=${() => this._selectReceiving(r)}>
         <div class="card-header">
-          <span class="task-no">${r.rcv_no}</span>
+          <span class="task-no">입고번호 : ${r.rcv_no}</span>
           <span class="status-badge ${(r.status || '').toLowerCase()}">
             ${r.status === 'READY' ? (TermsUtil.tLabel('wait') || '대기')
         : r.status === 'START' ? (TermsUtil.tLabel('in_progress') || '진행중')
@@ -769,7 +773,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           </span>
         </div>
         <div class="sub-info">
-          ${r.vend_cd || r.com_cd || ''} · ${r.wh_cd || ''} · ${r.rcv_req_date || ''}
+          화주사 : ${r.com_cd || ''} | 공급사 : ${r.vend_cd || ''} | 입고 예정일 : ${r.rcv_req_date || ''}
           ${totalItems ? ` · ${totalItems}건` : ''}
         </div>
         ${isStart ? html`
@@ -794,9 +798,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         <div class="progress-bar-large">
           <div class="fill" style="width: ${progressPct}%"></div>
         </div>
-        <div class="progress-text">
-          ${this.completedCount}/${this.totalCount}건 (${doneQty}/${totalQty})
-        </div>
+        <div class="progress-text">${this.completedCount}/${this.totalCount}건 (${doneQty}/${totalQty})</div>
       </div>
 
       ${currentItem ? html`
