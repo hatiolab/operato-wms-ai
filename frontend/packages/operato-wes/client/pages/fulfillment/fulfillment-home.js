@@ -404,7 +404,7 @@ class FulfillmentHome extends localize(i18next)(PageView) {
                   <button class="btn btn-outline" @click="${() => this._navigateTo('picking-task-list')}">🧺 피킹 목록</button>
                   <button class="btn btn-outline" @click="${() => this._navigateTo('packing-order-list')}">📦 포장 목록</button>
                   <button class="btn btn-outline" @click="${() => this._navigateTo('fulfillment-progress')}">📊 진행 현황</button>
-                  <button class="btn btn-outline" @click="${() => this._navigateTo('oms-home')}">🏠 OMS 대시보드</button>
+                  <button class="btn btn-outline" @click="${() => this._navigateTo('oms-home')}">🏠 출고 주문 대시보드</button>
                 </div>
               </div>
 

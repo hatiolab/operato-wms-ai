@@ -2,8 +2,11 @@ import { css, html } from 'lit-element'
 
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
-import { ServiceUtil, UiUtil, ValueUtil } from '@operato-app/metapage/dist-client'
+import { openPopup } from '@operato/layout'
+import { ServiceUtil, UiUtil, ValueUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import Chart from 'chart.js/auto'
+
+import './receiving-order-import-popup'
 
 class InboundHome extends localize(i18next)(PageView) {
   /** 컴포넌트 스타일 정의 */
@@ -280,7 +283,7 @@ class InboundHome extends localize(i18next)(PageView) {
   /** 페이지 컨텍스트 반환 - 브라우저 타이틀 등에 사용 */
   get context() {
     return {
-      title: `입고 관리 대시보드`
+      title: TermsUtil.tMenu('InboundDashboard')
     }
   }
 
@@ -297,6 +300,7 @@ class InboundHome extends localize(i18next)(PageView) {
                   <h2>오늘의 입고 현황</h2>
                   <div class="header-actions">
                     <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">🔍 새로고침</button>
+                    <button class="btn btn-outline" @click="${this._openImportPopup}">📥 주문 임포트</button>
                     <button class="btn btn-outline" @click="${() => this._navigateTo('receivings')}">📝 입고 현황</button>
                     <button class="btn btn-outline" @click="${() => this._navigateTo('inventories')}">📦 재고 조회</button>
                   </div>
@@ -508,6 +512,20 @@ class InboundHome extends localize(i18next)(PageView) {
         }
       }
     })
+  }
+
+  /** 입고 주문 임포트 팝업 열기 */
+  _openImportPopup() {
+    openPopup(
+      html`<receiving-order-import-popup
+        @import-completed="${() => this._fetchDashboardData()}"
+      ></receiving-order-import-popup>`,
+      {
+        backdrop: true,
+        size: 'large',
+        title: '입고 주문 임포트'
+      }
+    )
   }
 
   /** 지정된 페이지로 이동 (필터 조건 포함 가능) */

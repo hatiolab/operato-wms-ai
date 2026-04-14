@@ -3,7 +3,7 @@ import { css, html } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
 import { openPopup } from '@operato/layout'
-import { ServiceUtil, UiUtil, ValueUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, UiUtil, ValueUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import Chart from 'chart.js/auto'
 import './auto-wave-create-popup'
 import './shipment-order-detail'
@@ -355,7 +355,7 @@ class OmsHome extends localize(i18next)(PageView) {
   /** 페이지 컨텍스트 반환 */
   get context() {
     return {
-      title: 'OMS 대시보드'
+      title: TermsUtil.tMenu('OmsDashboard')
     }
   }
 
@@ -392,7 +392,7 @@ class OmsHome extends localize(i18next)(PageView) {
                     <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">🔍 새로고침</button>
                     <button class="btn btn-outline" @click="${() => this._navigateTo('shipment-orders')}">📋 주문 목록</button>
                     <button class="btn btn-outline" @click="${() => this._openWaveNewPopup()}">🌊 웨이브 생성</button>
-                    <button class="btn btn-outline" @click="${() => this._navigateTo('shipment-order-import')}">📥 임포트</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('shipment-order-import')}">📥 주문 임포트</button>
                     <button class="btn btn-outline" @click="${() => this._navigateTo('replenish-orders')}">🔁 보충 현황</button>
                     <button class="btn btn-outline" @click="${() => this._navigateTo('inventories')}">📦 재고 조회</button>
                   </div>
