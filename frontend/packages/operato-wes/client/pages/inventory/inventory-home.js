@@ -192,6 +192,7 @@ class InventoryHome extends localize(i18next)(PageView) {
         .stat-card.expired { border-left: 4px solid #F44336; }
         .stat-card.storage { border-left: 4px solid #2196F3; }
         .stat-card.picking { border-left: 4px solid #4CAF50; }
+        .stat-card.defect { border-left: 4px solid #FF9800; }
         .stat-card.other { border-left: 4px solid #9E9E9E; }
 
         /* 알림 영역 */
@@ -280,20 +281,27 @@ class InventoryHome extends localize(i18next)(PageView) {
     this.statusCounts = {
       total_sku: 0,
       total_qty: 0,
-      stored_qty: 0,
+      available_qty: 0,
       reserved_qty: 0,
-      picking_qty: 0,
+      waiting_qty: 0,
       locked_qty: 0,
       bad_qty: 0,
       shortage_count: 0
     }
     this.statusStats = {
+      available_qty: 0,
+      reserved_qty: 0,
+      waiting_qty: 0,
+      locked_qty: 0,
+      bad_qty: 0
+    }
+    /*this.statusStats = {
       STORED: 0,
       RESERVED: 0,
       PICKING: 0,
       LOCKED: 0,
       BAD: 0
-    }
+    }*/
     this.expireStats = {
       NORMAL: { sku_count: 0, qty: 0 },
       IMMINENT: { sku_count: 0, qty: 0 },
@@ -336,12 +344,12 @@ class InventoryHome extends localize(i18next)(PageView) {
                 <div class="status-cards">
                   <div class="status-card total" @click="${() => this._navigateTo('inventories')}">
                     <div class="label">전체 재고</div>
-                    <div class="count">${this.statusCounts.total_sku || 0}</div>
-                    <div class="subtitle">SKU / ${this._formatNumber(this.statusCounts.total_qty || 0)}개</div>
+                    <div class="count">${this._formatNumber(this.statusCounts.total_qty || 0)}</div>
+                    <div class="subtitle">SKU / ${this._formatNumber(this.statusCounts.total_sku || 0)}개</div>
                   </div>
                   <div class="status-card stored" @click="${() => this._navigateTo('inventories', { status: 'STORED' })}">
                     <div class="label">가용 재고</div>
-                    <div class="count">${this._formatNumber(this.statusCounts.stored_qty || 0)}</div>
+                    <div class="count">${this._formatNumber(this.statusCounts.available_qty || 0)}</div>
                     <div class="subtitle">출고 가능</div>
                   </div>
                   <div class="status-card reserved" @click="${() => this._navigateTo('inventories', { status: 'RESERVED' })}">
@@ -349,10 +357,10 @@ class InventoryHome extends localize(i18next)(PageView) {
                     <div class="count">${this._formatNumber(this.statusCounts.reserved_qty || 0)}</div>
                     <div class="subtitle">출고 예약됨</div>
                   </div>
-                  <div class="status-card shortage">
-                    <div class="label">부족 재고</div>
-                    <div class="count">${this.statusCounts.shortage_count || 0}</div>
-                    <div class="subtitle">안전재고 미만</div>
+                  <div class="status-card shortage" @click="${() => this._navigateTo('inventories', { status: 'WAITING' })}">
+                    <div class="label">입고 대기</div>
+                    <div class="count">${this._formatNumber(this.statusCounts.waiting_qty || 0)}</div>
+                    <div class="subtitle">적치 전</div>
                   </div>
                 </div>
               </section>
@@ -401,6 +409,11 @@ class InventoryHome extends localize(i18next)(PageView) {
                     <div class="count">${this.locationStats.PICKING?.usage_rate?.toFixed(1) || 0}%</div>
                     <div class="details">${this.locationStats.PICKING?.used || 0} / ${this.locationStats.PICKING?.total || 0}</div>
                   </div>
+                  <div class="stat-card defect">
+                    <div class="label">불량 로케이션</div>
+                    <div class="count">${this.locationStats.DEFECT?.usage_rate?.toFixed(1) || 0}%</div>
+                    <div class="details">${this.locationStats.DEFECT?.used || 0} / ${this.locationStats.DEFECT?.total || 0}</div>
+                  </div>
                   <div class="stat-card other">
                     <div class="label">기타 로케이션</div>
                     <div class="count">${this.locationStats.OTHER?.usage_rate?.toFixed(1) || 0}%</div>
@@ -447,8 +460,9 @@ class InventoryHome extends localize(i18next)(PageView) {
       this.statusCounts = statusCountsResponse
 
       // 재고 상태별 통계
-      const statusStatsResponse = await this._fetchStatusStats()
-      this.statusStats = statusStatsResponse
+      // const statusStatsResponse = await this._fetchStatusStats()
+      // this.statusStats = statusStatsResponse
+      this.statusStats = this.statusCounts;
 
       // 유효기한 상태별 통계
       const expireStatsResponse = await this._fetchExpireStats()
@@ -478,9 +492,9 @@ class InventoryHome extends localize(i18next)(PageView) {
       return data || {
         total_sku: 0,
         total_qty: 0,
-        stored_qty: 0,
+        available_qty: 0,
         reserved_qty: 0,
-        picking_qty: 0,
+        waiting_qty: 0,
         locked_qty: 0,
         bad_qty: 0,
         shortage_count: 0
@@ -490,9 +504,9 @@ class InventoryHome extends localize(i18next)(PageView) {
       return {
         total_sku: 0,
         total_qty: 0,
-        stored_qty: 0,
+        available_qty: 0,
         reserved_qty: 0,
-        picking_qty: 0,
+        waiting_qty: 0,
         locked_qty: 0,
         bad_qty: 0,
         shortage_count: 0
@@ -501,7 +515,7 @@ class InventoryHome extends localize(i18next)(PageView) {
   }
 
   /** 재고 상태별 통계 조회 */
-  async _fetchStatusStats() {
+  /*async _fetchStatusStats() {
     try {
       const data = await ServiceUtil.restGet('inv_dashboard/status-stats')
       return data || { STORED: 0, RESERVED: 0, PICKING: 0, LOCKED: 0, BAD: 0 }
@@ -509,7 +523,7 @@ class InventoryHome extends localize(i18next)(PageView) {
       console.error('재고 상태별 통계 조회 실패:', error)
       return { STORED: 0, RESERVED: 0, PICKING: 0, LOCKED: 0, BAD: 0 }
     }
-  }
+  }*/
 
   /** 유효기한 상태별 통계 조회 */
   async _fetchExpireStats() {
@@ -578,16 +592,16 @@ class InventoryHome extends localize(i18next)(PageView) {
     this._chart = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: ['보관 중', '예약됨', '피킹 중', '잠김', '불량'],
+        labels: ['보관 중', '예약됨', '입고 대기', '잠김', '불량'],
         datasets: [
           {
             label: '재고 수량',
             data: [
-              this.statusStats.STORED || 0,
-              this.statusStats.RESERVED || 0,
-              this.statusStats.PICKING || 0,
-              this.statusStats.LOCKED || 0,
-              this.statusStats.BAD || 0
+              this.statusStats.available_qty || 0,
+              this.statusStats.reserved_qty || 0,
+              this.statusStats.waiting_qty || 0,
+              this.statusStats.locked_qty || 0,
+              this.statusStats.bad_qty || 0
             ],
             backgroundColor: [
               '#2196F3', // 파란색 (STORED)

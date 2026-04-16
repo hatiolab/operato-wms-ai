@@ -34,17 +34,28 @@ public class InventoryDashboardService extends AbstractQueryService {
         Long domainId = Domain.currentDomainId();
 
         // 전체 SKU 수 및 총 수량
-        String totalSql = "SELECT COUNT(DISTINCT sku_cd) as sku_count, SUM(inv_qty) as total_qty " +
+        String totalSql = "SELECT COUNT(DISTINCT sku_cd) as sku_count, SUM(inv_qty) as total_qty, SUM(inv_qty - reserved_qty) as available_qty, SUM(reserved_qty) as reserved_qty "
+                +
                 "FROM inventories " +
                 "WHERE domain_id = :domainId " +
-                "AND del_flag = 'N' ";
+                "AND (del_flag is null or del_flag = false) ";
+
+        // 상태별 수량
+        String statusSql = "SELECT status, SUM(inv_qty) as qty " +
+                "FROM inventories " +
+                "WHERE domain_id = :domainId " +
+                "AND (del_flag is null or del_flag = false) ";
 
         if (ValueUtil.isNotEmpty(comCd)) {
             totalSql += "AND com_cd = :comCd ";
+            statusSql += "AND com_cd = :comCd ";
         }
         if (ValueUtil.isNotEmpty(whCd)) {
             totalSql += "AND wh_cd = :whCd ";
+            statusSql += "AND wh_cd = :whCd ";
         }
+
+        statusSql += "GROUP BY status";
 
         Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
         if (ValueUtil.isNotEmpty(comCd)) {
@@ -57,40 +68,23 @@ public class InventoryDashboardService extends AbstractQueryService {
         Map<String, Object> totalResult = (Map<String, Object>) this.queryManager.selectBySql(totalSql, params,
                 Map.class);
 
-        // 상태별 수량
-        String statusSql = "SELECT status, SUM(inv_qty) as qty " +
-                "FROM inventories " +
-                "WHERE domain_id = :domainId " +
-                "AND del_flag = 'N' ";
-
-        if (ValueUtil.isNotEmpty(comCd)) {
-            statusSql += "AND com_cd = :comCd ";
-        }
-        if (ValueUtil.isNotEmpty(whCd)) {
-            statusSql += "AND wh_cd = :whCd ";
-        }
-
-        statusSql += "GROUP BY status";
-
         List<Map<String, Object>> statusResults = (List<Map<String, Object>>) (List<?>) this.queryManager
                 .selectListBySql(statusSql, params, Map.class, 0, 0);
 
         Map<String, Object> statusCounts = ValueUtil.newMap(
-                "total_sku,total_qty,stored_qty,reserved_qty,picking_qty,locked_qty,bad_qty,shortage_count",
+                "total_sku,total_qty,available_qty,reserved_qty,waiting_qty,locked_qty,bad_qty",
                 ValueUtil.toInteger(totalResult.get("sku_count"), 0),
                 ValueUtil.toInteger(totalResult.get("total_qty"), 0),
-                0, 0, 0, 0, 0, 0);
+                ValueUtil.toInteger(totalResult.get("available_qty"), 0),
+                ValueUtil.toInteger(totalResult.get("reserved_qty"), 0),
+                0, 0, 0);
 
         for (Map<String, Object> row : statusResults) {
             String status = ValueUtil.toString(row.get("status"));
             Integer qty = ValueUtil.toInteger(row.get("qty"));
 
-            if (ValueUtil.isEqual(status, Inventory.STATUS_STORED)) {
-                statusCounts.put("stored_qty", qty);
-            } else if (ValueUtil.isEqual(status, Inventory.STATUS_RESERVED)) {
-                statusCounts.put("reserved_qty", qty);
-            } else if (ValueUtil.isEqual(status, Inventory.STATUS_PICK)) {
-                statusCounts.put("picking_qty", qty);
+            if (ValueUtil.isEqual(status, Inventory.STATUS_WAITING)) {
+                statusCounts.put("waiting_qty", qty);
             } else if (ValueUtil.isEqual(status, Inventory.STATUS_LOCK)) {
                 statusCounts.put("locked_qty", qty);
             } else if (ValueUtil.isEqual(status, Inventory.STATUS_BAD)) {
@@ -241,8 +235,9 @@ public class InventoryDashboardService extends AbstractQueryService {
 
         String sql = "SELECT " +
                 "  CASE " +
-                "    WHEN l.loc_type IN ('STORAGE', 'RACK') THEN 'STORAGE' " +
+                "    WHEN l.loc_type = 'STORE' THEN 'STORAGE' " +
                 "    WHEN l.loc_type = 'PICKABLE' THEN 'PICKING' " +
+                "    WHEN l.loc_type = 'DEFECT' THEN 'DEFECT' " +
                 "    ELSE 'OTHER' " +
                 "  END as loc_group, " +
                 "  COUNT(l.id) as total, " +
@@ -265,8 +260,9 @@ public class InventoryDashboardService extends AbstractQueryService {
 
         sql += "GROUP BY " +
                 "  CASE " +
-                "    WHEN l.loc_type IN ('STORAGE', 'RACK') THEN 'STORAGE' " +
+                "    WHEN l.loc_type = 'STORE' THEN 'STORAGE' " +
                 "    WHEN l.loc_type = 'PICKABLE' THEN 'PICKING' " +
+                "    WHEN l.loc_type = 'DEFECT' THEN 'DEFECT' " +
                 "    ELSE 'OTHER' " +
                 "  END";
 
@@ -284,6 +280,7 @@ public class InventoryDashboardService extends AbstractQueryService {
         Map<String, Object> locationStats = ValueUtil.newMap("STORAGE",
                 ValueUtil.newMap("total,used,usage_rate", 0, 0, 0.0));
         locationStats.put("PICKING", ValueUtil.newMap("total,used,usage_rate", 0, 0, 0.0));
+        locationStats.put("DEFECT", ValueUtil.newMap("total,used,usage_rate", 0, 0, 0.0));
         locationStats.put("OTHER", ValueUtil.newMap("total,used,usage_rate", 0, 0, 0.0));
 
         for (Map<String, Object> row : results) {
@@ -291,7 +288,6 @@ public class InventoryDashboardService extends AbstractQueryService {
             Integer total = ValueUtil.toInteger(row.get("total"));
             Integer used = ValueUtil.toInteger(row.get("used"));
             Double usageRate = total > 0 ? (used * 100.0 / total) : 0.0;
-
             locationStats.put(locGroup, ValueUtil.newMap("total,used,usage_rate", total, used, usageRate));
         }
 
