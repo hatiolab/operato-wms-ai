@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import operato.wms.base.entity.Location;
+import operato.wms.base.entity.SKU;
 import operato.wms.base.service.RuntimeConfigService;
 import operato.wms.base.service.WmsBaseService;
 import operato.wms.stock.entity.Inventory;
@@ -681,6 +682,55 @@ public class InventoryTransactionService extends AbstractQueryService {
         inventory.setLastTranCd(Inventory.TRANSACTION_OUT);
         this.queryManager.update(inventory);
         return inventory;
+    }
+
+    /**
+     * 재고 임의 생성 처리
+     * 
+     * @param domainId
+     * @param input
+     * @return
+     */
+    public Inventory createInventory(Long domainId, Inventory input) {
+        Inventory newInventory = ValueUtil.populate(input, new Inventory());
+
+        if (ValueUtil.isEmpty(input.getComCd())) {
+            // 화주사가 없습니다.
+            throw ThrowUtil.newNotAllowedEmptyInfo("label.com_cd");
+        }
+
+        if (ValueUtil.isEmpty(input.getLocCd())) {
+            // 로케이션이 없습니다.
+            throw ThrowUtil.newNotAllowedEmptyInfo("label.loc_cd");
+        }
+
+        if (ValueUtil.isEmpty(input.getInvQty()) || input.getInvQty() == 0.0) {
+            // 재고 수량이 없습니다.
+            throw ThrowUtil.newNotAllowedEmptyInfo("label.inv_qty");
+        }
+
+        if (ValueUtil.isEmpty(input.getSkuCd())) {
+            // 상품 코드가 없습니다.
+            throw ThrowUtil.newNotAllowedEmptyInfo("label.sku_cd");
+        }
+
+        // Find and Check Location
+        Location location = this.findAndCheckLocation(domainId, input.getLocCd(), Inventory.TRANSACTION_NEW);
+
+        // 혼적 가능 여부 체크
+        this.checkMixableLocation(location, input.getSkuCd());
+
+        // Find SKU
+        SKU sku = this.wmsBaseSvc.findSkuWithException(input.getComCd(), input.getSkuCd(), false);
+
+        // 사용자가 입력한 정보대로 재고 정보 생성
+        newInventory.setSkuNm(sku.getSkuNm());
+        newInventory.setVendCd(sku.getVendCd());
+        newInventory.setLastTranCd(Inventory.TRANSACTION_NEW);
+        this.queryManager.insert(newInventory);
+
+        // 생성 재고 정보 리턴
+        return newInventory;
     }
 
     /**

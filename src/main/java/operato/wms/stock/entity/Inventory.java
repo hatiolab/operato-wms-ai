@@ -3,6 +3,10 @@ package operato.wms.stock.entity;
 import java.util.Date;
 import java.util.UUID;
 
+import org.apache.commons.math3.stat.descriptive.summary.Product;
+
+import operato.wms.base.entity.Location;
+import operato.wms.base.entity.SKU;
 import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
@@ -649,17 +653,6 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	 * 이력에 남지 않는다.)
 	 */
 	private void createInventoryHistory() {
-		InventoryHist hist = ValueUtil.populate(this, new InventoryHist());
-		hist.setId(UUID.randomUUID().toString());
-		hist.setDomainId(this.domainId == null ? Domain.currentDomainId() : this.domainId);
-
-		IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
-		String sql = "select max(hist_seq) from inventory_hists where domain_id = :domainId and barcode = :barcode";
-		Integer maxSeq = queryMgr.selectBySql(sql,
-				ValueUtil.newMap("domainId,barcode", hist.getDomainId(), hist.getBarcode()), Integer.class);
-		hist.setHistSeq(maxSeq == null ? 1 : maxSeq + 1);
-		hist.setCreatorId(User.currentUser().getId());
-		hist.setCreatedAt(new Date());
-		queryMgr.insert(hist);
+		new InventoryHist().create(true, this);
 	}
 }

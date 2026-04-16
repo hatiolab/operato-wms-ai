@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -21,6 +22,7 @@ import xyz.anythings.sys.model.BaseResponse;
 import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
+import xyz.elidom.sys.SysConstants;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.system.service.AbstractRestService;
 import xyz.elidom.util.ValueUtil;
@@ -43,7 +45,14 @@ import xyz.elidom.util.ValueUtil;
 @RequestMapping("/rest/inventory_trx")
 @ServiceDesc(description = "Inventory Service API")
 public class InvTransactionController extends AbstractRestService {
-
+    /**
+     * 커스텀 서비스 - 재고 생성 (create) 전 처리
+     */
+    public static final String TRX_INV_PRE_CREATE_INVENTORY = "diy-inv-pre-create-inventory";
+    /**
+     * 커스텀 서비스 - 재고 생성 (create) 후 처리
+     */
+    public static final String TRX_INV_POST_CREATE_INVENTORY = "diy-inv-post-create-inventory";
     /**
      * 커스텀 서비스 - 재고 최초 입고 (putaway) 전 처리
      */
@@ -123,6 +132,37 @@ public class InvTransactionController extends AbstractRestService {
     @Override
     protected Class<?> entityClass() {
         return Inventory.class;
+    }
+
+    /**
+     * 재고 임의 생성
+     * 
+     * @param input
+     * @return
+     */
+    @PostMapping(value = "/create_inventory", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Create Inventory")
+    public BaseResponse createInventory(@RequestBody Inventory input) {
+        Long domainId = Domain.currentDomainId();
+        input.setId(null);
+
+        // 커스텀 서비스 처리
+        Object customResult = this.doCustomService(domainId, ValueUtil.newMap("input", input),
+                TRX_INV_PRE_CREATE_INVENTORY, TRX_INV_POST_CREATE_INVENTORY);
+
+        if (customResult == null) {
+            // 재고 생성 처리
+            Inventory inventory = this.invTrxSvc.createInventory(domainId, input);
+            // 커스텀 서비스 후 처리
+            this.customSvc.doCustomService(domainId, TRX_INV_POST_CREATE_INVENTORY,
+                    ValueUtil.newMap("inventory", inventory));
+            // 리턴
+            return new BaseResponse(true, SysConstants.OK_STRING);
+
+        } else {
+            // 리턴
+            return new BaseResponse(true, SysConstants.OK_STRING);
+        }
     }
 
     /**

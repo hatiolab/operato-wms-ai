@@ -1,22 +1,30 @@
 package operato.wms.stock.entity;
 
+import java.util.UUID;
+
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
 import xyz.elidom.dbist.annotation.Index;
 import xyz.elidom.dbist.annotation.PrimaryKey;
 import xyz.elidom.dbist.annotation.Table;
+import xyz.elidom.orm.IQueryManager;
+import xyz.elidom.sys.entity.Domain;
+import xyz.elidom.sys.entity.User;
+import xyz.elidom.sys.util.OperatoDateUtil;
+import xyz.elidom.sys.util.ValueUtil;
+import xyz.elidom.util.BeanUtil;
 
-@Table(name = "inventory_hists", idStrategy = GenerationRule.UUID, uniqueFields="barcode,histSeq,domainId", indexes = {
-	@Index(name = "ix_inventory_hists_0", columnList = "domain_id,barcode,hist_seq", unique = true),
-    @Index(name = "ix_inventory_hists_1", columnList = "domain_id,wh_cd,com_cd"),
-    @Index(name = "ix_inventory_hists_2", columnList = "domain_id,wh_cd,vend_cd,maker_cd"),
-    @Index(name = "ix_inventory_hists_3", columnList = "domain_id,wh_cd,loc_cd"),
-    @Index(name = "ix_inventory_hists_4", columnList = "domain_id,wh_cd,invoice_no"),
-    @Index(name = "ix_inventory_hists_5", columnList = "domain_id,wh_cd,lot_no"),
-    @Index(name = "ix_inventory_hists_6", columnList = "domain_id,wh_cd,expired_date"),
-    @Index(name = "ix_inventory_hists_7", columnList = "domain_id,wh_cd,expire_status"),
-    @Index(name = "ix_inventory_hists_8", columnList = "domain_id,wh_cd,status"),
-    @Index(name = "ix_inventory_hists_9", columnList = "domain_id,last_tran_cd")
+@Table(name = "inventory_hists", idStrategy = GenerationRule.UUID, uniqueFields = "barcode,histSeq,domainId", indexes = {
+		@Index(name = "ix_inventory_hists_0", columnList = "domain_id,barcode,hist_seq", unique = true),
+		@Index(name = "ix_inventory_hists_1", columnList = "domain_id,wh_cd,com_cd"),
+		@Index(name = "ix_inventory_hists_2", columnList = "domain_id,wh_cd,vend_cd,maker_cd"),
+		@Index(name = "ix_inventory_hists_3", columnList = "domain_id,wh_cd,loc_cd"),
+		@Index(name = "ix_inventory_hists_4", columnList = "domain_id,wh_cd,invoice_no"),
+		@Index(name = "ix_inventory_hists_5", columnList = "domain_id,wh_cd,lot_no"),
+		@Index(name = "ix_inventory_hists_6", columnList = "domain_id,wh_cd,expired_date"),
+		@Index(name = "ix_inventory_hists_7", columnList = "domain_id,wh_cd,expire_status"),
+		@Index(name = "ix_inventory_hists_8", columnList = "domain_id,wh_cd,status"),
+		@Index(name = "ix_inventory_hists_9", columnList = "domain_id,last_tran_cd")
 })
 public class InventoryHist extends xyz.elidom.orm.entity.basic.DomainCreateStamp {
 	/**
@@ -25,123 +33,123 @@ public class InventoryHist extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 	private static final long serialVersionUID = 189375711741828130L;
 
 	@PrimaryKey
-	@Column (name = "id", nullable = false, length = 40)
+	@Column(name = "id", nullable = false, length = 40)
 	private String id;
 
-	@Column (name = "barcode", nullable = false, length = 40)
+	@Column(name = "barcode", nullable = false, length = 40)
 	private String barcode;
-	
-    @Column (name = "hist_seq", nullable = false)
-    private Integer histSeq;
-	
-	@Column (name = "wh_cd", nullable = false, length = 30)
+
+	@Column(name = "hist_seq", nullable = false)
+	private Integer histSeq;
+
+	@Column(name = "wh_cd", nullable = false, length = 30)
 	private String whCd;
 
-	@Column (name = "com_cd", nullable = false, length = 30)
+	@Column(name = "com_cd", nullable = false, length = 30)
 	private String comCd;
 
-	@Column (name = "sku_cd", nullable = false, length = 30)
+	@Column(name = "sku_cd", nullable = false, length = 30)
 	private String skuCd;
 
-	@Column (name = "sku_bcd", length = 50)
+	@Column(name = "sku_bcd", length = 50)
 	private String skuBcd;
 
-	@Column (name = "sku_nm")
+	@Column(name = "sku_nm")
 	private String skuNm;
 
-	@Column (name = "vend_cd", length = 30)
+	@Column(name = "vend_cd", length = 30)
 	private String vendCd;
 
-	@Column (name = "maker_cd", length = 30)
+	@Column(name = "maker_cd", length = 30)
 	private String makerCd;
 
-	@Column (name = "loc_cd", nullable = false, length = 30)
+	@Column(name = "loc_cd", nullable = false, length = 30)
 	private String locCd;
-	
-	@Column (name = "pallet_cd", length = 30)
-    private String palletCd;
 
-	@Column (name = "po_no", length = 30)
+	@Column(name = "pallet_cd", length = 30)
+	private String palletCd;
+
+	@Column(name = "po_no", length = 30)
 	private String poNo;
 
-	@Column (name = "invoice_no", length = 30)
+	@Column(name = "invoice_no", length = 30)
 	private String invoiceNo;
-	
-	@Column (name = "rcv_no", length = 30)
+
+	@Column(name = "rcv_no", length = 30)
 	private String rcvNo;
-	
-	@Column (name = "rcv_seq")
+
+	@Column(name = "rcv_seq")
 	private Integer rcvSeq;
-	
-	@Column (name = "rls_ord_no", length = 30)
+
+	@Column(name = "rls_ord_no", length = 30)
 	private String rlsOrdNo;
-	
-	@Column (name = "rls_line_no", length = 30)
+
+	@Column(name = "rls_line_no", length = 30)
 	private String rlsLineNo;
 
-	@Column (name = "pack_type", length = 20)
+	@Column(name = "pack_type", length = 20)
 	private String packType;
 
-	@Column (name = "pack_no", length = 30)
+	@Column(name = "pack_no", length = 30)
 	private String packNo;
 
-    @Column (name = "origin", length = 10)
-    private String origin;
-    
-	@Column (name = "lot_no", length = 50)
+	@Column(name = "origin", length = 10)
+	private String origin;
+
+	@Column(name = "lot_no", length = 50)
 	private String lotNo;
 
-	@Column (name = "serial_no", length = 50)
+	@Column(name = "serial_no", length = 50)
 	private String serialNo;
 
-	@Column (name = "expired_date", length = 10)
+	@Column(name = "expired_date", length = 10)
 	private String expiredDate;
 
-	@Column (name = "prod_date", length = 10)
+	@Column(name = "prod_date", length = 10)
 	private String prodDate;
 
-	@Column (name = "weight")
+	@Column(name = "weight")
 	private Double weight;
 
-	@Column (name = "cbm")
+	@Column(name = "cbm")
 	private Double cbm;
 
-    @Column (name = "pallet_qty")
-    private Integer palletQty;
-    
-    @Column (name = "box_qty")
-    private Integer boxQty;
-    
-    @Column (name = "ea_qty")
-	private Double eaQty;
-    
-    @Column (name = "reserved_qty")
-    private Double reservedQty;
+	@Column(name = "pallet_qty")
+	private Integer palletQty;
 
-	@Column (name = "inv_qty", nullable = false)
+	@Column(name = "box_qty")
+	private Integer boxQty;
+
+	@Column(name = "ea_qty")
+	private Double eaQty;
+
+	@Column(name = "reserved_qty")
+	private Double reservedQty;
+
+	@Column(name = "inv_qty", nullable = false)
 	private Double invQty;
 
-	@Column (name = "last_tran_cd", length = 20)
+	@Column(name = "last_tran_cd", length = 20)
 	private String lastTranCd;
 
-	@Column (name = "expire_status", length = 10)
+	@Column(name = "expire_status", length = 10)
 	private String expireStatus;
-	
-	@Column (name = "owner", length = 32)
+
+	@Column(name = "owner", length = 32)
 	private String owner;
 
-	@Column (name = "status", length = 10)
+	@Column(name = "status", length = 10)
 	private String status;
-	
-	@Column (name = "erp_status", length = 20)
+
+	@Column(name = "erp_status", length = 20)
 	private String erpStatus;
 
-	@Column (name = "remarks", length = 1000)
+	@Column(name = "remarks", length = 1000)
 	private String remarks;
 
-	@Column (name = "del_flag")
+	@Column(name = "del_flag")
 	private Boolean delFlag;
-  
+
 	public String getId() {
 		return id;
 	}
@@ -271,14 +279,14 @@ public class InventoryHist extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 	}
 
 	public String getOrigin() {
-        return origin;
-    }
+		return origin;
+	}
 
-    public void setOrigin(String origin) {
-        this.origin = origin;
-    }
+	public void setOrigin(String origin) {
+		this.origin = origin;
+	}
 
-    public String getLotNo() {
+	public String getLotNo() {
 		return lotNo;
 	}
 
@@ -294,7 +302,7 @@ public class InventoryHist extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 		this.serialNo = serialNo;
 	}
 
-    public String getExpiredDate() {
+	public String getExpiredDate() {
 		return expiredDate;
 	}
 
@@ -327,22 +335,22 @@ public class InventoryHist extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 	}
 
 	public Integer getPalletQty() {
-        return palletQty;
-    }
+		return palletQty;
+	}
 
-    public void setPalletQty(Integer palletQty) {
-        this.palletQty = palletQty;
-    }
+	public void setPalletQty(Integer palletQty) {
+		this.palletQty = palletQty;
+	}
 
-    public Integer getBoxQty() {
-        return boxQty;
-    }
+	public Integer getBoxQty() {
+		return boxQty;
+	}
 
-    public void setBoxQty(Integer boxQty) {
-        this.boxQty = boxQty;
-    }
+	public void setBoxQty(Integer boxQty) {
+		this.boxQty = boxQty;
+	}
 
-    public Double getEaQty() {
+	public Double getEaQty() {
 		return eaQty;
 	}
 
@@ -351,14 +359,14 @@ public class InventoryHist extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 	}
 
 	public Double getReservedQty() {
-        return reservedQty;
-    }
+		return reservedQty;
+	}
 
-    public void setReservedQty(Double reservedQty) {
-        this.reservedQty = reservedQty;
-    }
+	public void setReservedQty(Double reservedQty) {
+		this.reservedQty = reservedQty;
+	}
 
-    public Double getInvQty() {
+	public Double getInvQty() {
 		return invQty;
 	}
 
@@ -452,5 +460,25 @@ public class InventoryHist extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 
 	public void setOwner(String owner) {
 		this.owner = owner;
+	}
+
+	public void create(Boolean save, Inventory inventory) {
+		ValueUtil.populate(inventory, this);
+		this.setId(UUID.randomUUID().toString());
+		this.setDomainId(this.domainId == null ? Domain.currentDomainId() : this.domainId);
+
+		String sql = "select max(hist_seq) from inventory_hists where domain_id = :domainId and barcode = :barcode";
+		IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
+		Integer maxSeq = queryMgr.selectBySql(sql,
+				ValueUtil.newMap("domainId,barcode", this.getDomainId(), this.getBarcode()), Integer.class);
+
+		this.setHistSeq(ValueUtil.toInteger(maxSeq, 0) + 1);
+		this.setCreatorId(User.currentUser().getId());
+		this.setCreatedAt(OperatoDateUtil.getDate());
+		this.delFlag = false;
+
+		if (save) {
+			queryMgr.insert(this);
+		}
 	}
 }
