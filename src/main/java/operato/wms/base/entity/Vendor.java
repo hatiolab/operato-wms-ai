@@ -6,12 +6,12 @@ import xyz.elidom.dbist.annotation.PrimaryKey;
 import xyz.elidom.dbist.annotation.GenerationRule;
 import xyz.elidom.dbist.annotation.Table;
 
-@Table(name = "vendors", idStrategy = GenerationRule.UUID, uniqueFields="comCd,vendCd,domainId", indexes = {
-	@Index(name = "ix_vendors_0", columnList = "com_cd,vend_cd,domain_id", unique = true),
-    @Index(name = "ix_vendors_1", columnList = "vend_nm,domain_id"),
-    @Index(name = "ix_vendors_2", columnList = "del_flag,domain_id"),
-    @Index(name = "ix_vendors_3", columnList = "vend_type,domain_id"),
-    @Index(name = "ix_vendors_4", columnList = "biz_lic_no,domain_id")
+@Table(name = "vendors", idStrategy = GenerationRule.UUID, uniqueFields = "comCd,vendCd,domainId", indexes = {
+		@Index(name = "ix_vendors_0", columnList = "com_cd,vend_cd,domain_id", unique = true),
+		@Index(name = "ix_vendors_1", columnList = "vend_nm,domain_id"),
+		@Index(name = "ix_vendors_2", columnList = "del_flag,domain_id"),
+		@Index(name = "ix_vendors_3", columnList = "vend_type,domain_id"),
+		@Index(name = "ix_vendors_4", columnList = "biz_lic_no,domain_id")
 })
 public class Vendor extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	/**
@@ -19,88 +19,164 @@ public class Vendor extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	 */
 	private static final long serialVersionUID = 189999155070254204L;
 
+	/**
+	 * 공급업체(벤더) 고유 ID (UUID)
+	 */
 	@PrimaryKey
-	@Column (name = "id", nullable = false, length = 40)
+	@Column(name = "id", nullable = false, length = 40)
 	private String id;
 
-	@Column (name = "com_cd", nullable = false, length = 20)
+	/**
+	 * 화주사 코드 - 이 공급업체가 속한 화주사 코드
+	 */
+	@Column(name = "com_cd", nullable = false, length = 20)
 	private String comCd;
 
-	@Column (name = "vend_cd", nullable = false, length = 20)
+	/**
+	 * 공급업체 코드 - 화주사 내 고유 공급업체 식별 코드 (comCd + vendCd 조합으로 유일).
+	 * SKU의 vendCd와 연결되어 입고 시 공급처 추적에 사용
+	 */
+	@Column(name = "vend_cd", nullable = false, length = 20)
 	private String vendCd;
 
-	@Column (name = "vend_nm", nullable = false, length = 100)
+	/**
+	 * 공급업체 명칭 - 공급업체 공식 법인명 또는 상호명
+	 */
+	@Column(name = "vend_nm", nullable = false, length = 100)
 	private String vendNm;
 
-	@Column (name = "vend_alias", length = 100)
+	/**
+	 * 공급업체 별칭 - 내부 관리용 약칭 또는 줄임말
+	 */
+	@Column(name = "vend_alias", length = 100)
 	private String vendAlias;
 
-	@Column (name = "vend_type", length = 20)
+	/**
+	 * 공급업체 유형 - 공급업체 분류 코드 (예: MANUFACTURER-제조사, IMPORTER-수입사, DISTRIBUTOR-총판)
+	 */
+	@Column(name = "vend_type", length = 20)
 	private String vendType;
 
-	@Column (name = "vend_group", length = 20)
+	/**
+	 * 공급업체 그룹 - 복수의 공급업체를 묶어 관리하는 그룹 코드
+	 */
+	@Column(name = "vend_group", length = 20)
 	private String vendGroup;
 
-	@Column (name = "vend_mgr_nm", length = 40)
+	/**
+	 * 공급업체 담당자 이름
+	 */
+	@Column(name = "vend_mgr_nm", length = 40)
 	private String vendMgrNm;
 
-	@Column (name = "vend_mgr_email", length = 50)
+	/**
+	 * 공급업체 담당자 이메일
+	 */
+	@Column(name = "vend_mgr_email", length = 50)
 	private String vendMgrEmail;
 
-	@Column (name = "vend_mgr_phone", length = 20)
+	/**
+	 * 공급업체 담당자 전화번호
+	 */
+	@Column(name = "vend_mgr_phone", length = 20)
 	private String vendMgrPhone;
 
-	@Column (name = "biz_lic_no", length = 50)
+	/**
+	 * 사업자 등록 번호
+	 */
+	@Column(name = "biz_lic_no", length = 50)
 	private String bizLicNo;
 
-	@Column (name = "rep_per_nm", length = 40)
+	/**
+	 * 대표자 이름
+	 */
+	@Column(name = "rep_per_nm", length = 40)
 	private String repPerNm;
 
-	@Column (name = "biz_item_nm")
-	private String bizItemNm;
-
-	@Column (name = "biz_con_nm")
+	/**
+	 * 업태 - 사업자 등록증 상의 업태 (예: 제조업, 도소매업)
+	 */
+	@Column(name = "biz_con_nm")
 	private String bizConNm;
 
-	@Column (name = "vend_tel_no", length = 20)
+	/**
+	 * 종목 - 사업자 등록증 상의 종목 (예: 전자제품, 의류)
+	 */
+	@Column(name = "biz_item_nm")
+	private String bizItemNm;
+
+	/**
+	 * 공급업체 대표 전화번호
+	 */
+	@Column(name = "vend_tel_no", length = 20)
 	private String vendTelNo;
 
-	@Column (name = "vend_fax_no", length = 20)
+	/**
+	 * 팩스 번호
+	 */
+	@Column(name = "vend_fax_no", length = 20)
 	private String vendFaxNo;
 
-	@Column (name = "cs_tel_no", length = 20)
-	private String csTelNo;
-
-	@Column (name = "vend_zip_cd", length = 100)
+	/**
+	 * 우편번호
+	 */
+	@Column(name = "vend_zip_cd", length = 100)
 	private String vendZipCd;
 
-	@Column (name = "vend_addr")
+	/**
+	 * 공급업체 주소
+	 */
+	@Column(name = "vend_addr")
 	private String vendAddr;
 
-	@Column (name = "contract_type", length = 20)
+	/**
+	 * 계약 유형 - 공급업체와의 거래 계약 유형 코드 (예: REGULAR-정기, SPOT-스팟)
+	 */
+	@Column(name = "contract_type", length = 20)
 	private String contractType;
 
-	@Column (name = "del_flag", nullable = false)
+	/**
+	 * 삭제 여부 - true이면 거래 중지된 공급업체
+	 */
+	@Column(name = "del_flag", nullable = false)
 	private Boolean delFlag = false;
 
-	@Column (name = "remarks", length = 1000)
+	/**
+	 * 비고
+	 */
+	@Column(name = "remarks", length = 1000)
 	private String remarks;
 
-	@Column (name = "attr01", length = 100)
+	/**
+	 * 사용자 정의 속성 1 - 화주사별 커스텀 속성 값
+	 */
+	@Column(name = "attr01", length = 100)
 	private String attr01;
 
-	@Column (name = "attr02", length = 100)
+	/**
+	 * 사용자 정의 속성 2 - 화주사별 커스텀 속성 값
+	 */
+	@Column(name = "attr02", length = 100)
 	private String attr02;
 
-	@Column (name = "attr03", length = 100)
+	/**
+	 * 사용자 정의 속성 3 - 화주사별 커스텀 속성 값
+	 */
+	@Column(name = "attr03", length = 100)
 	private String attr03;
 
-	@Column (name = "attr04", length = 100)
+	/**
+	 * 사용자 정의 속성 4 - 화주사별 커스텀 속성 값
+	 */
+	@Column(name = "attr04", length = 100)
 	private String attr04;
 
-	@Column (name = "attr05", length = 100)
+	/**
+	 * 사용자 정의 속성 5 - 화주사별 커스텀 속성 값
+	 */
+	@Column(name = "attr05", length = 100)
 	private String attr05;
-  
+
 	public String getId() {
 		return id;
 	}
@@ -197,20 +273,20 @@ public class Vendor extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.repPerNm = repPerNm;
 	}
 
-	public String getBizItemNm() {
-		return bizItemNm;
-	}
-
-	public void setBizItemNm(String bizItemNm) {
-		this.bizItemNm = bizItemNm;
-	}
-
 	public String getBizConNm() {
 		return bizConNm;
 	}
 
 	public void setBizConNm(String bizConNm) {
 		this.bizConNm = bizConNm;
+	}
+
+	public String getBizItemNm() {
+		return bizItemNm;
+	}
+
+	public void setBizItemNm(String bizItemNm) {
+		this.bizItemNm = bizItemNm;
 	}
 
 	public String getVendTelNo() {
@@ -229,13 +305,6 @@ public class Vendor extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.vendFaxNo = vendFaxNo;
 	}
 
-	public String getCsTelNo() {
-		return csTelNo;
-	}
-
-	public void setCsTelNo(String csTelNo) {
-		this.csTelNo = csTelNo;
-	}
 
 	public String getVendZipCd() {
 		return vendZipCd;
@@ -315,5 +384,5 @@ public class Vendor extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setAttr05(String attr05) {
 		this.attr05 = attr05;
-	}	
+	}
 }

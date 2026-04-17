@@ -529,7 +529,7 @@ public class InventoryTransactionService extends AbstractQueryService {
 
         List<Inventory> storedInvList = this.queryManager.selectList(Inventory.class, condition);
 
-        if (storedInvList == null) {
+        if (ValueUtil.isEmpty(storedInvList)) {
             // 보관 중인 동일 바코드가 없는 경우
             reservedInventory.setStatus(Inventory.STATUS_STORED);
             reservedInventory.setLastTranCd(Inventory.TRANSACTION_IN);
@@ -576,9 +576,12 @@ public class InventoryTransactionService extends AbstractQueryService {
                 barcode, locCd, skuCd);
         List<Inventory> invList = this.queryManager.selectListBySql(sql, params, Inventory.class, 0, 0);
 
-        if (ValueUtil.isEmpty(invList) && exceptionWhenNotExist) {
-            throw new ElidomRuntimeException(
-                    "바코드 [" + barcode + "], 로케이션 [" + locCd + "]에 출고 처리할 상품 [" + skuCd + "] 재고가 존재하지 않습니다.");
+        if (ValueUtil.isEmpty(invList)) {
+            if (exceptionWhenNotExist) {
+                throw new ElidomRuntimeException(
+                        "바코드 [" + barcode + "], 로케이션 [" + locCd + "]에 출고 처리할 상품 [" + skuCd + "] 재고가 존재하지 않습니다.");
+            }
+            return null;
         }
 
         return invList.get(0);

@@ -1,5 +1,7 @@
 package operato.wms.base.entity;
 
+import java.util.Date;
+
 import xyz.elidom.dbist.annotation.Index;
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.PrimaryKey;
@@ -15,49 +17,142 @@ public class CourierContract extends xyz.elidom.orm.entity.basic.ElidomStampHook
 	 */
 	private static final long serialVersionUID = 925961719349483915L;
 
+	/**
+	 * 택배 계약 고유 ID (UUID)
+	 */
 	@PrimaryKey
 	@Column (name = "id", nullable = false, length = 40)
 	private String id;
 
+	/**
+	 * 배송 벤더(택배사) 코드 - 계약 대상 택배사 코드 (예: CJ, LOGEN, HANJIN).
+	 * contractNo와 조합으로 유일
+	 */
 	@Column (name = "dlv_vend_cd", nullable = false, length = 30)
 	private String dlvVendCd;
 
+	/**
+	 * 계약 번호 - 택배사와 체결한 계약의 고유 번호 (운송장 번호 대역 할당 단위)
+	 */
 	@Column (name = "contract_no", nullable = false, length = 30)
 	private String contractNo;
 
-	@Column (name = "start_bandwidth", length = 30)
-	private String startBandwidth;
+	/**
+	 * 계약명 - 이 계약을 식별하는 명칭 (예: CJ대한통운 2024년 계약)
+	 */
+	@Column (name = "contract_nm", length = 100)
+	private String contractNm;
 
-	@Column (name = "end_bandwidth", length = 30)
-	private String endBandwidth;
+	/**
+	 * 계약 상태 - 계약의 현재 상태 코드
+	 * (예: ACTIVE-유효, EXPIRED-만료, SUSPENDED-중지)
+	 */
+	@Column (name = "status", length = 20)
+	private String status;
 
+	/**
+	 * 계약 시작일 - 이 계약이 유효하기 시작하는 날짜
+	 */
+	@Column (name = "contract_start_date")
+	private Date contractStartDate;
+
+	/**
+	 * 계약 종료일 - 이 계약이 만료되는 날짜.
+	 * 만료일 이후 운송장 발급 불가
+	 */
+	@Column (name = "contract_end_date")
+	private Date contractEndDate;
+
+	/**
+	 * 기본 운임 - 이 계약의 건당 기본 배송 단가 (원).
+	 * 중량·거리 할증 전 기준 요금
+	 */
+	@Column (name = "base_rate")
+	private Double baseRate;
+
+	/**
+	 * kg당 추가 운임 - 기본 중량 초과 시 kg당 부과되는 추가 단가 (원/kg)
+	 */
+	@Column (name = "rate_per_kg")
+	private Double ratePerKg;
+
+	/**
+	 * 유류할증료율 - 기본 운임에 곱하여 유류할증료를 산출하는 비율 (예: 0.15 = 15%).
+	 * 유가 변동에 따라 주기적으로 갱신
+	 */
+	@Column (name = "fuel_surcharge_rate")
+	private Double fuelSurchargeRate;
+
+	/**
+	 * 운송장 번호 시작 대역 - 이 계약에서 사용 가능한 운송장 번호 범위의 시작값
+	 */
+	@Column (name = "start_bandwidth")
+	private Long startBandwidth;
+
+	/**
+	 * 운송장 번호 종료 대역 - 이 계약에서 사용 가능한 운송장 번호 범위의 끝값
+	 */
+	@Column (name = "end_bandwidth")
+	private Long endBandwidth;
+
+	/**
+	 * 현재 발급 위치 번호 - 대역(startBandwidth ~ endBandwidth) 내에서
+	 * 다음에 발급할 운송장 번호. 발급 시마다 1씩 증가
+	 */
+	@Column (name = "current_no")
+	private Long currentNo;
+
+	/**
+	 * 총 운송장 수량 - 이 계약에서 할당된 운송장 번호 총 개수 (end - start + 1)
+	 */
 	@Column (name = "total_cnt")
 	private Integer totalCnt;
 
+	/**
+	 * 사용된 운송장 수량 - 현재까지 출고에 사용된 운송장 번호 수
+	 */
 	@Column (name = "use_cnt")
 	private Integer useCnt;
 
-	@Column (name = "remain_cnt")
-	private Integer remainCnt;
-
+	/**
+	 * 비고
+	 */
 	@Column (name = "remarks", length = 1000)
 	private String remarks;
 
+	/**
+	 * 삭제 여부 - true이면 만료 또는 사용 중지된 계약
+	 */
 	@Column (name = "del_flag")
 	private Boolean delFlag;
 
+	/**
+	 * 사용자 정의 속성 1 - 운영사별 커스텀 속성 값
+	 */
 	@Column (name = "attr01", length = 100)
 	private String attr01;
 
+	/**
+	 * 사용자 정의 속성 2 - 운영사별 커스텀 속성 값
+	 */
 	@Column (name = "attr02", length = 100)
 	private String attr02;
 
+	/**
+	 * 사용자 정의 속성 3 - 운영사별 커스텀 속성 값
+	 */
 	@Column (name = "attr03", length = 100)
 	private String attr03;
 
+	/**
+	 * 사용자 정의 속성 4 - 운영사별 커스텀 속성 값
+	 */
 	@Column (name = "attr04", length = 100)
 	private String attr04;
 
+	/**
+	 * 사용자 정의 속성 5 - 운영사별 커스텀 속성 값
+	 */
 	@Column (name = "attr05", length = 100)
 	private String attr05;
   
@@ -85,20 +180,84 @@ public class CourierContract extends xyz.elidom.orm.entity.basic.ElidomStampHook
 		this.contractNo = contractNo;
 	}
 
-	public String getStartBandwidth() {
+	public String getContractNm() {
+		return contractNm;
+	}
+
+	public void setContractNm(String contractNm) {
+		this.contractNm = contractNm;
+	}
+
+	public String getStatus() {
+		return status;
+	}
+
+	public void setStatus(String status) {
+		this.status = status;
+	}
+
+	public Date getContractStartDate() {
+		return contractStartDate;
+	}
+
+	public void setContractStartDate(Date contractStartDate) {
+		this.contractStartDate = contractStartDate;
+	}
+
+	public Date getContractEndDate() {
+		return contractEndDate;
+	}
+
+	public void setContractEndDate(Date contractEndDate) {
+		this.contractEndDate = contractEndDate;
+	}
+
+	public Double getBaseRate() {
+		return baseRate;
+	}
+
+	public void setBaseRate(Double baseRate) {
+		this.baseRate = baseRate;
+	}
+
+	public Double getRatePerKg() {
+		return ratePerKg;
+	}
+
+	public void setRatePerKg(Double ratePerKg) {
+		this.ratePerKg = ratePerKg;
+	}
+
+	public Double getFuelSurchargeRate() {
+		return fuelSurchargeRate;
+	}
+
+	public void setFuelSurchargeRate(Double fuelSurchargeRate) {
+		this.fuelSurchargeRate = fuelSurchargeRate;
+	}
+
+	public Long getStartBandwidth() {
 		return startBandwidth;
 	}
 
-	public void setStartBandwidth(String startBandwidth) {
+	public void setStartBandwidth(Long startBandwidth) {
 		this.startBandwidth = startBandwidth;
 	}
 
-	public String getEndBandwidth() {
+	public Long getEndBandwidth() {
 		return endBandwidth;
 	}
 
-	public void setEndBandwidth(String endBandwidth) {
+	public void setEndBandwidth(Long endBandwidth) {
 		this.endBandwidth = endBandwidth;
+	}
+
+	public Long getCurrentNo() {
+		return currentNo;
+	}
+
+	public void setCurrentNo(Long currentNo) {
+		this.currentNo = currentNo;
 	}
 
 	public Integer getTotalCnt() {
@@ -117,13 +276,6 @@ public class CourierContract extends xyz.elidom.orm.entity.basic.ElidomStampHook
 		this.useCnt = useCnt;
 	}
 
-	public Integer getRemainCnt() {
-		return remainCnt;
-	}
-
-	public void setRemainCnt(Integer remainCnt) {
-		this.remainCnt = remainCnt;
-	}
 
 	public String getRemarks() {
 		return remarks;

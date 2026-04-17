@@ -6,17 +6,21 @@ import xyz.elidom.dbist.annotation.PrimaryKey;
 import xyz.elidom.dbist.annotation.GenerationRule;
 import xyz.elidom.dbist.annotation.Table;
 
-@Table(name = "sku", idStrategy = GenerationRule.UUID, uniqueFields="comCd,skuCd,domainId", indexes = {
-	@Index(name = "ix_sku_0", columnList = "com_cd,sku_cd,domain_id", unique = true),
-	@Index(name = "ix_sku_1", columnList = "com_cd,vend_cd,domain_id"),
-	@Index(name = "ix_sku_2", columnList = "com_cd,sku_nm,domain_id"),
-	@Index(name = "ix_sku_3", columnList = "com_cd,sku_barcd,domain_id"),
-	@Index(name = "ix_sku_4", columnList = "com_cd,sku_type,domain_id"),
-	@Index(name = "ix_sku_5", columnList = "com_cd,sku_class,domain_id"),
-	@Index(name = "ix_sku_6", columnList = "com_cd,mat_type,domain_id"),
-	@Index(name = "ix_sku_7", columnList = "com_cd,temp_type,domain_id"),
-	@Index(name = "ix_sku_8", columnList = "com_cd,bom_set_flag,domain_id"),
-	@Index(name = "ix_sku_9", columnList = "del_flag,domain_id")
+/**
+ * 상품 마스터
+ * 관련 엔티티 : VasBom, VasBomItem, Inventory, ReceivingItem,
+ * ShipmentOrderItem, StockAllocation, PickingTaskItem, PackingOrderItem
+ */
+@Table(name = "sku", idStrategy = GenerationRule.UUID, uniqueFields = "comCd,skuCd,domainId", indexes = {
+		@Index(name = "ix_sku_0", columnList = "com_cd,sku_cd,domain_id", unique = true),
+		@Index(name = "ix_sku_1", columnList = "com_cd,vend_cd,domain_id"),
+		@Index(name = "ix_sku_2", columnList = "com_cd,sku_nm,domain_id"),
+		@Index(name = "ix_sku_3", columnList = "com_cd,sku_barcd,domain_id"),
+		@Index(name = "ix_sku_4", columnList = "com_cd,sku_type,domain_id"),
+		@Index(name = "ix_sku_5", columnList = "com_cd,sku_class,domain_id"),
+		@Index(name = "ix_sku_6", columnList = "com_cd,mat_type,domain_id"),
+		@Index(name = "ix_sku_7", columnList = "com_cd,bom_set_flag,domain_id"),
+		@Index(name = "ix_sku_8", columnList = "del_flag,domain_id")
 })
 public class SKU extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	/**
@@ -24,161 +28,344 @@ public class SKU extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	 */
 	private static final long serialVersionUID = 190420734368115192L;
 
+	/**
+	 * 상품 고유 ID (UUID)
+	 */
 	@PrimaryKey
-	@Column (name = "id", nullable = false, length = 40)
+	@Column(name = "id", nullable = false, length = 40)
 	private String id;
 
-	@Column (name = "com_cd", nullable = false, length = 30)
+	/**
+	 * 화주사 코드 - 상품을 소유한 화주사 식별 코드
+	 */
+	@Column(name = "com_cd", nullable = false, length = 30)
 	private String comCd;
 
-	@Column (name = "vend_cd", length = 30)
+	/**
+	 * 공급업체 코드 - 상품을 공급하는 벤더사 코드
+	 */
+	@Column(name = "vend_cd", length = 30)
 	private String vendCd;
 
-	@Column (name = "sku_cd", nullable = false, length = 30)
+	/**
+	 * 상품 코드 - 화주사 내 고유 상품 식별 코드 (comCd + skuCd 조합으로 유일)
+	 */
+	@Column(name = "sku_cd", nullable = false, length = 30)
 	private String skuCd;
 
-	@Column (name = "sku_nm", nullable = false, length = 200)
+	/**
+	 * 상품명
+	 */
+	@Column(name = "sku_nm", nullable = false, length = 200)
 	private String skuNm;
 
-	@Column (name = "sku_alias", length = 200)
+	/**
+	 * 상품 별칭 - 내부 관리용 상품 약칭 또는 별명
+	 */
+	@Column(name = "sku_alias", length = 200)
 	private String skuAlias;
 
-	@Column (name = "sku_desc", length = 200)
+	/**
+	 * 상품 설명
+	 */
+	@Column(name = "sku_desc", length = 200)
 	private String skuDesc;
 
-	@Column (name = "sku_barcd", nullable = false, length = 30)
+	/**
+	 * 상품 바코드 (주 바코드) - 낱개 단위 스캔용 바코드
+	 */
+	@Column(name = "sku_barcd", nullable = false, length = 30)
 	private String skuBarcd;
 
-	@Column (name = "sku_barcd2", length = 30)
+	/**
+	 * 상품 바코드 2 - 대체 바코드 (예: EAN, UPC 등 추가 바코드)
+	 */
+	@Column(name = "sku_barcd2", length = 30)
 	private String skuBarcd2;
 
-	@Column (name = "sku_barcd3", length = 30)
+	/**
+	 * 상품 바코드 3 - 추가 대체 바코드
+	 */
+	@Column(name = "sku_barcd3", length = 30)
 	private String skuBarcd3;
 
-	@Column (name = "case_barcd", length = 30)
+	/**
+	 * 케이스 바코드 - 케이스(묶음) 단위 스캔용 바코드
+	 */
+	@Column(name = "case_barcd", length = 30)
 	private String caseBarcd;
 
-	@Column (name = "box_barcd", length = 30)
+	/**
+	 * 박스 바코드 - 박스 단위 스캔용 바코드
+	 */
+	@Column(name = "box_barcd", length = 30)
 	private String boxBarcd;
 
-	@Column (name = "mat_type", length = 10)
+	/**
+	 * 자재 유형 - 원자재/반제품/완제품 등 자재 분류 코드
+	 */
+	@Column(name = "mat_type", length = 10)
 	private String matType;
 
-	@Column (name = "sku_type", length = 20)
+	/**
+	 * 상품 유형 - 상품 분류 코드 (예: NORMAL, SET, VAS 등)
+	 */
+	@Column(name = "sku_type", length = 20)
 	private String skuType;
 
-	@Column (name = "sku_class", length = 40)
+	/**
+	 * 상품 분류 - 카테고리 또는 품목 분류 코드 - 화주사에 따라 다름
+	 */
+	@Column(name = "sku_class", length = 40)
 	private String skuClass;
 
-	@Column (name = "stock_unit", length = 6)
+	/**
+	 * 재고 단위 - 재고 관리 기준 단위 (예: EA, BOX, PCS)
+	 */
+	@Column(name = "stock_unit", length = 6)
 	private String stockUnit;
 
-	@Column (name = "temp_type", length = 50)
+	/**
+	 * 온도 유형 - 보관 온도 조건 코드 (예: ROOM, COLD, FROZEN)
+	 */
+	@Column(name = "temp_type", length = 50)
 	private String tempType;
 
-	@Column (name = "fragile_flag")
+	/**
+	 * 파손 주의 여부 - true이면 취급 주의(Fragile) 상품
+	 */
+	@Column(name = "fragile_flag")
 	private Boolean fragileFlag;
-	
-    @Column (name = "variant_flag")
-    private Boolean variantFlag;
 
-	@Column (name = "box_in_qty")
+	/**
+	 * 옵션 상품 여부 - true이면 색상/사이즈 등 속성이 있는 옵션(variant) 상품
+	 */
+	@Column(name = "variant_flag")
+	private Boolean variantFlag;
+
+	/**
+	 * Lot 번호 관리 여부 - true이면 입고/출고 시 Lot 번호 입력 필수.
+	 * 동일 Lot 단위로 재고 추적 및 리콜 대응이 필요한 상품에 사용
+	 */
+	@Column(name = "lot_flag")
+	private Boolean lotFlag;
+
+	/**
+	 * 시리얼 번호 관리 여부 - true이면 입고/출고 시 개별 시리얼 번호 입력 필수.
+	 * 낱개 단위 추적이 필요한 고가 상품, 전자제품 등에 사용
+	 */
+	@Column(name = "serial_flag")
+	private Boolean serialFlag;
+
+	/**
+	 * 위험물 여부 - true이면 위험물(Hazardous Material) 상품.
+	 * 위험물 상품은 전용 로케이션에만 보관 가능하며, 혼적 및 일반 구역 적치가 제한됨
+	 */
+	@Column(name = "hazmat_flag")
+	private Boolean hazmatFlag;
+
+	/**
+	 * 박스 입수량 - 박스 1개에 들어가는 낱개(EA) 수량
+	 */
+	@Column(name = "box_in_qty")
 	private Integer boxInQty;
 
-	@Column (name = "plt_in_qty")
+	/**
+	 * 팔레트 입수량 - 팔레트 1개에 들어가는 박스 수량
+	 */
+	@Column(name = "plt_in_qty")
 	private Integer pltInQty;
 
-	@Column (name = "sku_wd")
+	/**
+	 * 안전 재고 수량 - 재고가 이 수량 이하로 내려가면 안 되는 최소 보유 수량.
+	 * 조달 지연, 수요 급증 등 비상 상황에 대비한 버퍼 재고
+	 */
+	@Column(name = "safety_stock")
+	private Double safetyStock;
+
+	/**
+	 * 재주문점 수량 - 재고가 이 수량 이하로 떨어지면 발주를 시작해야 하는 임계치.
+	 * 리드타임 동안 소비될 수량 + 안전 재고를 합산하여 설정
+	 * (예: 하루 판매 50개 × 리드타임 3일 + safetyStock 100 = 250)
+	 */
+	@Column(name = "reorder_point")
+	private Double reorderPoint;
+
+	/**
+	 * 상품 폭 - 낱개 상품의 가로 길이 (mm)
+	 */
+	@Column(name = "sku_wd")
 	private Float skuWd;
 
-	@Column (name = "sku_len")
+	/**
+	 * 상품 길이 - 낱개 상품의 세로 길이 (mm)
+	 */
+	@Column(name = "sku_len")
 	private Float skuLen;
 
-	@Column (name = "sku_ht")
+	/**
+	 * 상품 높이 - 낱개 상품의 높이 (mm)
+	 */
+	@Column(name = "sku_ht")
 	private Float skuHt;
 
-	@Column (name = "sku_vol")
+	/**
+	 * 상품 부피 - 낱개 상품의 부피 (CBM)
+	 */
+	@Column(name = "sku_vol")
 	private Float skuVol;
 
-	@Column (name = "sku_wt")
+	/**
+	 * 상품 중량 - 낱개 상품의 무게 (kg)
+	 */
+	@Column(name = "sku_wt")
 	private Float skuWt;
 
-	@Column (name = "box_wd")
+	/**
+	 * 박스 폭 - 박스 포장 단위의 가로 길이 (mm)
+	 */
+	@Column(name = "box_wd")
 	private Float boxWd;
 
-	@Column (name = "box_len")
+	/**
+	 * 박스 길이 - 박스 포장 단위의 세로 길이 (mm)
+	 */
+	@Column(name = "box_len")
 	private Float boxLen;
 
-	@Column (name = "box_ht")
+	/**
+	 * 박스 높이 - 박스 포장 단위의 높이 (mm)
+	 */
+	@Column(name = "box_ht")
 	private Float boxHt;
 
-	@Column (name = "box_vol")
+	/**
+	 * 박스 부피 - 박스 포장 단위의 부피 (CBM)
+	 */
+	@Column(name = "box_vol")
 	private Float boxVol;
 
-	@Column (name = "box_wt")
+	/**
+	 * 박스 중량 - 박스 포장 단위의 무게 (kg)
+	 */
+	@Column(name = "box_wt")
 	private Float boxWt;
 
-	@Column (name = "use_expire_date")
+	/**
+	 * 중량 단위 - skuWt, boxWt 등 중량 필드의 측정 단위 (예: kg, g, lb)
+	 */
+	@Column(name = "weight_unit", length = 6)
+	private String weightUnit;
+
+	/**
+	 * 치수 단위 - skuWd/Len/Ht, boxWd/Len/Ht 등 치수 필드의 측정 단위 (예: mm, cm, inch)
+	 */
+	@Column(name = "dimension_unit", length = 6)
+	private String dimensionUnit;
+
+	/**
+	 * 유효기간 관리 여부 - true이면 입고 시 유효기간 입력 필수
+	 */
+	@Column(name = "use_expire_date")
 	private Boolean useExpireDate;
 
-	@Column (name = "expire_period")
+	/**
+	 * 유효기간 (일) - 제조일로부터 소비 가능한 총 기간 (일 단위)
+	 */
+	@Column(name = "expire_period")
 	private Integer expirePeriod;
 
-	@Column (name = "prd_expired_period")
+	/**
+	 * 제조 후 출고 가능 기간 (일) - 제조일로부터 출고가 허용되는 기간. 이 기간 이후만 출고 가능
+	 */
+	@Column(name = "prd_expired_period")
 	private Integer prdExpiredPeriod;
 
-	@Column (name = "imminent_period")
+	/**
+	 * 임박 기간 (일) - 유효기간 만료 전 임박 알림을 발생시키는 기준 일수
+	 */
+	@Column(name = "imminent_period")
 	private Integer imminentPeriod;
 
-	@Column (name = "no_out_period")
+	/**
+	 * 출고 불가 기간 (일) - 유효기간 만료 전 출고를 금지하는 기준 일수
+	 */
+	@Column(name = "no_out_period")
 	private Integer noOutPeriod;
 
-	@Column (name = "box_split_qty")
-	private Float boxSplitQty;
-
-	@Column (name = "set_prd_flag")
+	/**
+	 * 세트 상품 여부 - true이면 복수 상품으로 구성된 세트 상품
+	 */
+	@Column(name = "set_prd_flag")
 	private Boolean setPrdFlag;
 
-	@Column (name = "bom_set_flag")
+	/**
+	 * BOM 세트 여부 - true이면 BOM(Bill of Materials) 구조로 구성된 상품
+	 */
+	@Column(name = "bom_set_flag")
 	private Boolean bomSetFlag;
 
-	@Column (name = "image_url")
+	/**
+	 * 상품 이미지 URL
+	 */
+	@Column(name = "image_url")
 	private String imageUrl;
 
-	@Column (name = "del_flag", nullable = false)
+	/**
+	 * 삭제 여부 - true이면 사용 중지된 상품
+	 */
+	@Column(name = "del_flag", nullable = false)
 	private Boolean delFlag = false;
 
-	@Column (name = "remarks", length = 255)
+	/**
+	 * 비고
+	 */
+	@Column(name = "remarks", length = 255)
 	private String remarks;
 
-	@Column (name = "attr01", length = 100)
+	/**
+	 * 사용자 정의 속성 1 - 화주사별 커스텀 속성 값
+	 */
+	@Column(name = "attr01", length = 100)
 	private String attr01;
 
-	@Column (name = "attr02", length = 100)
+	/**
+	 * 사용자 정의 속성 2 - 화주사별 커스텀 속성 값
+	 */
+	@Column(name = "attr02", length = 100)
 	private String attr02;
 
-	@Column (name = "attr03", length = 100)
+	/**
+	 * 사용자 정의 속성 3 - 화주사별 커스텀 속성 값
+	 */
+	@Column(name = "attr03", length = 100)
 	private String attr03;
 
-	@Column (name = "attr04", length = 100)
+	/**
+	 * 사용자 정의 속성 4 - 화주사별 커스텀 속성 값
+	 */
+	@Column(name = "attr04", length = 100)
 	private String attr04;
 
-	@Column (name = "attr05", length = 100)
+	/**
+	 * 사용자 정의 속성 5 - 화주사별 커스텀 속성 값
+	 */
+	@Column(name = "attr05", length = 100)
 	private String attr05;
-	
+
 	public SKU() {
 	}
-	
-    public SKU(String id) {
-        this.id = id;
-    }
-    
-    public SKU(Long domainId, String comCd, String skuCd) {
-        this.domainId = domainId;
-        this.comCd = comCd;
-        this.skuCd = skuCd;
-    }
-  
+
+	public SKU(String id) {
+		this.id = id;
+	}
+
+	public SKU(Long domainId, String comCd, String skuCd) {
+		this.domainId = domainId;
+		this.comCd = comCd;
+		this.skuCd = skuCd;
+	}
+
 	public String getId() {
 		return id;
 	}
@@ -196,14 +383,14 @@ public class SKU extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	}
 
 	public String getVendCd() {
-        return vendCd;
-    }
+		return vendCd;
+	}
 
-    public void setVendCd(String vendCd) {
-        this.vendCd = vendCd;
-    }
+	public void setVendCd(String vendCd) {
+		this.vendCd = vendCd;
+	}
 
-    public String getSkuCd() {
+	public String getSkuCd() {
 		return skuCd;
 	}
 
@@ -324,14 +511,38 @@ public class SKU extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	}
 
 	public Boolean getVariantFlag() {
-        return variantFlag;
-    }
+		return variantFlag;
+	}
 
-    public void setVariantFlag(Boolean variantFlag) {
-        this.variantFlag = variantFlag;
-    }
+	public void setVariantFlag(Boolean variantFlag) {
+		this.variantFlag = variantFlag;
+	}
 
-    public Integer getBoxInQty() {
+	public Boolean getLotFlag() {
+		return lotFlag;
+	}
+
+	public void setLotFlag(Boolean lotFlag) {
+		this.lotFlag = lotFlag;
+	}
+
+	public Boolean getSerialFlag() {
+		return serialFlag;
+	}
+
+	public void setSerialFlag(Boolean serialFlag) {
+		this.serialFlag = serialFlag;
+	}
+
+	public Boolean getHazmatFlag() {
+		return hazmatFlag;
+	}
+
+	public void setHazmatFlag(Boolean hazmatFlag) {
+		this.hazmatFlag = hazmatFlag;
+	}
+
+	public Integer getBoxInQty() {
 		return boxInQty;
 	}
 
@@ -345,6 +556,22 @@ public class SKU extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setPltInQty(Integer pltInQty) {
 		this.pltInQty = pltInQty;
+	}
+
+	public Double getSafetyStock() {
+		return safetyStock;
+	}
+
+	public void setSafetyStock(Double safetyStock) {
+		this.safetyStock = safetyStock;
+	}
+
+	public Double getReorderPoint() {
+		return reorderPoint;
+	}
+
+	public void setReorderPoint(Double reorderPoint) {
+		this.reorderPoint = reorderPoint;
 	}
 
 	public Float getSkuWd() {
@@ -427,6 +654,22 @@ public class SKU extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.boxWt = boxWt;
 	}
 
+	public String getWeightUnit() {
+		return weightUnit;
+	}
+
+	public void setWeightUnit(String weightUnit) {
+		this.weightUnit = weightUnit;
+	}
+
+	public String getDimensionUnit() {
+		return dimensionUnit;
+	}
+
+	public void setDimensionUnit(String dimensionUnit) {
+		this.dimensionUnit = dimensionUnit;
+	}
+
 	public Boolean getUseExpireDate() {
 		return useExpireDate;
 	}
@@ -465,14 +708,6 @@ public class SKU extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setNoOutPeriod(Integer noOutPeriod) {
 		this.noOutPeriod = noOutPeriod;
-	}
-
-	public Float getBoxSplitQty() {
-		return boxSplitQty;
-	}
-
-	public void setBoxSplitQty(Float boxSplitQty) {
-		this.boxSplitQty = boxSplitQty;
 	}
 
 	public Boolean getSetPrdFlag() {
@@ -553,5 +788,5 @@ public class SKU extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setAttr05(String attr05) {
 		this.attr05 = attr05;
-	}	
+	}
 }

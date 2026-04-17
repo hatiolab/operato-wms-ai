@@ -1,12 +1,5 @@
 package operato.wms.stock.entity;
 
-import java.util.Date;
-import java.util.UUID;
-
-import org.apache.commons.math3.stat.descriptive.summary.Product;
-
-import operato.wms.base.entity.Location;
-import operato.wms.base.entity.SKU;
 import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
@@ -17,7 +10,6 @@ import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.orm.IQueryManager;
 import xyz.elidom.sys.SysConstants;
 import xyz.elidom.sys.entity.Domain;
-import xyz.elidom.sys.entity.User;
 import xyz.elidom.util.BeanUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -156,118 +148,232 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.locCd = locCd;
 	}
 
+	/**
+	 * 재고 고유 ID (UUID)
+	 */
 	@PrimaryKey
 	@Column(name = "id", nullable = false, length = 40)
 	private String id;
 
+	/**
+	 * 재고 바코드 - 재고 단위를 식별하는 고유 바코드. 입고 시 자동 생성
+	 */
 	@Column(name = "barcode", nullable = false, length = 30)
 	private String barcode;
 
+	/**
+	 * 창고 코드 - 재고가 위치한 창고
+	 */
 	@Column(name = "wh_cd", nullable = false, length = 30)
 	private String whCd;
 
+	/**
+	 * 화주사 코드 - 재고를 소유한 화주사
+	 */
 	@Column(name = "com_cd", nullable = false, length = 30)
 	private String comCd;
 
+	/**
+	 * 상품 코드
+	 */
 	@Column(name = "sku_cd", nullable = false, length = 30)
 	private String skuCd;
 
+	/**
+	 * 상품 바코드 - 상품 자체의 바코드 (재고 바코드와 구분)
+	 */
 	@Column(name = "sku_bcd", length = 50)
 	private String skuBcd;
 
+	/**
+	 * 상품명
+	 */
 	@Column(name = "sku_nm", length = 255)
 	private String skuNm;
 
+	/**
+	 * 공급업체 코드
+	 */
 	@Column(name = "vend_cd", length = 30)
 	private String vendCd;
 
+	/**
+	 * 제조사 코드
+	 */
 	@Column(name = "maker_cd", length = 30)
 	private String makerCd;
 
+	/**
+	 * 로케이션 코드 - 재고가 현재 보관된 위치
+	 */
 	@Column(name = "loc_cd", nullable = false, length = 30)
 	private String locCd;
 
+	/**
+	 * 팔레트 코드 - 재고가 적재된 팔레트 단위 코드
+	 */
 	@Column(name = "pallet_cd", length = 30)
 	private String palletCd;
 
+	/**
+	 * 발주 번호 (PO Number)
+	 */
 	@Column(name = "po_no", length = 30)
 	private String poNo;
 
+	/**
+	 * 인보이스 번호 - 입고 시 공급업체가 발행한 송장 번호
+	 */
 	@Column(name = "invoice_no", length = 30)
 	private String invoiceNo;
 
+	/**
+	 * 입고 번호 - 연결된 입고 주문 번호
+	 */
 	@Column(name = "rcv_no", length = 30)
 	private String rcvNo;
 
+	/**
+	 * 입고 순번 - 입고 주문 내 라인 순번
+	 */
 	@Column(name = "rcv_seq")
 	private Integer rcvSeq;
 
+	/**
+	 * 출고 주문 번호 - 예약/피킹 중인 출고 주문 번호
+	 */
 	@Column(name = "rls_ord_no", length = 30)
 	private String rlsOrdNo;
 
+	/**
+	 * 출고 라인 번호 - 예약/피킹 중인 출고 주문의 라인 번호
+	 */
 	@Column(name = "rls_line_no", length = 30)
 	private String rlsLineNo;
 
+	/**
+	 * 포장 유형 - 상품 포장 단위 유형 (예: PALLET, BOX, EA)
+	 */
 	@Column(name = "pack_type", length = 20)
 	private String packType;
 
+	/**
+	 * 포장 번호 - 포장 단위 식별 번호
+	 */
 	@Column(name = "pack_no", length = 30)
 	private String packNo;
 
+	/**
+	 * 원산지 코드
+	 */
 	@Column(name = "origin", length = 10)
 	private String origin;
 
+	/**
+	 * Lot 번호 - 동일 생산 배치를 식별하는 번호
+	 */
 	@Column(name = "lot_no", length = 50)
 	private String lotNo;
 
+	/**
+	 * 시리얼 번호 - 개별 상품 고유 식별 번호
+	 */
 	@Column(name = "serial_no", length = 50)
 	private String serialNo;
 
+	/**
+	 * 유효기간 - 상품 소비 기한 (형식: YYYY-MM-DD)
+	 */
 	@Column(name = "expired_date", length = 10)
 	private String expiredDate;
 
+	/**
+	 * 제조일자 (형식: YYYY-MM-DD)
+	 */
 	@Column(name = "prod_date", length = 10)
 	private String prodDate;
 
+	/**
+	 * 중량 (kg)
+	 */
 	@Column(name = "weight")
 	private Double weight;
 
+	/**
+	 * 부피 (CBM, Cubic Meter)
+	 */
 	@Column(name = "cbm")
 	private Double cbm;
 
+	/**
+	 * 팔레트 수량
+	 */
 	@Column(name = "pallet_qty")
 	private Integer palletQty;
 
+	/**
+	 * 박스 수량
+	 */
 	@Column(name = "box_qty")
 	private Integer boxQty;
 
+	/**
+	 * EA 수량 - 낱개 단위 수량
+	 */
 	@Column(name = "ea_qty")
 	private Double eaQty;
 
+	/**
+	 * 예약 수량 - 출고 예약 또는 피킹 중인 수량
+	 */
 	@Column(name = "reserved_qty")
 	private Double reservedQty;
 
+	/**
+	 * 재고 수량 - 현재 실제 보유 수량. 출고 확정 시 0으로 변경됨
+	 */
 	@Column(name = "inv_qty", nullable = false)
 	private Double invQty;
 
+	/**
+	 * 마지막 트랜잭션 코드 - 재고에 마지막으로 수행된 작업 유형 (IN, OUT, MOVE 등)
+	 */
 	@Column(name = "last_tran_cd", length = 20)
 	private String lastTranCd;
 
+	/**
+	 * 유효기간 임박 상태 - NORMAL(정상) / IMMINENT(임박) / EXPIRED(만료)
+	 */
 	@Column(name = "expire_status", length = 10)
 	private String expireStatus;
 
+	/**
+	 * 소유자 - 재고를 점유한 작업자 또는 시스템 ID
+	 */
 	@Column(name = "owner", length = 32)
 	private String owner;
 
+	/**
+	 * 재고 상태 - EMPTY / WAITING / STORED / RESERVED / PICKING / LOCKED / BAD
+	 */
 	@Column(name = "status", length = 10)
 	private String status;
 
+	/**
+	 * ERP 연동 상태 - ERP 시스템과의 동기화 상태 코드
+	 */
 	@Column(name = "erp_status", length = 20)
 	private String erpStatus;
 
+	/**
+	 * 비고 - 트랜잭션 사유 또는 메모
+	 */
 	@Column(name = "remarks", length = 1000)
 	private String remarks;
 
+	/**
+	 * 삭제 여부 - true이면 재고 소진 또는 논리 삭제 처리된 상태
+	 */
 	@Column(name = "del_flag")
 	private Boolean delFlag;
 
