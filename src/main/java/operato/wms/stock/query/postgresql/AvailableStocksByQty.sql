@@ -7,7 +7,7 @@
       and wh_cd = :whCd
       and com_cd = :comCd
       and sku_cd = :skuCd
-      and del_flag = false
+      and (del_flag is null or del_flag = false)
       and status = 'STORED'
       and inv_qty > 0
       and expire_status = 'NORMAL'

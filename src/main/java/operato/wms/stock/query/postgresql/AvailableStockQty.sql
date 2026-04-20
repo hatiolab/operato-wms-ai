@@ -1,5 +1,5 @@
 select
-	sum(i.inv_qty) as inv_qty
+	sum(i.inv_qty - COALESCE(i.reserved_qty, 0)) as inv_qty
 from 
 	inventories i
 	inner join
@@ -11,10 +11,10 @@ where
 	and i.wh_cd = :whCd 
 	and i.sku_cd = :skuCd
 	and i.status = 'STORED'
-	and i.del_flag = false
-	and l.loc_type in ('STORE', 'PICKABLE')
+	and (i.del_flag is null or i.del_flag = 'N')
+	and l.loc_type = 'PICKABLE'
 	and (l.restrict_type is null or l.restrict_type != 'OUT')
-	and l.del_flag = false
+	and (l.del_flag is null or l.del_flag = 'N')
 	#if($lotNo)
 	and i.lot_no = :lotNo
 	#end

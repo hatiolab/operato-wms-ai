@@ -62,14 +62,14 @@
 
 ### 2-1. [STOCK] 재고 트랜잭션 핵심 로직 완성
 
-**담당 모듈**: `operato.wms.stock.service.InventoryTransactionService`
+**담당 모듈**: `operato.wms.stock.service.StockTransactionService`
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W1-S-1 | 재고 할당 피킹존 제한 | 재고 할당 시 `loc_type = PICKING` 로케이션에서만 할당하도록 쿼리 수정 | `InventoryTransactionService`, `InventoryForRelease.sql` | 2026-04-18 | 0% | ☐ | |
-| W1-S-2 | 로케이션 유효성 검증 | 적치/이동 시 `del_flag=false`, `restrict_type` 체크, 혼적 불가 로케이션 검증 추가 | `InventoryTransactionService` | 2026-04-18 | 0% | ☐ | |
-| W1-S-3 | 주문 마감 재고 차감 연결 | `OmsShipmentOrderService.close()`에서 `InventoryTransactionService.out()` 호출 연결 | `OmsShipmentOrderService` | 2026-04-19 | 0% | ☐ | |
-| W1-S-4 | InventoryTransactionService TODO 해소 | Line 190, 231, 1054 미구현 TODO 처리 | `InventoryTransactionService.java` | 2026-04-19 | 0% | ☐ | |
+| W1-S-1 | 재고 할당 피킹존 제한 | 재고 할당 시 `loc_type = PICKABLE` 로케이션에서만 할당하도록 쿼리 수정 | `StockTransactionService.searchAvailableInventory()` | 2026-04-18 | 100% | ☑ | StoragePolicy.releaseStrategy 기반 FEFO/FIFO/LIFO 분기, 윈도우함수 needQty 최적화 포함 |
+| W1-S-2 | 로케이션 유효성 검증 | 적치/이동 시 `del_flag=false`, `restrict_type` 체크, 혼적 불가 로케이션 검증 추가 | `StockTransactionService.findAndCheckLocation()` | 2026-04-18 | 0% | ☐ | |
+| W1-S-3 | 주문 마감 재고 차감 연결 | `OmsShipmentOrderService.close()`에서 `StockTransactionService.closeShipmentInventory()` 호출 연결 | `OmsShipmentOrderService` | 2026-04-19 | 0% | ☐ | |
+| W1-S-4 | StockTransactionService TODO 해소 | Line 190, 231, 1054 미구현 TODO 처리 | `StockTransactionService.java` | 2026-04-19 | 0% | ☐ | |
 
 ### 2-2. [OMS] 주문 취소 백 프로세스 최소 구현
 
@@ -77,9 +77,9 @@
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W1-O-1 | 주문 확정 취소 | `CONFIRMED → REGISTERED` 상태 복귀, 할당 재고 해제 | `OmsShipmentOrderService` | 2026-04-20 | 0% | ☐ | |
-| W1-O-2 | 웨이브 취소 | 웨이브 삭제 시 소속 주문 할당 취소, 상태 복귀 | `OmsWaveService` | 2026-04-20 | 0% | ☐ | |
-| W1-O-3 | 피킹 취소 | PickingTask 취소 시 할당 재고 RESERVE → 해제 | `FulfillmentPickingService` | 2026-04-21 | 0% | ☐ | |
+| W1-O-1 | 주문 확정 취소 | `CONFIRMED → REGISTERED` 상태 복귀, 할당 재고 해제 | `OmsShipmentOrderService.deallocateShipmentOrder()` | 2026-04-20 | 0% | ☐ | |
+| W1-O-2 | 웨이브 취소 | 웨이브 삭제 시 소속 주문 할당 취소, 상태 복귀 | `OmsWaveService.cancelWaveRelease()` | 2026-04-20 | 0% | ☐ | |
+| W1-O-3 | 피킹 취소 | PickingTask 취소 시 할당 재고 RESERVE → 해제 | `FulfillmentPickingService.cancelPickingTask()` | 2026-04-21 | 0% | ☐ | |
 
 ### 2-3. [INBOUND] 입고 핵심 보완
 
@@ -134,10 +134,10 @@
 | 항목 | 수치 |
 |------|------|
 | 전체 작업 수 | 25개 |
-| 완료 | 0개 |
+| 완료 | 1개 |
 | 진행 중 | 0개 |
-| 미시작 | 25개 |
-| 전체 진행율 | 0% |
+| 미시작 | 24개 |
+| 전체 진행율 | 4% |
 
 ---
 
@@ -221,6 +221,7 @@
 
 | 작업번호 | 엔티티 | 추가 필드 | 작업 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|--------|-----------|------|--------|--------|------|------|
+| W23-BF-0 | StoragePolicy | 보관 정책 마스터 엔티티 생성, entity_meta 등록, 15개 운영 필드 추가 | `StoragePolicy.java`, `entity_columns`, `common_codes` | 2026-04-20 | 100% | ☑ | putaway_strategy/release_strategy/wave 정책 등 포함 |
 | W23-BF-1 | SKU | lotFlag, serialFlag, hazmatFlag, safetyStock, reorderPoint | 상품 등록/수정 화면 필드 추가 | 2026-05-05 | 0% | ☐ | |
 | W23-BF-2 | Location | comCd, skuCd, sortNo, maxWeight, maxQty | 로케이션 관리 화면 필드 추가 | 2026-05-06 | 0% | ☐ | |
 | W23-BF-3 | Customer | deliveryZipCd, deliveryAddr, defaultCarrierCd, leadTimeDays | 거래처 관리 화면 필드 추가 | 2026-05-06 | 0% | ☐ | |
@@ -252,11 +253,11 @@
 
 | 항목 | 수치 |
 |------|------|
-| 전체 작업 수 | 40개 |
-| 완료 | 0개 |
+| 전체 작업 수 | 41개 |
+| 완료 | 1개 |
 | 진행 중 | 0개 |
 | 미시작 | 40개 |
-| 전체 진행율 | 0% |
+| 전체 진행율 | 2% |
 
 ---
 

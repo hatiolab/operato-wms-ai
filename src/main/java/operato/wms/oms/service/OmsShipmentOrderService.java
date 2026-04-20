@@ -4,12 +4,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import operato.wms.base.entity.StoragePolicy;
+import operato.wms.base.service.WmsBaseService;
 import operato.wms.oms.entity.ShipmentOrder;
 import operato.wms.oms.entity.ShipmentOrderItem;
 import operato.wms.oms.entity.StockAllocation;
 import operato.wms.stock.entity.Inventory;
+import operato.wms.stock.service.StockTransactionService;
 import xyz.anythings.sys.service.AbstractQueryService;
 import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.exception.server.ElidomValidationException;
@@ -26,6 +30,16 @@ import xyz.elidom.util.ValueUtil;
  */
 @Component
 public class OmsShipmentOrderService extends AbstractQueryService {
+	/**
+	 * WMS Base Service
+	 */
+	@Autowired
+	private WmsBaseService wmsBaseService;
+	/**
+	 * OMS, Fulfillment용 재고 트랜잭션 서비스
+	 */
+	@Autowired
+	private StockTransactionService stockTransactionService;
 
 	/**
 	 * 출하 주문 확정 + 재고 할당 (단건)
@@ -64,13 +78,13 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 
 		// 2. 재고 할당 처리
 		Map<String, Object> allocResult = this.allocateShipmentOrders(ids);
-
 		int allocSuccess = (int) allocResult.getOrDefault("success_count", 0);
 		int backOrderCount = (int) allocResult.getOrDefault("back_order_count", 0);
 
 		// 최종 주문 상태 조회
 		ShipmentOrder updatedOrder = this.findOrder(domainId, id);
 
+		// 결과 리턴
 		Map<String, Object> result = ValueUtil.newMap("success", allocSuccess > 0);
 		result.put("status", updatedOrder != null ? updatedOrder.getStatus() : null);
 		result.put("allocated_qty", updatedOrder != null ? updatedOrder.getTotalAlloc() : 0);
@@ -112,10 +126,8 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 			successCount++;
 		}
 
-		Map<String, Object> result = ValueUtil.newMap("success_count", successCount);
-		result.put("fail_count", failCount);
-		result.put("errors", errors);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success_count,fail_count,errors", successCount, failCount, errors);
 	}
 
 	/**
@@ -160,29 +172,28 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 			}
 
 			double totalAllocQty = 0;
-			double totalOrderQty = 0;
 			boolean hasShort = false;
 
 			for (ShipmentOrderItem item : items) {
 				double orderQty = item.getOrderQty() != null ? item.getOrderQty() : 0;
 				double existingAllocQty = item.getAllocQty() != null ? item.getAllocQty() : 0;
 				double needQty = orderQty - existingAllocQty;
-				totalOrderQty += orderQty;
 
 				if (needQty <= 0) {
 					totalAllocQty += existingAllocQty;
 					continue;
 				}
 
-				// 가용 재고 조회 (FEFO: 유통기한 임박순)
-				String invSql = "SELECT * FROM inventories WHERE domain_id = :domainId AND sku_cd = :skuCd"
-						+ " AND status = :status AND (del_flag IS NULL OR del_flag = false)"
-						+ " AND (inv_qty - COALESCE(reserved_qty, 0)) > 0"
-						+ " ORDER BY expired_date ASC NULLS LAST, created_at ASC";
-				Map<String, Object> invParams = ValueUtil.newMap("domainId,skuCd,status",
-						domainId, item.getSkuCd(), Inventory.STATUS_STORED);
-				List<Inventory> inventories = this.queryManager.selectListBySql(invSql, invParams, Inventory.class, 0,
-						0);
+				/**
+				 * 재고 할당 전략 조회
+				 */
+				StoragePolicy policy = this.wmsBaseService.findStoragePolicy(domainId, order.getComCd(),
+						order.getWhCd());
+				/**
+				 * 가용 재고 조회 (StoragePolicy.releaseStrategy에 따라 정렬, needQty 충족분까지만 반환)
+				 */
+				List<Inventory> inventories = this.stockTransactionService.searchAvailableInventory(domainId,
+						order.getComCd(), order.getWhCd(), item.getSkuCd(), needQty, policy.getReleaseStrategy());
 
 				double itemAllocQty = existingAllocQty;
 
@@ -211,16 +222,13 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 					alloc.setLotNo(inv.getLotNo());
 					alloc.setExpiredDate(inv.getExpiredDate());
 					alloc.setAllocQty(allocQty);
-					alloc.setAllocStrategy("FEFO");
+					alloc.setAllocStrategy(policy.getReleaseStrategy());
 					alloc.setStatus(StockAllocation.STATUS_HARD);
 					alloc.setAllocatedAt(now);
 					this.queryManager.insert(alloc);
 
-					// Inventory reserved_qty 증가
-					String updInvSql = "UPDATE inventories SET reserved_qty = COALESCE(reserved_qty, 0) + :allocQty, updated_at = now() WHERE domain_id = :domainId AND id = :invId";
-					Map<String, Object> updInvParams = ValueUtil.newMap("allocQty,domainId,invId", allocQty, domainId,
-							inv.getId());
-					this.queryManager.executeBySql(updInvSql, updInvParams);
+					// 재고 예약 처리
+					this.stockTransactionService.allocateInventory(inv, allocQty);
 
 					itemAllocQty += allocQty;
 					needQty -= allocQty;
@@ -253,11 +261,9 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 			}
 		}
 
-		Map<String, Object> result = ValueUtil.newMap("success_count", successCount);
-		result.put("allocated_count", allocatedCount);
-		result.put("back_order_count", backOrderCount);
-		result.put("errors", errors);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success_count,allocated_count,back_order_count,errors", successCount, allocatedCount,
+				backOrderCount, errors);
 	}
 
 	/**
@@ -289,10 +295,8 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 		// 각 할당 해제
 		for (StockAllocation alloc : allocations) {
 			// Inventory reserved_qty 복원
-			String updInvSql = "UPDATE inventories SET reserved_qty = GREATEST(COALESCE(reserved_qty, 0) - :allocQty, 0), updated_at = now() WHERE domain_id = :domainId AND id = :invId";
-			Map<String, Object> updInvParams = ValueUtil.newMap("allocQty,domainId,invId",
-					alloc.getAllocQty(), domainId, alloc.getInventoryId());
-			this.queryManager.executeBySql(updInvSql, updInvParams);
+			this.stockTransactionService.deallocateInventory(alloc.getDomainId(), alloc.getInventoryId(),
+					alloc.getAllocQty());
 
 			// StockAllocation 상태 변경
 			String updAllocSql = "UPDATE stock_allocations SET status = :status, released_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :allocId";
@@ -312,9 +316,8 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 				ShipmentOrder.STATUS_CONFIRMED, domainId, id);
 		this.queryManager.executeBySql(updOrderSql, updOrderParams);
 
-		Map<String, Object> result = ValueUtil.newMap("success", true);
-		result.put("released_count", allocations.size());
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success,released_count", true, allocations.size());
 	}
 
 	/**
@@ -357,11 +360,9 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 						StockAllocation.class, 0, 0);
 
 				for (StockAllocation alloc : allocations) {
-					// Inventory reserved_qty 복원
-					String updInvSql = "UPDATE inventories SET reserved_qty = GREATEST(COALESCE(reserved_qty, 0) - :allocQty, 0), updated_at = now() WHERE domain_id = :domainId AND id = :invId";
-					Map<String, Object> updInvParams = ValueUtil.newMap("allocQty,domainId,invId",
-							alloc.getAllocQty(), domainId, alloc.getInventoryId());
-					this.queryManager.executeBySql(updInvSql, updInvParams);
+					// Inventory reserved_qty 할당 해제
+					this.stockTransactionService.deallocateInventory(domainId, alloc.getInventoryId(),
+							alloc.getAllocQty());
 
 					// StockAllocation 취소
 					String updAllocSql = "UPDATE stock_allocations SET status = :status, released_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :allocId";
@@ -379,10 +380,8 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 			successCount++;
 		}
 
-		Map<String, Object> result = ValueUtil.newMap("success_count", successCount);
-		result.put("fail_count", failCount);
-		result.put("errors", errors);
-		return result;
+		// 결과 리턴
+		return ValueUtil.newMap("success_count,fail_count,errors", successCount, failCount, errors);
 	}
 
 	/**
@@ -415,18 +414,12 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 
 		for (StockAllocation alloc : allocations) {
 			double allocQty = alloc.getAllocQty() != null ? alloc.getAllocQty() : 0;
-			if (allocQty <= 0 || alloc.getInventoryId() == null) continue;
+			if (allocQty <= 0 || alloc.getInventoryId() == null)
+				continue;
 
 			// inv_qty 차감 + reserved_qty 해제
-			String updInvSql = "UPDATE inventories"
-					+ " SET inv_qty = GREATEST(inv_qty - :allocQty, 0),"
-					+ "     reserved_qty = GREATEST(COALESCE(reserved_qty, 0) - :allocQty, 0),"
-					+ "     last_tran_cd = 'OUT',"
-					+ "     updated_at = now()"
-					+ " WHERE domain_id = :domainId AND id = :invId";
-			Map<String, Object> updInvParams = ValueUtil.newMap("allocQty,domainId,invId",
-					allocQty, domainId, alloc.getInventoryId());
-			this.queryManager.executeBySql(updInvSql, updInvParams);
+			this.stockTransactionService.closeShipmentInventory(alloc.getDomainId(), alloc.getInventoryId(), allocQty,
+					order.getShipmentNo());
 
 			// stock_allocations 상태 RELEASED로 변경
 			String updAllocSql = "UPDATE stock_allocations SET status = :status, released_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :allocId";
@@ -442,9 +435,7 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 		this.queryManager.executeBySql(sql, params);
 
 		// 결과 리턴
-		Map<String, Object> result = ValueUtil.newMap("success", true);
-		result.put("released_count", allocations.size());
-		return result;
+		return ValueUtil.newMap("success,released_count", true, allocations.size());
 	}
 
 	/*
@@ -457,9 +448,8 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 	 * 주문 단건 조회
 	 */
 	private ShipmentOrder findOrder(Long domainId, String id) {
-		String sql = "SELECT * FROM shipment_orders WHERE domain_id = :domainId AND id = :id";
-		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
-		List<ShipmentOrder> list = this.queryManager.selectListBySql(sql, params, ShipmentOrder.class, 0, 1);
-		return list.isEmpty() ? null : list.get(0);
+		ShipmentOrder condition = new ShipmentOrder(id);
+		condition.setDomainId(domainId);
+		return this.queryManager.select(condition);
 	}
 }

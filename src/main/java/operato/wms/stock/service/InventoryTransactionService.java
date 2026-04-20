@@ -18,7 +18,6 @@ import operato.wms.stock.model.StockCheck;
 import operato.wms.stock.query.store.StockQueryStore;
 import xyz.anythings.sys.event.EventPublisher;
 import xyz.anythings.sys.service.AbstractQueryService;
-import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.sys.util.ThrowUtil;
 import xyz.elidom.util.ValueUtil;
@@ -45,11 +44,6 @@ public class InventoryTransactionService extends AbstractQueryService {
      */
     @Autowired
     protected StockQueryStore stockQueryStore;
-    /**
-     * 커스텀 서비스
-     */
-    @Autowired
-    protected ICustomService customSvc;
     /**
      * 이벤트 퍼블리셔
      */
@@ -724,7 +718,7 @@ public class InventoryTransactionService extends AbstractQueryService {
         this.checkMixableLocation(location, input.getSkuCd());
 
         // Find SKU
-        SKU sku = this.wmsBaseSvc.findSkuWithException(input.getComCd(), input.getSkuCd(), false);
+        SKU sku = this.wmsBaseSvc.findSku(input.getComCd(), input.getSkuCd(), false, true);
 
         // 사용자가 입력한 정보대로 재고 정보 생성
         newInventory.setSkuNm(sku.getSkuNm());

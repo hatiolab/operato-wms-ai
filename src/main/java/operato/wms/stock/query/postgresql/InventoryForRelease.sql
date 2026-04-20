@@ -7,6 +7,11 @@ from
 	on i.domain_id = l.domain_id and i.loc_cd = l.loc_cd
 where 
 	i.domain_id = :domainId
+	and i.status = 'STORED'
+	and l.loc_type = 'PICKABLE'
+	and (l.restrict_type is null or l.restrict_type != 'OUT')
+	and (i.del_flag is null or i.del_flag = 'N')
+	and (l.del_flag is null or l.del_flag = 'N')
 	#if($comCd)
 	and i.com_cd = :comCd
 	#end
@@ -19,11 +24,6 @@ where
 	#if($barcode)
 	and i.barcode = :barcode
 	#end
-	and i.status = 'STORED'
-	and l.loc_type in ('STORE', 'PICKABLE')
-	and (l.restrict_type is null or l.restrict_type != 'OUT')
-	and i.del_flag = false
-	and l.del_flag = false
 	#if($lotNo)
 	and i.lot_no = :lotNo
 	#end

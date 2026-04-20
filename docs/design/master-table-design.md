@@ -825,15 +825,16 @@ CREATE INDEX ix_billing_policies_1 ON billing_policies (com_cd, billing_type, ef
 
 화주사별 재고 보관 운영 기준을 정의하는 마스터 테이블.
 
-재고 불출 순서(FIFO/FEFO), 유통기한 관리 방식, 혼적 허용 여부, 로트 관리 여부 등을 화주사 단위로 설정한다. 현재 이 기준이 없어 재고 처리 로직이 단일 정책으로 고정되어 있으며, 다중 화주사 운영 시 충돌이 발생할 수 있다.
+입고 적치 전략, 재고 불출 순서(FIFO/FEFO), 유통기한 관리 방식, 웨이브 운영 정책, 리포트 템플릿 등을 화주사 단위로 설정한다. 현재 이 기준이 없어 재고 처리 로직이 단일 정책으로 고정되어 있으며, 다중 화주사 운영 시 충돌이 발생할 수 있다.
 
 **주요 활용:**
-- 출고 재고 할당 시 불출 순서 결정 (FIFO: 먼저 입고된 것 먼저 / FEFO: 유통기한 가까운 것 먼저)
+- 입고 완료 시 적치 로케이션 결정 (`putaway_strategy` 기준)
+- 출고 재고 할당 시 불출 순서 결정 (`release_strategy` 기준)
 - 유통기한 임박 재고 알림 기준 (`expiry_alert_days` 이하 남은 경우 경고)
-- 혼적 불허 화주사의 경우 입고 적치 시 단일 SKU 로케이션 강제 적용
-- 로트 관리 화주사의 경우 재고 트랜잭션에 lot_no 필수 입력 강제
+- B2B/B2C 웨이브 자동 생성 트리거 및 조건 관리
+- 각종 리포트/라벨 템플릿 화주사별 지정
 
-**불출 순서 유형:**
+**불출 순서 유형 (`release_strategy`):**
 
 | 코드 | 설명 |
 |------|------|
@@ -841,6 +842,23 @@ CREATE INDEX ix_billing_policies_1 ON billing_policies (com_cd, billing_type, ef
 | `FEFO` | First Expired First Out — 유통기한이 가까운 것 우선 |
 | `LIFO` | Last In First Out — 나중에 입고된 것 우선 (일부 원자재 창고) |
 | `MANUAL` | 수동 선택 — 시스템 자동 결정 없이 작업자가 직접 선택 |
+
+**입고 적치 전략 유형 (`putaway_strategy`):**
+
+| 코드 | 설명 | 구현 방식 |
+|------|------|----------|
+| `FIXED` | 고정 로케이션 — SKU별 지정 로케이션에만 적치 | `Location.skuCd = 입고 SKU`인 로케이션 조회 |
+| `RANDOM` | 빈 로케이션 자동 배정 — 여유 공간 있는 임의 로케이션 선택 | `maxQty/maxWeight` 여유 있는 로케이션 랜덤 선택 |
+| `ZONE` | 존 기반 배정 — SKU 속성에 맞는 존 내 빈 로케이션 선택 | `SKU.tempType`, `SKU.hazmatFlag` 조건 매칭 |
+| `NEAREST` | 최근접 로케이션 — 도크에서 가장 가까운 빈 로케이션 선택 | `Location.sortNo ASC` 정렬로 최소 이동 거리 우선 배정 |
+
+**웨이브 생성 트리거 유형 (`b2b_wave_trigger`, `b2c_wave_trigger`):**
+
+| 코드 | 설명 |
+|------|------|
+| `MANUAL` | 수동 생성 — 관리자가 직접 웨이브 생성 |
+| `SCHEDULE` | 스케줄 기준 — 특정 시각에 자동 생성 |
+| `COUNT` | 누적 주문 수 기준 — `*_wave_trigger_cnt` 이상 주문 누적 시 자동 생성 |
 
 #### 테이블 명세: `storage_policies`
 
@@ -850,14 +868,24 @@ CREATE INDEX ix_billing_policies_1 ON billing_policies (com_cd, billing_type, ef
 | `com_cd` | VARCHAR(20) | NOT NULL | — | 화주사 코드. 화주사당 1개 정책 |
 | `wh_cd` | VARCHAR(20) | NULL | — | 창고 코드. NULL이면 해당 화주사 전체 창고 적용 |
 | `release_strategy` | VARCHAR(10) | NULL | `FIFO` | 불출 순서 전략 (FIFO/FEFO/LIFO/MANUAL) |
-| `lot_mgmt_yn` | BOOLEAN | NULL | false | 로트(Lot) 관리 여부. true이면 입출고 시 lot_no 필수 |
-| `serial_mgmt_yn` | BOOLEAN | NULL | false | 시리얼 관리 여부. true이면 낱개 단위 일련번호 추적 |
-| `expiry_mgmt_yn` | BOOLEAN | NULL | false | 유통기한 관리 여부 |
+| `putaway_strategy` | VARCHAR(10) | NULL | — | 입고 적치 전략 (FIXED/RANDOM/ZONE/NEAREST). NEAREST는 Location.sortNo 오름차순 활용 |
+| `default_wait_loc` | VARCHAR(30) | NULL | — | 입고 완료 후 기본 대기 로케이션 코드 (loc_cd 참조) |
+| `inbound_sheet_tmpl` | VARCHAR(30) | NULL | — | 입고지시서 리포트 템플릿 코드 |
+| `inv_label_tmpl` | VARCHAR(30) | NULL | — | 재고 바코드 라벨 템플릿 코드 |
+| `picking_sheet_tmpl` | VARCHAR(30) | NULL | — | 피킹지시서 리포트 템플릿 코드 |
+| `picked_inv_move_flag` | BOOLEAN | NULL | false | 피킹 후 재고 이동 여부. true이면 피킹존 → 포장존 이동 처리 |
+| `b2b_label_tmpl` | VARCHAR(30) | NULL | — | B2B 출고 라벨 템플릿 코드 |
+| `b2c_label_tmpl` | VARCHAR(30) | NULL | — | B2C 출고 라벨 템플릿 코드 |
+| `outbound_sheet_tmpl` | VARCHAR(30) | NULL | — | 출고 거래명세서 리포트 템플릿 코드 |
+| `b2b_wave_flag` | BOOLEAN | NULL | false | B2B 웨이브 사용 여부 |
+| `b2b_wave_trigger` | VARCHAR(10) | NULL | — | B2B 웨이브 생성 트리거 (MANUAL/SCHEDULE/COUNT) |
+| `b2b_wave_trigger_cnt` | INTEGER | NULL | — | B2B 웨이브 생성 임계 주문 수 (b2b_wave_trigger=COUNT 시) |
+| `b2c_wave_flag` | BOOLEAN | NULL | false | B2C 웨이브 사용 여부 |
+| `b2c_wave_trigger` | VARCHAR(10) | NULL | — | B2C 웨이브 생성 트리거 (MANUAL/SCHEDULE/COUNT) |
+| `b2c_wave_trigger_cnt` | INTEGER | NULL | — | B2C 웨이브 생성 임계 주문 수 (b2c_wave_trigger=COUNT 시) |
 | `expiry_alert_days` | INTEGER | NULL | — | 유통기한 임박 알림 기준일. 잔여 유통기한이 이 값 이하이면 경고 |
 | `expiry_block_days` | INTEGER | NULL | — | 출고 차단 기준일. 잔여 유통기한이 이 값 이하이면 출고 불가 |
-| `mix_yn` | BOOLEAN | NULL | true | 로케이션 혼적 허용 여부. false이면 로케이션당 단일 SKU 강제 |
-| `mix_lot_yn` | BOOLEAN | NULL | true | 동일 로케이션 내 다른 Lot 혼재 허용 여부 |
-| `auto_reorder_yn` | BOOLEAN | NULL | false | 자동 발주 여부. `SKU.reorderPoint` 도달 시 자동 발주 지시 생성 |
+| `auto_reorder_flag` | BOOLEAN | NULL | false | 자동 발주 여부. `SKU.reorderPoint` 도달 시 자동 발주 지시 생성 |
 | `del_flag` | BOOLEAN | NULL | false | 삭제 여부 |
 | `remarks` | VARCHAR(1000) | NULL | — | 비고 |
 | `domain_id` | BIGINT | NOT NULL | — | 멀티테넌시 도메인 ID |
@@ -875,26 +903,56 @@ INDEX  ix_storage_policies_1 (com_cd, release_strategy, domain_id)
 **DDL:**
 ```sql
 CREATE TABLE storage_policies (
-    id                  VARCHAR(40)  NOT NULL PRIMARY KEY,
-    com_cd              VARCHAR(20)  NOT NULL,
-    wh_cd               VARCHAR(20),
-    release_strategy    VARCHAR(10)  DEFAULT 'FIFO',
-    lot_mgmt_yn         BOOLEAN      DEFAULT FALSE,
-    serial_mgmt_yn      BOOLEAN      DEFAULT FALSE,
-    expiry_mgmt_yn      BOOLEAN      DEFAULT FALSE,
-    expiry_alert_days   INTEGER,
-    expiry_block_days   INTEGER,
-    mix_yn              BOOLEAN      DEFAULT TRUE,
-    mix_lot_yn          BOOLEAN      DEFAULT TRUE,
-    auto_reorder_yn     BOOLEAN      DEFAULT FALSE,
-    del_flag            BOOLEAN      DEFAULT FALSE,
-    remarks             VARCHAR(1000),
-    domain_id           BIGINT       NOT NULL,
-    creator_id          BIGINT,
-    updater_id          BIGINT,
-    created_at          TIMESTAMP,
-    updated_at          TIMESTAMP
+    id                   VARCHAR(40)  NOT NULL PRIMARY KEY,
+    com_cd               VARCHAR(20)  NOT NULL,
+    wh_cd                VARCHAR(20),
+    release_strategy     VARCHAR(10)  DEFAULT 'FIFO',
+    putaway_strategy     VARCHAR(10),
+    default_wait_loc     VARCHAR(30),
+    inbound_sheet_tmpl   VARCHAR(30),
+    inv_label_tmpl       VARCHAR(30),
+    picking_sheet_tmpl   VARCHAR(30),
+    picked_inv_move_flag BOOLEAN      DEFAULT FALSE,
+    b2b_label_tmpl       VARCHAR(30),
+    b2c_label_tmpl       VARCHAR(30),
+    outbound_sheet_tmpl  VARCHAR(30),
+    b2b_wave_flag        BOOLEAN      DEFAULT FALSE,
+    b2b_wave_trigger     VARCHAR(10),
+    b2b_wave_trigger_cnt INTEGER,
+    b2c_wave_flag        BOOLEAN      DEFAULT FALSE,
+    b2c_wave_trigger     VARCHAR(10),
+    b2c_wave_trigger_cnt INTEGER,
+    expiry_alert_days    INTEGER,
+    expiry_block_days    INTEGER,
+    auto_reorder_flag    BOOLEAN      DEFAULT FALSE,
+    del_flag             BOOLEAN      DEFAULT FALSE,
+    remarks              VARCHAR(1000),
+    domain_id            BIGINT       NOT NULL,
+    creator_id           BIGINT,
+    updater_id           BIGINT,
+    created_at           TIMESTAMP,
+    updated_at           TIMESTAMP
 );
 CREATE UNIQUE INDEX ix_storage_policies_0 ON storage_policies (com_cd, COALESCE(wh_cd, ''), domain_id);
 CREATE INDEX ix_storage_policies_1 ON storage_policies (com_cd, release_strategy, domain_id);
+```
+
+**ALTER TABLE (기존 테이블에 컬럼 추가 시):**
+```sql
+ALTER TABLE storage_policies
+    ADD COLUMN putaway_strategy     VARCHAR(10),
+    ADD COLUMN default_wait_loc     VARCHAR(30),
+    ADD COLUMN inbound_sheet_tmpl   VARCHAR(30),
+    ADD COLUMN inv_label_tmpl       VARCHAR(30),
+    ADD COLUMN picking_sheet_tmpl   VARCHAR(30),
+    ADD COLUMN picked_inv_move_flag BOOLEAN DEFAULT FALSE,
+    ADD COLUMN b2b_label_tmpl       VARCHAR(30),
+    ADD COLUMN b2c_label_tmpl       VARCHAR(30),
+    ADD COLUMN outbound_sheet_tmpl  VARCHAR(30),
+    ADD COLUMN b2b_wave_flag        BOOLEAN DEFAULT FALSE,
+    ADD COLUMN b2b_wave_trigger     VARCHAR(10),
+    ADD COLUMN b2b_wave_trigger_cnt INTEGER,
+    ADD COLUMN b2c_wave_flag        BOOLEAN DEFAULT FALSE,
+    ADD COLUMN b2c_wave_trigger     VARCHAR(10),
+    ADD COLUMN b2c_wave_trigger_cnt INTEGER;
 ```

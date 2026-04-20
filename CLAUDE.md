@@ -130,6 +130,7 @@
 | `/create_module` | 모듈 패키지 구조 생성. 인자: `moduleName` |
 | `/entity_meta_by_entity` | Entity → entities + entity_columns + terminologies + common_codes 일괄 등록 + 번역. 인자: `EntityName` |
 | `/add_term` | 용어 등록 (모든 도메인, ko/en/ja/zh). 인자: `category name display` |
+| `/add_message` | 메시지 등록 (모든 도메인, ko/en/ja/zh). 인자: `name display`. 인자: `name display` |
 | `/translate` | 미번역 항목 번역 (ko/en/zh) |
 | `/code_by_entity` | Entity 공통코드 일괄 등록. 인자: `EntityName` |
 | `/code_by_entity_column` | 필드별 공통코드 등록. 인자: `EntityName fieldName` |

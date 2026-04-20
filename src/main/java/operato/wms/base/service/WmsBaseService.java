@@ -1,21 +1,23 @@
 package operato.wms.base.service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
 import operato.wms.base.entity.Location;
 import operato.wms.base.entity.SKU;
+import operato.wms.base.entity.StoragePolicy;
 import operato.wms.base.entity.Warehouse;
 import xyz.anythings.sys.service.AbstractQueryService;
 import xyz.elidom.dbist.dml.Filter;
 import xyz.elidom.dbist.dml.Query;
-import xyz.elidom.exception.client.ElidomRecordNotFoundException;
 import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.print.entity.Printer;
-import xyz.elidom.sys.SysConstants;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.util.MessageUtil;
+import xyz.elidom.sys.util.ThrowUtil;
 import xyz.elidom.util.ValueUtil;
 
 /**
@@ -25,6 +27,11 @@ import xyz.elidom.util.ValueUtil;
  */
 @Component
 public class WmsBaseService extends AbstractQueryService {
+    /**
+     * 화주사 보관 정책 캐시
+     */
+    private Map<String, StoragePolicy> storagePolicyCache = new HashMap<String, StoragePolicy>();
+
     /**
      * 기본 일반 프린터 ID 조회
      * 
@@ -66,279 +73,99 @@ public class WmsBaseService extends AbstractQueryService {
     }
 
     /**
-     * 창고 조회
+     * 화주사 보관 정책 조회
      * 
+     * @param domainId
+     * @param comCd
      * @param whCd
      * @return
      */
-    public Warehouse findWarehouse(String whCd) {
+    public synchronized StoragePolicy findStoragePolicy(Long domainId, String comCd, String whCd) {
+        // cacheKey로 캐시 조회
+        String cacheKey = domainId + ":" + comCd + ":" + whCd;
+
+        if (this.storagePolicyCache.containsKey(cacheKey)) {
+            return this.storagePolicyCache.get(cacheKey);
+        }
+
+        // 캐시에 없으면 DB에서 조회
+        Query storagePolicyQuery = new Query();
+        storagePolicyQuery.addFilter("domain_id", domainId);
+        storagePolicyQuery.addFilter("com_cd", comCd);
+        storagePolicyQuery.addFilter("wh_cd", whCd);
+        StoragePolicy policy = this.queryManager.selectByCondition(StoragePolicy.class, storagePolicyQuery);
+
+        // 캐시에 보관 정책 저장
+        this.storagePolicyCache.put(cacheKey, policy);
+
+        // 보관 정책 리턴
+        return policy;
+    }
+
+    /**
+     * 창고 조회
+     * 
+     * @param whCd
+     * @param withLock
+     * @param exceptionWhenNotFound
+     * @return
+     */
+    public Warehouse findWarehouse(String whCd, Boolean withLock, Boolean exceptionWhenNotFound) {
         Query warehouseQuery = new Query();
         warehouseQuery.addFilter("domain_id", Domain.currentDomainId());
         warehouseQuery.addFilter("wh_cd", whCd);
-        return this.findWarehouse(warehouseQuery);
+        Warehouse wh = this.selectRecord(Warehouse.class, warehouseQuery, withLock);
+
+        if (exceptionWhenNotFound && (wh == null || true == wh.getDelFlag())) {
+            throw ThrowUtil.newNotFoundRecord(MessageUtil.getTerm("menu.Warehouse"), whCd);
+        }
+
+        return true == wh.getDelFlag() ? null : wh;
     }
-
-    /**
-     * 창고 조회
-     * 
-     * @param warehouseQuery
-     * @return
-     */
-    public Warehouse findWarehouse(Query warehouseQuery) {
-        return this.findWarehouse(warehouseQuery, false);
-    }
-
-    /**
-     * 창고 조회
-     * 
-     * @param warehouseQuery
-     * @param withLock
-     * @return
-     */
-    public Warehouse findWarehouse(Query warehouseQuery, Boolean withLock) {
-        return this.selectRecord(Warehouse.class, warehouseQuery, withLock);
-    };
-
-    /**
-     * 창고 조회, 없으면 예외 발생
-     * 
-     * @param whCd
-     * @return
-     */
-    public Warehouse findWarehouseWithException(String whCd, Boolean withLock) {
-        Query warehouseQuery = new Query();
-        warehouseQuery.addFilter("domain_id", Domain.currentDomainId());
-        warehouseQuery.addFilter("wh_cd", whCd);
-        return this.findWarehouseWithException(warehouseQuery, withLock);
-    }
-
-    /**
-     * 창고 조회, 없으면 예외 발생
-     * 
-     * @param warehouseQuery
-     * @param withLock
-     * @return
-     */
-    public Warehouse findWarehouseWithException(Query warehouseQuery, Boolean withLock) {
-        return this.findWarehouseWithException(warehouseQuery, withLock, SysConstants.EMPTY_STRING);
-    };
-
-    /**
-     * 창고 조회, 없으면 예외 발생
-     * 
-     * @param warehouseQuery
-     * @param withLock
-     * @param target
-     * @return
-     */
-    public Warehouse findWarehouseWithException(Query warehouseQuery, Boolean withLock, String target) {
-        return this.findWarehouseWithException(warehouseQuery, withLock, "NOT_FOUND",
-                MessageUtil.getTerm("menu.Warehouse"), target);
-    };
-
-    /**
-     * 창고 조회, 없으면 예외 발생
-     * 
-     * @param warehouseQuery
-     * @param withLock
-     * @param message
-     * @param params
-     * @return
-     */
-    public Warehouse findWarehouseWithException(Query warehouseQuery, Boolean withLock, String message,
-            String... params) {
-        return this.selectRecordWithException(Warehouse.class, warehouseQuery, withLock, message,
-                ValueUtil.toList(params));
-    };
 
     /**
      * 로케이션 조회
      * 
      * @param locCd
-     * @return
-     */
-    public Location findLocation(String locCd) {
-        Query locationQuery = new Query();
-        locationQuery.addFilter("domain_id", Domain.currentDomainId());
-        locationQuery.addFilter("loc_cd", locCd);
-        return this.findLocation(locationQuery);
-    }
-
-    /**
-     * 로케이션 조회
-     * 
-     * @param whCd
-     * @param locCd
-     * @return
-     */
-    public Location findLocation(String whCd, String locCd) {
-        Query locationQuery = new Query();
-        locationQuery.addFilter("domain_id", Domain.currentDomainId());
-        locationQuery.addFilter("wh_cd", whCd);
-        locationQuery.addFilter("loc_cd", locCd);
-        return this.findLocation(locationQuery);
-    }
-
-    /**
-     * 로케이션 조회
-     * 
-     * @param locationQuery
-     * @return
-     */
-    public Location findLocation(Query locationQuery) {
-        return this.findLocation(locationQuery, false);
-    }
-
-    /**
-     * 로케이션 조회
-     * 
-     * @param locationQuery
      * @param withLock
+     * @param exceptionWhenNotFound
      * @return
      */
-    public Location findLocation(Query locationQuery, Boolean withLock) {
-        return this.selectRecord(Location.class, locationQuery, withLock);
-    };
+    public Location findLocation(String locCd, Boolean withLock, Boolean exceptionWhenNotFound) {
+        Query locQuery = new Query();
+        locQuery.addFilter("domain_id", Domain.currentDomainId());
+        locQuery.addFilter("loc_cd", locCd);
+        Location loc = this.selectRecord(Location.class, locQuery, withLock);
 
-    /**
-     * 로케이션 조회, 없으면 예외 발생
-     * 
-     * @param locCd
-     * @return
-     */
-    public Location findLocationWithException(String locCd, Boolean withLock) {
-        Query locationQuery = new Query();
-        locationQuery.addFilter("domain_id", Domain.currentDomainId());
-        locationQuery.addFilter("loc_cd", locCd);
-        return this.findLocationWithException(locationQuery, withLock);
+        if (exceptionWhenNotFound && (loc == null || true == loc.getDelFlag())) {
+            throw ThrowUtil.newNotFoundRecord(MessageUtil.getTerm("menu.Location"), locCd);
+        }
+
+        return true == loc.getDelFlag() ? null : loc;
     }
-
-    /**
-     * 로케이션 조회, 없으면 예외 발생
-     * 
-     * @param locationQuery
-     * @param withLock
-     * @return
-     */
-    public Location findLocationWithException(Query locationQuery, Boolean withLock) {
-        return this.findLocationWithException(locationQuery, withLock, SysConstants.EMPTY_STRING);
-    };
-
-    /**
-     * 로케이션 조회, 없으면 예외 발생
-     * 
-     * @param locationQuery
-     * @param withLock
-     * @param target
-     * @return
-     */
-    public Location findLocationWithException(Query locationQuery, Boolean withLock, String target) {
-        return this.findLocationWithException(locationQuery, withLock, "NOT_FOUND",
-                MessageUtil.getTerm("menu.Location"), target);
-    };
-
-    /**
-     * 로케이션 조회, 없으면 예외 발생
-     * 
-     * @param locationQuery
-     * @param withLock
-     * @param message
-     * @param params
-     * @return
-     */
-    public Location findLocationWithException(Query locationQuery, Boolean withLock, String message, String... params) {
-        return this.selectRecordWithException(Location.class, locationQuery, withLock, message,
-                ValueUtil.toList(params));
-    };
 
     /**
      * SKU 조회
      * 
      * @param comCd
      * @param skuCd
+     * @param withLock
+     * @param exceptionWhenNotFound
      * @return
      */
-    public SKU findSku(String comCd, String skuCd) {
+    public SKU findSku(String comCd, String skuCd, Boolean withLock, Boolean exceptionWhenNotFound) {
         Query skuQuery = new Query();
         skuQuery.addFilter("domain_id", Domain.currentDomainId());
         skuQuery.addFilter("com_cd", comCd);
         skuQuery.addFilter("sku_cd", skuCd);
-        return this.findSku(skuQuery);
+        SKU sku = this.selectRecord(SKU.class, skuQuery, false);
+
+        if (exceptionWhenNotFound && (sku == null || true == sku.getDelFlag())) {
+            throw ThrowUtil.newNotFoundRecord(MessageUtil.getTerm("menu.SKU"), skuCd);
+        }
+
+        return true == sku.getDelFlag() ? null : sku;
     }
-
-    /**
-     * SKU 조회
-     * 
-     * @param skuQuery
-     * @return
-     */
-    public SKU findSku(Query skuQuery) {
-        return this.findSku(skuQuery, false);
-    }
-
-    /**
-     * SKU 조회
-     * 
-     * @param skuQuery
-     * @param withLock
-     * @return
-     */
-    public SKU findSku(Query skuQuery, Boolean withLock) {
-        return this.selectRecord(SKU.class, skuQuery, withLock);
-    };
-
-    /**
-     * SKU 조회, 없으면 예외 발생
-     * 
-     * @param comCd
-     * @param skuCd
-     * @param withLock
-     * @return
-     */
-    public SKU findSkuWithException(String comCd, String skuCd, Boolean withLock) {
-        Query skuQuery = new Query();
-        skuQuery.addFilter("domain_id", Domain.currentDomainId());
-        skuQuery.addFilter("com_cd", comCd);
-        skuQuery.addFilter("sku_cd", skuCd);
-        return this.findSkuWithException(skuQuery, withLock);
-    }
-
-    /**
-     * SKU 조회, 없으면 예외 발생
-     * 
-     * @param skuQuery
-     * @param withLock
-     * @return
-     */
-    public SKU findSkuWithException(Query skuQuery, Boolean withLock) {
-        return this.findSkuWithException(skuQuery, withLock, SysConstants.EMPTY_STRING);
-    };
-
-    /**
-     * SKU 조회, 없으면 예외 발생
-     * 
-     * @param skuQuery
-     * @param withLock
-     * @param target
-     * @return
-     */
-    public SKU findSkuWithException(Query skuQuery, Boolean withLock, String target) {
-        return this.findSkuWithException(skuQuery, withLock, "NOT_FOUND", MessageUtil.getTerm("menu.SKU"),
-                target);
-    };
-
-    /**
-     * SKU 조회, 없으면 예외 발생
-     * 
-     * @param skuQuery
-     * @param withLock
-     * @param message
-     * @param params
-     * @return
-     */
-    public SKU findSkuWithException(Query skuQuery, Boolean withLock, String message, String... params) {
-        return this.selectRecordWithException(SKU.class, skuQuery, withLock, message, ValueUtil.toList(params));
-    };
 
     /**
      * 레코드 조회
@@ -368,15 +195,15 @@ public class WmsBaseService extends AbstractQueryService {
      * @param condition
      * @param withLock
      * @param message
-     * @param params
+     * @param keyData
      * @return
      */
     public <T> T selectRecordWithException(Class<T> entityClass, Query condition, Boolean withLock, String message,
-            List<String> params) {
+            String keyData) {
         T queryResult = this.selectRecord(entityClass, condition, withLock);
 
         if (ValueUtil.isEmpty(queryResult)) {
-            throw new ElidomRecordNotFoundException(message, params);
+            throw ThrowUtil.newNotFoundRecord(message, keyData);
         }
 
         return queryResult;
