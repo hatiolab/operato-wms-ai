@@ -59,8 +59,15 @@ public class StockTransactionService extends AbstractQueryService {
         // 혼적 가능 여부 체크
         this.checkMixableLocation(location, input.getSkuCd());
 
+        // 고정 SKU 로케이션 적치 제한 체크
+        this.checkFixedSkuLocation(location, input.getSkuCd());
+
         // Find SKU
         SKU sku = this.wmsBaseSvc.findSku(input.getComCd(), input.getSkuCd(), false, true);
+
+        // 로케이션 최대 수량·중량 초과 검증
+        double addWeight = (sku.getSkuWt() != null) ? sku.getSkuWt() * input.getInvQty() : 0.0;
+        this.checkLocationCapacity(location, input.getInvQty(), addWeight);
 
         // 사용자가 입력한 정보대로 재고 정보 생성
         newInventory.setSkuNm(sku.getSkuNm());
@@ -106,9 +113,17 @@ public class StockTransactionService extends AbstractQueryService {
         // 혼적 가능 여부 체크
         this.checkMixableLocation(toLoc, inventory.getSkuCd());
 
+        // 고정 SKU 로케이션 적치 제한 체크
+        this.checkFixedSkuLocation(toLoc, inventory.getSkuCd());
+
         // 바코드 재고 수량, 작업자 입력 수량 체크
         double invQty = inventory.getInvQty();
         double inputQty = input.getInvQty();
+
+        // 로케이션 최대 수량·중량 초과 검증 (분할 시 비례 중량 계산)
+        double putawayWeight = (inventory.getWeight() != null && invQty > 0)
+                ? inventory.getWeight() * inputQty / invQty : 0.0;
+        this.checkLocationCapacity(toLoc, inputQty, putawayWeight);
 
         // 바코드 재고 수량이 입력 수량보다 크다면 재고 분할 처리
         if (invQty > inputQty) {
@@ -187,6 +202,13 @@ public class StockTransactionService extends AbstractQueryService {
 
         // 혼적 가능 여부 체크
         this.checkMixableLocation(toLoc, inventory.getSkuCd());
+
+        // 고정 SKU 로케이션 적치 제한 체크
+        this.checkFixedSkuLocation(toLoc, inventory.getSkuCd());
+
+        // 로케이션 최대 수량·중량 초과 검증
+        double moveWeight = (inventory.getWeight() != null) ? inventory.getWeight() : 0.0;
+        this.checkLocationCapacity(toLoc, inventory.getInvQty(), moveWeight);
 
         // 로케이션에 동일 바코드 조회
         Inventory cond = new Inventory(inventory.getDomainId(), inventory.getBarcode(), toLocCd);
@@ -735,6 +757,58 @@ public class StockTransactionService extends AbstractQueryService {
                     ValueUtil.newMap("domainId,locCd", toLoc.getDomainId(), toLoc.getLocCd()), String.class, 0, 0);
             if (skuList.size() >= 1 && !skuList.contains(skuCd)) {
                 throw ThrowUtil.newValidationErrorWithNoLog("다른 상품과 혼적이 불가한 로케이션입니다.");
+            }
+        }
+    }
+
+    /**
+     * 고정 SKU 로케이션 적치 제한 체크
+     *
+     * Location.skuCd가 지정된 경우, 해당 로케이션에는 지정된 SKU만 적치할 수 있다.
+     * 다른 SKU를 적치하려 하면 예외를 발생시킨다.
+     *
+     * @param toLoc 대상 로케이션
+     * @param skuCd 적치하려는 SKU 코드
+     */
+    public void checkFixedSkuLocation(Location toLoc, String skuCd) {
+        if (ValueUtil.isNotEmpty(toLoc.getSkuCd()) && ValueUtil.isNotEqual(toLoc.getSkuCd(), skuCd)) {
+            throw ThrowUtil.newValidationErrorWithNoLog(
+                    "로케이션 [" + toLoc.getLocCd() + "]은 상품 [" + toLoc.getSkuCd() + "] 전용 고정 로케이션입니다.");
+        }
+    }
+
+    /**
+     * W1-FL-3: 로케이션 최대 수량·중량 초과 검증
+     *
+     * Location.maxQty 또는 Location.maxWeight가 설정된 경우,
+     * 현재 재고 합계에 추가 수량·중량을 더했을 때 초과하면 예외를 발생시킨다.
+     *
+     * @param toLoc     대상 로케이션
+     * @param addQty    추가될 수량
+     * @param addWeight 추가될 중량 (알 수 없으면 0)
+     */
+    public void checkLocationCapacity(Location toLoc, double addQty, double addWeight) {
+        if (toLoc.getMaxQty() != null && toLoc.getMaxQty() > 0) {
+            String sql = "SELECT COALESCE(SUM(inv_qty), 0) FROM inventories " +
+                    "WHERE domain_id = :domainId AND loc_cd = :locCd AND (del_flag IS NULL OR del_flag = false) AND inv_qty > 0";
+            Double currentQty = this.queryManager.selectBySql(sql,
+                    ValueUtil.newMap("domainId,locCd", toLoc.getDomainId(), toLoc.getLocCd()), Double.class);
+            if (currentQty == null) currentQty = 0.0;
+            if (currentQty + addQty > toLoc.getMaxQty()) {
+                throw ThrowUtil.newValidationErrorWithNoLog(
+                        "로케이션 [" + toLoc.getLocCd() + "]의 최대 수량(" + toLoc.getMaxQty() + ")을 초과합니다.");
+            }
+        }
+
+        if (toLoc.getMaxWeight() != null && toLoc.getMaxWeight() > 0 && addWeight > 0) {
+            String sql = "SELECT COALESCE(SUM(weight), 0) FROM inventories " +
+                    "WHERE domain_id = :domainId AND loc_cd = :locCd AND (del_flag IS NULL OR del_flag = false) AND inv_qty > 0";
+            Double currentWeight = this.queryManager.selectBySql(sql,
+                    ValueUtil.newMap("domainId,locCd", toLoc.getDomainId(), toLoc.getLocCd()), Double.class);
+            if (currentWeight == null) currentWeight = 0.0;
+            if (currentWeight + addWeight > toLoc.getMaxWeight()) {
+                throw ThrowUtil.newValidationErrorWithNoLog(
+                        "로케이션 [" + toLoc.getLocCd() + "]의 최대 중량(" + toLoc.getMaxWeight() + ")을 초과합니다.");
             }
         }
     }

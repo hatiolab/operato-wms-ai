@@ -1,11 +1,13 @@
 package operato.wms.fulfillment.service;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
+import operato.wms.base.entity.CourierContract;
 import operato.wms.fulfillment.entity.PackingBox;
 import operato.wms.fulfillment.entity.PackingOrder;
 import operato.wms.oms.entity.ShipmentOrder;
@@ -44,6 +46,9 @@ public class FulfillmentShippingService extends AbstractQueryService {
 			throw new ElidomValidationException(
 					"패킹 지시 상태가 [" + order.getStatus() + "]이므로 라벨을 출력할 수 없습니다 (COMPLETED 상태만 가능)");
 		}
+
+		// 택배사 계약 유효성 검증
+		this.validateCourierContract(domainId, order);
 
 		// 패킹 지시 상태 변경
 		String sql = "UPDATE packing_orders SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
@@ -480,6 +485,43 @@ public class FulfillmentShippingService extends AbstractQueryService {
 	 * 내부 유틸리티
 	 * ============================================================
 	 */
+
+	/**
+	 * 택배사 계약 유효성 검증
+	 *
+	 * carrierCd가 있을 경우 해당 택배사의 계약 정보를 조회하여
+	 * 계약 상태(ACTIVE), 계약 기간(contractStartDate ~ contractEndDate)을 검증한다.
+	 *
+	 * @param domainId 도메인 ID
+	 * @param order    패킹 지시
+	 */
+	private void validateCourierContract(Long domainId, PackingOrder order) {
+		String carrierCd = order.getCarrierCd();
+		if (ValueUtil.isEmpty(carrierCd)) return;
+
+		String sql = "SELECT * FROM courier_contracts WHERE domain_id = :domainId AND dlv_vend_cd = :dlvVendCd AND (del_flag IS NULL OR del_flag = false)";
+		List<CourierContract> contracts = this.queryManager.selectListBySql(sql,
+				ValueUtil.newMap("domainId,dlvVendCd", domainId, carrierCd), CourierContract.class, 0, 1);
+
+		if (contracts.isEmpty()) {
+			throw new ElidomValidationException("택배사 [" + carrierCd + "]의 계약 정보가 없습니다.");
+		}
+
+		CourierContract contract = contracts.get(0);
+
+		if (!"ACTIVE".equals(contract.getStatus())) {
+			throw new ElidomValidationException(
+					"택배사 [" + carrierCd + "]의 계약 상태가 유효하지 않습니다 (현재: " + contract.getStatus() + ", ACTIVE 상태만 가능)");
+		}
+
+		Date today = new Date();
+		if (contract.getContractStartDate() != null && today.before(contract.getContractStartDate())) {
+			throw new ElidomValidationException("택배사 [" + carrierCd + "]의 계약 시작일 이전입니다.");
+		}
+		if (contract.getContractEndDate() != null && today.after(contract.getContractEndDate())) {
+			throw new ElidomValidationException("택배사 [" + carrierCd + "]의 계약이 만료되었습니다.");
+		}
+	}
 
 	/**
 	 * 패킹 지시 단건 조회

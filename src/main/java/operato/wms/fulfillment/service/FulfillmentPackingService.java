@@ -57,6 +57,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 	 *
 	 * 1. INSPECTED 아이템을 PACKED로 일괄 변경
 	 * 2. 포장 박스 생성 (boxType, boxCount, boxWeight, trackingNo)
+	 *    - boxType이 없으면 주문 아이템 합산 중량·부피 기준으로 최적 BoxType 자동 선택 (sortNo 우선)
 	 * 3. 패킹 지시 상태를 COMPLETED로 변경
 	 *
 	 * @param id     패킹 지시 ID
@@ -83,6 +84,12 @@ public class FulfillmentPackingService extends AbstractQueryService {
 
 		// 2. 포장 박스 생성
 		String boxType = params.get("boxType") != null ? params.get("boxType").toString() : null;
+
+		// boxType이 없으면 주문 아이템 기준으로 자동 선택
+		if (ValueUtil.isEmpty(boxType)) {
+			boxType = this.selectOptimalBoxType(domainId, id, order.getComCd(), order.getWhCd());
+		}
+
 		int boxCount = params.get("boxCount") != null ? Integer.parseInt(params.get("boxCount").toString()) : 1;
 		double boxWeight = params.get("boxWeight") != null ? Double.parseDouble(params.get("boxWeight").toString())
 				: 0.0;
@@ -559,6 +566,53 @@ public class FulfillmentPackingService extends AbstractQueryService {
 	 * 내부 유틸리티
 	 * ============================================================
 	 */
+
+	/**
+	 * 최적 BoxType 자동 선택
+	 *
+	 * 포장 아이템의 합산 중량·부피를 계산하고, 조건을 충족하는 BoxType 중
+	 * sortNo가 가장 낮은 것을 반환한다.
+	 *
+	 * 조건: max_weight >= 총 중량, box_vol >= 총 부피 (NULL이면 무제한으로 간주)
+	 *
+	 * @param domainId       도메인 ID
+	 * @param packingOrderId 패킹 지시 ID
+	 * @param comCd          화주사 코드 (BoxType 필터링)
+	 * @param whCd           창고 코드 (BoxType 필터링)
+	 * @return 선택된 BoxType 코드, 없으면 null
+	 */
+	@SuppressWarnings("rawtypes")
+	private String selectOptimalBoxType(Long domainId, String packingOrderId, String comCd, String whCd) {
+		// 1. 포장 아이템의 합산 중량·부피 계산 (SKU 마스터 JOIN)
+		String aggSql = "SELECT COALESCE(SUM(s.sku_wt * poi.pack_qty), 0) AS total_weight,"
+				+ " COALESCE(SUM(s.sku_vol * poi.pack_qty), 0) AS total_volume"
+				+ " FROM packing_order_items poi"
+				+ " LEFT JOIN skus s ON s.domain_id = poi.domain_id AND s.com_cd = :comCd AND s.sku_cd = poi.sku_cd"
+				+ " WHERE poi.domain_id = :domainId AND poi.packing_order_id = :packingOrderId AND poi.status = :packedStatus";
+		Map<String, Object> aggParams = ValueUtil.newMap("domainId,packingOrderId,packedStatus,comCd",
+				domainId, packingOrderId, PackingOrderItem.STATUS_PACKED, comCd);
+		List<Map> aggList = this.queryManager.selectListBySql(aggSql, aggParams, Map.class, 0, 1);
+
+		double totalWeight = 0;
+		double totalVolume = 0;
+		if (!aggList.isEmpty()) {
+			Map row = aggList.get(0);
+			totalWeight = row.get("total_weight") != null ? Double.parseDouble(row.get("total_weight").toString()) : 0;
+			totalVolume = row.get("total_volume") != null ? Double.parseDouble(row.get("total_volume").toString()) : 0;
+		}
+
+		// 2. 조건을 충족하는 BoxType 중 sortNo가 가장 낮은 것 선택
+		String boxSql = "SELECT box_type_cd FROM box_types"
+				+ " WHERE domain_id = :domainId AND com_cd = :comCd AND wh_cd = :whCd"
+				+ " AND (del_flag IS NULL OR del_flag = false)"
+				+ " AND (max_weight IS NULL OR max_weight >= :totalWeight)"
+				+ " AND (box_vol IS NULL OR box_vol >= :totalVolume)"
+				+ " ORDER BY sort_no ASC NULLS LAST"
+				+ " LIMIT 1";
+		Map<String, Object> boxParams = ValueUtil.newMap("domainId,comCd,whCd,totalWeight,totalVolume",
+				domainId, comCd, whCd, totalWeight, totalVolume);
+		return this.queryManager.selectBySql(boxSql, boxParams, String.class);
+	}
 
 	/**
 	 * 포장 항목 단건 조회

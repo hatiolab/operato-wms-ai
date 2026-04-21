@@ -122,22 +122,22 @@
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W1-FL-1 | SKU lotFlag 로트 추적 강제 | 입고 시 `lotFlag=true`인 SKU는 로트 번호 필수 입력 검증 추가 | `InboundTransactionService` | 2026-04-23 | 0% | ☐ | |
-| W1-FL-2 | SKU serialFlag 시리얼 추적 강제 | 입고 시 `serialFlag=true`인 SKU는 시리얼 번호 필수 입력 검증 추가 | `InboundTransactionService` | 2026-04-23 | 0% | ☐ | |
-| W1-FL-3 | Location maxWeight/maxQty 초과 검증 | 적치·이동 시 로케이션 최대 중량·수량 초과 여부 검증. 초과 시 오류 반환 | `InventoryTransactionService` | 2026-04-23 | 0% | ☐ | |
-| W1-FL-4 | Location skuCd 고정 SKU 적치 제한 | `skuCd` 지정 로케이션에 다른 SKU 적치 시 오류 처리 | `InventoryTransactionService` | 2026-04-24 | 0% | ☐ | |
-| W1-FL-5 | BoxType 자동 선택 알고리즘 | 포장 시 주문 총 부피·중량 기준 최적 BoxType 자동 선택 (`sortNo` 우선순위 적용) | `FulfillmentPackingService` | 2026-04-24 | 0% | ☐ | |
-| W1-FL-6 | CourierContract 유효성 검증 | 출하 시 `status=ACTIVE`, `contractStartDate~contractEndDate` 범위 내 여부 검증 | `FulfillmentShippingService` | 2026-04-24 | 0% | ☐ | |
+| W1-FL-1 | SKU lotFlag 로트 추적 강제 | 입고 시 `lotFlag=true`인 SKU는 로트 번호 필수 입력 검증 추가 | `InboundTransactionService` | 2026-04-23 | 100% | ☑ | `finishReceivingOrderLine()` 내 inspFlag 체크 이후 SKU 조회 → lotFlag+lotNo 검증 추가 |
+| W1-FL-2 | SKU serialFlag 시리얼 추적 강제 | 입고 시 `serialFlag=true`인 SKU는 시리얼 번호 필수 입력 검증 추가 | `InboundTransactionService` | 2026-04-23 | 100% | ☑ | `ReceivingItem`에 `serial_no` 컬럼 추가 후 `finishReceivingOrderLine()`에서 serialFlag+serialNo 검증 추가 |
+| W1-FL-3 | Location maxWeight/maxQty 초과 검증 | 적치·이동 시 로케이션 최대 중량·수량 초과 여부 검증. 초과 시 오류 반환 | `InventoryTransactionService` | 2026-04-23 | 100% | ☑ | `checkLocationCapacity()` 신규 메서드 추가 (Inventory/StockTransactionService 양쪽) → `createInventory`, `putAway`, `moveInventory` 3곳에서 호출 |
+| W1-FL-4 | Location skuCd 고정 SKU 적치 제한 | `skuCd` 지정 로케이션에 다른 SKU 적치 시 오류 처리 | `InventoryTransactionService` | 2026-04-24 | 100% | ☑ | `checkFixedSkuLocation()` 신규 메서드 추가 → `createInventory`, `putAway`, `moveInventory` 3곳에서 `checkMixableLocation` 이후 호출 |
+| W1-FL-5 | BoxType 자동 선택 알고리즘 | 포장 시 주문 총 부피·중량 기준 최적 BoxType 자동 선택 (`sortNo` 우선순위 적용) | `FulfillmentPackingService` | 2026-04-24 | 100% | ☑ | `selectOptimalBoxType()` private 메서드 추가 → `completePackingOrder()`에서 boxType 미지정 시 자동 호출. SKU의 sku_wt·sku_vol JOIN 집계 후 max_weight·box_vol 조건 충족 BoxType 중 sort_no 최솟값 선택 |
+| W1-FL-6 | CourierContract 유효성 검증 | 출하 시 `status=ACTIVE`, `contractStartDate~contractEndDate` 범위 내 여부 검증 | `FulfillmentShippingService` | 2026-04-24 | 100% | ☑ | `validateCourierContract()` private 메서드 추가 → `printLabel()` 상태 검증 이후 호출 |
 
 ### Week 1 진행 현황
 
 | 항목 | 수치 |
 |------|------|
 | 전체 작업 수 | 23개 |
-| 완료 (☑) | 14개 (W1-S-1, W1-S-2, W1-S-3, W1-S-4, W1-O-1, W1-O-2, W1-V-1, W1-V-2, W1-I-1, W1-I-2, W1-R-1, W1-ST-1, W1-ST-2, W1-ST-3) |
+| 완료 (☑) | 20개 (W1-S-1, W1-S-2, W1-S-3, W1-S-4, W1-O-1, W1-O-2, W1-V-1, W1-V-2, W1-I-1, W1-I-2, W1-R-1, W1-ST-1, W1-ST-2, W1-ST-3, W1-FL-1, W1-FL-2, W1-FL-3, W1-FL-4, W1-FL-5, W1-FL-6) |
 | 진행 중 | 1개 (W1-O-3 50%) |
-| 미시작 | 8개 (W1-F-1, W1-F-2, W1-FL-1~6) |
-| 전체 진행율 | 61% (완료 14 / 전체 23) |
+| 미시작 | 2개 (W1-F-1, W1-F-2) |
+| 전체 진행율 | 87% (완료 20 / 전체 23) |
 
 ---
 
