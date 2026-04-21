@@ -138,6 +138,10 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	 * 재고 트렌젝션 - RWA_RESTOCK (반품 재입고)
 	 */
 	public static final String TRANSACTION_RWA_RESTOCK = "RWA_RESTOCK";
+	/**
+	 * 재고 트렌젝션 - VAS-OUT (유통가공 구성품 차감)
+	 */
+	public static final String TRANSACTION_VAS_OUT = "VAS-OUT";
 
 	public Inventory() {
 	}

@@ -93,7 +93,7 @@
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
 | W1-V-1 | VasBom 번호 채번 | `BOM-YYYYMMDD-XXXXX` 형식 자동 채번 구현 (시퀀스 or DB MAX+1) | `VasBom.java:303` | 2026-04-22 | 100% | ☑ | `beforeCreate()`에서 `RangedSeq.increaseSequence()`로 도메인별 일련번호 채번, `BOM{domainId}-yyMMdd-XXXXX` 형식 완성 |
-| W1-V-2 | VAS 재고 처리 연결 | VAS 작업 완료 시 구성품 재고 차감, 세트 SKU 재고 증가 | `VasTransactionService.java:417` | 2026-04-22 | 10% | ☐ | `registerResult()` 메서드 존재, TODO 주석(`processInventoryByVasType`)만 있고 실제 재고 트랜잭션 미구현 |
+| W1-V-2 | VAS 재고 처리 연결 | VAS 작업 완료 시 구성품 재고 차감, 세트 SKU 재고 증가 | `VasTransactionService.java` | 2026-04-22 | 100% | ☑ | `processInventoryByVasType()` 구현. SET_ASSEMBLY: BOM 구성품 차감(`VAS-OUT`) → 세트 SKU 재고 생성. DISASSEMBLY: 세트 SKU 차감 → 구성품 재고 생성. REPACK/LABEL/CUSTOM 스킵. |
 
 ### 2-5. [RWA] SKU명 자동 조회
 
@@ -134,10 +134,10 @@
 | 항목 | 수치 |
 |------|------|
 | 전체 작업 수 | 23개 |
-| 완료 (☑) | 13개 (W1-S-1, W1-S-2, W1-S-3, W1-S-4, W1-O-1, W1-O-2, W1-V-1, W1-I-1, W1-I-2, W1-R-1, W1-ST-1, W1-ST-2, W1-ST-3) |
-| 진행 중 | 2개 (W1-O-3 50%, W1-V-2 10%) |
+| 완료 (☑) | 14개 (W1-S-1, W1-S-2, W1-S-3, W1-S-4, W1-O-1, W1-O-2, W1-V-1, W1-V-2, W1-I-1, W1-I-2, W1-R-1, W1-ST-1, W1-ST-2, W1-ST-3) |
+| 진행 중 | 1개 (W1-O-3 50%) |
 | 미시작 | 8개 (W1-F-1, W1-F-2, W1-FL-1~6) |
-| 전체 진행율 | 57% (완료 13 / 전체 23) |
+| 전체 진행율 | 61% (완료 14 / 전체 23) |
 
 ---
 

@@ -8,10 +8,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import operato.wms.base.entity.SKU;
 import operato.wms.base.entity.VasBom;
 import operato.wms.base.entity.VasBomItem;
 import operato.wms.base.service.WmsBaseService;
+import operato.wms.stock.entity.Inventory;
+import operato.wms.stock.service.StockTransactionService;
 import operato.wms.vas.WmsVasConstants;
 import operato.wms.vas.entity.VasOrder;
 import operato.wms.vas.entity.VasOrderItem;
@@ -53,6 +54,12 @@ public class VasTransactionService extends AbstractQueryService {
 	 */
 	@Autowired
 	private VasSseService vasSseService;
+
+	/**
+	 * 재고 트랜잭션 서비스
+	 */
+	@Autowired
+	private StockTransactionService stockTrxSvc;
 
 	/********************************************************************************************************
 	 * 1. 작업 지시 생성 및 승인
@@ -414,8 +421,8 @@ public class VasTransactionService extends AbstractQueryService {
 		vasOrder.setCompletedQty(currentCompleted + result.getResultQty());
 		this.queryManager.update(vasOrder, "completedQty");
 
-		// TODO: 재고 처리 로직 구현
-		// processInventoryByVasType(vasOrder, result);
+		// VAS 유형별 재고 처리
+		this.processInventoryByVasType(vasOrder, result);
 
 		// SSE 이벤트 발행
 		vasSseService.publish(vasOrder.getDomainId(), new VasEventData(
@@ -925,5 +932,188 @@ public class VasTransactionService extends AbstractQueryService {
 		}
 
 		return alerts;
+	}
+
+	/********************************************************************************************************
+	 * 10. VAS 재고 처리
+	 ********************************************************************************************************/
+
+	/**
+	 * VAS 유형별 재고 처리
+	 *
+	 * SET_ASSEMBLY : 구성품 재고 차감 → 세트 SKU 재고 생성
+	 * DISASSEMBLY : 세트 SKU 재고 차감 → 구성품 재고 생성
+	 * 기타(REPACK/LABEL/CUSTOM) : 수량 변화 없음 — 스킵
+	 *
+	 * @param vasOrder 작업 지시
+	 * @param result   실적 정보
+	 */
+	private void processInventoryByVasType(VasOrder vasOrder, VasResult result) {
+		String vasType = vasOrder.getVasType();
+
+		if (WmsVasConstants.VAS_TYPE_SET_ASSEMBLY.equals(vasType)) {
+			// 1. BOM 구성품 재고 차감
+			if (ValueUtil.isNotEmpty(vasOrder.getVasBomId())) {
+				this.consumeComponentInventories(vasOrder, result);
+			}
+			// 2. 세트 SKU 재고 생성
+			this.createSetSkuInventory(vasOrder, result);
+
+		} else if (WmsVasConstants.VAS_TYPE_DISASSEMBLY.equals(vasType)) {
+			// 1. 세트 SKU 재고 차감
+			this.consumeSetSkuInventory(vasOrder, result);
+			// 2. BOM 구성품 재고 생성
+			if (ValueUtil.isNotEmpty(vasOrder.getVasBomId())) {
+				this.createComponentInventories(vasOrder, result);
+			}
+		}
+		// REPACK, LABEL, CUSTOM: 재고 수량 변화 없음 — 스킵
+	}
+
+	/**
+	 * SET_ASSEMBLY 시 BOM 구성품 재고 차감
+	 *
+	 * BOM item별 소비량 = resultQty × componentQty
+	 * FIFO 순(created_at ASC)으로 재고를 조회하여 소비량만큼 차감
+	 *
+	 * @param vasOrder 작업 지시
+	 * @param result   실적 정보
+	 */
+	private void consumeComponentInventories(VasOrder vasOrder, VasResult result) {
+		Query bomQuery = new Query();
+		bomQuery.addFilter("domainId", vasOrder.getDomainId());
+		bomQuery.addFilter("vasBomId", vasOrder.getVasBomId());
+		bomQuery.addOrder("bomSeq", true);
+		List<VasBomItem> bomItems = this.queryManager.selectList(VasBomItem.class, bomQuery);
+
+		for (VasBomItem bomItem : bomItems) {
+			double usedQty = result.getResultQty() * bomItem.getComponentQty();
+			this.deductInventory(vasOrder.getDomainId(), vasOrder.getComCd(), vasOrder.getWhCd(),
+					bomItem.getSkuCd(), usedQty, vasOrder.getVasNo());
+		}
+	}
+
+	/**
+	 * DISASSEMBLY 시 세트 SKU 재고 차감
+	 *
+	 * @param vasOrder 작업 지시
+	 * @param result   실적 정보
+	 */
+	private void consumeSetSkuInventory(VasOrder vasOrder, VasResult result) {
+		this.deductInventory(vasOrder.getDomainId(), vasOrder.getComCd(), vasOrder.getWhCd(),
+				result.getSetSkuCd(), result.getResultQty(), vasOrder.getVasNo());
+	}
+
+	/**
+	 * 창고 내 특정 SKU 재고에서 qty 차감 (FIFO 순)
+	 *
+	 * 재고 부족 시 경고 로그만 남기고 계속 진행 (실적은 이미 등록된 상태)
+	 *
+	 * @param domainId 도메인 ID
+	 * @param comCd    화주사 코드
+	 * @param whCd     창고 코드
+	 * @param skuCd    상품 코드
+	 * @param qty      차감할 수량
+	 * @param vasNo    작업 지시 번호 (로그용)
+	 */
+	private void deductInventory(Long domainId, String comCd, String whCd, String skuCd, double qty, String vasNo) {
+		String sql = "SELECT * FROM inventories " +
+				"WHERE domain_id = :domainId AND com_cd = :comCd AND wh_cd = :whCd AND sku_cd = :skuCd " +
+				"AND (del_flag IS NULL OR del_flag = false) AND inv_qty > 0 " +
+				"ORDER BY created_at ASC";
+		List<Inventory> invList = this.queryManager.selectListBySql(sql,
+				ValueUtil.newMap("domainId,comCd,whCd,skuCd", domainId, comCd, whCd, skuCd),
+				Inventory.class, 0, 0);
+
+		if (invList.isEmpty()) {
+			this.logger.warn("VAS 재고 차감 실패 - 가용 재고 없음: vasNo={}, skuCd={}, qty={}", vasNo, skuCd, qty);
+			return;
+		}
+
+		double remainQty = qty;
+		for (Inventory inv : invList) {
+			if (remainQty <= 0.0001)
+				break;
+			double deductQty = Math.min(inv.getInvQty(), remainQty);
+			String deductSql = "UPDATE inventories " +
+					"SET inv_qty = inv_qty - :deductQty, last_tran_cd = :tranCd, updated_at = now() " +
+					"WHERE id = :invId AND domain_id = :domainId AND inv_qty >= :deductQty";
+			this.queryManager.executeBySql(deductSql, ValueUtil.newMap(
+					"deductQty,tranCd,invId,domainId",
+					deductQty, Inventory.TRANSACTION_VAS_OUT, inv.getId(), domainId));
+			remainQty -= deductQty;
+		}
+
+		if (remainQty > 0.0001) {
+			this.logger.warn("VAS 재고 부분 차감: vasNo={}, skuCd={}, 차감={}/{}", vasNo, skuCd, qty - remainQty, qty);
+		}
+	}
+
+	/**
+	 * SET_ASSEMBLY 완성품(세트 SKU) 재고 생성
+	 *
+	 * result.destLocCd 우선, 없으면 vasOrder.workLocCd 사용
+	 *
+	 * @param vasOrder 작업 지시
+	 * @param result   실적 정보
+	 */
+	private void createSetSkuInventory(VasOrder vasOrder, VasResult result) {
+		String destLocCd = ValueUtil.isNotEmpty(result.getDestLocCd()) ? result.getDestLocCd()
+				: vasOrder.getWorkLocCd();
+		if (ValueUtil.isEmpty(destLocCd)) {
+			this.logger.warn("VAS 세트 재고 생성 실패 - destLocCd 없음: vasNo={}", vasOrder.getVasNo());
+			return;
+		}
+
+		Inventory newInv = new Inventory();
+		newInv.setDomainId(vasOrder.getDomainId());
+		newInv.setComCd(vasOrder.getComCd());
+		newInv.setWhCd(vasOrder.getWhCd());
+		newInv.setLocCd(destLocCd);
+		newInv.setSkuCd(result.getSetSkuCd());
+		newInv.setInvQty(result.getResultQty());
+		newInv.setLotNo(result.getLotNo());
+		newInv.setStatus(Inventory.STATUS_STORED);
+		newInv.setRemarks("VAS 완성품 재고 생성");
+		this.stockTrxSvc.createInventory(vasOrder.getDomainId(), newInv);
+	}
+
+	/**
+	 * DISASSEMBLY 시 BOM 구성품 재고 생성
+	 *
+	 * 구성품별 생성 수량 = resultQty × componentQty
+	 * result.destLocCd 우선, 없으면 vasOrder.workLocCd 사용
+	 *
+	 * @param vasOrder 작업 지시
+	 * @param result   실적 정보
+	 */
+	private void createComponentInventories(VasOrder vasOrder, VasResult result) {
+		String destLocCd = ValueUtil.isNotEmpty(result.getDestLocCd()) ? result.getDestLocCd()
+				: vasOrder.getWorkLocCd();
+		if (ValueUtil.isEmpty(destLocCd)) {
+			this.logger.warn("VAS 구성품 재고 생성 실패 - destLocCd 없음: vasNo={}", vasOrder.getVasNo());
+			return;
+		}
+
+		Query bomQuery = new Query();
+		bomQuery.addFilter("domainId", vasOrder.getDomainId());
+		bomQuery.addFilter("vasBomId", vasOrder.getVasBomId());
+		bomQuery.addOrder("bomSeq", true);
+		List<VasBomItem> bomItems = this.queryManager.selectList(VasBomItem.class, bomQuery);
+
+		for (VasBomItem bomItem : bomItems) {
+			double compQty = result.getResultQty() * bomItem.getComponentQty();
+
+			Inventory newInv = new Inventory();
+			newInv.setDomainId(vasOrder.getDomainId());
+			newInv.setComCd(vasOrder.getComCd());
+			newInv.setWhCd(vasOrder.getWhCd());
+			newInv.setLocCd(destLocCd);
+			newInv.setSkuCd(bomItem.getSkuCd());
+			newInv.setInvQty(compQty);
+			newInv.setStatus(Inventory.STATUS_STORED);
+
+			this.stockTrxSvc.createInventory(vasOrder.getDomainId(), newInv);
+		}
 	}
 }
