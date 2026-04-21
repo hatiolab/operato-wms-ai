@@ -1,5 +1,8 @@
 package operato.wms.stock.entity;
 
+import operato.wms.base.entity.SKU;
+import operato.wms.inbound.entity.Receiving;
+import operato.wms.inbound.entity.ReceivingItem;
 import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
@@ -11,6 +14,7 @@ import xyz.elidom.orm.IQueryManager;
 import xyz.elidom.sys.SysConstants;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.util.BeanUtil;
+import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
 @Table(name = "inventories", idStrategy = GenerationRule.UUID, indexes = {
@@ -712,11 +716,8 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.delFlag = (this.delFlag == null) ? false : this.delFlag;
 		this.expireStatus = (this.expireStatus == null) ? Inventory.EXPIRE_STATUS_NORMAL : this.expireStatus;
 
-		if (ValueUtil.isEmpty(this.skuNm) && ValueUtil.isNotEmpty(this.skuCd) && ValueUtil.isNotEmpty(this.comCd)) {
-			String sql = "select sku_nm from sku where domain_id = :domainId and com_cd = :comCd and sku_cd = :skuCd";
-			this.skuNm = BeanUtil.get(IQueryManager.class).selectBySql(sql,
-					ValueUtil.newMap("domainId,comCd,skuCd", this.domainId, this.comCd, this.skuCd), String.class);
-		}
+		// 유통기한 계산
+		this.calculateExpiryDate();
 
 		if (this.invQty <= 0) {
 			// 재고 소진시 상태 : 비어있음
@@ -726,6 +727,34 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 			// 상태 초기화 : 보관 중
 			this.status = (this.status == null) ? Inventory.STATUS_STORED : this.status;
 		}
+	}
+
+	/**
+	 * 유통기한 계산
+	 */
+	public void calculateExpiryDate() {
+		// 이미 유통기한이 설정되어 있다면 계산하지 않음
+		if (ValueUtil.isNotEmpty(this.skuNm) && ValueUtil.isNotEmpty(this.expiredDate)) {
+			return;
+		}
+
+		String sql = "select id, sku_nm, prd_expired_period from sku where domain_id = :domainId and com_cd = :comCd and sku_cd = :skuCd";
+		SKU sku = BeanUtil.get(IQueryManager.class).selectBySql(sql,
+				ValueUtil.newMap("domainId,comCd,skuCd", this.domainId, this.comCd, this.skuCd), SKU.class);
+
+		if (ValueUtil.isEmpty(this.skuNm)) {
+			this.skuNm = sku.getSkuNm();
+		}
+
+		if (sku == null || sku.getPrdExpiredPeriod() == null) {
+			return;
+		}
+
+		// 유통기한 = 제조일 + prdExpiredPeriod(일)
+		String expiredDate = DateUtil.addDateToStr(
+				DateUtil.parse(this.prodDate, DateUtil.getDateFormat()),
+				sku.getPrdExpiredPeriod());
+		this.setExpiredDate(expiredDate);
 	}
 
 	@Override

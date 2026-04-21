@@ -8,7 +8,9 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import operato.wms.base.entity.Location;
 import operato.wms.base.entity.SKU;
+import operato.wms.base.entity.StoragePolicy;
 import operato.wms.base.service.RuntimeConfigService;
 import operato.wms.base.service.WmsBaseService;
 import operato.wms.inbound.WmsInboundConfigConstants;
@@ -371,12 +373,17 @@ public class InboundTransactionService extends AbstractQueryService {
         }
         
         double splitQty = item.getRcvExpQty() - item.getRcvQty();
-        
+
         // 예정 수량과 입고 수량이 다르면 자동 분할 처리
         if(splitQty > 0) {
             item.split(splitQty, false, true);
         }
-        
+
+        // 유통기한 자동 계산: 제조일이 있고 유통기한이 비어있는 경우 SKU의 prdExpiredPeriod 기반으로 계산
+        if (ValueUtil.isNotEmpty(item.getPrdDate()) && ValueUtil.isEmpty(item.getExpiredDate())) {
+            this.calculateExpiryDateForItem(receiving, item);
+        }
+
         // 완료 처리
         if ( ValueUtil.isEmpty(item.getBarcode()) ) {
         	item.setBarcode(Inventory.newBarcode());
@@ -384,6 +391,30 @@ public class InboundTransactionService extends AbstractQueryService {
         item.setRcvDate(DateUtil.todayStr());
         item.setStatus(WmsInboundConstants.STATUS_END);
         return item;
+    }
+
+    /**
+     * 입고 상세 라인 유통기한 자동 계산
+     *
+     * 제조일(prdDate)이 있고 유통기한(expiredDate)이 비어있을 때,
+     * SKU 마스터의 prdExpiredPeriod(유통기한 일수)를 기반으로 자동 계산한다.
+     * StoragePolicy의 expiryBlockDays와 비교하여 출고 차단 기준 위반 시 경고를 출력한다.
+     *
+     * @param receiving 입고 주문
+     * @param item 입고 상세 라인
+     */
+    public void calculateExpiryDateForItem(Receiving receiving, ReceivingItem item) {
+        SKU sku = this.queryManager.selectByCondition(SKU.class,
+                new SKU(receiving.getDomainId(), receiving.getComCd(), item.getSkuCd()));
+        if (sku == null || sku.getPrdExpiredPeriod() == null) {
+            return;
+        }
+
+        // 유통기한 = 제조일 + prdExpiredPeriod(일)
+        String expiredDate = DateUtil.addDateToStr(
+                DateUtil.parse(item.getPrdDate(), DateUtil.getDateFormat()),
+                sku.getPrdExpiredPeriod());
+        item.setExpiredDate(expiredDate);
     }
     
     /**
@@ -701,6 +732,94 @@ public class InboundTransactionService extends AbstractQueryService {
         return items;
     }
     
+    /**
+     * 적치 추천 로케이션 조회
+     *
+     * StoragePolicy.putawayStrategy에 따라 SKU·화주사 조건에 맞는 로케이션을 추천한다.
+     *
+     * - FIXED : Location.skuCd가 해당 SKU로 지정된 STORAGE 로케이션
+     * - ZONE  : SKU.tempType 과 Location.tempType 이 일치하는 STORAGE 로케이션 중 재고 없는 곳
+     * - NEAREST : sortNo ASC 기준으로 가장 가까운 빈 STORAGE 로케이션
+     * - RANDOM(기본) : 화주사 comCd 또는 미지정(null) 로케이션 중 재고 없는 빈 곳 (sortNo ASC)
+     *
+     * 공통 필터: del_flag=false, restrict_type IS NULL, loc_type='STORAGE'
+     *
+     * @param domainId 도메인 ID
+     * @param comCd    화주사 코드
+     * @param whCd     창고 코드
+     * @param skuCd    SKU 코드
+     * @param limit    추천 로케이션 최대 반환 수 (0이면 기본 5)
+     * @return 추천 로케이션 목록
+     */
+    public List<Location> recommendPutawayLocations(Long domainId, String comCd, String whCd, String skuCd, int limit) {
+        if (limit <= 0) {
+            limit = 5;
+        }
+
+        // SKU 조회 (tempType, hazmatFlag 참조)
+        SKU sku = this.queryManager.selectByCondition(SKU.class, new SKU(domainId, comCd, skuCd));
+
+        // StoragePolicy 조회 (putawayStrategy 결정)
+        StoragePolicy policy = this.wmsBaseSvc.findStoragePolicy(domainId, comCd, whCd);
+        String strategy = (policy != null && ValueUtil.isNotEmpty(policy.getPutawayStrategy()))
+                ? policy.getPutawayStrategy() : StoragePolicy.PUTAWAY_STRATEGY_RANDOM;
+
+        // 공통 서브쿼리: 재고가 있는 로케이션 목록
+        String occupiedSubSql = "SELECT DISTINCT loc_cd FROM inventories"
+                + " WHERE domain_id = :domainId AND wh_cd = :whCd"
+                + " AND (del_flag IS NULL OR del_flag = false) AND inv_qty > 0";
+
+        String baseSql = "SELECT * FROM locations"
+                + " WHERE domain_id = :domainId AND wh_cd = :whCd"
+                + " AND loc_type = 'STORAGE'"
+                + " AND (del_flag IS NULL OR del_flag = false)"
+                + " AND (restrict_type IS NULL OR restrict_type = '')";
+
+        Map<String, Object> params = ValueUtil.newMap("domainId,whCd,limit", domainId, whCd, limit);
+        String sql;
+
+        if (StoragePolicy.PUTAWAY_STRATEGY_FIXED.equals(strategy)) {
+            // FIXED: Location.skuCd가 해당 SKU로 지정된 로케이션
+            sql = baseSql
+                    + " AND sku_cd = :skuCd"
+                    + " ORDER BY sort_no ASC NULLS LAST"
+                    + " LIMIT :limit";
+            params.put("skuCd", skuCd);
+
+        } else if (StoragePolicy.PUTAWAY_STRATEGY_ZONE.equals(strategy)) {
+            // ZONE: SKU.tempType과 Location.tempType 일치, 재고 없는 빈 로케이션
+            String tempType = (sku != null) ? sku.getTempType() : null;
+            sql = baseSql
+                    + " AND loc_cd NOT IN (" + occupiedSubSql + ")"
+                    + (ValueUtil.isNotEmpty(tempType)
+                            ? " AND temp_type = :tempType"
+                            : " AND (temp_type IS NULL OR temp_type = '')")
+                    + " ORDER BY sort_no ASC NULLS LAST"
+                    + " LIMIT :limit";
+            if (ValueUtil.isNotEmpty(tempType)) {
+                params.put("tempType", tempType);
+            }
+
+        } else if (StoragePolicy.PUTAWAY_STRATEGY_NEAREST.equals(strategy)) {
+            // NEAREST: sortNo ASC 기준 가장 가까운 빈 로케이션
+            sql = baseSql
+                    + " AND loc_cd NOT IN (" + occupiedSubSql + ")"
+                    + " ORDER BY sort_no ASC NULLS LAST"
+                    + " LIMIT :limit";
+
+        } else {
+            // RANDOM(기본): 화주사 전용 또는 공용(com_cd IS NULL) 빈 로케이션
+            sql = baseSql
+                    + " AND loc_cd NOT IN (" + occupiedSubSql + ")"
+                    + " AND (com_cd = :comCd OR com_cd IS NULL OR com_cd = '')"
+                    + " ORDER BY sort_no ASC NULLS LAST"
+                    + " LIMIT :limit";
+            params.put("comCd", comCd);
+        }
+
+        return this.queryManager.selectListBySql(sql, params, Location.class, 0, 0);
+    }
+
     /**
      * 적치 작업 화면 - 완료 항목 조회 (rcv_no 기준, inventories status = STORED)
      *

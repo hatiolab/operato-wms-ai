@@ -1,11 +1,16 @@
 package operato.wms.base.entity;
 
+import org.apache.commons.lang.StringUtils;
+
 import operato.wms.vas.WmsVasConstants;
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
 import xyz.elidom.dbist.annotation.Index;
 import xyz.elidom.dbist.annotation.PrimaryKey;
 import xyz.elidom.dbist.annotation.Table;
+import xyz.elidom.dev.entity.RangedSeq;
+import xyz.elidom.sys.SysConstants;
+import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -297,11 +302,13 @@ public class VasBom extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 			this.status = WmsVasConstants.BOM_STATUS_ACTIVE;
 		}
 
-		// BOM 번호 자동 채번 (BOM-YYYYMMDD-XXXXX)
+		// BOM 번호 자동 채번 (BOM-YYMMDD-XXXXX)
 		if (ValueUtil.isEmpty(this.bomNo)) {
-			String dateStr = DateUtil.todayStr("yyyyMMdd");
-			// TODO: 일련번호 채번 서비스 구현 필요
-			this.bomNo = this.bomNo;
+			String dateStr = DateUtil.todayStr("yyMMdd");
+			Integer seq = RangedSeq.increaseSequence(Domain.currentDomainId(), "BOM_NO", "BOM_NO", "DATE", dateStr,
+					null, null);
+			String serialNo = StringUtils.leftPad(String.valueOf(seq), 5, "0");
+			this.bomNo = "BOM" + Domain.currentDomainId() + SysConstants.DASH + dateStr + SysConstants.DASH + serialNo;
 		}
 
 		// 구성 품목 수 초기화

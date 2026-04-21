@@ -35,6 +35,15 @@ public class StoragePolicy extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	/** 불출 전략: 수동 선택 */
 	public static final String RELEASE_STRATEGY_MANUAL = "MANUAL";
 
+	/** 적치 전략: SKU별 고정 로케이션 (Location.skuCd 기준) */
+	public static final String PUTAWAY_STRATEGY_FIXED = "FIXED";
+	/** 적치 전략: 빈 로케이션 자동 배정 (화주사 전용 또는 공용) */
+	public static final String PUTAWAY_STRATEGY_RANDOM = "RANDOM";
+	/** 적치 전략: SKU 속성(tempType) 기준 존 내 배정 */
+	public static final String PUTAWAY_STRATEGY_ZONE = "ZONE";
+	/** 적치 전략: 도크에서 가장 가까운 빈 로케이션 (Location.sortNo ASC) */
+	public static final String PUTAWAY_STRATEGY_NEAREST = "NEAREST";
+
 	/**
 	 * 보관 정책 고유 ID (UUID)
 	 */

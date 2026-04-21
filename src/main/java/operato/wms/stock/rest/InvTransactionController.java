@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import operato.wms.stock.entity.Inventory;
 import operato.wms.stock.model.InvTransaction;
-import operato.wms.stock.service.InventoryTransactionService;
+import operato.wms.stock.service.StockTransactionService;
 import xyz.anythings.sys.model.BaseResponse;
 import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
@@ -122,7 +122,7 @@ public class InvTransactionController extends AbstractRestService {
      * 재고 트랜잭션 서비스
      */
     @Autowired
-    private InventoryTransactionService invTrxSvc;
+    private StockTransactionService invTrxSvc;
     /**
      * 커스텀 서비스
      */

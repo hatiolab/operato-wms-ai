@@ -227,6 +227,8 @@ public class FulfillmentPickingService extends AbstractQueryService {
 				PickingTask.STATUS_CANCELLED, domainId, id);
 		this.queryManager.executeBySql(sql, params);
 
+		// TODO 피킹 지시 취소 시 할당 재고 RESERVE → 해제 로직이 맞는지 체크
+
 		// 결과 리턴
 		return ValueUtil.newMap("success,pick_task_no", true, task.getPickTaskNo());
 	}

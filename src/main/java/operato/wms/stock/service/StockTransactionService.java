@@ -133,20 +133,45 @@ public class StockTransactionService extends AbstractQueryService {
     /**
      * 재고 이동 처리
      * 
+     * @param domainId
+     * @param input
+     * @return
+     */
+    public Inventory moveInventory(Long domainId, InvTransaction input) {
+        // 이동 로케이션 값 체크
+        ValueUtil.checkEmptyData(input.getToLocCd(), "label.to_loc_cd");
+
+        // 재고 이동 사유값 체크
+        ValueUtil.checkEmptyData(input.getReason(), "label.reason");
+
+        // 재고 조회 & 기본 체크 포인트 체크
+        Inventory inventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_MOVE);
+
+        // 재고 이동 처리
+        if (ValueUtil.isEmpty(input.getToQty())) {
+            return this.moveInventory(inventory, input.getToLocCd(), input.getReason());
+        } else {
+            return this.moveInventory(inventory, input.getToLocCd(), input.getToQty(), input.getReason());
+        }
+    }
+
+    /**
+     * 재고 이동 처리
+     * 
      * @param inventory
-     * @param locCd
+     * @param toLocCd
      * @param remark
      * @return
      */
-    public Inventory moveInventory(Inventory inventory, String locCd, String remark) {
+    public Inventory moveInventory(Inventory inventory, String toLocCd, String remark) {
         // To 로케이션 체크
-        ValueUtil.checkEmptyData(locCd, "label.loc_cd");
+        ValueUtil.checkEmptyData(toLocCd, "label.to_loc_cd");
 
         // 재고 조회 & 기본 체크 포인트 체크
         this.checkInventoryForTrx(inventory, Inventory.TRANSACTION_MOVE);
 
         // 로케이션 조회 & 기본 체크 포인트 체크
-        Location toLoc = this.findAndCheckLocation(inventory.getDomainId(), locCd, Inventory.TRANSACTION_MOVE);
+        Location toLoc = this.findAndCheckLocation(inventory.getDomainId(), toLocCd, Inventory.TRANSACTION_MOVE);
 
         if (ValueUtil.isEqualIgnoreCase(inventory.getLocCd(), toLoc.getLocCd())) {
             throw ThrowUtil.newValidationErrorWithNoLog("이동하려는 로케이션이 재고의 로케이션과 동일합니다.");
@@ -164,7 +189,7 @@ public class StockTransactionService extends AbstractQueryService {
         this.checkMixableLocation(toLoc, inventory.getSkuCd());
 
         // 로케이션에 동일 바코드 조회
-        Inventory cond = new Inventory(inventory.getDomainId(), inventory.getBarcode(), locCd);
+        Inventory cond = new Inventory(inventory.getDomainId(), inventory.getBarcode(), toLocCd);
         cond.setSkuCd(inventory.getSkuCd());
         Inventory alreadyExistInv = this.queryManager.selectByCondition(Inventory.class, cond);
 
@@ -183,6 +208,31 @@ public class StockTransactionService extends AbstractQueryService {
 
         // 재고 정보 리턴
         return inventory;
+    }
+
+    /**
+     * 재고 바코드에서 모든 재고를 이동하는 것이 아니고 moveQty 만큼만 이동 처리
+     * 
+     * @param inventory
+     * @param locCd
+     * @param moveQty
+     * @param remark
+     * @return
+     */
+    public Inventory moveInventory(Inventory inventory, String locCd, double moveQty, String remark) {
+        // 바코드 재고 수량, 작업자 입력 수량 체크
+        double invQty = inventory.getInvQty();
+
+        // 바코드 재고 수량이 이동할 수량보다 크다면 재고 분할 처리
+        if (invQty > moveQty) {
+            Inventory[] invs = this.splitInventory(inventory, moveQty, null, false);
+            Inventory remainInv = invs[1];
+            this.queryManager.update(remainInv);
+            inventory = invs[0];
+        }
+
+        // 재고 이동 처리
+        return this.moveInventory(inventory, locCd, remark);
     }
 
     /**
@@ -213,8 +263,17 @@ public class StockTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory mergeInventory(Long domainId, InvTransaction input) {
-        // TODO 구현 ...
-        return null;
+        // 원본 재고 조회 & 기본 체크 포인트 체크
+        Inventory mainInventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_MERGE);
+        // 병합할 바코드 체크
+        ValueUtil.checkEmptyData(input.getMergeBarcode(), "label.merge_barcode");
+        // 병합할 로케이션 체크
+        ValueUtil.checkEmptyData(input.getMergeLocCd(), "label.merge_loc_cd");
+        // 병합할 재고 조회 & 기본 체크 포인트 체크
+        Inventory mergeInventory = this.findAndCheckInventory(domainId, input.getMergeBarcode(), input.getMergeLocCd(),
+                Inventory.TRANSACTION_MERGE);
+        // 병합 처리 & 결과 리턴
+        return this.mergeInventory(mainInventory, mergeInventory, input.getReason());
     }
 
     /**
@@ -334,6 +393,47 @@ public class StockTransactionService extends AbstractQueryService {
         inventory.setStatus(Inventory.STATUS_STORED);
         inventory.setRemarks(input.getReason());
         inventory.setLastTranCd(Inventory.TRANSACTION_RELEASE_HOLD);
+        this.queryManager.update(inventory);
+
+        // 리턴
+        return inventory;
+    }
+
+    /**
+     * 재고 스크랩 로케이션 이동 처리
+     * 
+     * @param domainId
+     * @param input
+     * @return
+     */
+    public Inventory scrapInventory(Long domainId, InvTransaction input) {
+        // 이동 로케이션 값 체크
+        ValueUtil.checkEmptyData(input.getToLocCd(), "label.to_loc_cd");
+
+        // 사유 값 체크
+        ValueUtil.checkEmptyData(input.getReason(), "label.reason");
+
+        // 재고 조회 & 기본 체크 포인트 체크
+        Inventory inventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_SCRAP);
+
+        // 로케이션 조회 & 기본 체크 포인트 체크
+        Location toLoc = this.findAndCheckLocation(domainId, input.getToLocCd(), Inventory.TRANSACTION_SCRAP);
+
+        if (ValueUtil.isEqualIgnoreCase(inventory.getLocCd(), toLoc.getLocCd())) {
+            throw ThrowUtil.newValidationErrorWithNoLog("이동하려는 로케이션이 재고의 로케이션과 동일합니다.");
+        }
+
+        if (ValueUtil.isNotEqual(inventory.getWhCd(), toLoc.getWhCd())) {
+            throw ThrowUtil.newValidationErrorWithNoLog("이동하려는 로케이션의 창고와 재고의 창고가 다릅니다.");
+        }
+
+        // From 로케이션 조회 & 기본 체크 포인트 체크
+        this.findAndCheckLocation(domainId, inventory.getLocCd(), Inventory.TRANSACTION_MOVE);
+
+        // 재고 이동 트랜잭션 처리
+        inventory.setLocCd(toLoc.getLocCd());
+        inventory.setRemarks(input.getReason());
+        inventory.setLastTranCd(Inventory.TRANSACTION_SCRAP);
         this.queryManager.update(inventory);
 
         // 리턴
@@ -521,6 +621,21 @@ public class StockTransactionService extends AbstractQueryService {
         Inventory condition = new Inventory(id);
         condition.setDomainId(domainId);
         Inventory inventory = this.queryManager.select(condition);
+        this.checkInventoryForTrx(inventory, tranCd);
+        return inventory;
+    }
+
+    /**
+     * 재고 ID로 재고 정보 조회 & 기본 체크 포인트 체크
+     * 
+     * @param domainId
+     * @param id
+     * @param tranCd
+     * @return
+     */
+    public Inventory findAndCheckInventory(Long domainId, String barcode, String locCd, String tranCd) {
+        Inventory condition = new Inventory(domainId, barcode, locCd);
+        Inventory inventory = this.queryManager.selectByCondition(Inventory.class, condition);
         this.checkInventoryForTrx(inventory, tranCd);
         return inventory;
     }

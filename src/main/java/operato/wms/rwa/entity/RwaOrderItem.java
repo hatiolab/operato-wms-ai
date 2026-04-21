@@ -1,5 +1,6 @@
 package operato.wms.rwa.entity;
 
+import operato.wms.base.entity.SKU;
 import operato.wms.rwa.WmsRwaConstants;
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
@@ -17,14 +18,14 @@ import xyz.elidom.util.ValueUtil;
  * - 상태: REQUEST, APPROVED, RECEIVING, INSPECTED, DISPOSED, COMPLETED
  * - 처분 유형: RESTOCK, SCRAP, REPAIR, RETURN_VENDOR, DONATION
  */
-@Table(name = "rwa_order_items", idStrategy = GenerationRule.UUID, uniqueFields="rwaOrderId,rwaSeq,domainId", indexes = {
-	@Index(name = "ix_rwa_order_items_0", columnList = "rwa_order_id,rwa_seq,domain_id", unique = true),
-	@Index(name = "ix_rwa_order_items_1", columnList = "rwa_order_id,domain_id"),
-	@Index(name = "ix_rwa_order_items_2", columnList = "sku_cd,domain_id"),
-	@Index(name = "ix_rwa_order_items_3", columnList = "status,domain_id"),
-	@Index(name = "ix_rwa_order_items_4", columnList = "orig_order_no,domain_id"),
-	@Index(name = "ix_rwa_order_items_5", columnList = "lot_no,domain_id"),
-	@Index(name = "ix_rwa_order_items_6", columnList = "disposition_type,domain_id")
+@Table(name = "rwa_order_items", idStrategy = GenerationRule.UUID, uniqueFields = "rwaOrderId,rwaSeq,domainId", indexes = {
+		@Index(name = "ix_rwa_order_items_0", columnList = "rwa_order_id,rwa_seq,domain_id", unique = true),
+		@Index(name = "ix_rwa_order_items_1", columnList = "rwa_order_id,domain_id"),
+		@Index(name = "ix_rwa_order_items_2", columnList = "sku_cd,domain_id"),
+		@Index(name = "ix_rwa_order_items_3", columnList = "status,domain_id"),
+		@Index(name = "ix_rwa_order_items_4", columnList = "orig_order_no,domain_id"),
+		@Index(name = "ix_rwa_order_items_5", columnList = "lot_no,domain_id"),
+		@Index(name = "ix_rwa_order_items_6", columnList = "disposition_type,domain_id")
 })
 public class RwaOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
@@ -575,8 +576,8 @@ public class RwaOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 			IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
 			String sql = "SELECT COALESCE(MAX(rwa_seq), 0) FROM rwa_order_items WHERE domain_id = :domainId AND rwa_order_id = :rwaOrderId";
 			Integer maxSeq = queryMgr.selectBySql(sql,
-				ValueUtil.newMap("domainId,rwaOrderId", this.domainId, this.rwaOrderId),
-				Integer.class);
+					ValueUtil.newMap("domainId,rwaOrderId", this.domainId, this.rwaOrderId),
+					Integer.class);
 			this.rwaSeq = (maxSeq != null ? maxSeq : 0) + 1;
 		}
 
@@ -597,13 +598,17 @@ public class RwaOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 			this.inspectedQty = 0.0;
 		}
 
-		// TODO: SKU 명 자동 조회 로직 구현 필요
-		// if (ValueUtil.isEmpty(this.skuNm) && ValueUtil.isNotEmpty(this.skuCd)) {
-		//     SKU sku = queryMgr.select(SKU.class, new SKU(this.domainId, comCd, this.skuCd));
-		//     if (sku != null) {
-		//         this.skuNm = sku.getSkuNm();
-		//     }
-		// }
+		// SKU 명 자동 조회
+		if (ValueUtil.isEmpty(this.skuNm) && ValueUtil.isNotEmpty(this.skuCd)
+				&& ValueUtil.isNotEmpty(this.rwaOrderId)) {
+			String sql = "select sku_nm from sku where domain_id = :domainId and sku_cd = :skuCd and com_cd = (select com_cd from rwa_orders where domain_id = :domainId and rwa_order_id = :rwaOrderId)";
+			String skuNm = BeanUtil.get(IQueryManager.class).selectBySql(sql,
+					ValueUtil.newMap("domainId,rwaOrderId,skuCd", this.domainId, this.rwaOrderId, this.skuCd),
+					String.class);
+			if (ValueUtil.isNotEmpty(skuNm)) {
+				this.skuNm = skuNm;
+			}
+		}
 	}
 
 	@Override
@@ -613,7 +618,7 @@ public class RwaOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		// 수량 검증: good_qty + defect_qty = inspected_qty
 		if (this.inspectedQty != null && this.inspectedQty > 0) {
 			double sumQty = (this.goodQty != null ? this.goodQty : 0.0)
-						  + (this.defectQty != null ? this.defectQty : 0.0);
+					+ (this.defectQty != null ? this.defectQty : 0.0);
 			if (Math.abs(sumQty - this.inspectedQty) > 0.001) {
 				// 검수 수량과 양품+불량 수량이 일치하지 않음 - 자동 조정
 				this.inspectedQty = sumQty;

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import operato.wms.base.entity.Location;
 import operato.wms.base.service.RuntimeConfigService;
 import operato.wms.base.service.WmsBaseService;
 import operato.wms.inbound.WmsInboundConfigConstants;
@@ -680,6 +681,31 @@ public class InboundTransactionController extends AbstractRestService {
         }
 
         return this.inbTrxService.getPutawayDoneItems(Domain.currentDomainId(), rcvNo);
+    }
+
+    /**
+     * 적치 추천 로케이션 조회
+     *
+     * StoragePolicy.putawayStrategy에 따라 SKU·화주사 조건에 맞는 빈 로케이션을 추천한다.
+     *
+     * GET /rest/inbound_trx/putaway/recommend_locations
+     *   ?com_cd={comCd}&wh_cd={whCd}&sku_cd={skuCd}&limit={limit}
+     *
+     * @param comCd  화주사 코드
+     * @param whCd   창고 코드
+     * @param skuCd  SKU 코드
+     * @param limit  최대 반환 수 (기본 5)
+     * @return 추천 로케이션 목록
+     */
+    @RequestMapping(value = "/putaway/recommend_locations", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Recommend putaway locations by StoragePolicy strategy")
+    public List<Location> recommendPutawayLocations(
+            @RequestParam(name = "com_cd") String comCd,
+            @RequestParam(name = "wh_cd") String whCd,
+            @RequestParam(name = "sku_cd") String skuCd,
+            @RequestParam(name = "limit", required = false, defaultValue = "5") int limit) {
+
+        return this.inbTrxService.recommendPutawayLocations(Domain.currentDomainId(), comCd, whCd, skuCd, limit);
     }
 
     /********************************************************************************************************

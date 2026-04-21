@@ -67,9 +67,9 @@
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
 | W1-S-1 | 재고 할당 피킹존 제한 | 재고 할당 시 `loc_type = PICKABLE` 로케이션에서만 할당하도록 쿼리 수정 | `StockTransactionService.searchAvailableInventory()` | 2026-04-18 | 100% | ☑ | StoragePolicy.releaseStrategy 기반 FEFO/FIFO/LIFO 분기, 윈도우함수 needQty 최적화 포함 |
-| W1-S-2 | 로케이션 유효성 검증 | 적치/이동 시 `del_flag=false`, `restrict_type` 체크, 혼적 불가 로케이션 검증 추가 | `StockTransactionService.findAndCheckLocation()` | 2026-04-18 | 0% | ☐ | |
-| W1-S-3 | 주문 마감 재고 차감 연결 | `OmsShipmentOrderService.close()`에서 `StockTransactionService.closeShipmentInventory()` 호출 연결 | `OmsShipmentOrderService` | 2026-04-19 | 0% | ☐ | |
-| W1-S-4 | StockTransactionService TODO 해소 | Line 190, 231, 1054 미구현 TODO 처리 | `StockTransactionService.java` | 2026-04-19 | 0% | ☐ | |
+| W1-S-2 | 로케이션 유효성 검증 | 적치/이동 시 `del_flag=false`, `restrict_type` 체크, 혼적 불가 로케이션 검증 추가 | `StockTransactionService.findAndCheckLocation()` | 2026-04-18 | 100% | ☑ | restrictType(MOVE/IN/OUT/SCRAP) 분기, mixableFlag 혼적 체크(`checkMixableLocation()`), RCV-WAIT 존 차단 구현됨 |
+| W1-S-3 | 주문 마감 재고 차감 연결 | `OmsShipmentOrderService.close()`에서 `StockTransactionService.closeShipmentInventory()` 호출 연결 | `OmsShipmentOrderService` | 2026-04-19 | 100% | ☑ | `closeShipmentOrder()` → stock_allocations 순회 → `closeShipmentInventory()` 호출 구현됨 |
+| W1-S-4 | StockTransactionService TODO 해소 | Line 216 미구현 TODO 처리 | `StockTransactionService.java` | 2026-04-19 | 100% | ☑ | `mergeInventory(Long, InvTransaction)` 구현 완료 (barcode+locCd로 재고 조회 후 병합). allocate/dealloc/split/close 전부 구현됨 |
 
 ### 2-2. [OMS] 주문 취소 백 프로세스 최소 구현
 
@@ -77,29 +77,29 @@
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W1-O-1 | 주문 확정 취소 | `CONFIRMED → REGISTERED` 상태 복귀, 할당 재고 해제 | `OmsShipmentOrderService.deallocateShipmentOrder()` | 2026-04-20 | 0% | ☐ | |
-| W1-O-2 | 웨이브 취소 | 웨이브 삭제 시 소속 주문 할당 취소, 상태 복귀 | `OmsWaveService.cancelWaveRelease()` | 2026-04-20 | 0% | ☐ | |
-| W1-O-3 | 피킹 취소 | PickingTask 취소 시 할당 재고 RESERVE → 해제 | `FulfillmentPickingService.cancelPickingTask()` | 2026-04-21 | 0% | ☐ | |
+| W1-O-1 | 주문 확정 취소 | `CONFIRMED → REGISTERED` 상태 복귀, 할당 재고 해제 | `OmsShipmentOrderService.deallocateShipmentOrder()` | 2026-04-20 | 100% | ☑ | stock_allocations 순회 → deallocateInventory() 호출, 주문 상태 REGISTERED 복귀 구현됨 |
+| W1-O-2 | 웨이브 취소 | 웨이브 삭제 시 소속 주문 할당 취소, 상태 복귀 | `OmsWaveService.cancelWaveRelease()` | 2026-04-20 | 100% | ☑ | `cancelWaveRelease()` (RELEASED→CREATED) + `cancelWave()` (CREATED→CANCELLED) 구현, WaveCancelledEvent 발행 → FulfillmentEventListener 피킹 지시 삭제 연동 |
+| W1-O-3 | 피킹 취소 | PickingTask 취소 시 할당 재고 RESERVE → 해제 | `FulfillmentPickingService.cancelPickingTask()` | 2026-04-21 | 50% | ☐ | `cancelPickingTask()` 피킹 지시 상태 취소는 구현됨. 개별 취소 시 `deallocateInventory()` 호출 미연결 |
 
 ### 2-3. [INBOUND] 입고 핵심 보완
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W1-I-1 | 유통기한 자동 계산 | 제조일 입력 시 SKU 마스터의 `shelfLifeDays` 기반 유통기한 자동 계산 | `InboundTransactionService` | 2026-04-21 | 0% | ☐ | |
-| W1-I-2 | 적치 추천 로케이션 | 적치 시 `tempType`, `comCd`, `restrictType` 조건 맞는 빈 로케이션 추천 반환 | `InboundTransactionService` | 2026-04-22 | 0% | ☐ | |
+| W1-I-1 | 유통기한 자동 계산 | 제조일 입력 시 SKU 마스터의 `shelfLifeDays` 기반 유통기한 자동 계산 | `InboundTransactionService` | 2026-04-21 | 100% | ☑ | `finishReceivingOrderLine()`에서 prdDate 있고 expiredDate 비어있을 때 `calculateExpiryDateForItem()` 호출 → `SKU.prdExpiredPeriod` 기반 자동 계산 |
+| W1-I-2 | 적치 추천 로케이션 | 적치 시 `tempType`, `comCd`, `restrictType` 조건 맞는 빈 로케이션 추천 반환 | `InboundTransactionService` | 2026-04-22 | 100% | ☑ | `recommendPutawayLocations()` 구현. StoragePolicy.putawayStrategy 기반 FIXED/ZONE/NEAREST/RANDOM 분기. API: `GET /rest/inbound_trx/putaway/recommend_locations` |
 
 ### 2-4. [VAS] BOM 번호 채번 구현
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W1-V-1 | VasBom 번호 채번 | `BOM-YYYYMMDD-XXXXX` 형식 자동 채번 구현 (시퀀스 or DB MAX+1) | `VasBom.java:303` | 2026-04-22 | 0% | ☐ | |
-| W1-V-2 | VAS 재고 처리 연결 | VAS 작업 완료 시 구성품 재고 차감, 세트 SKU 재고 증가 | `VasTransactionService.java:417` | 2026-04-22 | 0% | ☐ | |
+| W1-V-1 | VasBom 번호 채번 | `BOM-YYYYMMDD-XXXXX` 형식 자동 채번 구현 (시퀀스 or DB MAX+1) | `VasBom.java:303` | 2026-04-22 | 100% | ☑ | `beforeCreate()`에서 `RangedSeq.increaseSequence()`로 도메인별 일련번호 채번, `BOM{domainId}-yyMMdd-XXXXX` 형식 완성 |
+| W1-V-2 | VAS 재고 처리 연결 | VAS 작업 완료 시 구성품 재고 차감, 세트 SKU 재고 증가 | `VasTransactionService.java:417` | 2026-04-22 | 10% | ☐ | `registerResult()` 메서드 존재, TODO 주석(`processInventoryByVasType`)만 있고 실제 재고 트랜잭션 미구현 |
 
 ### 2-5. [RWA] SKU명 자동 조회
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W1-R-1 | RwaOrderItem SKU명 조회 | `beforeCreate()`에서 `sku_cd`로 SKU 조회 후 `sku_nm` 자동 세팅 | `RwaOrderItem.java:600` | 2026-04-22 | 0% | ☐ | |
+| W1-R-1 | RwaOrderItem SKU명 조회 | `beforeCreate()`에서 `sku_cd`로 SKU 조회 후 `sku_nm` 자동 세팅 | `RwaOrderItem.java:600` | 2026-04-22 | 100% | ☑ | `beforeCreate()`에서 `rwa_orders` 서브쿼리로 `com_cd` 조회 후 `sku_nm` 자동 세팅 구현됨 |
 
 ### 2-6. [FULFILLMENT] B2B 피킹 구현
 
@@ -112,9 +112,9 @@
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W1-ST-1 | 실사 PCS 자동 계산 | 실사 항목 등록 시 로케이션별 SKU 총 PCS 자동 계산 | `StocktakeController.java:271` | 2026-04-24 | 0% | ☐ | |
-| W1-ST-2 | 차이 PCS 자동 계산 | 전산 수량 vs 실사 수량 차이 자동 계산 | `StocktakeController.java:292` | 2026-04-24 | 0% | ☐ | |
-| W1-ST-3 | 실사 취소 처리 | 실사 상태 `CANCEL` 변경 로직 구현 | `StocktakeController.java:313` | 2026-04-24 | 0% | ☐ | |
+| W1-ST-1 | 실사 PCS 자동 계산 | 실사 항목 등록 시 로케이션별 SKU 총 PCS 자동 계산 | `StocktakeController.java` | 2026-04-24 | 100% | ☑ | `/start` 호출 시 stocktake_items 순회 → inventories에서 `SUM(inv_qty)` 조회 후 `total_qty` 일괄 업데이트. stocktake.plan_sku 집계 포함 |
+| W1-ST-2 | 차이 PCS 자동 계산 | 전산 수량 vs 실사 수량 차이 자동 계산 | `StocktakeController.java` | 2026-04-24 | 100% | ☑ | `/finish` 호출 시 `diff_qty = stocktake_qty - total_qty` 일괄 계산·업데이트. stocktake 헤더 result_sku/diff_sku 집계 포함 |
+| W1-ST-3 | 실사 취소 처리 | 실사 상태 `CANCEL` 변경 로직 구현 | `StocktakeController.java:313` | 2026-04-24 | 100% | ☑ | `/cancel` 엔드포인트에서 `STATUS_CANCEL` 변경 + 커스텀 훅(pre/post) 연동 구현 완료. TODO 주석만 잔존 |
 
 ### 2-8. [필드 로직] 엔티티 정의 필드 비즈니스 로직 연결
 
@@ -133,11 +133,11 @@
 
 | 항목 | 수치 |
 |------|------|
-| 전체 작업 수 | 25개 |
-| 완료 | 1개 |
-| 진행 중 | 0개 |
-| 미시작 | 24개 |
-| 전체 진행율 | 4% |
+| 전체 작업 수 | 23개 |
+| 완료 (☑) | 13개 (W1-S-1, W1-S-2, W1-S-3, W1-S-4, W1-O-1, W1-O-2, W1-V-1, W1-I-1, W1-I-2, W1-R-1, W1-ST-1, W1-ST-2, W1-ST-3) |
+| 진행 중 | 2개 (W1-O-3 50%, W1-V-2 10%) |
+| 미시작 | 8개 (W1-F-1, W1-F-2, W1-FL-1~6) |
+| 전체 진행율 | 57% (완료 13 / 전체 23) |
 
 ---
 
@@ -426,7 +426,7 @@
 
 | 단계 | 기간 | 항목 수 | 핵심 목표 |
 |------|------|---------|-----------|
-| **Week 1** | ~1주 | 25개 | 재고 트랜잭션 안정화, 취소 백프로세스 최소화, VAS/RWA 핵심 버그 해소, 필드 로직 연결 |
+| **Week 1** | ~1주 | 23개 | 재고 트랜잭션 안정화, 취소 백프로세스 최소화, VAS/RWA 핵심 버그 해소, 필드 로직 연결 |
 | **Week 2~3** | ~3주 | 40개 | 화면 완성, 자동화 기능, DB 마이그레이션, 신규 필드 화면 반영, 운영 규칙 구현 |
 | **오픈 후 즉시** | 1~2주 | 15개 | 운영 안정화, 상황 조회, 일별 마감, Carrier 마스터 |
 | **중기** | 1~3개월 | 30개 | 외부 연동, 정산, 대시보드, 마스터 고도화 |
