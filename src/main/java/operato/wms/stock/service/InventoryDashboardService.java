@@ -92,7 +92,26 @@ public class InventoryDashboardService extends AbstractQueryService {
             }
         }
 
-        // TODO: 부족 재고 계산 (safety_stock 컬럼이 있는 경우)
+        // 부족 재고 SKU 수 계산 (가용 재고 < safety_stock인 SKU)
+        String shortageSql = "SELECT COUNT(*) FROM (" +
+                "  SELECT i.sku_cd" +
+                "  FROM inventories i" +
+                "  INNER JOIN skus s ON s.domain_id = i.domain_id AND s.com_cd = i.com_cd AND s.sku_cd = i.sku_cd" +
+                "  WHERE i.domain_id = :domainId" +
+                "  AND (i.del_flag IS NULL OR i.del_flag = false)" +
+                "  AND s.safety_stock IS NOT NULL AND s.safety_stock > 0 ";
+        if (ValueUtil.isNotEmpty(comCd)) {
+            shortageSql += "  AND i.com_cd = :comCd ";
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            shortageSql += "  AND i.wh_cd = :whCd ";
+        }
+        shortageSql += "  GROUP BY i.sku_cd, i.com_cd" +
+                "  HAVING SUM(i.inv_qty - COALESCE(i.reserved_qty, 0)) < MAX(s.safety_stock)" +
+                ") shortage_skus";
+
+        Integer shortageSkuCount = this.queryManager.selectBySql(shortageSql, params, Integer.class);
+        statusCounts.put("shortage_sku", shortageSkuCount != null ? shortageSkuCount : 0);
 
         return statusCounts;
     }
@@ -382,9 +401,59 @@ public class InventoryDashboardService extends AbstractQueryService {
                     "90일 이상 미출고 재고 " + longTermCount + "건이 있습니다."));
         }
 
-        // TODO: 4. 부족 재고 알림 (safety_stock 컬럼이 있는 경우)
+        // 4. 부족 재고 알림 (가용 재고 < safety_stock)
+        List<Map<String, Object>> shortageList = this.getShortageSkus(comCd, whCd);
+        if (!shortageList.isEmpty()) {
+            alerts.add(ValueUtil.newMap(
+                    "type,icon,message,count",
+                    "warning",
+                    "📉",
+                    "안전 재고 이하 SKU " + shortageList.size() + "건이 있습니다.",
+                    shortageList.size()));
+        }
 
         return alerts;
+    }
+
+    /**
+     * 부족 재고 SKU 목록 조회
+     *
+     * 가용 재고(inv_qty - reserved_qty)가 SKU의 safety_stock 미만인 SKU 목록을 반환한다.
+     * safety_stock이 NULL이거나 0인 SKU는 제외한다.
+     *
+     * @param comCd 화주사 코드 (optional)
+     * @param whCd  창고 코드 (optional)
+     * @return [{ sku_cd, sku_nm, available_qty, safety_stock, shortage_qty }]
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getShortageSkus(String comCd, String whCd) {
+        Long domainId = Domain.currentDomainId();
+
+        String sql = "SELECT i.sku_cd, MAX(s.sku_nm) AS sku_nm," +
+                " SUM(i.inv_qty - COALESCE(i.reserved_qty, 0)) AS available_qty," +
+                " MAX(s.safety_stock) AS safety_stock," +
+                " MAX(s.safety_stock) - SUM(i.inv_qty - COALESCE(i.reserved_qty, 0)) AS shortage_qty" +
+                " FROM inventories i" +
+                " INNER JOIN skus s ON s.domain_id = i.domain_id AND s.com_cd = i.com_cd AND s.sku_cd = i.sku_cd" +
+                " WHERE i.domain_id = :domainId" +
+                " AND (i.del_flag IS NULL OR i.del_flag = false)" +
+                " AND s.safety_stock IS NOT NULL AND s.safety_stock > 0";
+
+        Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+        if (ValueUtil.isNotEmpty(comCd)) {
+            sql += " AND i.com_cd = :comCd";
+            params.put("comCd", comCd);
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            sql += " AND i.wh_cd = :whCd";
+            params.put("whCd", whCd);
+        }
+
+        sql += " GROUP BY i.sku_cd, i.com_cd" +
+                " HAVING SUM(i.inv_qty - COALESCE(i.reserved_qty, 0)) < MAX(s.safety_stock)" +
+                " ORDER BY shortage_qty DESC";
+
+        return (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
     }
 
 }
