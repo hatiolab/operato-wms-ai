@@ -222,11 +222,11 @@
 | 작업번호 | 엔티티 | 추가 필드 | 작업 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|--------|-----------|------|--------|--------|------|------|
 | W23-BF-0 | StoragePolicy | 보관 정책 마스터 엔티티 생성, entity_meta 등록, 15개 운영 필드 추가 | `StoragePolicy.java`, `entity_columns`, `common_codes` | 2026-04-20 | 100% | ☑ | putaway_strategy/release_strategy/wave 정책 등 포함 |
-| W23-BF-1 | SKU | lotFlag, serialFlag, hazmatFlag, safetyStock, reorderPoint | 상품 등록/수정 화면 필드 추가 | 2026-05-05 | 0% | ☐ | |
-| W23-BF-2 | Location | comCd, skuCd, sortNo, maxWeight, maxQty | 로케이션 관리 화면 필드 추가 | 2026-05-06 | 0% | ☐ | |
-| W23-BF-3 | Customer | deliveryZipCd, deliveryAddr, defaultCarrierCd, leadTimeDays | 거래처 관리 화면 필드 추가 | 2026-05-06 | 0% | ☐ | |
-| W23-BF-4 | CourierContract | status, contractNm, contractStartDate/EndDate, 요금 필드 | 택배 계약 관리 화면 필드 추가 | 2026-05-07 | 0% | ☐ | |
-| W23-BF-5 | Warehouse | 담당자, 시설 규모, 온도, 운영 시간 필드 | 창고 관리 화면 필드 추가 | 2026-05-07 | 0% | ☐ | |
+| W23-BF-1 | SKU | lotFlag, serialFlag, hazmatFlag, safetyStock, reorderPoint | 상품 등록/수정 화면 필드 추가 | 2026-05-05 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
+| W23-BF-2 | Location | comCd, skuCd, sortNo, maxWeight, maxQty | 로케이션 관리 화면 필드 추가 | 2026-05-06 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
+| W23-BF-3 | Customer | deliveryZipCd, deliveryAddr, defaultCarrierCd, leadTimeDays | 거래처 관리 화면 필드 추가 | 2026-05-06 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
+| W23-BF-4 | CourierContract | status, contractNm, contractStartDate/EndDate, 요금 필드 | 택배 계약 관리 화면 필드 추가 | 2026-05-07 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
+| W23-BF-5 | Warehouse | 담당자, 시설 규모, 온도, 운영 시간 필드 | 창고 관리 화면 필드 추가 | 2026-05-07 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
 
 ### 3-11. [인프라] DB 마이그레이션 파일 작성
 
@@ -253,11 +253,11 @@
 
 | 항목 | 수치 |
 |------|------|
-| 전체 작업 수 | 41개 |
-| 완료 | 1개 |
+| 전체 작업 수 | 35개 |
+| 완료 | 10개 |
 | 진행 중 | 0개 |
-| 미시작 | 40개 |
-| 전체 진행율 | 2% |
+| 미시작 | 25개 |
+| 전체 진행율 | 29% |
 
 ---
 
