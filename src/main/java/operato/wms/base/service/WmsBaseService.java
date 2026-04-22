@@ -238,4 +238,80 @@ public class WmsBaseService extends AbstractQueryService {
         return filters.stream().filter(filter -> ValueUtil.isNotEmpty(filter.getRightOperand()))
                 .toList();
     }
+
+    /**
+     * 사용자가 접근 가능한 화주사 코드 목록 조회
+     *
+     * user_companies 매핑 레코드가 없는 사용자는 도메인 내 전체 화주사를 반환한다.
+     *
+     * @param domainId 도메인 ID
+     * @param userId   사용자 로그인 ID
+     * @return 화주사 코드 목록
+     */
+    @SuppressWarnings("unchecked")
+    public List<String> getUserCompanyCodes(Long domainId, String userId) {
+        // 매핑 레코드 존재 여부 확인
+        String countSql = "SELECT COUNT(*) FROM user_companies WHERE domain_id = :domainId AND user_id = :userId";
+        Integer mappingCount = this.queryManager.selectBySql(countSql,
+                ValueUtil.newMap("domainId,userId", domainId, userId), Integer.class);
+
+        if (mappingCount == null || mappingCount == 0) {
+            // 매핑 없음 → 도메인 내 전체 활성 화주사 코드 반환
+            String allSql = "SELECT com_cd FROM companies WHERE domain_id = :domainId AND (del_flag IS NULL OR del_flag = false) ORDER BY com_cd";
+            List<Map<String, Object>> rows = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
+                    allSql, ValueUtil.newMap("domainId", domainId), Map.class, 0, 0);
+            return rows.stream()
+                    .map(r -> r.get("com_cd") != null ? r.get("com_cd").toString() : null)
+                    .filter(ValueUtil::isNotEmpty)
+                    .toList();
+        }
+
+        // 매핑 있음 → 허용된 화주사 코드만 반환 (company_id FK로 JOIN)
+        String sql = "SELECT c.com_cd FROM user_companies uc" +
+                " INNER JOIN companies c ON c.id = uc.company_id AND c.domain_id = uc.domain_id" +
+                " WHERE uc.domain_id = :domainId AND uc.user_id = :userId" +
+                " AND (c.del_flag IS NULL OR c.del_flag = false)" +
+                " ORDER BY c.com_cd";
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
+                sql, ValueUtil.newMap("domainId,userId", domainId, userId), Map.class, 0, 0);
+        return rows.stream()
+                .map(r -> r.get("com_cd") != null ? r.get("com_cd").toString() : null)
+                .filter(ValueUtil::isNotEmpty)
+                .toList();
+    }
+
+    /**
+     * 사용자가 접근 가능한 화주사 목록 조회 (Company 객체)
+     *
+     * user_companies 매핑 레코드가 없는 사용자는 도메인 내 전체 화주사를 반환한다.
+     *
+     * @param domainId 도메인 ID
+     * @param userId   사용자 로그인 ID
+     * @return 화주사 목록 [{ com_cd, com_nm, com_alias }]
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getUserAccessibleCompanies(Long domainId, String userId) {
+        String countSql = "SELECT COUNT(*) FROM user_companies WHERE domain_id = :domainId AND user_id = :userId";
+        Integer mappingCount = this.queryManager.selectBySql(countSql,
+                ValueUtil.newMap("domainId,userId", domainId, userId), Integer.class);
+
+        String sql;
+        Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+
+        if (mappingCount == null || mappingCount == 0) {
+            // 매핑 없음 → 전체 활성 화주사
+            sql = "SELECT com_cd as name, com_nm as description FROM companies WHERE domain_id = :domainId AND (del_flag IS NULL OR del_flag = false) ORDER BY com_cd";
+        } else {
+            // 매핑 있음 → 허용된 화주사만 반환 (company_id FK로 JOIN)
+            sql = "SELECT c.com_cd as name, c.com_nm as description" +
+                    " FROM companies c" +
+                    " INNER JOIN user_companies uc ON uc.company_id = c.id AND uc.domain_id = c.domain_id" +
+                    " WHERE c.domain_id = :domainId AND uc.user_id = :userId" +
+                    " AND (c.del_flag IS NULL OR c.del_flag = false)" +
+                    " ORDER BY c.com_cd";
+            params.put("userId", userId);
+        }
+
+        return (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+    }
 }

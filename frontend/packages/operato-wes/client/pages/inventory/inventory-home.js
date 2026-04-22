@@ -237,6 +237,35 @@ class InventoryHome extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface);
         }
 
+        .alert-item .badge {
+          min-width: 28px;
+          height: 28px;
+          padding: 0 8px;
+          border-radius: 14px;
+          background: currentColor;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 700;
+          flex-shrink: 0;
+        }
+
+        .alert-item.warning .badge {
+          background: #FF9800;
+          color: #fff;
+        }
+
+        .alert-item.error .badge {
+          background: #F44336;
+          color: #fff;
+        }
+
+        .alert-item.info .badge {
+          background: #2196F3;
+          color: #fff;
+        }
+
         /* 로딩 상태 */
         .loading {
           display: flex;
@@ -286,7 +315,7 @@ class InventoryHome extends localize(i18next)(PageView) {
       waiting_qty: 0,
       locked_qty: 0,
       bad_qty: 0,
-      shortage_count: 0
+      shortage_sku: 0
     }
     this.statusStats = {
       available_qty: 0,
@@ -362,6 +391,11 @@ class InventoryHome extends localize(i18next)(PageView) {
                     <div class="count">${this._formatNumber(this.statusCounts.waiting_qty || 0)}</div>
                     <div class="subtitle">적치 전</div>
                   </div>
+                  <div class="status-card shortage" @click="${() => this._navigateTo('shortage-skus')}">
+                    <div class="label">부족 재고</div>
+                    <div class="count">${this._formatNumber(this.statusCounts.shortage_sku || 0)}</div>
+                    <div class="subtitle">안전 재고 이하 SKU</div>
+                  </div>
                 </div>
               </section>
 
@@ -432,6 +466,7 @@ class InventoryHome extends localize(i18next)(PageView) {
                           <div class="alert-item ${alert.type}">
                             <span class="icon">${alert.icon}</span>
                             <span class="message">${alert.message}</span>
+                            ${alert.count ? html`<span class="badge">${alert.count}</span>` : ''}
                           </div>
                         `
             )}
@@ -497,7 +532,7 @@ class InventoryHome extends localize(i18next)(PageView) {
         waiting_qty: 0,
         locked_qty: 0,
         bad_qty: 0,
-        shortage_count: 0
+        shortage_sku: 0
       }
     } catch (error) {
       console.error('재고 현황 조회 실패:', error)
@@ -509,7 +544,7 @@ class InventoryHome extends localize(i18next)(PageView) {
         waiting_qty: 0,
         locked_qty: 0,
         bad_qty: 0,
-        shortage_count: 0
+        shortage_sku: 0
       }
     }
   }

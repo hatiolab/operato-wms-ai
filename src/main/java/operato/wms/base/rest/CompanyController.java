@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,11 +17,14 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import operato.wms.base.entity.Company;
+import operato.wms.base.entity.UserCompany;
+import operato.wms.base.service.WmsBaseService;
 import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.dbist.dml.Page;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.sys.entity.Domain;
+import xyz.elidom.sys.entity.User;
 import xyz.elidom.sys.system.service.AbstractRestService;
 import xyz.elidom.util.ValueUtil;
 
@@ -30,8 +34,8 @@ import xyz.elidom.util.ValueUtil;
 @RequestMapping("/rest/companies")
 @ServiceDesc(description = "Company Service API")
 public class CompanyController extends AbstractRestService {
-	
-	/**
+
+    /**
      * 커스텀 서비스 - MultipleUpdate 전 처리
      */
     public static final String TRX_COM_PRE_MULTIPLE_UPDATE = "diy-com-pre-multiple-update";
@@ -39,13 +43,19 @@ public class CompanyController extends AbstractRestService {
      * 커스텀 서비스 - MultipleUpdate 후 처리
      */
     public static final String TRX_COM_POST_MULTIPLE_UPDATE = "diy-com-post-multiple-update";
-    
+
+    /**
+     * WMS 공통 서비스
+     */
+    @Autowired
+    private WmsBaseService wmsBaseSvc;
+
     /**
      * 커스텀 서비스
      */
     @Autowired
     private ICustomService customSvc;
-	
+
     @Override
     protected Class<?> entityClass() {
         return Company.class;
@@ -96,76 +106,118 @@ public class CompanyController extends AbstractRestService {
     @RequestMapping(value = "/update_multiple", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiDesc(description = "Create, Update or Delete multiple at one time")
     public Boolean multipleUpdate(@RequestBody List<Company> list) {
-		// 화주사 정보 변경 분에 대하여 mw에 반영 
-		// this.setMwQueueList(list);
-		
+        // 화주사 정보 변경 분에 대하여 mw에 반영
+        // this.setMwQueueList(list);
+
         // 1. 전 처리 커스텀 서비스 호출
         Map<String, Object> custSvcParams = ValueUtil.newMap("domain_id,list", Domain.currentDomainId(), list);
         this.customSvc.doCustomService(Domain.currentDomainId(), TRX_COM_PRE_MULTIPLE_UPDATE, custSvcParams);
-        
-        // 2. 업데이트 
+
+        // 2. 업데이트
         this.cudMultipleData(this.entityClass(), list);
-        
+
         // 3. 후 처리 커스텀 서비스 호출
         this.customSvc.doCustomService(Domain.currentDomainId(), TRX_COM_POST_MULTIPLE_UPDATE, custSvcParams);
-    	
+
         return true;
     }
-    
-	/**
-	 * 화주사 정보 변경 분에 대해 mw 반영 
-	 * @param list
-	 */
-	/*private void setMwQueueList(List<Company> list) {
-		// 현재 도메인 검색 
-		Domain domain = Domain.currentDomain();
-		
-		// 도메인에 siteCd 가 있을 경우에만 MW 이벤트 발생 
-		if(ValueUtil.isNotEmpty(domain.getMwSiteCd())) {
-			// 화주사 내용 변경 분에 대한 rabbitmq 에서의 이벤트 처리 리스트 
-			List<IQueueNameModel> queueModels = new ArrayList<IQueueNameModel>();
-			
-			for(Company company : list) {
-				// Update 는 기존 Queue 이름에 대한 조회가 필요 
-				if(company.getCudFlag_().equalsIgnoreCase(SysConstants.CUD_FLAG_UPDATE)) {
-					Company befCompany = this.findOne(company.getId());
-					
-					// StageCd 가 변경 되면 이벤트 발생  
-					if(ValueUtil.isNotEqual(befCompany.getComCd(), company.getComCd())) {
-						queueModels.add(new MwQueueNameModel(domain.getId(), domain.getMwSiteCd(), befCompany.getComCd(), company.getComCd(), company.getCudFlag_()));
-					}
-					
-				} else {
-					queueModels.add(new MwQueueNameModel(domain.getId(), domain.getMwSiteCd(), null, company.getComCd(), company.getCudFlag_()));
-				}
-			}
-			
-			if(queueModels.size() > 0 ) {
-				MwQueueManageEvent event = new MwQueueManageEvent(domain.getId(), queueModels);
-				eventPublisher.publishEvent(event);
-			}
-		}
-	} */  
-    
-//    /**
-//     * 애플리케이션 초기화 시점에 생성할 M/W 큐 리스트를 조회
-//     * 
-//     * @param event
-//     */
-//	@EventListener(condition = "#event.isExecuted() == false")
-//	@Order(Ordered.LOWEST_PRECEDENCE)
-//	public void getRabbitMqVhostQueueList(MwQueueListEvent event) {
-//		Company condCompany = new Company();
-//		condCompany.setDomainId(event.getDomainId());
-//		
-//		List<Company> companyList = this.queryManager.selectList(Company.class, condCompany);
-//		List<String> queueNames = new ArrayList<String>(companyList.size());
-//		
-//		for(Company comp : companyList) {
-//			queueNames.add(comp.getComCd());
-//		}
-//		
-//		event.setQueueNames(queueNames);
-//		event.setExecuted(true);
-//	}
+
+    @RequestMapping(value = "/{id}/users", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Search company users by company ID")
+    public List<Map> searchCompanyUsers(@PathVariable("id") String id) {
+        String sql = "SELECT uc.id, uc.company_id, uc.user_id, u.name as user_name, uc.updated_at, uc.updater_id FROM user_companies uc INNER JOIN users u ON uc.user_id = u.id WHERE uc.domain_id = :domainId AND uc.company_id = :id";
+        return this.queryManager.selectListBySql(sql, ValueUtil.newMap("domainId,id", Domain.currentDomainId(), id),
+                Map.class, 0, 0);
+    }
+
+    @RequestMapping(value = "/{id}/users/update_multiple", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Create, Update or Delete multiple users at one time")
+    public Boolean multipleUpdateUsers(@PathVariable("id") String id, @RequestBody List<UserCompany> list) {
+        for (UserCompany userCompany : list) {
+            userCompany.setCompanyId(id);
+        }
+
+        this.cudMultipleData(UserCompany.class, list);
+        return true;
+    }
+
+    /**
+     * 현재 로그인 사용자가 접근 가능한 화주사 목록 조회
+     * user_companies 매핑이 없는 사용자는 도메인 내 전체 화주사를 반환한다.
+     *
+     * GET /rest/companies/my_companies
+     * 
+     * @return 화주사 목록 [{ com_cd, com_nm, com_alias }]
+     */
+    @GetMapping(value = "/my_companies", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Get accessible companies for the current user")
+    public List<Map<String, Object>> getMyCompanies() {
+        Long domainId = Domain.currentDomainId();
+        String userId = User.currentUser() != null ? User.currentUser().getId() : null;
+        return this.wmsBaseSvc.getUserAccessibleCompanies(domainId, userId);
+    }
+
+    /**
+     * 화주사 정보 변경 분에 대해 mw 반영
+     * 
+     * @param list
+     */
+    /*
+     * private void setMwQueueList(List<Company> list) {
+     * // 현재 도메인 검색
+     * Domain domain = Domain.currentDomain();
+     * 
+     * // 도메인에 siteCd 가 있을 경우에만 MW 이벤트 발생
+     * if(ValueUtil.isNotEmpty(domain.getMwSiteCd())) {
+     * // 화주사 내용 변경 분에 대한 rabbitmq 에서의 이벤트 처리 리스트
+     * List<IQueueNameModel> queueModels = new ArrayList<IQueueNameModel>();
+     * 
+     * for(Company company : list) {
+     * // Update 는 기존 Queue 이름에 대한 조회가 필요
+     * if(company.getCudFlag_().equalsIgnoreCase(SysConstants.CUD_FLAG_UPDATE)) {
+     * Company befCompany = this.findOne(company.getId());
+     * 
+     * // StageCd 가 변경 되면 이벤트 발생
+     * if(ValueUtil.isNotEqual(befCompany.getComCd(), company.getComCd())) {
+     * queueModels.add(new MwQueueNameModel(domain.getId(), domain.getMwSiteCd(),
+     * befCompany.getComCd(), company.getComCd(), company.getCudFlag_()));
+     * }
+     * 
+     * } else {
+     * queueModels.add(new MwQueueNameModel(domain.getId(), domain.getMwSiteCd(),
+     * null, company.getComCd(), company.getCudFlag_()));
+     * }
+     * }
+     * 
+     * if(queueModels.size() > 0 ) {
+     * MwQueueManageEvent event = new MwQueueManageEvent(domain.getId(),
+     * queueModels);
+     * eventPublisher.publishEvent(event);
+     * }
+     * }
+     * }
+     */
+
+    // /**
+    // * 애플리케이션 초기화 시점에 생성할 M/W 큐 리스트를 조회
+    // *
+    // * @param event
+    // */
+    // @EventListener(condition = "#event.isExecuted() == false")
+    // @Order(Ordered.LOWEST_PRECEDENCE)
+    // public void getRabbitMqVhostQueueList(MwQueueListEvent event) {
+    // Company condCompany = new Company();
+    // condCompany.setDomainId(event.getDomainId());
+    //
+    // List<Company> companyList = this.queryManager.selectList(Company.class,
+    // condCompany);
+    // List<String> queueNames = new ArrayList<String>(companyList.size());
+    //
+    // for(Company comp : companyList) {
+    // queueNames.add(comp.getComCd());
+    // }
+    //
+    // event.setQueueNames(queueNames);
+    // event.setExecuted(true);
+    // }
 }

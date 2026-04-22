@@ -176,8 +176,8 @@
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W23-UA-1 | 사용자-화주사 매핑 API | 사용자별 접근 가능 화주사 코드 목록 조회 API | `WmsBaseService` | 2026-04-29 | 0% | ☐ | |
-| W23-UA-2 | 화주사 선택 컴포넌트 | 로그인 사용자 권한 내 화주사 선택 드롭다운 공통 컴포넌트 | 프론트엔드 공통 컴포넌트 | 2026-04-30 | 0% | ☐ | |
+| W23-UA-1 | 사용자-화주사 매핑 API | 사용자별 접근 가능 화주사 코드 목록 조회 API | `WmsBaseService`, `UserCompanyController` | 2026-04-29 | 100% | ☑ | |
+| W23-UA-2 | 화주사 선택 컴포넌트 | 로그인 사용자 권한 내 화주사 선택 드롭다운 공통 컴포넌트 | `MenuMetaService` (REF_TYPE_URL 구현) | 2026-04-30 | 100% | ☑ | |
 
 ### 3-5. [INBOUND] 입고 검수 반려 기능
 
@@ -190,8 +190,8 @@
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W23-SA-1 | 부족 재고 계산 | `SKU.safetyStock` 기준 부족 재고 SKU 목록 계산 | `InventoryDashboardService.java:95` | 2026-05-01 | 0% | ☐ | |
-| W23-SA-2 | 부족 재고 알림 노출 | 재고 대시보드에 부족 재고 경고 배지 표시 | `InventoryDashboardService.java:385` | 2026-05-01 | 0% | ☐ | |
+| W23-SA-1 | 부족 재고 계산 | `SKU.safetyStock` 기준 부족 재고 SKU 목록 계산 | `InventoryDashboardService.java:95` | 2026-05-01 | 100% | ☑ | `getShortageSkus()` 신규 메서드 추가 → `getDashboardStatusCounts()`에 `shortage_sku` 집계, `getDashboardAlerts()`에 부족 재고 알림 추가, `GET /shortage-skus` 엔드포인트 추가 |
+| W23-SA-2 | 부족 재고 알림 노출 | 재고 대시보드에 부족 재고 경고 배지 표시 | `InventoryDashboardService.java:385` | 2026-05-01 | 100% | ☑ | 4번째 상태 카드를 "부족 재고 SKU" 배지 카드로 교체(`shortage_sku`), 알림 아이템에 건수 배지 CSS+HTML 추가 |
 
 ### 3-7. [OMS] 추가 취소 백 프로세스
 

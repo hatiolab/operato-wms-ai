@@ -131,4 +131,24 @@ public class InvDashboardController extends AbstractRestService {
 		return this.invDashSvc.getDashboardAlerts(comCd, whCd);
 	}
 
+	/**
+	 * 부족 재고 SKU 목록 조회
+	 *
+	 * 가용 재고가 안전 재고(safety_stock) 미만인 SKU 목록을 반환한다.
+	 * shortage_qty(부족 수량) 내림차순으로 정렬된다.
+	 *
+	 * GET /rest/inv_dashboard/shortage-skus
+	 *
+	 * @param comCd 화주사 코드 (optional)
+	 * @param whCd  창고 코드 (optional)
+	 * @return [{ sku_cd, sku_nm, available_qty, safety_stock, shortage_qty }]
+	 */
+	@RequestMapping(value = "/shortage-skus", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get Shortage SKU List")
+	public List<Map<String, Object>> getShortageSkus(
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd", required = false) String whCd) {
+		return this.invDashSvc.getShortageSkus(comCd, whCd);
+	}
+
 }
