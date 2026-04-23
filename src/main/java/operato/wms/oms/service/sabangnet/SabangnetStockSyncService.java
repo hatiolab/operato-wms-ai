@@ -1,95 +1,188 @@
 package operato.wms.oms.service.sabangnet;
 
-import java.util.ArrayList;
-import java.util.Arrays;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import xyz.anythings.sys.service.AbstractQueryService;
+
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 4. 재고 동기화
- * - 사방넷 재고 조회 / 단건 / 일괄 업데이트
- * - WMS 가용재고 계산 및 동기화
+ * 사방넷 재고 동기화 서비스
+ * - 사방넷 풀필먼트에서 재고 조회 → WMS 로컬 DB 갱신 방향으로 동작
+ *
+ * 사방넷 API:
+ *   재고 조회(단일) : GET /v2/inventory/stock/{출고상품ID}
+ *   재고 조회(벌크) : GET /v2/inventory/stocks  (최대 100개)
+ *   로케이션 재고 조회(단일상품) : GET /v2/inventory/stock_locations
+ *   유통기한별 재고 조회         : GET /v2/inventory/stock_expire
+ *
+ * 응답 재고 필드:
+ *   total_stock, normal_stock(출고가능), order_stock, shipping_stock,
+ *   damaged_stock, return_stock, keeping_stock, receiving_stock
+ *
+ * 주의: 사방넷 풀필먼트 API에는 재고 수량을 외부에서 직접 수정하는 API가 없습니다.
+ *       재고는 입고예정 등록/처리 및 발주 처리를 통해 사방넷 내부에서 변동됩니다.
+ *       이 서비스는 사방넷 재고를 조회하여 WMS 로컬 DB에 반영하는 역할을 합니다.
+ *
+ * TODO:
+ *   - syncStockAll(): WMS에서 전체 출고상품 ID 목록 조회 구현 필요
+ *   - updateLocalStock(): WMS 재고 테이블(inventories) 업데이트 구현 필요
  */
-public class SabangnetStockSyncService {
+@Component
+public class SabangnetStockSyncService extends AbstractQueryService {
 
-    /*
-     * To-Do List
-     * System.out.printf(...) 제거
-     * calculateAvailableQty(...); WMS 가용재고 계산 구현 필요
-     * syncStockAll(); WMS에서 전체 상품 코드 목록 조회 구현 필요
-     * syncStockSingle(); 단건 재고 즉시 동기화 (출고/입고/조정 발생 시 호출) 사용 여부 확인
-     */
+    private static final Logger log = LoggerFactory.getLogger(SabangnetStockSyncService.class);
+
+    @Autowired
+    private SabangnetApiService sabangnetApiService;
 
     /**
-     * 사방넷 현재 재고 조회
+     * 사방넷 단일 상품 재고 조회
+     * 응답: response — 재고 기본 Object
+     *
+     * @param shippingProductId 사방넷 출고상품 ID
      */
-    public Map<String, Object> getStockList() throws Exception {
-        return SabangnetApiService.apiGet("/stock/list", new HashMap<>());
+    public Map<String, Object> getStock(int shippingProductId,
+            String comCd, String whCd) throws Exception {
+        return sabangnetApiService.apiGet(
+                "/v2/inventory/stock/" + shippingProductId, null, comCd, whCd);
     }
 
     /**
-     * 사방넷 재고 수량 단건 업데이트
+     * 사방넷 다중 상품 재고 조회 (최대 100개)
+     * 응답: response.data_list — 재고 기본 Object 리스트
+     *
+     * @param shippingProductIds 조회할 출고상품 ID 목록 (최대 100개)
+     * @param page               페이지 번호
      */
-    public Map<String, Object> updateStock(String productCode, int availableQty) throws Exception {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("product_code", productCode);
-        payload.put("available_qty", availableQty);
-        return SabangnetApiService.apiPost("/stock/update", payload);
+    public Map<String, Object> getStocks(List<Integer> shippingProductIds, int page,
+            String comCd, String whCd) throws Exception {
+        Map<String, String> params = new HashMap<>();
+        // 사방넷 배열 파라미터 형식: shipping_product_ids%5B0%5D=xxx
+        for (int i = 0; i < shippingProductIds.size(); i++) {
+            params.put("shipping_product_ids[" + i + "]", String.valueOf(shippingProductIds.get(i)));
+        }
+        params.put("page", String.valueOf(page));
+        return sabangnetApiService.apiGet("/v2/inventory/stocks", params, comCd, whCd);
     }
 
     /**
-     * 재고 일괄 업데이트
-     * stockList: [{"product_code": "P001", "available_qty": 100}, ...]
+     * 로케이션별 재고 조회 (물류사 권한 전용)
+     * 응답: response.data_list — 로케이션 재고 리스트
+     *
+     * @param shippingProductId 출고상품 ID (필수)
+     * @param locType           재고 구분 (1.입고, 2.출고가능, 5.반품, 6.불량, 7.보관)
+     * @param locationId        로케이션 ID (null이면 전체)
+     * @param page              페이지 번호
      */
-    public Map<String, Object> bulkUpdateStock(List<Map<String, Object>> stockList) throws Exception {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("stocks", stockList);
-        return SabangnetApiService.apiPost("/stock/bulk_update", payload);
+    public Map<String, Object> getStockByLocation(int shippingProductId, Integer locType,
+            Integer locationId, int page, String comCd, String whCd) throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("shipping_product_id", String.valueOf(shippingProductId));
+        if (locType != null)    params.put("loc_type", String.valueOf(locType));
+        if (locationId != null) params.put("location_id", String.valueOf(locationId));
+        params.put("page", String.valueOf(page));
+        return sabangnetApiService.apiGet("/v2/inventory/stock_locations", params, comCd, whCd);
     }
 
     /**
-     * WMS 가용재고 계산
-     * 가용재고 = 총재고 - 불량재고 - 보류재고 - 출고예정재고
-     * TODO: 실제 WMS DB 조회로 대체 필요
+     * 유통기한별 재고 조회 (물류사 권한 전용)
+     * 응답: response.data_list — 유통기한별 재고 리스트 (expire_date, total_stock, normal_stock)
+     *
+     * @param shippingProductIds 출고상품 ID 목록 (최대 50개, 필수)
+     * @param memberId           고객사 ID (물류사 권한인 경우 필수)
+     * @param page               페이지 번호
      */
-    private int calculateAvailableQty(String productCode) {
-        // int totalQty = inventoryRepository.sumQty(productCode, "NORMAL");
-        // int defectQty = inventoryRepository.sumQty(productCode, "DEFECT");
-        // int holdQty = inventoryRepository.sumQty(productCode, "HOLD");
-        // int pendingQty = outboundItemRepository.sumPendingQty(productCode);
-        // return totalQty - defectQty - holdQty - pendingQty;
-        return 100; // 샘플용 placeholder
+    public Map<String, Object> getStockByExpireDate(List<Integer> shippingProductIds,
+            int memberId, int page, String comCd, String whCd) throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("member_id", String.valueOf(memberId));
+        for (int i = 0; i < shippingProductIds.size(); i++) {
+            params.put("shipping_product_ids[" + i + "]", String.valueOf(shippingProductIds.get(i)));
+        }
+        params.put("page", String.valueOf(page));
+        return sabangnetApiService.apiGet("/v2/inventory/stock_expire", params, comCd, whCd);
     }
 
     /**
-     * 전체 재고 동기화 (매일 새벽 전체 보정 권장)
+     * WMS 로컬 재고 업데이트 (사방넷 재고 기준)
+     * 사방넷에서 조회한 재고 정보로 WMS inventories 테이블 갱신
+     *
+     * @param stockData 사방넷 재고 기본 Object
+     *                  (shipping_product_id, total_stock, normal_stock, ...)
      */
-    public void syncStockAll() throws Exception {
-        // TODO: WMS에서 전체 상품 코드 목록 조회
-        // List<String> productCodes = productMasterRepository.findAllProductCodes();
-        List<String> productCodes = Arrays.asList("P001", "P002", "P003"); // 샘플용 placeholder
+    private void updateLocalStock(Map<String, Object> stockData) {
+        // TODO: WMS inventories 테이블 업데이트
+        // inventoryRepository.upsertBySabangnetProductId(
+        //     stockData.get("shipping_product_id"),
+        //     stockData.get("normal_stock")   // 출고가능 재고
+        // );
+    }
 
-        List<Map<String, Object>> stockList = new ArrayList<>();
-        for (String productCode : productCodes) {
-            int availableQty = calculateAvailableQty(productCode);
-            Map<String, Object> stock = new LinkedHashMap<>();
-            stock.put("product_code", productCode);
-            stock.put("available_qty", availableQty);
-            stockList.add(stock);
+    /**
+     * 전체 재고 동기화 (매일 새벽 권장)
+     * 사방넷 재고 → WMS 로컬 재고 테이블 갱신
+     *
+     * @param shippingProductIds 동기화할 출고상품 ID 목록 (WMS DB에서 조회)
+     */
+    public void syncStockAll(List<Integer> shippingProductIds,
+            String comCd, String whCd) throws Exception {
+        // 100개 단위로 분할 요청
+        int batchSize = 100;
+        int totalSynced = 0;
+
+        for (int i = 0; i < shippingProductIds.size(); i += batchSize) {
+            List<Integer> batch = shippingProductIds.subList(
+                    i, Math.min(i + batchSize, shippingProductIds.size()));
+
+            int page = 1;
+            while (true) {
+                Map<String, Object> result = getStocks(batch, page, comCd, whCd);
+
+                if (!sabangnetApiService.isSuccess(result)) {
+                    log.error("[재고 동기화] API 오류 - code: {}, message: {}",
+                            result.get("code"), result.get("message"));
+                    break;
+                }
+
+                Map<String, Object> response = (Map<String, Object>) result.get("response");
+                List<Map<String, Object>> dataList =
+                        (List<Map<String, Object>>) response.get("data_list");
+
+                if (dataList == null || dataList.isEmpty()) break;
+
+                for (Map<String, Object> stockData : dataList) {
+                    updateLocalStock(stockData);
+                    totalSynced++;
+                }
+
+                Object totalPage = response.get("total_page");
+                if (totalPage == null || page >= Integer.parseInt(String.valueOf(totalPage))) break;
+                page++;
+            }
+        }
+        log.info("[재고 동기화] 총 {}개 상품 재고 동기화 완료", totalSynced);
+    }
+
+    /**
+     * 단건 재고 즉시 동기화 (입고/출고/조정 발생 시 호출)
+     */
+    public void syncStockSingle(int shippingProductId, String comCd, String whCd) throws Exception {
+        Map<String, Object> result = getStock(shippingProductId, comCd, whCd);
+
+        if (!sabangnetApiService.isSuccess(result)) {
+            log.error("[재고 즉시 동기화] API 오류 - 출고상품ID: {}, code: {}, message: {}",
+                    shippingProductId, result.get("code"), result.get("message"));
+            return;
         }
 
-        bulkUpdateStock(stockList);
-        System.out.printf("[재고 동기화] 총 %d개 상품 재고 동기화 완료%n", stockList.size());
-    }
-
-    /**
-     * 단건 재고 즉시 동기화 (출고/입고/조정 발생 시 호출)
-     */
-    public void syncStockSingle(String productCode) throws Exception {
-        int availableQty = calculateAvailableQty(productCode);
-        updateStock(productCode, availableQty);
-        System.out.printf("[재고 즉시 동기화] 상품코드: %s, 가용재고: %d%n", productCode, availableQty);
+        Map<String, Object> stockData = (Map<String, Object>) result.get("response");
+        updateLocalStock(stockData);
+        log.info("[재고 즉시 동기화] 출고상품ID: {}, 출고가능 재고: {}",
+                shippingProductId, stockData.get("normal_stock"));
     }
 }
