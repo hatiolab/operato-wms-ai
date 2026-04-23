@@ -63,7 +63,8 @@ export default {
     { tagname: 'pda-fulfillment-packing', page: 'pda-fulfillment-packing' },
     { tagname: 'pda-fulfillment-picking', page: 'pda-fulfillment-picking' },
     { tagname: 'pda-inbound-receiving', page: 'pda-inbound-receiving' },
-    { tagname: 'pda-inbound-putaway', page: 'pda-inbound-putaway' }
+    { tagname: 'pda-inbound-putaway', page: 'pda-inbound-putaway' },
+    { tagname: 'pda-stock-move', page: 'pda-stock-move' }
   ],
   bootstrap
 }
