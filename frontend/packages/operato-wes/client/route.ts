@@ -78,6 +78,7 @@ import './pages/pda/pda-fulfillment-picking'
 import './pages/pda/pda-inbound-receiving'
 import './pages/pda/pda-inbound-putaway'
 import './pages/pda/pda-stock-move'
+import './pages/pda/pda-stock-inquiry'
 
 export default function route(page, module) {
   let route = module.routes?.find(mapping => mapping.page == page)
