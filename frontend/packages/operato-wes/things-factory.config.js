@@ -31,6 +31,7 @@ export default {
     { tagname: 'outbound-inspection', page: 'outbound-inspection' },
 
     { tagname: 'inventory-home', page: 'inventory-home' },
+    { tagname: 'inventory-transaction-list', page: 'inventory-transaction-list' },
 
     { tagname: 'rwa-home', page: 'rwa-home' },
     { tagname: 'rwa-receive-list', page: 'rwa-receive-list' },

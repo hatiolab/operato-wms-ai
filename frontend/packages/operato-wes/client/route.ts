@@ -28,6 +28,7 @@ import './pages/inventory/inventory-home'
 import './pages/inventory/inventory-form-element'
 import './pages/inventory/inventory-lock'
 import './pages/inventory/inventory-releases'
+import './pages/inventory/inventory-transaction-list'
 import './pages/inventory/inventory-product-change'
 
 import './pages/rwa/rwa-home'

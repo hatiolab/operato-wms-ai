@@ -96,7 +96,7 @@ public class InventoryDashboardService extends AbstractQueryService {
         String shortageSql = "SELECT COUNT(*) FROM (" +
                 "  SELECT i.sku_cd" +
                 "  FROM inventories i" +
-                "  INNER JOIN skus s ON s.domain_id = i.domain_id AND s.com_cd = i.com_cd AND s.sku_cd = i.sku_cd" +
+                "  INNER JOIN sku s ON s.domain_id = i.domain_id AND s.com_cd = i.com_cd AND s.sku_cd = i.sku_cd" +
                 "  WHERE i.domain_id = :domainId" +
                 "  AND (i.del_flag IS NULL OR i.del_flag = false)" +
                 "  AND s.safety_stock IS NOT NULL AND s.safety_stock > 0 ";
@@ -434,7 +434,7 @@ public class InventoryDashboardService extends AbstractQueryService {
                 " MAX(s.safety_stock) AS safety_stock," +
                 " MAX(s.safety_stock) - SUM(i.inv_qty - COALESCE(i.reserved_qty, 0)) AS shortage_qty" +
                 " FROM inventories i" +
-                " INNER JOIN skus s ON s.domain_id = i.domain_id AND s.com_cd = i.com_cd AND s.sku_cd = i.sku_cd" +
+                " INNER JOIN sku s ON s.domain_id = i.domain_id AND s.com_cd = i.com_cd AND s.sku_cd = i.sku_cd" +
                 " WHERE i.domain_id = :domainId" +
                 " AND (i.del_flag IS NULL OR i.del_flag = false)" +
                 " AND s.safety_stock IS NOT NULL AND s.safety_stock > 0";
