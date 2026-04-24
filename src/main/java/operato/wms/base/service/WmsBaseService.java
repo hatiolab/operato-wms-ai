@@ -16,8 +16,10 @@ import xyz.elidom.dbist.dml.Query;
 import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.print.entity.Printer;
 import xyz.elidom.sys.entity.Domain;
+import xyz.elidom.sys.util.EntityUtil;
 import xyz.elidom.sys.util.MessageUtil;
 import xyz.elidom.sys.util.ThrowUtil;
+import xyz.elidom.util.ClassUtil;
 import xyz.elidom.util.ValueUtil;
 
 /**
@@ -191,8 +193,15 @@ public class WmsBaseService extends AbstractQueryService {
             }
         }
 
-        if (exceptionWhenNotFound && record == null) {
-            throw ThrowUtil.newNotFoundRecord(MessageUtil.getTerm("menu." + entityClass.getSimpleName()), "Data");
+        if (exceptionWhenNotFound) {
+            if (record == null) {
+                throw ThrowUtil.newNotFoundRecord(MessageUtil.getTerm("menu." + entityClass.getSimpleName()), "Data");
+            } else {
+                if (this.hasDelFlagField(entityClass) && ValueUtil.isTrue(ClassUtil.getFieldValue(record, "delFlag"))) {
+                    throw ThrowUtil.newNotFoundRecord(MessageUtil.getTerm("menu." + entityClass.getSimpleName()),
+                            "Data");
+                }
+            }
         }
 
         return record;

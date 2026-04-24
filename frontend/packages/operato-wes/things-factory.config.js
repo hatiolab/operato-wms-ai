@@ -59,13 +59,15 @@ export default {
     { tagname: 'rls-work-page', page: 'release-work' },
     { tagname: 'rcv-work-page', page: 'receiving-work' },
     { tagname: 'putaway-work-page', page: 'put-away-work' },
+
     { tagname: 'pda-fulfillment-shipping', page: 'pda-fulfillment-shipping' },
     { tagname: 'pda-fulfillment-packing', page: 'pda-fulfillment-packing' },
     { tagname: 'pda-fulfillment-picking', page: 'pda-fulfillment-picking' },
     { tagname: 'pda-inbound-receiving', page: 'pda-inbound-receiving' },
     { tagname: 'pda-inbound-putaway', page: 'pda-inbound-putaway' },
     { tagname: 'pda-stock-move', page: 'pda-stock-move' },
-    { tagname: 'pda-stock-inquiry', page: 'pda-stock-inquiry' }
+    { tagname: 'pda-stock-inquiry', page: 'pda-stock-inquiry' },
+    { tagname: 'pda-oms-replenish', page: 'pda-oms-replenish' }
   ],
   bootstrap
 }

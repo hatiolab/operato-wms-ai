@@ -317,8 +317,8 @@ public class ReplenishOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook 
 		// 보충 지시 번호 생성
 		if (ValueUtil.isEmpty(this.replenishNo)) {
 			String today = DateUtil.todayStr("yyMMdd");
-			Integer seq = RangedSeq.increaseSequence(this.domainId, "REPLENISH_NO", "DATE", today,
-					null, null, null);
+			Integer seq = RangedSeq.increaseSequence(this.domainId, "REPLENISH_NO", "REPLENISH_NO", "DATE", today, null,
+					null);
 			this.replenishNo = "RP" + Domain.currentDomainId() + SysConstants.DASH + today + SysConstants.DASH
 					+ StringUtils.leftPad(String.valueOf(seq), 4, "0");
 		}
