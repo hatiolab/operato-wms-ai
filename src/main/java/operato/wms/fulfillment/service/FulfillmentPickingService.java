@@ -196,10 +196,11 @@ public class FulfillmentPickingService extends AbstractQueryService {
 	}
 
 	/**
-	 * 피킹 지시 취소 (-> CANCELLED)
+	 * 피킹 지시 리셋 (CREATED/IN_PROGRESS → CREATED)
 	 *
-	 * 피킹 지시를 취소하고, 모든 상세 항목도 함께 취소한다.
-	 * COMPLETED 상태인 피킹 지시는 취소할 수 없다.
+	 * 작업자 교대·작업 불가 등의 사유로 피킹을 처음부터 다시 시작할 수 있도록 리셋한다.
+	 * COMPLETED 상태인 피킹 지시는 리셋할 수 없다.
+	 * 재고 할당(stock_allocations/reserved_qty)은 유지하므로 재할당 없이 즉시 재작업 가능하다.
 	 *
 	 * @param id 피킹 지시 ID
 	 * @return { success, pick_task_no }
@@ -210,24 +211,30 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		PickingTask task = this.findPickingTask(domainId, id);
 
 		String status = task.getStatus();
-		if (PickingTask.STATUS_COMPLETED.equals(status) || PickingTask.STATUS_CANCELLED.equals(status)) {
-			throw new ElidomValidationException("피킹 지시 상태가 [" + status + "]이므로 취소할 수 없습니다");
+		if (PickingTask.STATUS_COMPLETED.equals(status)) {
+			throw new ElidomValidationException("피킹 지시 상태가 [COMPLETED]이므로 리셋할 수 없습니다");
+		}
+		if (PickingTask.STATUS_CREATED.equals(status)) {
+			throw new ElidomValidationException("피킹 지시 상태가 이미 [CREATED]입니다");
 		}
 
-		// 상세 아이템 전체 취소
-		String itemSql = "UPDATE picking_task_items SET status = :status, updated_at = now() WHERE domain_id = :domainId AND pick_task_id = :pickTaskId AND status NOT IN (:s1, :s2)";
-		Map<String, Object> itemParams = ValueUtil.newMap("status,domainId,pickTaskId,s1,s2",
-				PickingTaskItem.STATUS_CANCEL, domainId, id, PickingTaskItem.STATUS_PICKED,
-				PickingTaskItem.STATUS_CANCEL);
+		// 상세 아이템 전체 리셋 (WAIT 복귀, 실적 수량 초기화)
+		String itemSql = "UPDATE picking_task_items"
+				+ " SET status = :status, pick_qty = 0, short_qty = 0, picked_at = null, updated_at = now()"
+				+ " WHERE domain_id = :domainId AND pick_task_id = :pickTaskId";
+		Map<String, Object> itemParams = ValueUtil.newMap("status,domainId,pickTaskId",
+				PickingTaskItem.STATUS_WAIT, domainId, id);
 		this.queryManager.executeBySql(itemSql, itemParams);
 
-		// 피킹 지시 헤더 취소
-		String sql = "UPDATE picking_tasks SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+		// 피킹 지시 헤더 리셋 (CREATED 복귀, 작업자·시작일시·실적 초기화)
+		String sql = "UPDATE picking_tasks"
+				+ " SET status = :status, worker_id = null, started_at = null,"
+				+ " result_order = 0, result_item = 0, result_total = 0, short_total = 0,"
+				+ " updated_at = now()"
+				+ " WHERE domain_id = :domainId AND id = :id";
 		Map<String, Object> params = ValueUtil.newMap("status,domainId,id",
-				PickingTask.STATUS_CANCELLED, domainId, id);
+				PickingTask.STATUS_CREATED, domainId, id);
 		this.queryManager.executeBySql(sql, params);
-
-		// TODO 피킹 지시 취소 시 할당 재고 RESERVE → 해제 로직이 맞는지 체크
 
 		// 결과 리턴
 		return ValueUtil.newMap("success,pick_task_no", true, task.getPickTaskNo());

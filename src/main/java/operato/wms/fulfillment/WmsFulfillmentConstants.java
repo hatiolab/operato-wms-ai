@@ -7,11 +7,17 @@ package operato.wms.fulfillment;
  */
 public class WmsFulfillmentConstants {
 
-	// === 피킹 지시 생성 ===
+	// === 피킹 지시 생성 (B2C 웨이브 기반) ===
 	/** 커스텀 서비스 - 피킹 지시 생성 전 처리 */
 	public static final String TRX_FUL_PRE_CREATE_PICKING = "diy-ful-pre-create-picking-tasks";
 	/** 커스텀 서비스 - 피킹 지시 생성 후 처리 */
 	public static final String TRX_FUL_POST_CREATE_PICKING = "diy-ful-post-create-picking-tasks";
+
+	// === B2B 피킹 지시 생성 (웨이브 없이 직접) ===
+	/** 커스텀 서비스 - B2B 피킹 지시 생성 전 처리 */
+	public static final String TRX_FUL_PRE_CREATE_B2B_PICKING = "diy-ful-pre-create-b2b-picking-tasks";
+	/** 커스텀 서비스 - B2B 피킹 지시 생성 후 처리 */
+	public static final String TRX_FUL_POST_CREATE_B2B_PICKING = "diy-ful-post-create-b2b-picking-tasks";
 
 	// === 피킹 시작 ===
 	/** 커스텀 서비스 - 피킹 시작 전 처리 */

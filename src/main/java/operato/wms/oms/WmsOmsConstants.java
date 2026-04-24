@@ -19,6 +19,12 @@ public class WmsOmsConstants {
 	/** 커스텀 서비스 - 출하 주문 확정 후 처리 */
 	public static final String TRX_OMS_POST_CONFIRM_SHIPMENT = "diy-oms-post-confirm-shipment-order";
 
+	// === 주문 확정 취소 ===
+	/** 커스텀 서비스 - 출하 주문 확정 취소 전 처리 */
+	public static final String TRX_OMS_PRE_CANCEL_CONFIRM_SHIPMENT = "diy-oms-pre-cancel-confirm-shipment-order";
+	/** 커스텀 서비스 - 출하 주문 확정 취소 후 처리 */
+	public static final String TRX_OMS_POST_CANCEL_CONFIRM_SHIPMENT = "diy-oms-post-cancel-confirm-shipment-order";
+
 	// === 재고 할당 ===
 	/** 커스텀 서비스 - 재고 할당 전 처리 */
 	public static final String TRX_OMS_PRE_ALLOCATE_SHIPMENT = "diy-oms-pre-allocate-shipment-order";
@@ -60,6 +66,12 @@ public class WmsOmsConstants {
 	public static final String TRX_OMS_PRE_CLOSE_SHIPMENT = "diy-oms-pre-close-shipment-order";
 	/** 커스텀 서비스 - 출하 주문 마감 후 처리 */
 	public static final String TRX_OMS_POST_CLOSE_SHIPMENT = "diy-oms-post-close-shipment-order";
+
+	// === 주문 마감 취소 ===
+	/** 커스텀 서비스 - 출하 주문 마감 취소 전 처리 */
+	public static final String TRX_OMS_PRE_CANCEL_CLOSE_SHIPMENT = "diy-oms-pre-cancel-close-shipment-order";
+	/** 커스텀 서비스 - 출하 주문 마감 취소 후 처리 */
+	public static final String TRX_OMS_POST_CANCEL_CLOSE_SHIPMENT = "diy-oms-post-cancel-close-shipment-order";
 
 	// === 웨이브 확정 취소 ===
 	/** 커스텀 서비스 - 웨이브 확정 취소 전 처리 */

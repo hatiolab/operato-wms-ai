@@ -77,9 +77,12 @@
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W1-O-1 | 주문 확정 취소 | `CONFIRMED → REGISTERED` 상태 복귀, 할당 재고 해제 | `OmsShipmentOrderService.deallocateShipmentOrder()` | 2026-04-20 | 100% | ☑ | stock_allocations 순회 → deallocateInventory() 호출, 주문 상태 REGISTERED 복귀 구현됨 |
-| W1-O-2 | 웨이브 취소 | 웨이브 삭제 시 소속 주문 할당 취소, 상태 복귀 | `OmsWaveService.cancelWaveRelease()` | 2026-04-20 | 100% | ☑ | `cancelWaveRelease()` (RELEASED→CREATED) + `cancelWave()` (CREATED→CANCELLED) 구현, WaveCancelledEvent 발행 → FulfillmentEventListener 피킹 지시 삭제 연동 |
-| W1-O-3 | 피킹 취소 | PickingTask 취소 시 할당 재고 RESERVE → 해제 | `FulfillmentPickingService.cancelPickingTask()` | 2026-04-21 | 50% | ☐ | `cancelPickingTask()` 피킹 지시 상태 취소는 구현됨. 개별 취소 시 `deallocateInventory()` 호출 미연결 |
+| W1-O-1 | 주문 취소 | `REGISTERED, BACK_ORDER → CANCELLED` 상태 복귀 | `OmsShipmentOrderService.cancelShipmentOrders()` | 2026-04-24 | 100% | ☑ | REGISTERED·CONFIRMED·ALLOCATED·BACK_ORDER·WAVED·RELEASED 취소 가능. PICKING·PACKING·SHIPPED·CLOSED·CANCELLED 취소 불가(예외). CONFIRMED 취소 시 confirmed_at null 초기화, WAVED/RELEASED 취소 시 wave_no null 초기화 |
+| W1-O-2 | 주문 확정 취소 | `CONFIRMED → REGISTERED` 상태 복귀 | `OmsShipmentOrderService.cancelConfirmShipmentOrders()` | 2026-04-24 | 100% | ☑ | `cancelConfirmShipmentOrders()` 신규 구현, confirmed_at null 초기화. 엔드포인트: `POST /rest/oms_trx/shipment_orders/cancel_confirm`, `cancel_confirm_list`. WmsOmsConstants 훅 상수 추가 |
+| W1-O-3 | 주문 할당 해제 | `ALLOCATED → CONFIRMED` 상태 복귀, 할당 재고 해제 | `OmsShipmentOrderService.deallocateShipmentOrder()` | 2026-04-20 | 100% | ☑ | stock_allocations 순회 → deallocateInventory() 호출, 주문 상태 REGISTERED 복귀 구현됨 |
+| W1-O-4 | 웨이브 확정 취소 | 웨이브 상태 `RELEASED → CREATED`, 소속 주문 상태 복귀, 피킹 지시 삭제 | `OmsWaveService.cancelWaveRelease()` | 2026-04-20 | 100% | ☑ | `cancelWaveRelease()` (WAVE RELEASED→CREATED), Wave 소속 주문 RELEASED/PICKING → WAVED 변경, WaveCancelledEvent 발행 → FulfillmentEventListener 피킹 지시 삭제 연동 |
+| W1-O-5 | 웨이브 취소 | 웨이브 상태 `CREATED → CANCELLED`, 소속 주문의 상태 복귀 | `OmsWaveService.cancelWave()` | 2026-04-20 | 100% | ☑ | `cancelWave()` (WAVE CREATED→CANCELLED) 구현, 소속 주문 Wave 정보 NULL, 상태는 ALLOCATED 로 변경됨 |
+| W1-O-6 | 주문 마감 취소 | 주문 상태 `CLOSED → SHIPPED`, 재고 차감 복귀 | `OmsShipmentOrderService.cancelCloseShipmentOrder()` | 2026-04-24 | 100% | ☑ | `cancelCloseShipmentOrder()` 신규 구현: stock_allocations(RELEASED→HARD) 복귀, inv_qty·reserved_qty 복원, ShipmentOrder→SHIPPED·closed_at null. 엔드포인트: `POST /rest/oms_trx/shipment_orders/{id}/cancel_close`. WmsOmsConstants 훅 상수 추가 |
 
 ### 2-3. [INBOUND] 입고 핵심 보완
 
@@ -105,7 +108,7 @@
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W1-F-1 | B2B 피킹 API | 웨이브 없이 주문별 직접 피킹 처리 엔드포인트 추가 | `FulfillmentPickingService`, `FulfillmentTransactionController` | 2026-04-23 | 0% | ☐ | |
+| W1-F-1 | B2B 피킹 API | 웨이브 없이 주문별 직접 피킹 처리 엔드포인트 추가 | `FulfillmentPickingService`, `FulfillmentTransactionController` | 2026-04-23 | 100% | ☑ | `createB2bPickingTasks()` 신규 구현: biz_type=B2B_OUT·status=ALLOCATED 검증, wave_no=null·INDIVIDUAL 고정, ALLOCATED→PICKING. 엔드포인트: `POST /rest/ful_trx/b2b_picking/create`, `create_list`. PickingTask.waveNo nullable 변경. WmsFulfillmentConstants 훅 상수 추가 |
 | W1-F-2 | 피킹 재고 부족 처리 | 피킹 시 할당 재고 부족이면 보충 지시 자동 생성 또는 부분 피킹 처리 | `FulfillmentPickingService` | 2026-04-23 | 0% | ☐ | |
 
 ### 2-7. [STOCK] 재고실사(Stocktake) 상태 자동화
@@ -133,11 +136,11 @@
 
 | 항목 | 수치 |
 |------|------|
-| 전체 작업 수 | 23개 |
-| 완료 (☑) | 20개 (W1-S-1, W1-S-2, W1-S-3, W1-S-4, W1-O-1, W1-O-2, W1-V-1, W1-V-2, W1-I-1, W1-I-2, W1-R-1, W1-ST-1, W1-ST-2, W1-ST-3, W1-FL-1, W1-FL-2, W1-FL-3, W1-FL-4, W1-FL-5, W1-FL-6) |
-| 진행 중 | 1개 (W1-O-3 50%) |
+| 전체 작업 수 | 26개 |
+| 완료 (☑) | 24개 (W1-S-1~4, W1-O-1~6, W1-I-1~2, W1-V-1~2, W1-R-1, W1-ST-1~3, W1-FL-1~6) |
+| 진행 중 | 0개 |
 | 미시작 | 2개 (W1-F-1, W1-F-2) |
-| 전체 진행율 | 87% (완료 20 / 전체 23) |
+| 전체 진행율 | 92% (완료 24 / 전체 26) |
 
 ---
 
@@ -197,10 +200,13 @@
 
 ### 3-7. [OMS] 추가 취소 백 프로세스
 
+> **설계 원칙**: 취소는 영구 종료가 아닌 **리셋** — 작업자 교대·실수 등의 사유로 처음부터 재작업 가능하게 복귀. 재고 할당(stock_allocations/reserved_qty)은 유지하여 재할당 없이 즉시 재작업 가능.
+
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W23-CB-1 | 포장 취소 | PackingOrder 취소 → PickingTask 복귀 | `FulfillmentPackingService` | 2026-05-02 | 0% | ☐ | |
-| W23-CB-2 | 출하 취소 | 출하 확정 취소 → 포장 완료 상태 복귀, 재고 차감 롤백 | `FulfillmentShippingService` | 2026-05-03 | 0% | ☐ | |
+| W23-CB-1 | 피킹 취소 | PickingTask 리셋 (IN_PROGRESS → CREATED), PickingTaskItem WAIT 복귀·실적 수량 초기화, ShipmentOrder 상태 유지(PICKING) | `FulfillmentPickingService.cancelPickingTask()` | 2026-04-21 | 100% | ☑ | `cancelPickingTask()` 리셋 방식으로 재구현: PickingTask→CREATED, worker_id·started_at·실적 수량 null/0 초기화, PickingTaskItem→WAIT·pick_qty/short_qty 0 초기화, stock_allocations 유지 |
+| W23-CB-2 | 포장 취소 | PackingOrder 리셋 (CREATED/IN_PROGRESS/COMPLETED → CREATED), 박스 삭제, PackingOrderItem WAIT 복귀·수량 초기화, ShipmentOrder 상태 유지(PACKING) | `FulfillmentPackingService.cancelPackingOrder()` | 2026-05-02 | 100% | ☑ | `cancelPackingOrder()` 리셋 방식으로 재구현: PackingOrder→CREATED, packing_boxes 삭제, PackingOrderItem→WAIT·insp_qty/pack_qty/packing_box_id 초기화, LABEL_PRINTED 이후는 리셋 불가(송장 취소 필요), stock_allocations 유지 |
+| W23-CB-3 | 출하 취소 | 출하 확정 취소 → 포장 완료 상태 복귀 (SHIPPED → COMPLETED), ShipmentOrder PACKING 복귀, shipped_qty 롤백 | `FulfillmentShippingService.cancelShipping()` | 2026-05-03 | 100% | ☑ | `cancelShipping()` 재구현: PackingOrder→COMPLETED·PackingBox→CLOSED 복귀, ShipmentOrder→PACKING, ShipmentOrderItem.shipped_qty 0 롤백, stock_allocations 유지(재출하 확정 즉시 가능) |
 
 ### 3-8. [VAS] 유통가공 완성 및 테스트
 
@@ -255,11 +261,11 @@
 
 | 항목 | 수치 |
 |------|------|
-| 전체 작업 수 | 35개 |
-| 완료 | 10개 |
+| 전체 작업 수 | 38개 |
+| 완료 (☑) | 20개 (W23-SF-1~5, W23-UA-1~2, W23-SA-1~2, W23-CB-1~3, W23-BF-0~5, W23-DB-1~2) |
 | 진행 중 | 0개 |
-| 미시작 | 25개 |
-| 전체 진행율 | 29% |
+| 미시작 (☐) | 18개 (W23-SF-6, W23-WA-1~3, W23-RE-1~2, W23-IR-1~2, W23-VA-1~3, W23-RW-1~2, W23-FL-1~5) |
+| 전체 진행율 | 53% (완료 20 / 전체 38) |
 
 ---
 

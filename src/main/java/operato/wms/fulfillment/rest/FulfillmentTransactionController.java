@@ -346,6 +346,67 @@ public class FulfillmentTransactionController {
 		return this.pickingService.getWorkerTasks(workerCd);
 	}
 
+	// ==================== 9.1-B B2B 피킹 지시 생성 API ====================
+
+	/**
+	 * B2B 피킹 지시 생성 (단건)
+	 * POST /rest/ful_trx/b2b_picking/create
+	 *
+	 * 웨이브 없이 ALLOCATED 상태의 B2B_OUT 주문을 직접 피킹 지시로 변환한다.
+	 */
+	@PostMapping(value = "b2b_picking/create", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Create B2B picking task directly from allocated shipment order (single)")
+	public Map<String, Object> createB2bPickingTask(@RequestBody Map<String, Object> params) {
+		Long domainId = Domain.currentDomainId();
+		String shipmentOrderId = (String) params.get("shipment_order_id");
+
+		if (ValueUtil.isEmpty(shipmentOrderId)) {
+			throw new ElidomValidationException("shipment_order_id는 필수 파라미터입니다");
+		}
+
+		// 1. 커스텀 서비스 - 전 처리
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_B2B_PICKING, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.fulTrxService.createB2bPickingTasks(List.of(shipmentOrderId));
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_B2B_PICKING, params);
+
+		return result;
+	}
+
+	/**
+	 * B2B 피킹 지시 생성 (복수)
+	 * POST /rest/ful_trx/b2b_picking/create_list
+	 *
+	 * 웨이브 없이 ALLOCATED 상태의 B2B_OUT 주문 여러 건을 일괄 피킹 지시로 변환한다.
+	 */
+	@PostMapping(value = "b2b_picking/create_list", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Create B2B picking tasks directly from allocated shipment orders (batch)")
+	@SuppressWarnings("unchecked")
+	public Map<String, Object> createB2bPickingTaskList(@RequestBody Map<String, Object> params) {
+		Long domainId = Domain.currentDomainId();
+		List<String> ids = (List<String>) params.get("ids");
+
+		if (ValueUtil.isEmpty(ids)) {
+			throw new ElidomValidationException("ids는 필수 파라미터입니다");
+		}
+
+		// 1. 커스텀 서비스 - 전 처리
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_B2B_PICKING, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.fulTrxService.createB2bPickingTasks(ids);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_B2B_PICKING, params);
+
+		return result;
+	}
+
 	// ==================== 9.2 검수/포장 트랜잭션 API ====================
 
 	/**

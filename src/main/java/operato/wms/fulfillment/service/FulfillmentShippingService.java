@@ -199,17 +199,17 @@ public class FulfillmentShippingService extends AbstractQueryService {
 	}
 
 	/**
-	 * 출하 취소 (SHIPPED -> CANCELLED)
+	 * 출하 취소 (SHIPPED -> COMPLETED 복귀)
 	 *
 	 * 출하 확정 후 취소 처리를 수행한다.
-	 * 연결된 박스를 CLOSED 상태로 복원하고, 재고를 복원한다.
+	 * 패킹 지시와 출하 주문을 포장 완료 상태로 복귀시켜 재출하가 가능하게 한다.
+	 * 재고 할당(stock_allocations)은 유지하므로 별도 재할당 없이 재출하 확정 가능하다.
 	 *
 	 * @param packingOrderId 패킹 지시 ID
 	 * @return { success, pack_order_no, restored_box_count }
 	 */
 	public Map<String, Object> cancelShipping(String packingOrderId) {
 		Long domainId = Domain.currentDomainId();
-		String now = DateUtil.currentTimeStr();
 
 		PackingOrder order = this.findPackingOrder(domainId, packingOrderId);
 
@@ -218,7 +218,7 @@ public class FulfillmentShippingService extends AbstractQueryService {
 					"패킹 지시 상태가 [" + order.getStatus() + "]이므로 출하 취소할 수 없습니다 (SHIPPED 상태만 가능)");
 		}
 
-		// 박스 상태를 CLOSED로 복원
+		// 박스 상태를 CLOSED로 복원 (재출하 대기 상태)
 		String boxCountSql = "SELECT COUNT(*) FROM packing_boxes WHERE domain_id = :domainId AND packing_order_id = :packingOrderId AND status = :shippedStatus";
 		Map<String, Object> boxCountParams = ValueUtil.newMap("domainId,packingOrderId,shippedStatus",
 				domainId, packingOrderId, PackingBox.STATUS_SHIPPED);
@@ -229,52 +229,21 @@ public class FulfillmentShippingService extends AbstractQueryService {
 				PackingBox.STATUS_CLOSED, domainId, packingOrderId, PackingBox.STATUS_SHIPPED);
 		this.queryManager.executeBySql(boxSql, boxParams);
 
-		// 패킹 지시 상태를 CANCELLED로 변경
+		// 패킹 지시 상태를 COMPLETED로 복귀 (재출하 확정 가능)
 		String sql = "UPDATE packing_orders SET status = :status, shipped_at = null, updated_at = now() WHERE domain_id = :domainId AND id = :id";
 		Map<String, Object> params = ValueUtil.newMap("status,domainId,id",
-				PackingOrder.STATUS_CANCELLED, domainId, packingOrderId);
+				PackingOrder.STATUS_COMPLETED, domainId, packingOrderId);
 		this.queryManager.executeBySql(sql, params);
 
-		// 연결된 출하 주문의 재고 복원 처리 (마감 전 취소이므로 reserved_qty만 해제)
+		// 출하 주문 상태를 PACKING으로 복귀 + ShipmentOrderItem shipped_qty 롤백
 		if (ValueUtil.isNotEmpty(order.getShipmentOrderId())) {
-			// 아직 마감(CLOSED) 전이므로 SOFT/HARD 상태 할당 레코드 조회
-			String allocSql = "SELECT * FROM stock_allocations WHERE domain_id = :domainId AND shipment_order_id = :orderId AND status IN ('SOFT', 'HARD')";
-			Map<String, Object> allocParams = ValueUtil.newMap("domainId,orderId", domainId,
-					order.getShipmentOrderId());
-			List<Map> allocations = this.queryManager.selectListBySql(allocSql, allocParams, Map.class, 0, 0);
-
-			for (Map alloc : allocations) {
-				Object allocQty = alloc.get("alloc_qty");
-				String inventoryId = alloc.get("inventory_id") != null ? alloc.get("inventory_id").toString() : null;
-				if (allocQty != null && inventoryId != null) {
-					double qty = Double.parseDouble(allocQty.toString());
-					// reserved_qty만 해제 (inv_qty는 마감 시점에 차감되므로 복원 불필요)
-					String updInvSql = "UPDATE inventories"
-							+ " SET reserved_qty = GREATEST(COALESCE(reserved_qty, 0) - :allocQty, 0),"
-							+ "     updated_at = now()"
-							+ " WHERE domain_id = :domainId AND id = :invId";
-					Map<String, Object> updInvParams = ValueUtil.newMap("allocQty,domainId,invId", qty, domainId,
-							inventoryId);
-					this.queryManager.executeBySql(updInvSql, updInvParams);
-				}
-
-				// 할당 상태 취소
-				String allocId = alloc.get("id") != null ? alloc.get("id").toString() : null;
-				if (allocId != null) {
-					String updAllocSql = "UPDATE stock_allocations SET status = 'CANCELLED', released_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :allocId";
-					Map<String, Object> updAllocParams = ValueUtil.newMap("now,domainId,allocId", now, domainId,
-							allocId);
-					this.queryManager.executeBySql(updAllocSql, updAllocParams);
-				}
-			}
-
-			// 출하 주문 상태를 CANCELLED로 변경
-			String updOrderSql = "UPDATE shipment_orders SET status = :status, shipped_at = null, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-			Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id",
-					ShipmentOrder.STATUS_CANCELLED, domainId, order.getShipmentOrderId());
+			// 출하 주문 상태를 PACKING으로 복귀 (재출하 확정 대기)
+			String updOrderSql = "UPDATE shipment_orders SET status = :status, shipped_at = null, updated_at = now() WHERE domain_id = :domainId AND id = :id AND status = :shippedStatus";
+			Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id,shippedStatus",
+					ShipmentOrder.STATUS_PACKING, domainId, order.getShipmentOrderId(), ShipmentOrder.STATUS_SHIPPED);
 			this.queryManager.executeBySql(updOrderSql, updOrderParams);
 
-			// ShipmentOrderItem shipped_qty 초기화
+			// ShipmentOrderItem shipped_qty 롤백 (출하 확정 시 반영된 수량 초기화)
 			String resetItemSql = "UPDATE shipment_order_items SET shipped_qty = 0, updated_at = now() WHERE domain_id = :domainId AND shipment_order_id = :orderId";
 			Map<String, Object> resetItemParams = ValueUtil.newMap("domainId,orderId", domainId, order.getShipmentOrderId());
 			this.queryManager.executeBySql(resetItemSql, resetItemParams);

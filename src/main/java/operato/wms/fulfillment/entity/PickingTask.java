@@ -66,9 +66,9 @@ public class PickingTask extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String pickTaskNo;
 
 	/**
-	 * 웨이브 번호 (FK -> shipment_waves)
+	 * 웨이브 번호 (FK -> shipment_waves). B2B 직접 피킹 시 null 허용.
 	 */
-	@Column(name = "wave_no", nullable = false, length = 30)
+	@Column(name = "wave_no", nullable = true, length = 30)
 	private String waveNo;
 
 	/**

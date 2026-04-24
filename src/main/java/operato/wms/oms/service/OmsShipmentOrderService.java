@@ -131,6 +131,43 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 	}
 
 	/**
+	 * 출하 주문 확정 취소 (CONFIRMED → REGISTERED)
+	 *
+	 * @param ids 주문 ID 리스트
+	 * @return { success_count, fail_count, errors }
+	 */
+	public Map<String, Object> cancelConfirmShipmentOrders(List<String> ids) {
+		Long domainId = Domain.currentDomainId();
+		int successCount = 0;
+		int failCount = 0;
+		List<String> errors = new ArrayList<>();
+
+		for (String id : ids) {
+			ShipmentOrder order = this.findOrder(domainId, id);
+			if (order == null) {
+				errors.add("주문을 찾을 수 없습니다: " + id);
+				failCount++;
+				continue;
+			}
+
+			if (!ShipmentOrder.STATUS_CONFIRMED.equals(order.getStatus())) {
+				errors.add("주문 [" + order.getShipmentNo() + "] 상태가 [" + order.getStatus() + "]이므로 확정 취소할 수 없습니다 (CONFIRMED 상태만 가능)");
+				failCount++;
+				continue;
+			}
+
+			String sql = "UPDATE shipment_orders SET status = :status, confirmed_at = null, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+			Map<String, Object> params = ValueUtil.newMap("status,domainId,id",
+					ShipmentOrder.STATUS_REGISTERED, domainId, id);
+			this.queryManager.executeBySql(sql, params);
+			successCount++;
+		}
+
+		// 결과 리턴
+		return ValueUtil.newMap("success_count,fail_count,errors", successCount, failCount, errors);
+	}
+
+	/**
 	 * 출하 주문 재고 할당 (CONFIRMED/BACK_ORDER → ALLOCATED 또는 BACK_ORDER)
 	 *
 	 * 각 주문 상세의 SKU를 기준으로 가용 재고를 조회하여 FEFO 순서로 할당한다.
@@ -321,13 +358,16 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 	}
 
 	/**
-	 * 출하 주문 취소
+	 * 출하 주문 취소 (REGISTERED/CONFIRMED/ALLOCATED/BACK_ORDER/WAVED/RELEASED 상태만 가능)
 	 *
-	 * CLOSED/CANCELLED 상태가 아닌 모든 주문을 취소한다.
-	 * 할당된 재고가 있으면 해제 처리한다.
+	 * 피킹 처리 이후(PICKING/PACKING/SHIPPED/CLOSED) 상태는 취소 불가.
+	 * 상태별 추가 처리:
+	 *   - ALLOCATED/BACK_ORDER: stock_allocations 해제
+	 *   - CONFIRMED: confirmed_at 초기화
+	 *   - WAVED/RELEASED: wave_no 초기화 (웨이브 정합성 유지)
 	 *
 	 * @param ids 주문 ID 리스트
-	 * @return { success_count, fail_count }
+	 * @return { success_count, fail_count, errors }
 	 */
 	public Map<String, Object> cancelShipmentOrders(List<String> ids) {
 		Long domainId = Domain.currentDomainId();
@@ -345,13 +385,19 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 			}
 
 			String status = order.getStatus();
-			if (ShipmentOrder.STATUS_CLOSED.equals(status) || ShipmentOrder.STATUS_CANCELLED.equals(status)) {
+
+			// 피킹 이후 상태는 취소 불가
+			if (ShipmentOrder.STATUS_PICKING.equals(status)
+					|| ShipmentOrder.STATUS_PACKING.equals(status)
+					|| ShipmentOrder.STATUS_SHIPPED.equals(status)
+					|| ShipmentOrder.STATUS_CLOSED.equals(status)
+					|| ShipmentOrder.STATUS_CANCELLED.equals(status)) {
 				errors.add("주문 [" + order.getShipmentNo() + "] 상태가 [" + status + "]이므로 취소할 수 없습니다");
 				failCount++;
 				continue;
 			}
 
-			// 할당 레코드가 있으면 해제
+			// ALLOCATED/BACK_ORDER: stock_allocations 해제
 			if (ShipmentOrder.STATUS_ALLOCATED.equals(status) || ShipmentOrder.STATUS_BACK_ORDER.equals(status)) {
 				String allocSql = "SELECT * FROM stock_allocations WHERE domain_id = :domainId AND shipment_order_id = :orderId AND status IN (:s1, :s2)";
 				Map<String, Object> allocParams = ValueUtil.newMap("domainId,orderId,s1,s2",
@@ -360,11 +406,8 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 						StockAllocation.class, 0, 0);
 
 				for (StockAllocation alloc : allocations) {
-					// Inventory reserved_qty 할당 해제
-					this.stockTransactionService.deallocateInventory(domainId, alloc.getInventoryId(),
-							alloc.getAllocQty());
+					this.stockTransactionService.deallocateInventory(domainId, alloc.getInventoryId(), alloc.getAllocQty());
 
-					// StockAllocation 취소
 					String updAllocSql = "UPDATE stock_allocations SET status = :status, released_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :allocId";
 					Map<String, Object> updAllocParams = ValueUtil.newMap("status,now,domainId,allocId",
 							StockAllocation.STATUS_CANCELLED, now, domainId, alloc.getId());
@@ -372,11 +415,20 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 				}
 			}
 
-			// 주문 취소
-			String updSql = "UPDATE shipment_orders SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+			// 주문 취소 — 상태별 타임스탬프/wave_no 초기화 포함
+			StringBuilder updSql = new StringBuilder(
+					"UPDATE shipment_orders SET status = :status, updated_at = now()");
+			if (ShipmentOrder.STATUS_CONFIRMED.equals(status)) {
+				updSql.append(", confirmed_at = null");
+			}
+			if (ShipmentOrder.STATUS_WAVED.equals(status) || ShipmentOrder.STATUS_RELEASED.equals(status)) {
+				updSql.append(", wave_no = null");
+			}
+			updSql.append(" WHERE domain_id = :domainId AND id = :id");
+
 			Map<String, Object> updParams = ValueUtil.newMap("status,domainId,id",
 					ShipmentOrder.STATUS_CANCELLED, domainId, id);
-			this.queryManager.executeBySql(updSql, updParams);
+			this.queryManager.executeBySql(updSql.toString(), updParams);
 			successCount++;
 		}
 
@@ -436,6 +488,64 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 
 		// 결과 리턴
 		return ValueUtil.newMap("success,released_count", true, allocations.size());
+	}
+
+	/**
+	 * 출하 주문 마감 취소 (CLOSED → SHIPPED)
+	 *
+	 * 마감으로 차감된 재고(inv_qty)를 복원하고 할당 예약(reserved_qty)을 재설정한다.
+	 * stock_allocations는 RELEASED → HARD로 복귀하여 재마감이 가능하게 한다.
+	 *
+	 * @param id 주문 ID
+	 * @return { success, restored_count }
+	 */
+	public Map<String, Object> cancelCloseShipmentOrder(String id) {
+		Long domainId = Domain.currentDomainId();
+
+		ShipmentOrder order = this.findOrder(domainId, id);
+		if (order == null) {
+			throw new ElidomValidationException("주문을 찾을 수 없습니다: " + id);
+		}
+
+		if (!ShipmentOrder.STATUS_CLOSED.equals(order.getStatus())) {
+			throw new ElidomValidationException("주문 상태가 [" + order.getStatus() + "]이므로 마감 취소할 수 없습니다 (CLOSED 상태만 가능)");
+		}
+
+		// 마감 처리된 할당 레코드(RELEASED) 조회
+		String allocSql = "SELECT * FROM stock_allocations WHERE domain_id = :domainId AND shipment_order_id = :orderId AND status = :status";
+		Map<String, Object> allocParams = ValueUtil.newMap("domainId,orderId,status",
+				domainId, id, StockAllocation.STATUS_RELEASED);
+		List<StockAllocation> allocations = this.queryManager.selectListBySql(allocSql, allocParams,
+				StockAllocation.class, 0, 0);
+
+		for (StockAllocation alloc : allocations) {
+			double allocQty = alloc.getAllocQty() != null ? alloc.getAllocQty() : 0;
+			if (allocQty <= 0 || alloc.getInventoryId() == null) continue;
+
+			// inv_qty 복원(증가) + reserved_qty 재설정
+			String updInvSql = "UPDATE inventories"
+					+ " SET inv_qty = inv_qty + :qty,"
+					+ "     reserved_qty = COALESCE(reserved_qty, 0) + :qty,"
+					+ "     updated_at = now()"
+					+ " WHERE domain_id = :domainId AND id = :invId";
+			Map<String, Object> updInvParams = ValueUtil.newMap("qty,domainId,invId", allocQty, domainId, alloc.getInventoryId());
+			this.queryManager.executeBySql(updInvSql, updInvParams);
+
+			// stock_allocations RELEASED → HARD 복귀 (재마감 가능)
+			String updAllocSql = "UPDATE stock_allocations SET status = :status, released_at = null, updated_at = now() WHERE domain_id = :domainId AND id = :allocId";
+			Map<String, Object> updAllocParams = ValueUtil.newMap("status,domainId,allocId",
+					StockAllocation.STATUS_HARD, domainId, alloc.getId());
+			this.queryManager.executeBySql(updAllocSql, updAllocParams);
+		}
+
+		// 주문 상태 SHIPPED로 복귀
+		String sql = "UPDATE shipment_orders SET status = :status, closed_at = null, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+		Map<String, Object> params = ValueUtil.newMap("status,domainId,id",
+				ShipmentOrder.STATUS_SHIPPED, domainId, id);
+		this.queryManager.executeBySql(sql, params);
+
+		// 결과 리턴
+		return ValueUtil.newMap("success,restored_count", true, allocations.size());
 	}
 
 	/*

@@ -624,15 +624,15 @@ public class StockTransactionService extends AbstractQueryService {
         String orderBy;
         switch (allocPolicy) {
             case StoragePolicy.RELEASE_STRATEGY_FEFO:
-                orderBy = "i.expired_date ASC NULLS LAST, i.created_at ASC";
+                orderBy = "expired_date ASC NULLS LAST, created_at ASC";
                 break;
             case StoragePolicy.RELEASE_STRATEGY_LIFO:
-                orderBy = "i.created_at DESC";
+                orderBy = "created_at DESC";
                 break;
             case StoragePolicy.RELEASE_STRATEGY_FIFO:
             case StoragePolicy.RELEASE_STRATEGY_MANUAL:
             default:
-                orderBy = "i.created_at ASC";
+                orderBy = "created_at ASC";
                 break;
         }
 

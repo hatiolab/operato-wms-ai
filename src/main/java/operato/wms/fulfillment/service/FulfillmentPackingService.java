@@ -57,7 +57,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 	 *
 	 * 1. INSPECTED 아이템을 PACKED로 일괄 변경
 	 * 2. 포장 박스 생성 (boxType, boxCount, boxWeight, trackingNo)
-	 *    - boxType이 없으면 주문 아이템 합산 중량·부피 기준으로 최적 BoxType 자동 선택 (sortNo 우선)
+	 * - boxType이 없으면 주문 아이템 합산 중량·부피 기준으로 최적 BoxType 자동 선택 (sortNo 우선)
 	 * 3. 패킹 지시 상태를 COMPLETED로 변경
 	 *
 	 * @param id     패킹 지시 ID
@@ -167,9 +167,12 @@ public class FulfillmentPackingService extends AbstractQueryService {
 	}
 
 	/**
-	 * 패킹 지시 취소 (-> CANCELLED)
+	 * 패킹 지시 리셋 (CREATED/IN_PROGRESS/COMPLETED → CREATED)
 	 *
-	 * SHIPPED 상태인 패킹 지시는 취소할 수 없다.
+	 * 포장 실수·작업자 교대 등의 사유로 포장을 처음부터 다시 시작할 수 있도록 리셋한다.
+	 * LABEL_PRINTED 이후(송장 발행 후)와 SHIPPED 상태는 리셋 불가.
+	 * 박스는 물리적으로 해체되므로 삭제하고, ShipmentOrder는 PACKING 유지.
+	 * 재고 할당(stock_allocations/reserved_qty)은 유지하므로 재할당 없이 즉시 재작업 가능하다.
 	 *
 	 * @param id 패킹 지시 ID
 	 * @return { success, pack_order_no }
@@ -181,33 +184,38 @@ public class FulfillmentPackingService extends AbstractQueryService {
 
 		String status = order.getStatus();
 		if (PackingOrder.STATUS_SHIPPED.equals(status)) {
-			throw new ElidomValidationException("패킹 지시 상태가 [SHIPPED]이므로 취소할 수 없습니다");
+			throw new ElidomValidationException("패킹 지시 상태가 [SHIPPED]이므로 리셋할 수 없습니다");
 		}
-		if (PackingOrder.STATUS_CANCELLED.equals(status)) {
-			throw new ElidomValidationException("패킹 지시가 이미 취소되었습니다");
+		if (PackingOrder.STATUS_LABEL_PRINTED.equals(status) || PackingOrder.STATUS_MANIFESTED.equals(status)) {
+			throw new ElidomValidationException("패킹 지시 상태가 [" + status + "]이므로 리셋할 수 없습니다 (송장 취소 후 처리 필요)");
+		}
+		if (PackingOrder.STATUS_CREATED.equals(status)) {
+			throw new ElidomValidationException("패킹 지시 상태가 이미 [CREATED]입니다");
 		}
 
-		// 패킹 상세 아이템 취소
-		String itemSql = "UPDATE packing_order_items SET status = :status, updated_at = now() WHERE domain_id = :domainId AND packing_order_id = :packingOrderId AND status != :cancelStatus";
-		Map<String, Object> itemParams = ValueUtil.newMap("status,domainId,packingOrderId,cancelStatus",
-				PackingOrderItem.STATUS_CANCEL, domainId, id, PackingOrderItem.STATUS_CANCEL);
+		// 박스 삭제 (물리적으로 해체되므로 레코드 제거)
+		String delBoxSql = "DELETE FROM packing_boxes WHERE domain_id = :domainId AND packing_order_id = :packingOrderId";
+		Map<String, Object> delBoxParams = ValueUtil.newMap("domainId,packingOrderId", domainId, id);
+		this.queryManager.executeBySql(delBoxSql, delBoxParams);
+
+		// 패킹 상세 아이템 리셋 (WAIT 복귀, 수량·박스 배정 초기화)
+		String itemSql = "UPDATE packing_order_items"
+				+ " SET status = :status, insp_qty = 0, pack_qty = 0, short_qty = 0, packing_box_id = null, updated_at = now()"
+				+ " WHERE domain_id = :domainId AND packing_order_id = :packingOrderId";
+		Map<String, Object> itemParams = ValueUtil.newMap("status,domainId,packingOrderId",
+				PackingOrderItem.STATUS_WAIT, domainId, id);
 		this.queryManager.executeBySql(itemSql, itemParams);
 
-		// 박스 상태도 취소 처리 (OPEN 박스만)
-		String boxSql = "UPDATE packing_boxes SET status = 'CANCELLED', updated_at = now() WHERE domain_id = :domainId AND packing_order_id = :packingOrderId AND status = :openStatus";
-		Map<String, Object> boxParams = ValueUtil.newMap("domainId,packingOrderId,openStatus",
-				domainId, id, PackingBox.STATUS_OPEN);
-		this.queryManager.executeBySql(boxSql, boxParams);
-
-		// 패킹 지시 헤더 취소
-		String sql = "UPDATE packing_orders SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+		// 패킹 지시 헤더 리셋 (CREATED 복귀, 작업자·시간·박스 정보 초기화)
+		String sql = "UPDATE packing_orders"
+				+ " SET status = :status, worker_id = null, started_at = null, completed_at = null,"
+				+ " total_box = 0, total_wt = 0, updated_at = now()"
+				+ " WHERE domain_id = :domainId AND id = :id";
 		Map<String, Object> params = ValueUtil.newMap("status,domainId,id",
-				PackingOrder.STATUS_CANCELLED, domainId, id);
+				PackingOrder.STATUS_CREATED, domainId, id);
 		this.queryManager.executeBySql(sql, params);
 
-		Map<String, Object> result = ValueUtil.newMap("success", true);
-		result.put("pack_order_no", order.getPackOrderNo());
-		return result;
+		return ValueUtil.newMap("success,pack_order_no", true, order.getPackOrderNo());
 	}
 
 	/**

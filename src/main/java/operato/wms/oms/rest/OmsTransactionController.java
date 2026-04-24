@@ -335,6 +335,63 @@ public class OmsTransactionController extends AbstractRestService {
 	}
 
 	/**
+	 * 출하 주문 확정 취소 (Multiple by params)
+	 *
+	 * POST /rest/oms_trx/shipment_orders/cancel_confirm
+	 *
+	 * @param params { ids: ["id1", "id2", ...] }
+	 * @return { success_count, fail_count, errors }
+	 */
+	@SuppressWarnings("unchecked")
+	@RequestMapping(value = "shipment_orders/cancel_confirm", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Cancel confirm shipment orders (CONFIRMED → REGISTERED)")
+	public Map<String, Object> cancelConfirmOrders(@RequestBody Map<String, Object> params) {
+		Long domainId = Domain.currentDomainId();
+		List<String> ids = (List<String>) params.get("ids");
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> customParams = ValueUtil.newMap("ids", ids);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CANCEL_CONFIRM_SHIPMENT, customParams);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.orderService.cancelConfirmShipmentOrders(ids);
+
+		// 3. 커스텀 서비스 - 후 처리
+		customParams.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CANCEL_CONFIRM_SHIPMENT, customParams);
+
+		return result;
+	}
+
+	/**
+	 * 출하 주문 확정 취소 (Multiple by list)
+	 *
+	 * POST /rest/oms_trx/shipment_orders/cancel_confirm_list
+	 *
+	 * @param list [{ id: "id1" }, { id: "id2" }, ...]
+	 * @return { success_count, fail_count, errors }
+	 */
+	@RequestMapping(value = "shipment_orders/cancel_confirm_list", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Cancel confirm shipment orders (CONFIRMED → REGISTERED)")
+	public Map<String, Object> cancelConfirmOrderList(@RequestBody List<ShipmentOrder> list) {
+		Long domainId = Domain.currentDomainId();
+		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("ids", ids);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CANCEL_CONFIRM_SHIPMENT, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.orderService.cancelConfirmShipmentOrders(ids);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CANCEL_CONFIRM_SHIPMENT, params);
+
+		return result;
+	}
+
+	/**
 	 * 출하 주문 확정 + 재고 할당 (단건)
 	 *
 	 * POST /rest/oms_trx/shipment_orders/{id}/confirm_and_allocate
@@ -597,6 +654,33 @@ public class OmsTransactionController extends AbstractRestService {
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CLOSE_SHIPMENT, params);
 
 		return ValueUtil.newMap("success", true);
+	}
+
+	/**
+	 * 출하 주문 마감 취소 (단건)
+	 *
+	 * POST /rest/oms_trx/shipment_orders/{id}/cancel_close
+	 *
+	 * @param id 주문 ID
+	 * @return { success, restored_count }
+	 */
+	@RequestMapping(value = "shipment_orders/{id}/cancel_close", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Cancel close shipment order (CLOSED → SHIPPED), restore inv_qty and reserved_qty")
+	public Map<String, Object> cancelCloseOrder(@PathVariable("id") String id) {
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("id", id);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CANCEL_CLOSE_SHIPMENT, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.orderService.cancelCloseShipmentOrder(id);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CANCEL_CLOSE_SHIPMENT, params);
+
+		return result;
 	}
 
 	/*
