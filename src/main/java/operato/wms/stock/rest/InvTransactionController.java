@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import operato.wms.base.entity.Location;
 import operato.wms.stock.entity.Inventory;
 import operato.wms.stock.model.InvTransaction;
 import operato.wms.stock.service.StockTransactionService;
@@ -135,8 +136,51 @@ public class InvTransactionController extends AbstractRestService {
     }
 
     /**
+     * 이동 목적지 로케이션 유효성 사전 검증
+     *
+     * PDA 재고 이동 화면에서 목적지 로케이션 스캔 후 호출한다.
+     * 유효한 로케이션이면 로케이션 정보를 반환하고,
+     * 존재하지 않거나 이동 제한이 걸린 경우 오류를 반환한다.
+     *
+     * POST /rest/inventory_trx/validate_location_for_move
+     * Body: { "to_loc_cd": "A-01-01" }
+     *
+     * @param input to_loc_cd를 포함하는 요청 바디
+     * @return 유효한 Location 엔티티
+     */
+    @PostMapping(value = "/validate_location_for_move", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Validate Location for Move")
+    public Location validateLocationForMove(@RequestBody Map<String, String> input) {
+        Long domainId = Domain.currentDomainId();
+        String toLocCd = input.get("to_loc_cd");
+        return this.invTrxSvc.validateLocationForMove(domainId, toLocCd);
+    }
+
+    /**
+     * 재고 바코드 이동 가능 여부 사전 검증
+     *
+     * PDA 재고 이동 화면에서 재고 바코드 스캔 후 호출한다.
+     * 재고 상태, 창고 일치, 화주사 전용·고정 SKU 로케이션, 혼적 가능 여부를 모두 체크한다.
+     * 유효하면 재고 정보를 반환하고, 이동 불가한 경우 오류를 반환한다.
+     *
+     * POST /rest/inventory_trx/validate_barcode_for_move
+     * Body: { "barcode": "BARCODE123", "to_loc_cd": "A-01-01" }
+     *
+     * @param input barcode와 to_loc_cd를 포함하는 요청 바디
+     * @return 유효한 Inventory 엔티티
+     */
+    @PostMapping(value = "/validate_barcode_for_move", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Validate Barcode for Move")
+    public Inventory validateBarcodeForMove(@RequestBody Map<String, String> input) {
+        Long domainId = Domain.currentDomainId();
+        String barcode = input.get("barcode");
+        String toLocCd = input.get("to_loc_cd");
+        return this.invTrxSvc.validateInventoryForMove(domainId, barcode, toLocCd);
+    }
+
+    /**
      * 재고 임의 생성
-     * 
+     *
      * @param input
      * @return
      */

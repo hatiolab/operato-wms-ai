@@ -20,7 +20,7 @@ import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
  */
 @customElement('pda-stock-inquiry')
 export class PdaStockInquiry extends connect(store)(PageView) {
-  /** 화면 모드: list / detail / history / add */
+  /** 화면 모드: list / detail / history / add / adjust */
   @state() mode = 'list'
 
   /** 검색 조건: 재고 바코드 */
@@ -61,6 +61,11 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   @state() warehouses = []
   /** 화주사 목록 (select 옵션용) */
   @state() companies = []
+
+  /** 재고 조정 수량 입력값 */
+  @state() _adjQty = ''
+  /** 재고 조정 원인 입력값 */
+  @state() _adjReason = ''
 
   /** 피드백 메시지 */
   @state() lastFeedback = null
@@ -543,6 +548,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       case 'detail': return this._renderDetailMode()
       case 'history': return this._renderHistoryMode()
       case 'add': return this._renderAddMode()
+      case 'adjust': return this._renderAdjustMode()
       default: return this._renderListMode()
     }
   }
@@ -670,6 +676,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           ${this._detailRow(TermsUtil.tLabel('loc_cd') || '로케이션', inv.loc_cd || '-', 'highlight')}
           ${this._detailRow(TermsUtil.tLabel('inv_qty') || '재고 수량', inv.inv_qty ?? '-')}
           ${this._detailRow(TermsUtil.tLabel('reserved_qty') || '할당 수량', inv.reserved_qty ?? '0', inv.reserved_qty > 0 ? 'danger' : '')}
+          ${this._detailRow(TermsUtil.tLabel('available_qty') || '가용 수량', (inv.inv_qty ?? 0) - (inv.reserved_qty ?? 0), 'highlight')}
           ${this._detailRow(TermsUtil.tLabel('lot_no') || 'LOT 번호', inv.lot_no || '-')}
           ${this._detailRow(TermsUtil.tLabel('expired_date') || '유효기간', inv.expired_date || '-')}
           ${this._detailRow(TermsUtil.tLabel('com_cd') || '화주사', inv.com_cd || '-')}
@@ -684,6 +691,9 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       <div class="footer-area">
         <button class="btn-secondary" @click=${this._goHistory}>
           ${TermsUtil.tMenu('InventoryHist') || '이력 보기'}
+        </button>
+        <button class="btn-secondary" @click=${this._goAdjust}>
+          ${TermsUtil.tButton('adjust') || '재고 조정'}
         </button>
         <button class="btn-primary" @click=${this._goList}>
           ${TermsUtil.tButton('go_list') || '메인 화면'}
@@ -729,10 +739,14 @@ export class PdaStockInquiry extends connect(store)(PageView) {
               </div>
               <div class="h-info">
                 ${TermsUtil.tLabel('loc_cd') || '로케이션'}: ${h.loc_cd || '-'}
-                · ${TermsUtil.tLabel('inv_qty') || '수량'}: ${h.inv_qty ?? '-'}
-                ${h.lot_no ? ` · LOT: ${h.lot_no}` : ''}
-                ${h.rcv_no ? ` · ${h.rcv_no}` : ''}
+                · ${TermsUtil.tLabel('inv_qty') || '재고 수량'}: ${h.inv_qty ?? '-'}
+                · ${TermsUtil.tLabel('reserved_qty') || '할당 수량'}: ${h.reserved_qty ?? '-'}
               </div>
+              ${h.remarks ? html`
+                <div class="h-info" style="margin-top:2px;">
+                  ${TermsUtil.tLabel('remarks') || '비고'}: ${h.remarks}
+                </div>
+              ` : ''}
               <div class="h-date">
                 ${h.created_at ? h.created_at.substring(0, 16).replace('T', ' ') : '-'}
               </div>
@@ -742,7 +756,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       ` : html`
         <div class="empty-guide">
           <div class="guide-icon">📋</div>
-          <div class="guide-text">${TermsUtil.tLabel('no_history') || '이력 데이터가 없습니다'}</div>
+          <div class="guide-text">${TermsUtil.tText('No Data') || '이력 데이터가 없습니다'}</div>
         </div>
       `}
 
@@ -866,6 +880,94 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         : (TermsUtil.tButton('save') || '저장')}
         </button>
         <button class="btn-secondary" ?disabled=${this.processing} @click=${this._goList}>
+          ${TermsUtil.tButton('cancel') || '취소'}
+        </button>
+      </div>
+    `
+  }
+
+  /** adjust 모드 렌더링 — 재고 조정 폼 */
+  _renderAdjustMode() {
+    const inv = this.selectedInventory
+    return html`
+      <div class="header-bar">
+        <button class="back-btn" @click=${() => (this.mode = 'detail')}>◀</button>
+        <span class="title">${TermsUtil.tButton('adjust') || '재고 조정'}</span>
+      </div>
+
+      ${this.lastFeedback ? html`
+        <div class="scan-feedback ${this.lastFeedback.type}">${this.lastFeedback.message}</div>
+      ` : ''}
+
+      <div class="add-form">
+        <!-- 현재 재고 정보 (읽기 전용) -->
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('barcode') || '바코드'}</label>
+          <input type="text" readonly .value=${inv?.barcode || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('sku_cd') || 'SKU'}</label>
+          <input type="text" readonly .value=${inv?.sku_cd || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('loc_cd') || '로케이션'}</label>
+          <input type="text" readonly .value=${inv?.loc_cd || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('inv_qty') || '재고 수량'}</label>
+          <input type="text" readonly .value=${inv?.inv_qty ?? '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('reserved_qty') || '예약 수량'}</label>
+          <input type="text" readonly .value=${inv?.reserved_qty ?? '0'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('available_qty') || '가용 수량'}</label>
+          <input type="text" readonly .value=${(inv?.inv_qty ?? 0) - (inv?.reserved_qty ?? 0)}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-primary, #1976D2); font-weight: 600;">
+        </div>
+
+        <div style="height:1px; background: var(--md-sys-color-outline-variant,#e0e0e0); margin: 4px 0;"></div>
+
+        <!-- 조정 입력 -->
+        <div class="form-field">
+          <label>
+            ${TermsUtil.tLabel('to_qty') || '조정 수량'}
+            <span class="required">*</span>
+          </label>
+          <input type="number"
+            id="adjQtyInput"
+            placeholder="예약 수량보다는 커야합니다."
+            .value=${this._adjQty}
+            @input=${e => (this._adjQty = e.target.value)}>
+        </div>
+        <div class="form-field">
+          <label>
+            ${TermsUtil.tLabel('reason') || '조정 원인'}
+            <span class="required">*</span>
+          </label>
+          <input type="text"
+            placeholder="${TermsUtil.tLabel('reason') || '조정 원인 입력'}"
+            .value=${this._adjReason}
+            @input=${e => (this._adjReason = e.target.value)}>
+        </div>
+      </div>
+
+      <div class="footer-area">
+        <button class="btn-primary"
+          ?disabled=${this.processing}
+          @click=${this._submitAdjust}>
+          ${this.processing
+        ? (TermsUtil.tText('processing') || '처리 중...')
+        : (TermsUtil.tButton('adjust') || '조정')}
+        </button>
+        <button class="btn-secondary" ?disabled=${this.processing}
+          @click=${() => (this.mode = 'detail')}>
           ${TermsUtil.tButton('cancel') || '취소'}
         </button>
       </div>
@@ -1060,6 +1162,63 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       this._goList()
     } catch (error) {
       this._showFeedback(error.message || '재고 추가에 실패했습니다', 'error')
+    } finally {
+      this.processing = false
+    }
+  }
+
+  /**
+   * 재고 조정 화면으로 이동
+   */
+  _goAdjust() {
+    this._adjQty = ''
+    this._adjReason = ''
+    this.lastFeedback = null
+    this.mode = 'adjust'
+  }
+
+  /**
+   * 재고 조정 확정 API 호출
+   * POST /rest/inventory_trx/{id}/adjust_inventory
+   */
+  async _submitAdjust() {
+    if (!this._adjQty) {
+      this._showFeedback('조정 수량을 입력하세요', 'warning')
+      return
+    }
+    if (!this._adjReason || !this._adjReason.trim()) {
+      this._showFeedback('조정 원인을 입력하세요', 'warning')
+      return
+    }
+
+    const qty = parseInt(this._adjQty, 10)
+    if (isNaN(qty) || qty < 0) {
+      this._showFeedback('조정 수량은 0 이상이어야 합니다', 'warning')
+      return
+    }
+
+    this.processing = true
+    try {
+      const inv = this.selectedInventory
+      const result = await ServiceUtil.restPost(`inventory_trx/${inv.id}/adjust_inventory`, {
+        to_qty: qty,
+        reason: this._adjReason.trim()
+      })
+
+      if (result && result.id) {
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: { level: 'info', message: `재고 조정 완료: ${inv.barcode} (${qty > 0 ? '+' : ''}${qty})` }
+        }))
+
+        // 조정 후 상세 화면으로 복귀하며 재고 정보 갱신
+        this.selectedInventory = result || inv
+        this.lastFeedback = null
+        this.mode = 'detail'
+      }
+
+    } catch (error) {
+      this._showFeedback(error.message || '재고 조정에 실패했습니다', 'error')
+      navigator.vibrate?.(200)
     } finally {
       this.processing = false
     }

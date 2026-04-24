@@ -122,7 +122,8 @@ public class StockTransactionService extends AbstractQueryService {
 
         // 로케이션 최대 수량·중량 초과 검증 (분할 시 비례 중량 계산)
         double putawayWeight = (inventory.getWeight() != null && invQty > 0)
-                ? inventory.getWeight() * inputQty / invQty : 0.0;
+                ? inventory.getWeight() * inputQty / invQty
+                : 0.0;
         this.checkLocationCapacity(toLoc, inputQty, putawayWeight);
 
         // 바코드 재고 수량이 입력 수량보다 크다면 재고 분할 처리
@@ -479,6 +480,14 @@ public class StockTransactionService extends AbstractQueryService {
         // 재고 조회 & 기본 체크 포인트 체크
         Inventory inventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_ADJUST);
 
+        // 조정 수량 제약 조건 체크
+        double reservedQty = inventory.getReservedQty();
+        if (reservedQty > 0) {
+            if (input.getToQty() < reservedQty) {
+                throw ThrowUtil.newValidationErrorWithNoLog("조정 수량이 예약 수량보다 작을 수 없습니다.");
+            }
+        }
+
         // 재고 조정 트랜잭션 처리
         inventory.setInvQty(input.getToQty());
         inventory.setRemarks(input.getReason());
@@ -486,6 +495,97 @@ public class StockTransactionService extends AbstractQueryService {
         this.queryManager.update(inventory);
 
         // 리턴
+        return inventory;
+    }
+
+    /**
+     * 이동 목적지 로케이션 유효성 사전 검증
+     *
+     * 로케이션 존재 여부, 삭제 여부, 이동 제한(restrictType=MOVE) 여부를 체크한다.
+     * 유효한 경우 로케이션 정보를 반환한다.
+     *
+     * @param domainId 도메인 ID
+     * @param toLocCd  목적지 로케이션 코드
+     * @return 유효한 Location 엔티티
+     */
+    public Location validateLocationForMove(Long domainId, String toLocCd) {
+        // 목적지 로케이션 코드 값 체크
+        ValueUtil.checkEmptyData(toLocCd, "label.to_loc_cd");
+        // 로케이션 조회
+        Location location = this.wmsBaseSvc.findLocation(toLocCd, false, true);
+
+        if (ValueUtil.isEqualIgnoreCase(location.getRestrictType(), Inventory.TRANSACTION_IN)) {
+            throw ThrowUtil.newValidationErrorWithNoLog("입고 제한이 걸린 로케이션이라 " + toLocCd + " 으로 이동이 불가합니다.");
+        }
+
+        // 로케이션 리턴
+        return location;
+    }
+
+    /**
+     * 재고 바코드 이동 가능 여부 사전 검증
+     *
+     * 아래 항목을 순서대로 체크한다.
+     * 1. 바코드로 재고 조회 (del_flag=false)
+     * 2. 재고 기본 체크 (존재, 수량 > 0, LOCKED 상태 여부)
+     * 3. 목적지 로케이션 조회 & 이동 제한 체크
+     * 4. 현재 로케이션과 목적지 동일 여부
+     * 5. 창고 일치 여부
+     * 6. 화주사 전용 로케이션 체크
+     * 7. 고정 SKU 로케이션 체크
+     * 8. 혼적 가능 여부 체크
+     *
+     * @param domainId 도메인 ID
+     * @param barcode  재고 바코드
+     * @param toLocCd  목적지 로케이션 코드
+     * @return 유효한 Inventory 엔티티
+     */
+    public Inventory validateInventoryForMove(Long domainId, String barcode, String toLocCd) {
+        // 바코드 존재 여부 체크
+        ValueUtil.checkEmptyData(barcode, "label.barcode");
+        // 목적지 로케이션 코드 존재 여부 체크
+        ValueUtil.checkEmptyData(toLocCd, "label.to_loc_cd");
+
+        // 바코드로 재고 조회 (삭제되지 않은 재고만)
+        String sql = "SELECT * FROM inventories WHERE domain_id = :domainId AND barcode = :barcode AND (del_flag IS NULL OR del_flag = false) LIMIT 1";
+        Inventory inventory = this.queryManager.selectBySql(
+                sql, ValueUtil.newMap("domainId,barcode", domainId, barcode), Inventory.class);
+
+        // 재고 예약 수량이 있는지 체크
+        if (inventory.getReservedQty() != null && inventory.getReservedQty() > 0) {
+            throw ThrowUtil.newValidationErrorWithNoLog("예약 수량이 있는 재고는 이동할 수 없습니다.");
+        }
+
+        // 재고 기본 유효성 체크 (존재, 삭제, 수량, LOCKED 상태 등)
+        this.checkInventoryForTrx(inventory, Inventory.TRANSACTION_MOVE);
+
+        // 목적지 로케이션 조회 & 이동 제한(restrict_type=MOVE) 체크
+        Location toLoc = this.validateLocationForMove(domainId, toLocCd);
+
+        // 현재 로케이션과 목적지 동일 여부 체크
+        if (ValueUtil.isEqualIgnoreCase(inventory.getLocCd(), toLocCd)) {
+            throw ThrowUtil.newValidationErrorWithNoLog("이동하려는 로케이션이 재고의 현재 로케이션과 동일합니다.");
+        }
+
+        // 창고 일치 여부 체크 (창고 간 이동 불가)
+        if (ValueUtil.isNotEqual(inventory.getWhCd(), toLoc.getWhCd())) {
+            throw ThrowUtil.newValidationErrorWithNoLog(
+                    "이동 로케이션의 창고와 재고의 창고가 다릅니다. 창고 간 이동은 Transfer 트랜잭션을 이용하세요.");
+        }
+
+        // 화주사 전용 로케이션 체크
+        if (ValueUtil.isNotEmpty(toLoc.getComCd()) && ValueUtil.isNotEqual(toLoc.getComCd(), inventory.getComCd())) {
+            throw ThrowUtil.newValidationErrorWithNoLog(
+                    "화주사 [" + toLoc.getComCd() + "] 전용 로케이션입니다. 해당 재고(" + inventory.getComCd() + ")는 이동할 수 없습니다.");
+        }
+
+        // 고정 SKU 로케이션 체크
+        this.checkFixedSkuLocation(toLoc, inventory.getSkuCd());
+
+        // 혼적 가능 여부 체크
+        this.checkMixableLocation(toLoc, inventory.getSkuCd());
+
+        // toLocCd로 이동 가능한 재고 리턴
         return inventory;
     }
 
@@ -793,7 +893,8 @@ public class StockTransactionService extends AbstractQueryService {
                     "WHERE domain_id = :domainId AND loc_cd = :locCd AND (del_flag IS NULL OR del_flag = false) AND inv_qty > 0";
             Double currentQty = this.queryManager.selectBySql(sql,
                     ValueUtil.newMap("domainId,locCd", toLoc.getDomainId(), toLoc.getLocCd()), Double.class);
-            if (currentQty == null) currentQty = 0.0;
+            if (currentQty == null)
+                currentQty = 0.0;
             if (currentQty + addQty > toLoc.getMaxQty()) {
                 throw ThrowUtil.newValidationErrorWithNoLog(
                         "로케이션 [" + toLoc.getLocCd() + "]의 최대 수량(" + toLoc.getMaxQty() + ")을 초과합니다.");
@@ -805,7 +906,8 @@ public class StockTransactionService extends AbstractQueryService {
                     "WHERE domain_id = :domainId AND loc_cd = :locCd AND (del_flag IS NULL OR del_flag = false) AND inv_qty > 0";
             Double currentWeight = this.queryManager.selectBySql(sql,
                     ValueUtil.newMap("domainId,locCd", toLoc.getDomainId(), toLoc.getLocCd()), Double.class);
-            if (currentWeight == null) currentWeight = 0.0;
+            if (currentWeight == null)
+                currentWeight = 0.0;
             if (currentWeight + addWeight > toLoc.getMaxWeight()) {
                 throw ThrowUtil.newValidationErrorWithNoLog(
                         "로케이션 [" + toLoc.getLocCd() + "]의 최대 중량(" + toLoc.getMaxWeight() + ")을 초과합니다.");
