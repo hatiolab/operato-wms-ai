@@ -1,9 +1,11 @@
 package operato.wms.oms.rest;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import xyz.elidom.dbist.dml.Filter;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,10 +22,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 import operato.wms.oms.entity.ReplenishOrder;
 import operato.wms.oms.entity.ReplenishOrderItem;
+import operato.wms.oms.entity.ShipmentOrder;
+import operato.wms.oms.service.OmsReplenishOrderService;
 
+import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
+import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.system.service.AbstractRestService;
+import xyz.elidom.util.ValueUtil;
 import xyz.elidom.dbist.dml.Page;
 
 @RestController
@@ -32,6 +39,9 @@ import xyz.elidom.dbist.dml.Page;
 @RequestMapping("/rest/replenish_orders")
 @ServiceDesc(description = "ReplenishOrder Service API")
 public class ReplenishOrderController extends AbstractRestService {
+
+	@Autowired
+	private OmsReplenishOrderService omsReplenishOrderService;
 
 	@Override
 	protected Class<?> entityClass() {
@@ -110,6 +120,90 @@ public class ReplenishOrderController extends AbstractRestService {
 
 		this.cudMultipleData(ReplenishOrderItem.class, list);
 		return this.findReplenishOrderItems(id);
+	}
+
+	@PostMapping(value = "/start/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "보충 지시 시작 (CREATED → IN_PROGRESS)")
+	public Map<String, Object> startReplenishOrder(@PathVariable("id") String id) {
+		return this.omsReplenishOrderService.startReplenishOrder(id);
+	}
+
+	@PostMapping(value = "/complete/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "보충 지시 완료 (IN_PROGRESS → COMPLETED)")
+	public Map<String, Object> completeReplenishOrder(@PathVariable("id") String id) {
+		return this.omsReplenishOrderService.completeReplenishOrder(id);
+	}
+
+	@PostMapping(value = "/cancel/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "보충 지시 취소 (CREATED/IN_PROGRESS → CANCELLED)")
+	public Map<String, Object> cancelReplenishOrder(@PathVariable("id") String id) {
+		return this.omsReplenishOrderService.cancelReplenishOrder(id);
+	}
+
+	@PostMapping(value = "/create_from_order", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "BACK_ORDER 출하 주문 기반 보충 지시 수동 생성 (단건)")
+	public Map<String, Object> createFromOrder(@RequestBody Map<String, Object> params) {
+		Long domainId = Domain.currentDomainId();
+		String shipmentOrderId = ValueUtil.toString(params.get("shipment_order_id"));
+		String comCd = ValueUtil.toString(params.get("com_cd"));
+		String whCd = ValueUtil.toString(params.get("wh_cd"));
+
+		if (ValueUtil.isEmpty(shipmentOrderId)) {
+			throw new ElidomValidationException("shipment_order_id는 필수입니다");
+		}
+
+		// com_cd, wh_cd 미전달 시 주문에서 조회
+		if (ValueUtil.isEmpty(comCd) || ValueUtil.isEmpty(whCd)) {
+			String orderSql = "SELECT com_cd, wh_cd FROM shipment_orders WHERE domain_id = :domainId AND id = :id";
+			java.util.Map<String, Object> orderParams = ValueUtil.newMap("domainId,id", domainId, shipmentOrderId);
+			List<ShipmentOrder> orders = this.queryManager.selectListBySql(orderSql, orderParams, ShipmentOrder.class, 0, 1);
+			if (orders.isEmpty()) {
+				throw new ElidomValidationException("출하 주문을 찾을 수 없습니다: " + shipmentOrderId);
+			}
+			comCd = orders.get(0).getComCd();
+			whCd = orders.get(0).getWhCd();
+		}
+
+		return this.omsReplenishOrderService.createReplenishForOrder(domainId, shipmentOrderId, comCd, whCd);
+	}
+
+	@PostMapping(value = "/create_from_orders", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "BACK_ORDER 출하 주문 기반 보충 지시 수동 생성 (복수)")
+	public Map<String, Object> createFromOrders(@RequestBody Map<String, Object> params) {
+		Long domainId = Domain.currentDomainId();
+		@SuppressWarnings("unchecked")
+		List<String> ids = (List<String>) params.get("ids");
+
+		if (ids == null || ids.isEmpty()) {
+			throw new ElidomValidationException("ids는 필수입니다");
+		}
+
+		int totalCreated = 0;
+		int totalItems = 0;
+		List<String> replenishNos = new ArrayList<>();
+		List<String> noStockOrders = new ArrayList<>();
+
+		for (String orderId : ids) {
+			String orderSql = "SELECT com_cd, wh_cd FROM shipment_orders WHERE domain_id = :domainId AND id = :id";
+			java.util.Map<String, Object> orderParams = ValueUtil.newMap("domainId,id", domainId, orderId);
+			List<ShipmentOrder> orders = this.queryManager.selectListBySql(orderSql, orderParams, ShipmentOrder.class, 0, 1);
+			if (orders.isEmpty())
+				continue;
+
+			Map<String, Object> result = this.omsReplenishOrderService.createReplenishForOrder(
+					domainId, orderId, orders.get(0).getComCd(), orders.get(0).getWhCd());
+
+			if (Boolean.TRUE.equals(result.get("replenish_created"))) {
+				totalCreated++;
+				totalItems += (int) result.getOrDefault("item_count", 0);
+				replenishNos.add(ValueUtil.toString(result.get("replenish_no")));
+			} else {
+				noStockOrders.add(orderId);
+			}
+		}
+
+		return ValueUtil.newMap("total_created,total_items,replenish_nos,no_stock_orders",
+				totalCreated, totalItems, replenishNos, noStockOrders);
 	}
 
 }

@@ -174,6 +174,37 @@ public class WmsBaseService extends AbstractQueryService {
      * @param entityClass
      * @param condition
      * @param withLock
+     * @param exceptionWhenNotFound
+     * @return
+     */
+    public <T> T findRecord(Class<T> entityClass, Object condition, Boolean withLock, Boolean exceptionWhenNotFound) {
+        T record = null;
+
+        if (condition instanceof Query) {
+            record = this.selectRecord(entityClass, (Query) condition, withLock);
+
+        } else {
+            if (withLock == true) {
+                record = this.queryManager.selectByConditionWithLock(entityClass, condition);
+            } else {
+                record = this.queryManager.selectByCondition(entityClass, condition);
+            }
+        }
+
+        if (exceptionWhenNotFound && record == null) {
+            throw ThrowUtil.newNotFoundRecord(MessageUtil.getTerm("menu." + entityClass.getSimpleName()), "Data");
+        }
+
+        return record;
+    }
+
+    /**
+     * 레코드 조회
+     * 
+     * @param <T>
+     * @param entityClass
+     * @param condition
+     * @param withLock
      * @return
      */
     public <T> T selectRecord(Class<T> entityClass, Query condition, Boolean withLock) {

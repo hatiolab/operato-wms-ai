@@ -1,10 +1,15 @@
 package operato.wms.oms.entity;
 
+import org.apache.commons.lang.StringUtils;
+
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
 import xyz.elidom.dbist.annotation.Index;
 import xyz.elidom.dbist.annotation.PrimaryKey;
 import xyz.elidom.dbist.annotation.Table;
+import xyz.elidom.dev.entity.RangedSeq;
+import xyz.elidom.sys.SysConstants;
+import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -14,10 +19,10 @@ import xyz.elidom.util.ValueUtil;
  * @author HatioLab
  */
 @Table(name = "replenish_orders", idStrategy = GenerationRule.UUID, uniqueFields = "domainId,replenishNo", indexes = {
-	@Index(name = "ix_replenish_orders_0", columnList = "domain_id,replenish_no", unique = true),
-	@Index(name = "ix_replenish_orders_1", columnList = "domain_id,wave_no"),
-	@Index(name = "ix_replenish_orders_2", columnList = "domain_id,order_date,status"),
-	@Index(name = "ix_replenish_orders_3", columnList = "domain_id,com_cd,wh_cd")
+		@Index(name = "ix_replenish_orders_0", columnList = "domain_id,replenish_no", unique = true),
+		@Index(name = "ix_replenish_orders_1", columnList = "domain_id,wave_no"),
+		@Index(name = "ix_replenish_orders_2", columnList = "domain_id,order_date,status"),
+		@Index(name = "ix_replenish_orders_3", columnList = "domain_id,com_cd,wh_cd")
 })
 public class ReplenishOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	/**
@@ -307,6 +312,15 @@ public class ReplenishOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook 
 		// 지시 일자 초기화
 		if (ValueUtil.isEmpty(this.orderDate)) {
 			this.orderDate = DateUtil.todayStr();
+		}
+
+		// 보충 지시 번호 생성
+		if (ValueUtil.isEmpty(this.replenishNo)) {
+			String today = DateUtil.todayStr("yyMMdd");
+			Integer seq = RangedSeq.increaseSequence(this.domainId, "REPLENISH_NO", "DATE", today,
+					null, null, null);
+			this.replenishNo = "RP" + Domain.currentDomainId() + SysConstants.DASH + today + SysConstants.DASH
+					+ StringUtils.leftPad(String.valueOf(seq), 4, "0");
 		}
 	}
 }

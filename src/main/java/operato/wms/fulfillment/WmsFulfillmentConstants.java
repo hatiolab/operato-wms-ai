@@ -49,6 +49,12 @@ public class WmsFulfillmentConstants {
 	/** 커스텀 서비스 - 피킹 취소 후 처리 */
 	public static final String TRX_FUL_POST_CANCEL_PICKING = "diy-ful-post-cancel-picking-task";
 
+	// === 피킹 부족 보충 지시 생성 ===
+	/** 커스텀 서비스 - 피킹 부족 보충 지시 생성 전 처리 */
+	public static final String TRX_FUL_PRE_CREATE_REPLENISH_FROM_SHORT = "diy-ful-pre-create-replenish-from-short";
+	/** 커스텀 서비스 - 피킹 부족 보충 지시 생성 후 처리 */
+	public static final String TRX_FUL_POST_CREATE_REPLENISH_FROM_SHORT = "diy-ful-post-create-replenish-from-short";
+
 	// === 포장 지시 생성 ===
 	/** 커스텀 서비스 - 포장 지시 생성 전 처리 */
 	public static final String TRX_FUL_PRE_CREATE_PACKING = "diy-ful-pre-create-packing-order";

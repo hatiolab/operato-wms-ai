@@ -40,6 +40,11 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 	 */
 	@Autowired
 	private StockTransactionService stockTransactionService;
+	/**
+	 * 보충 지시 서비스
+	 */
+	@Autowired
+	private OmsReplenishOrderService omsReplenishOrderService;
 
 	/**
 	 * 출하 주문 확정 + 재고 할당 (단건)
@@ -293,6 +298,7 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 			successCount++;
 			if (hasShort) {
 				backOrderCount++;
+				this.omsReplenishOrderService.createReplenishForOrder(domainId, orderId, order.getComCd(), order.getWhCd());
 			} else {
 				allocatedCount++;
 			}

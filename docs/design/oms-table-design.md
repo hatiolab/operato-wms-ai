@@ -301,6 +301,27 @@ CREATED ─→ IN_PROGRESS ─→ COMPLETED
   └── CANCELLED ──────────┘
 ```
 
+#### 4.3.1 보충 필요 감지 시점
+
+PICKABLE 존의 재고 부족을 언제 감지하여 보충 지시를 생성할지는 아래 3가지 시점 중 선택·조합합니다.
+
+| # | 시점 | 트리거 | 장점 | 단점 |
+|---|------|--------|------|------|
+| ① | **재고 할당 시** | `allocateShipmentOrders()` 실행 중 BACK_ORDER 발생 | 가장 이른 감지, 실시간 대응 | 할당 서비스에 보충 로직 추가 필요 |
+| ② | **웨이브 릴리스 시** | `releaseWave()` 직전 PICKABLE 재고 vs 피킹 예정 수량 비교 | 피킹 직전 최종 검증 | 이미 웨이브 확정 후라 처리가 늦음 |
+| ③ | **Safety Stock 스케줄러** | 정기 배치로 PICKABLE 재고가 Safety Stock 이하인 SKU 탐색 | 주문과 무관하게 재고 적정 수준 유지 | 즉각적이지 않음, 배치 주기 설계 필요 |
+
+**권장 조합**: ①(재고 할당 시 이벤트 감지) + ③(Safety Stock 스케줄러)
+
+- **①**: 주문 할당 중 BACK_ORDER(`alloc_qty < ord_qty`)가 발생하는 시점에 즉시 보충 지시 생성
+  - 구현 위치: `OmsTransactionService.allocateShipmentOrders()` 내 `BACK_ORDER` 분기 처리
+  - 연결: W23-RE-1 (보충 지시 자동 감지 API)
+- **③**: 스케줄러가 주기적으로 `inventories` 테이블을 스캔하여 `inv_qty < safety_stock` SKU를 보충
+  - 설정: `oms.replenish.safety-stock.scheduler.cron` (예: 매일 새벽 2시)
+- **②는 보조 수단**: ①을 사용하면 ②는 중복 검증 역할로만 활용 가능 (필수 아님)
+
+**피킹 부족(shortItem) 사후 보충**: 피킹 중 실제 재고 부족이 확인되면 `shortItem(auto_replenish=true)` 호출 시 즉시 보충 지시 생성 (W1-F-2 구현)
+
 ### 4.4 재고 할당 (StockAllocation) 상태
 
 ```
@@ -990,8 +1011,12 @@ FROM
 
 | 설정키 | 기본값 | 설명 |
 |--------|--------|------|
-| `oms.replenish.auto-create.on-wave` | `true` | 웨이브 생성 시 자동 보충 지시 |
-| `oms.replenish.min-stock-rate` | `0.3` | 최소 재고 비율 (이하 시 보충) |
+| `oms.replenish.auto-create.on-allocate` | `true` | 재고 할당 시 BACK_ORDER 발생하면 자동 보충 지시 생성 (권장 감지 시점 ①) |
+| `oms.replenish.auto-create.on-wave` | `false` | 웨이브 릴리스 시 PICKABLE 재고 부족 시 자동 보충 지시 생성 (감지 시점 ②, 보조) |
+| `oms.replenish.auto-create.on-short-item` | `false` | 피킹 중 shortItem 호출 시 자동 보충 지시 생성 (사후 대응) |
+| `oms.replenish.safety-stock.enabled` | `false` | Safety Stock 기반 스케줄러 활성화 (감지 시점 ③) |
+| `oms.replenish.safety-stock.scheduler.cron` | `0 0 2 * * ?` | Safety Stock 스캔 스케줄 (기본 매일 새벽 2시) |
+| `oms.replenish.min-stock-rate` | `0.3` | 최소 재고 비율 (이하 시 보충, safety-stock 미설정 시 fallback) |
 
 ### 8.5 출력
 

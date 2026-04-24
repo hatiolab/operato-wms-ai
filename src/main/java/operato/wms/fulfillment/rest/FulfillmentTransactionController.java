@@ -211,6 +211,34 @@ public class FulfillmentTransactionController {
 	}
 
 	/**
+	 * 피킹 부족 보충 지시 생성 (SHORT 항목 대상 수동 호출)
+	 * POST /rest/ful_trx/picking_tasks/{id}/items/{item_id}/create_replenish
+	 *
+	 * shortItem() 호출 시 auto_replenish를 놓쳤거나 재시도가 필요할 때 사용한다.
+	 * 해당 항목이 SHORT 상태이고 short_qty > 0이어야 한다.
+	 */
+	@PostMapping(value = "picking_tasks/{id}/items/{item_id}/create_replenish", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Create replenish order from short picking item")
+	public Map<String, Object> createReplenishFromShortItem(
+			@PathVariable("id") String id,
+			@PathVariable("item_id") String itemId) {
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("id,item_id", id, itemId);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_REPLENISH_FROM_SHORT, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.pickingService.createReplenishFromShortItem(itemId);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_REPLENISH_FROM_SHORT, params);
+
+		return result;
+	}
+
+	/**
 	 * 피킹 완료 (IN_PROGRESS → COMPLETED) + 포장 지시 자동 생성
 	 * POST /rest/ful_trx/picking_tasks/{id}/complete
 	 *

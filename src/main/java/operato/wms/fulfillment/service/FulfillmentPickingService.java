@@ -3,6 +3,7 @@ package operato.wms.fulfillment.service;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -11,10 +12,13 @@ import operato.wms.base.service.WmsBaseService;
 import operato.wms.fulfillment.WmsFulfillmentConfigConstants;
 import operato.wms.fulfillment.entity.PickingTask;
 import operato.wms.fulfillment.entity.PickingTaskItem;
+import operato.wms.oms.entity.ReplenishOrder;
+import operato.wms.oms.entity.ReplenishOrderItem;
 import xyz.anythings.sys.event.EventPublisher;
 import xyz.anythings.sys.event.model.PrintEvent;
 import xyz.anythings.sys.model.BaseResponse;
 import xyz.anythings.sys.service.AbstractQueryService;
+import xyz.elidom.dev.entity.RangedSeq;
 import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
@@ -418,7 +422,7 @@ public class FulfillmentPickingService extends AbstractQueryService {
 	 * 피킹 항목의 short_qty를 갱신하고 상태를 SHORT로 변경한다.
 	 *
 	 * @param itemId 피킹 항목 ID
-	 * @param params { short_qty, pick_qty, reason }
+	 * @param params { short_qty, pick_qty, reason, auto_replenish }
 	 * @return { success, item_id, sku_cd, pick_qty, short_qty, status }
 	 */
 	public Map<String, Object> shortItem(String itemId, Map<String, Object> params) {
@@ -442,9 +446,106 @@ public class FulfillmentPickingService extends AbstractQueryService {
 				pickQty, shortQty, PickingTaskItem.STATUS_SHORT, now, domainId, itemId);
 		this.queryManager.executeBySql(sql, updParams);
 
-		// 결과 리턴
-		return ValueUtil.newMap("success,item_id,sku_cd,pick_qty,short_qty,status", true, itemId, item.getSkuCd(),
-				pickQty, shortQty, PickingTaskItem.STATUS_SHORT);
+		Map<String, Object> result = ValueUtil.newMap("success,item_id,sku_cd,pick_qty,short_qty,status", true, itemId,
+				item.getSkuCd(), pickQty, shortQty, PickingTaskItem.STATUS_SHORT);
+
+		// auto_replenish=true이면 보충 지시 자동 생성
+		boolean autoReplenish = params.get("auto_replenish") != null
+				&& Boolean.parseBoolean(params.get("auto_replenish").toString());
+		if (autoReplenish && shortQty > 0) {
+			Map<String, Object> replenishResult = this.createReplenishFromShortItem(itemId);
+			result.put("replenish_created", replenishResult.get("replenish_created"));
+			if (Boolean.TRUE.equals(replenishResult.get("replenish_created"))) {
+				result.put("replenish_no", replenishResult.get("replenish_no"));
+				result.put("replenish_from_loc_cd", replenishResult.get("from_loc_cd"));
+			} else {
+				result.put("replenish_reason", replenishResult.get("reason"));
+			}
+		}
+
+		return result;
+	}
+
+	/**
+	 * 피킹 부족 보충 지시 생성
+	 *
+	 * SHORT 처리된 피킹 항목의 부족 수량(short_qty)에 대해 STORAGE/BULK 존 재고에서
+	 * PICKABLE 존으로 이동하는 보충 지시를 생성한다.
+	 * 동일 창고 내 PICKABLE 외 존에서 같은 SKU 가용 재고를 탐색하여 보충 경로를 결정한다.
+	 * 재고가 없으면 생성하지 않고 reason=NO_STOCK을 반환한다.
+	 * 생성된 ReplenishOrderItem.attr01에 pick_task_item_id를 기록하여 연결을 유지한다.
+	 *
+	 * @param pickTaskItemId 피킹 항목 ID (SHORT 상태, short_qty > 0)
+	 * @return { replenish_created, replenish_no, from_loc_cd, to_loc_cd, order_qty
+	 *         }
+	 *         또는 { replenish_created: false, reason }
+	 */
+	@SuppressWarnings("rawtypes")
+	public Map<String, Object> createReplenishFromShortItem(String pickTaskItemId) {
+		Long domainId = Domain.currentDomainId();
+		String today = DateUtil.todayStr();
+
+		// 1. PickingTaskItem 조회
+		PickingTaskItem item = this.findPickingTaskItem(domainId, pickTaskItemId);
+
+		double shortQty = item.getShortQty() != null ? item.getShortQty() : 0;
+		if (shortQty <= 0) {
+			return ValueUtil.newMap("replenish_created,reason", false, "NO_SHORT_QTY");
+		}
+
+		// 2. PickingTask에서 comCd, whCd 조회
+		PickingTask task = this.findPickingTask(domainId, item.getPickTaskId());
+		String skuCd = item.getSkuCd();
+		String whCd = task.getWhCd();
+		String toLocCd = item.getFromLocCd(); // 원래 PICKABLE 피킹 위치
+
+		// 3. PICKABLE 외 동일 창고 로케이션에서 해당 SKU 가용 재고 탐색 (수량 많은 순)
+		String stockSql = "SELECT i.loc_cd, i.sku_nm, (i.inv_qty - COALESCE(i.reserved_qty, 0)) AS avail_qty"
+				+ " FROM inventories i"
+				+ " INNER JOIN locations l ON l.domain_id = i.domain_id AND l.loc_cd = i.loc_cd AND l.wh_cd = :whCd"
+				+ " WHERE i.domain_id = :domainId AND i.sku_cd = :skuCd"
+				+ " AND l.loc_type = 'STORE' AND (l.del_flag IS NULL OR l.del_flag = false)"
+				+ " AND (i.inv_qty - COALESCE(i.reserved_qty, 0)) > 0"
+				+ " ORDER BY (i.inv_qty - COALESCE(i.reserved_qty, 0)) DESC";
+		Map<String, Object> stockParams = ValueUtil.newMap("domainId,skuCd,whCd", domainId, skuCd, whCd);
+		List<Map> stockList = this.queryManager.selectListBySql(stockSql, stockParams, Map.class, 0, 1);
+
+		if (stockList.isEmpty()) {
+			return ValueUtil.newMap("replenish_created,reason", false, "NO_STOCK");
+		}
+
+		Map stockRow = stockList.get(0);
+		String fromLocCd = stockRow.get("loc_cd").toString();
+		String skuNm = stockRow.get("sku_nm") != null ? stockRow.get("sku_nm").toString() : null;
+
+		// 4. ReplenishOrder 헤더 생성
+		ReplenishOrder replenish = new ReplenishOrder();
+		replenish.setDomainId(domainId);
+		replenish.setOrderDate(today);
+		replenish.setComCd(task.getComCd());
+		replenish.setWhCd(whCd);
+		replenish.setPlanItem(1);
+		replenish.setPlanTotal(shortQty);
+		replenish.setStatus(ReplenishOrder.STATUS_CREATED);
+		replenish.setRemarks("피킹 부족 자동 보충 [" + item.getPickTaskId() + "]");
+		this.queryManager.insert(replenish);
+
+		// 5. ReplenishOrderItem 상세 생성
+		ReplenishOrderItem replenishItem = new ReplenishOrderItem();
+		replenishItem.setDomainId(domainId);
+		replenishItem.setReplenishOrderId(replenish.getId());
+		replenishItem.setRank(1);
+		replenishItem.setSkuCd(skuCd);
+		replenishItem.setSkuNm(skuNm);
+		replenishItem.setFromLocCd(fromLocCd);
+		replenishItem.setToLocCd(toLocCd);
+		replenishItem.setOrderQty(shortQty);
+		replenishItem.setResultQty(0.0);
+		replenishItem.setRemarks(pickTaskItemId); // 피킹 항목 연결 키
+		this.queryManager.insert(replenishItem);
+
+		return ValueUtil.newMap("replenish_created,replenish_no,from_loc_cd,to_loc_cd,order_qty",
+				true, replenish.getReplenishNo(), fromLocCd, toLocCd, shortQty);
 	}
 
 	/*

@@ -1,11 +1,14 @@
 package operato.wms.oms.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
 import operato.wms.oms.entity.ReplenishOrder;
+import operato.wms.oms.entity.ReplenishOrderItem;
+import operato.wms.oms.entity.ShipmentOrderItem;
 import xyz.anythings.sys.service.AbstractQueryService;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
@@ -113,6 +116,122 @@ public class OmsReplenishOrderService extends AbstractQueryService {
 
 		// 결과 리턴
 		return ValueUtil.newMap("success", true);
+	}
+
+	/**
+	 * BACK_ORDER 출하 주문 기반 보충 지시 자동 생성
+	 *
+	 * short_qty > 0인 주문 상세 항목을 조회하고, PICKABLE 외 존에서 가용 재고가 있는
+	 * SKU에 대해 ReplenishOrder + ReplenishOrderItem을 생성한다.
+	 *
+	 * @param domainId        도메인 ID
+	 * @param shipmentOrderId 출하 주문 ID (BACK_ORDER 상태)
+	 * @param comCd           회사 코드
+	 * @param whCd            창고 코드
+	 * @return { replenish_created, replenish_no, item_count, no_stock_skus }
+	 */
+	public Map<String, Object> createReplenishForOrder(Long domainId, String shipmentOrderId, String comCd, String whCd) {
+		// short_qty > 0인 상세 항목 조회
+		String itemSql = "SELECT * FROM shipment_order_items WHERE domain_id = :domainId AND shipment_order_id = :orderId AND short_qty > 0 ORDER BY line_no";
+		Map<String, Object> itemParams = ValueUtil.newMap("domainId,orderId", domainId, shipmentOrderId);
+		List<ShipmentOrderItem> shortItems = this.queryManager.selectListBySql(itemSql, itemParams, ShipmentOrderItem.class, 0, 0);
+
+		if (shortItems.isEmpty()) {
+			return ValueUtil.newMap("replenish_created,reason", false, "NO_SHORT_ITEMS");
+		}
+
+		ReplenishOrder replenishOrder = null;
+		int itemCount = 0;
+		int rank = 1;
+		List<String> noStockSkus = new ArrayList<>();
+
+		for (ShipmentOrderItem shortItem : shortItems) {
+			double needQty = shortItem.getShortQty() != null ? shortItem.getShortQty() : 0;
+			if (needQty <= 0)
+				continue;
+
+			// PICKABLE 외 존에서 동일 창고/SKU 가용 재고 탐색
+			String stockSql = """
+					SELECT i.loc_cd, i.sku_nm, (i.inv_qty - COALESCE(i.reserved_qty, 0)) AS avail_qty
+					FROM inventories i
+					INNER JOIN locations l ON l.domain_id = i.domain_id AND l.loc_cd = i.loc_cd
+					WHERE i.domain_id = :domainId AND i.com_cd = :comCd AND i.wh_cd = :whCd
+					  AND i.sku_cd = :skuCd AND l.loc_type != 'PICKABLE'
+					  AND (i.inv_qty - COALESCE(i.reserved_qty, 0)) > 0
+					ORDER BY (i.inv_qty - COALESCE(i.reserved_qty, 0)) DESC
+					LIMIT 1
+					""";
+			Map<String, Object> stockParams = ValueUtil.newMap("domainId,comCd,whCd,skuCd",
+					domainId, comCd, whCd, shortItem.getSkuCd());
+			List<Map<String, Object>> stockRows = this.queryManager.selectListBySql(stockSql, stockParams, Map.class, 0, 1);
+
+			if (stockRows.isEmpty()) {
+				noStockSkus.add(shortItem.getSkuCd());
+				continue;
+			}
+
+			Map<String, Object> stock = stockRows.get(0);
+			String fromLocCd = (String) stock.get("loc_cd");
+			String skuNm = (String) stock.get("sku_nm");
+
+			// 도착 로케이션: 기존 할당에서 PICKABLE 위치 조회
+			String toLocSql = """
+					SELECT loc_cd FROM stock_allocations
+					WHERE domain_id = :domainId AND shipment_order_item_id = :itemId
+					  AND status NOT IN ('CANCELLED', 'RELEASED')
+					LIMIT 1
+					""";
+			Map<String, Object> toLocParams = ValueUtil.newMap("domainId,itemId", domainId, shortItem.getId());
+			List<Map<String, Object>> toLocRows = this.queryManager.selectListBySql(toLocSql, toLocParams, Map.class, 0, 1);
+			String toLocCd = toLocRows.isEmpty() ? fromLocCd : (String) toLocRows.get(0).get("loc_cd");
+
+			// ReplenishOrder 최초 아이템에서 헤더 생성
+			if (replenishOrder == null) {
+				replenishOrder = new ReplenishOrder();
+				replenishOrder.setDomainId(domainId);
+				replenishOrder.setComCd(comCd);
+				replenishOrder.setWhCd(whCd);
+				replenishOrder.setOrderDate(DateUtil.todayStr());
+				replenishOrder.setStatus(ReplenishOrder.STATUS_CREATED);
+				replenishOrder.setRemarks("shipment_order_id:" + shipmentOrderId);
+				this.queryManager.insert(replenishOrder);
+			}
+
+			// ReplenishOrderItem 생성
+			ReplenishOrderItem replenishItem = new ReplenishOrderItem();
+			replenishItem.setDomainId(domainId);
+			replenishItem.setReplenishOrderId(replenishOrder.getId());
+			replenishItem.setRank(rank++);
+			replenishItem.setSkuCd(shortItem.getSkuCd());
+			replenishItem.setSkuNm(skuNm);
+			replenishItem.setFromLocCd(fromLocCd);
+			replenishItem.setToLocCd(toLocCd);
+			replenishItem.setOrderQty(needQty);
+			replenishItem.setRemarks("shipment_order_item_id:" + shortItem.getId());
+			this.queryManager.insert(replenishItem);
+
+			itemCount++;
+		}
+
+		if (replenishOrder == null) {
+			return ValueUtil.newMap("replenish_created,reason,no_stock_skus", false, "NO_STOCK", noStockSkus);
+		}
+
+		// 헤더 planItem/planTotal 업데이트
+		String updateSql = """
+				UPDATE replenish_orders SET plan_item = :planItem,
+				  plan_total = (SELECT COALESCE(SUM(order_qty), 0) FROM replenish_order_items WHERE domain_id = :domainId AND replenish_order_id = :orderId),
+				  updated_at = now()
+				WHERE domain_id = :domainId AND id = :orderId
+				""";
+		Map<String, Object> updateParams = ValueUtil.newMap("domainId,orderId,planItem", domainId, replenishOrder.getId(), itemCount);
+		this.queryManager.executeBySql(updateSql, updateParams);
+
+		Map<String, Object> result = ValueUtil.newMap("replenish_created,replenish_no,item_count", true, replenishOrder.getReplenishNo(), itemCount);
+		if (!noStockSkus.isEmpty()) {
+			result.put("no_stock_skus", noStockSkus);
+		}
+		return result;
 	}
 
 	/*
