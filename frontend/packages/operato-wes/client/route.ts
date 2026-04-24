@@ -72,13 +72,15 @@ import './pages/pda/pda-stocktake-page'
 import './pages/pda/pda-wms-peer-to-peer'
 import './pages/pda/pda-wms-peer-to-peer-popup'
 import './pages/pda/pda-wms-shipment-barcode-manually'
-import './pages/pda/pda-fulfillment-shipping'
-import './pages/pda/pda-fulfillment-packing'
-import './pages/pda/pda-fulfillment-picking'
+
 import './pages/pda/pda-inbound-receiving'
 import './pages/pda/pda-inbound-putaway'
 import './pages/pda/pda-stock-move'
 import './pages/pda/pda-stock-inquiry'
+import './pages/pda/pda-oms-replenish'
+import './pages/pda/pda-fulfillment-shipping'
+import './pages/pda/pda-fulfillment-packing'
+import './pages/pda/pda-fulfillment-picking'
 
 export default function route(page, module) {
   let route = module.routes?.find(mapping => mapping.page == page)

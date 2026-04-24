@@ -175,7 +175,7 @@
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
 | W23-RE-1 | 보충 지시 생성 | 피킹존 재고 부족 감지 → `ReplenishOrder` 자동 생성 | `OmsReplenishOrderService` | 2026-04-28 | 100% | ☑ | 재고 할당 시 BACK_ORDER 발생 → 자동 생성. 수동 생성 API(create_from_order/orders) 추가. start/complete/cancel 엔드포인트를 OmsReplenishOrderService에서 ReplenishOrderController로 노출 |
-| W23-RE-2 | 보충 작업 처리 | PDA 보충 작업 → 재고 이동 트랜잭션 연결 | `InvTransactionController` | 2026-04-29 | 0% | ☐ | |
+| W23-RE-2 | 보충 작업 처리 | PDA 보충 작업 → 재고 이동 트랜잭션 연결 | `InvTransactionController` | 2026-04-29 | 100% | ☑ | `OmsReplenishOrderService.completeReplenishItem()` 신규 (result_qty 기록 + 전체 완료 시 헤더 자동 COMPLETED). PDA 화면 `pda-oms-replenish.js` 신규: 보충번호 스캔 → 바코드 스캔 → move_inventory → complete 연속 처리 |
 
 ### 3-4. [BASE] 사용자-화주사 매핑
 
@@ -262,10 +262,10 @@
 | 항목 | 수치 |
 |------|------|
 | 전체 작업 수 | 38개 |
-| 완료 (☑) | 21개 (W23-SF-1~5, W23-UA-1~2, W23-SA-1~2, W23-CB-1~3, W23-BF-0~5, W23-DB-1~2, W23-RE-1) |
+| 완료 (☑) | 22개 (W23-SF-1~5, W23-UA-1~2, W23-SA-1~2, W23-CB-1~3, W23-BF-0~5, W23-DB-1~2, W23-RE-1~2) |
 | 진행 중 | 0개 |
-| 미시작 (☐) | 17개 (W23-SF-6, W23-WA-1~3, W23-RE-2, W23-IR-1~2, W23-VA-1~3, W23-RW-1~2, W23-FL-1~5) |
-| 전체 진행율 | 55% (완료 21 / 전체 38) |
+| 미시작 (☐) | 16개 (W23-SF-6, W23-WA-1~3, W23-IR-1~2, W23-VA-1~3, W23-RW-1~2, W23-FL-1~5) |
+| 전체 진행율 | 58% (완료 22 / 전체 38) |
 
 ---
 
