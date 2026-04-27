@@ -2,51 +2,50 @@ import '@things-factory/barcode-ui'
 import { html, css } from 'lit'
 import { customElement, query, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
-import { ServiceUtil, TermsUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, TermsUtil, ValueUtil } from '@operato-app/metapage/dist-client'
 import { store, PageView } from '@operato/shell'
 import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
 
 /**
  * PDA 보충 작업 화면 (W23-RE-2)
  *
- * 보충 지시 번호를 스캔하여 작업을 시작하고, 아이템별로 from_loc의 재고를
- * to_loc으로 이동한 뒤 완료 처리한다.
+ * 오늘의 보충 지시 현황(대기/진행중/완료)을 상단에 표시하고, 지시를 선택하거나
+ * 번호를 스캔하여 아이템별 재고 이동 작업을 수행한다.
  *
- * 화면 모드: ready(지시 스캔) → work(아이템 작업) → complete(완료)
+ * 화면 모드: list(지시 목록) → work(아이템 작업) → complete(완료)
  */
 @customElement('pda-oms-replenish')
 export class PdaOmsReplenish extends connect(store)(PageView) {
-  /** 화면 모드: ready / work / complete */
-  @state() mode = 'ready'
+  /** 화면 모드: list / work / complete */
+  @state() mode = 'list'
 
-  /** 보충 지시 정보 */
+  /** 오늘의 보충 지시 목록 */
+  @state() taskList = []
+  /** 목록 필터 상태 */
+  @state() filterStatus = 'CREATED'
+  /** 목록 로딩 중 */
+  @state() loading = false
+
+  /** 선택된 보충 지시 */
   @state() replenishOrder = null
-
   /** 보충 아이템 목록 */
   @state() replenishItems = []
-
   /** 현재 작업 중인 아이템 인덱스 */
   @state() currentItemIdx = 0
-
   /** 스캔한 재고 정보 */
   @state() scannedInventory = null
-
   /** 작업자가 수동 스캔한 도착 로케이션 코드 (to_loc_cd가 null인 아이템용) */
   @state() scannedToLocCd = null
-
   /** API 처리 중 */
   @state() processing = false
-
   /** 피드백 메시지 */
   @state() lastFeedback = null
 
-  /** 보충 지시 번호 입력 */
-  @query('#replenishInput') _replenishInput
-
-  /** 도착 로케이션 스캔 입력 */
+  /** 보충 지시 번호 스캔 입력 (list 모드) */
+  @query('#replenishScanInput') _replenishScanInput
+  /** 도착 로케이션 스캔 입력 (work 모드) */
   @query('#toLocInput') _toLocInput
-
-  /** 재고 바코드 스캔 입력 */
+  /** 재고 바코드 스캔 입력 (work 모드) */
   @query('#barcodeInput') _barcodeInput
 
   static get styles() {
@@ -62,30 +61,212 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
           overflow: hidden;
         }
 
-        /* ready 모드 */
-        .ready-section {
-          flex: 1;
+        /* ── 헤더 바 (work 모드) ── */
+        .header-bar {
           display: flex;
-          flex-direction: column;
           align-items: center;
-          justify-content: center;
-          padding: 32px 24px;
-          gap: 20px;
+          justify-content: space-between;
+          padding: 8px 12px;
+          background: var(--md-sys-color-surface-container-low, #f5f5f5);
+          color: var(--md-sys-color-on-surface, #333);
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
+          flex-shrink: 0;
         }
 
-        .ready-section .guide-icon { font-size: 56px; }
-        .ready-section .guide-text {
+        .header-bar .title {
           font-size: 15px;
-          color: var(--md-sys-color-on-surface-variant, #666);
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .header-bar .back-btn {
+          background: none;
+          border: none;
+          color: var(--md-sys-color-primary, #1976D2);
+          font-size: 16px;
+          cursor: pointer;
+          padding: 4px;
+        }
+
+        /* ── 현황 요약 카드 ── */
+        .summary-cards {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 8px;
+          padding: 8px 12px;
+          flex-shrink: 0;
+        }
+
+        .summary-card {
           text-align: center;
+          padding: 10px 4px;
+          border-radius: 8px;
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          cursor: pointer;
+          transition: all 0.15s;
+          border: 2px solid transparent;
         }
 
-        .ready-section ox-input-barcode {
-          width: 100%;
-          max-width: 320px;
+        .summary-card[active] {
+          border-color: var(--md-sys-color-primary, #1976D2);
+          box-shadow: 0 2px 6px rgba(25, 118, 210, 0.25);
         }
 
-        /* 지시 정보 헤더 */
+        .summary-card .count {
+          font-size: 22px;
+          font-weight: bold;
+          color: var(--md-sys-color-primary, #1976D2);
+        }
+
+        .summary-card .card-label {
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          margin-top: 4px;
+        }
+
+        .summary-card.waiting .count { color: var(--md-sys-color-error, #d32f2f); }
+        .summary-card.done .count { color: #4CAF50; }
+
+        /* ── 보충 지시 번호 스캔 영역 (list 모드 하단) ── */
+        .scan-task-order {
+          padding: 8px 12px 12px;
+          flex-shrink: 0;
+          border-top: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
+        }
+
+        .scan-task-order label {
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-surface, #333);
+          display: block;
+          margin-bottom: 4px;
+        }
+
+        .scan-task-order .scan-row-outer {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .scan-task-order .scan-row-outer ox-input-barcode {
+          flex: 1;
+        }
+
+        .btn-refresh {
+          flex-shrink: 0;
+          padding: 8px 12px;
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 6px;
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          color: var(--md-sys-color-primary, #1976D2);
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .btn-refresh:active {
+          background: var(--md-sys-color-primary-container, #e3f2fd);
+        }
+
+        /* ── 보충 지시 카드 목록 ── */
+        .task-list {
+          flex: 1;
+          overflow-y: auto;
+          padding: 4px 12px 8px;
+        }
+
+        .task-card {
+          padding: 12px;
+          margin-bottom: 8px;
+          border-radius: 8px;
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          cursor: pointer;
+        }
+
+        .task-card:active {
+          background: var(--md-sys-color-surface-variant, #eee);
+        }
+
+        .task-card .card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .task-card .task-no {
+          font-weight: bold;
+          font-size: 14px;
+          color: var(--md-sys-color-on-surface, #333);
+        }
+
+        .task-card .status-badge {
+          padding: 2px 8px;
+          border-radius: 10px;
+          font-size: 11px;
+          font-weight: 600;
+        }
+
+        .task-card .status-badge.created {
+          background: #fff3e0;
+          color: #ff9800;
+        }
+
+        .task-card .status-badge.in_progress {
+          background: #e3f2fd;
+          color: #1976d2;
+        }
+
+        .task-card .status-badge.completed {
+          background: #e8f5e9;
+          color: #4CAF50;
+        }
+
+        .task-card .status-badge.cancelled {
+          background: #fafafa;
+          color: #999;
+        }
+
+        .task-card .sub-info {
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          margin-top: 6px;
+        }
+
+        .task-card .progress-bar {
+          height: 4px;
+          background: var(--md-sys-color-surface-variant, #e0e0e0);
+          border-radius: 2px;
+          margin-top: 8px;
+          overflow: hidden;
+        }
+
+        .task-card .progress-bar .fill {
+          height: 100%;
+          background: var(--md-sys-color-primary, #1976D2);
+          border-radius: 2px;
+          transition: width 0.3s;
+        }
+
+        /* ── 빈 목록 / 로딩 ── */
+        .empty-message {
+          text-align: center;
+          padding: 32px 16px;
+          font-size: 14px;
+          color: var(--md-sys-color-on-surface-variant, #999);
+        }
+
+        .loading-overlay {
+          text-align: center;
+          padding: 30px;
+          color: var(--md-sys-color-on-surface-variant, #999);
+        }
+
+        /* ── 지시 정보 헤더 (work 모드) ── */
         .order-header {
           padding: 10px 14px 6px;
           background: var(--md-sys-color-primary-container, #e3f2fd);
@@ -119,7 +300,7 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
           transition: width 0.3s;
         }
 
-        /* 아이템 목록 */
+        /* ── 아이템 목록 (work 모드) ── */
         .item-list {
           flex: 1;
           overflow-y: auto;
@@ -166,7 +347,7 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
           white-space: nowrap;
         }
 
-        .item-card .status-badge {
+        .item-card .item-status-badge {
           flex-shrink: 0;
           font-size: 11px;
           font-weight: 600;
@@ -174,12 +355,12 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
           border-radius: 10px;
         }
 
-        .status-badge.waiting {
+        .item-status-badge.waiting {
           background: #fff3e0;
           color: #e65100;
         }
 
-        .status-badge.done {
+        .item-status-badge.done {
           background: #e8f5e9;
           color: #2e7d32;
         }
@@ -203,7 +384,7 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
 
         .item-card .qty-row .val { font-weight: 600; color: var(--md-sys-color-on-surface, #333); }
 
-        /* 바코드 스캔 영역 */
+        /* ── 바코드 스캔 영역 (work 모드) ── */
         .scan-area {
           padding: 8px 12px 4px;
           flex-shrink: 0;
@@ -273,7 +454,7 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
           --input-font-size: 13px;
         }
 
-        /* 스캔 확인 카드 */
+        /* ── 재고 확인 카드 ── */
         .confirm-card {
           margin: 6px 12px;
           padding: 10px 14px;
@@ -330,7 +511,7 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
           cursor: pointer;
         }
 
-        /* 피드백 */
+        /* ── 스캔 피드백 ── */
         .scan-feedback {
           margin: 3px 12px;
           padding: 6px 12px;
@@ -344,7 +525,7 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
         .scan-feedback.error { background: #ffebee; color: #c62828; }
         .scan-feedback.warning { background: #fff8e1; color: #f57f17; }
 
-        .loading-overlay {
+        .processing-overlay {
           text-align: center;
           padding: 8px;
           color: var(--md-sys-color-on-surface-variant, #999);
@@ -352,7 +533,7 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
           flex-shrink: 0;
         }
 
-        /* 완료 화면 */
+        /* ── 완료 화면 ── */
         .complete-section {
           flex: 1;
           display: flex;
@@ -400,17 +581,31 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
         .result-card .stat-row .r-value.primary { color: var(--md-sys-color-primary, #1976D2); }
         .result-card .stat-row .r-value.success { color: #2e7d32; }
 
-        .complete-section .btn-new {
-          padding: 13px 32px;
-          border: none;
-          border-radius: 10px;
-          font-size: 14px;
-          font-weight: 600;
-          background: var(--md-sys-color-primary, #1976D2);
-          color: #fff;
-          cursor: pointer;
+        .complete-section .btn-group {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
           width: 100%;
           max-width: 360px;
+        }
+
+        .complete-section .btn-group button {
+          padding: 12px;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .btn-next {
+          background: var(--md-sys-color-primary, #1976D2);
+          color: #fff;
+        }
+
+        .btn-list {
+          background: var(--md-sys-color-surface-variant, #e0e0e0);
+          color: var(--md-sys-color-on-surface-variant, #333);
         }
       `
     ]
@@ -426,30 +621,117 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
   /** 화면 렌더링 — 모드별 분기 */
   render() {
     if (this.mode === 'complete') return this._renderCompleteMode()
-    if (this.mode === 'work') return this._renderWorkMode()
-    return this._renderReadyMode()
+    if (this.mode === 'work') return html`${this._renderHeader()}${this._renderWorkMode()}`
+    return this._renderListMode()
   }
 
-  /** ready 모드 렌더링 */
-  _renderReadyMode() {
+  /** 헤더 바 렌더링 — work 모드 타이틀 및 뒤로가기 버튼 */
+  _renderHeader() {
+    const replenishNo = this.replenishOrder?.replenish_no || ''
     return html`
-      <div class="ready-section">
-        <div class="guide-icon">📋</div>
-        <div class="guide-text">${TermsUtil.tLabel('replenish_no') || '보충 지시 번호를 스캔하세요'}</div>
-        <ox-input-barcode id="replenishInput"
-          placeholder="${TermsUtil.tLabel('replenish_no') || '보충 지시 번호'}"
-          ?disabled=${this.processing}
-          @change=${e => this._onScanReplenishNo(e.target.value)}>
-        </ox-input-barcode>
-        ${this.processing ? html`<div class="loading-overlay">${TermsUtil.tText('loading') || '조회 중...'}</div>` : ''}
-        ${this.lastFeedback ? html`
-          <div class="scan-feedback ${this.lastFeedback.type}">${this.lastFeedback.message}</div>
+      <div class="header-bar">
+        <span class="title">
+          <button class="back-btn" @click=${this._goBack}>◀</button>
+          ${TermsUtil.tLabel('replenish_no') || '보충 번호'}: ${replenishNo}
+        </span>
+      </div>
+    `
+  }
+
+  /** list 모드 렌더링 — 현황 요약 카드, 보충 지시 목록, 번호 스캔 */
+  _renderListMode() {
+    if (this.loading) {
+      return html`<div class="loading-overlay">${TermsUtil.tLabel('loading') || '로딩 중...'}</div>`
+    }
+
+    const created = this.taskList.filter(t => t.status === 'CREATED')
+    const inProgress = this.taskList.filter(t => t.status === 'IN_PROGRESS')
+    const completed = this.taskList.filter(t => t.status === 'COMPLETED')
+
+    const filtered =
+      this.filterStatus === 'CREATED' ? created
+        : this.filterStatus === 'IN_PROGRESS' ? inProgress
+          : this.filterStatus === 'COMPLETED' ? completed
+            : this.taskList.filter(t => t.status !== 'CANCELLED')
+
+    return html`
+      <div class="summary-cards">
+        <div class="summary-card waiting"
+          ?active=${this.filterStatus === 'CREATED'}
+          @click=${() => this._toggleFilter('CREATED')}>
+          <div class="count">${created.length}</div>
+          <div class="card-label">${TermsUtil.tLabel('wait') || '대기'}</div>
+        </div>
+        <div class="summary-card"
+          ?active=${this.filterStatus === 'IN_PROGRESS'}
+          @click=${() => this._toggleFilter('IN_PROGRESS')}>
+          <div class="count">${inProgress.length}</div>
+          <div class="card-label">${TermsUtil.tLabel('in_progress') || '진행중'}</div>
+        </div>
+        <div class="summary-card done"
+          ?active=${this.filterStatus === 'COMPLETED'}
+          @click=${() => this._toggleFilter('COMPLETED')}>
+          <div class="count">${completed.length}</div>
+          <div class="card-label">${TermsUtil.tLabel('completed') || '완료'}</div>
+        </div>
+      </div>
+
+      <div class="task-list">
+        ${filtered.length === 0
+          ? html`<div class="empty-message">${TermsUtil.tText('No Data') || '보충 지시가 없습니다'}</div>`
+          : filtered.map(r => this._renderTaskCard(r))}
+      </div>
+
+      <div class="scan-task-order">
+        <label>${TermsUtil.tLabel('replenish_no') || '보충 지시 번호 스캔'}</label>
+        <div class="scan-row-outer">
+          <ox-input-barcode id="replenishScanInput"
+            placeholder="${TermsUtil.tLabel('replenish_no') || '보충 지시 번호'}"
+            @change=${e => this._onScanReplenishNo(e.target.value)}>
+          </ox-input-barcode>
+          <button class="btn-refresh" @click=${this._refresh}>
+            ${TermsUtil.tButton('refresh') || '새로고침'}
+          </button>
+        </div>
+      </div>
+    `
+  }
+
+  /** 보충 지시 카드 렌더링 */
+  _renderTaskCard(r) {
+    const isInProgress = r.status === 'IN_PROGRESS'
+    const planTotal = r.plan_total || 0
+    const resultTotal = r.result_total || 0
+    const progressPct = isInProgress && planTotal > 0 && resultTotal > 0
+      ? Math.round((resultTotal / planTotal) * 100)
+      : 0
+
+    const statusKey = (r.status || '').toLowerCase()
+    const statusLabel =
+      r.status === 'CREATED' ? (TermsUtil.tLabel('wait') || '대기')
+        : r.status === 'IN_PROGRESS' ? (TermsUtil.tLabel('in_progress') || '진행중')
+          : r.status === 'COMPLETED' ? (TermsUtil.tLabel('completed') || '완료')
+            : (TermsUtil.tLabel('cancelled') || '취소')
+
+    return html`
+      <div class="task-card" @click=${() => this._selectOrder(r)}>
+        <div class="card-header">
+          <span class="task-no">${r.replenish_no}</span>
+          <span class="status-badge ${statusKey}">${statusLabel}</span>
+        </div>
+        <div class="sub-info">
+          창고: ${r.wh_cd || ''} | 화주사: ${r.com_cd || ''} | ${r.plan_item || 0}건
+        </div>
+        ${isInProgress && progressPct > 0 ? html`
+          <div class="progress-bar">
+            <div class="fill" style="width: ${progressPct}%"></div>
+          </div>
         ` : ''}
       </div>
     `
   }
 
-  /** work 모드 렌더링 */
+  /** work 모드 렌더링 — 지시 진행률, 아이템 목록, 스캔 영역 */
   _renderWorkMode() {
     const order = this.replenishOrder
     const items = this.replenishItems
@@ -458,7 +740,7 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
     const currentItem = items[this.currentItemIdx]
 
     return html`
-      <!-- 지시 정보 헤더 -->
+      <!-- 지시 진행률 헤더 -->
       <div class="order-header">
         <div class="order-no">${order?.replenish_no || ''}</div>
         <div class="order-meta">
@@ -477,14 +759,14 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
             @click=${() => this._selectItem(idx)}>
             <div class="item-top">
               <span class="sku">${item.sku_cd}${item.sku_nm ? ` · ${item.sku_nm}` : ''}</span>
-              <span class="status-badge ${item._done ? 'done' : 'waiting'}">
+              <span class="item-status-badge ${item._done ? 'done' : 'waiting'}">
                 ${item._done ? (TermsUtil.tButton('complete') || '완료') : (TermsUtil.tLabel('wait') || '대기')}
               </span>
             </div>
             <div class="loc-row">
               <span>${item.from_loc_cd}</span>
               <span class="loc-arrow">→</span>
-              <span>${item.to_loc_cd}</span>
+              <span>${item.to_loc_cd || '?'}</span>
             </div>
             <div class="qty-row">
               <span>${TermsUtil.tLabel('order_qty') || '지시'}: <span class="val">${item.order_qty}</span></span>
@@ -498,7 +780,9 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
         <div class="scan-feedback ${this.lastFeedback.type}">${this.lastFeedback.message}</div>
       ` : ''}
 
-      ${this.processing ? html`<div class="loading-overlay">${TermsUtil.tText('processing') || '처리 중...'}</div>` : ''}
+      ${this.processing ? html`
+        <div class="processing-overlay">${TermsUtil.tText('processing') || '처리 중...'}</div>
+      ` : ''}
 
       <!-- 재고 확인 카드 (바코드 스캔 완료 시) -->
       ${this.scannedInventory ? html`
@@ -540,8 +824,8 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
             <span class="row-label">${TermsUtil.tLabel('barcode') || '바코드'}</span>
             <ox-input-barcode id="barcodeInput"
               placeholder="${!currentItem.to_loc_cd && !this.scannedToLocCd
-          ? (TermsUtil.tLabel('scan_to_loc_first') || '도착 로케이션 스캔 후 입력 가능')
-          : (TermsUtil.tLabel('scan_barcode') || '출발지 재고 바코드 스캔')}"
+                ? (TermsUtil.tLabel('scan_to_loc_first') || '도착 로케이션 스캔 후 입력 가능')
+                : (TermsUtil.tLabel('scan_barcode') || '출발지 재고 바코드 스캔')}"
               ?disabled=${this.processing || (!currentItem.to_loc_cd && !this.scannedToLocCd)}
               @change=${e => this._onScanBarcode(e.target.value)}>
             </ox-input-barcode>
@@ -556,10 +840,11 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
     `
   }
 
-  /** complete 모드 렌더링 */
+  /** complete 모드 렌더링 — 완료 통계 + 목록 복귀 버튼 */
   _renderCompleteMode() {
     const order = this.replenishOrder
     const doneCount = this.replenishItems.filter(i => i._done).length
+
     return html`
       <div class="complete-section">
         <div class="check-icon">✅</div>
@@ -578,53 +863,102 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
             <span class="r-value success">${doneCount}건</span>
           </div>
         </div>
-        <button class="btn-new" @click=${this._reset}>
-          ${TermsUtil.tButton('new_work') || '새 작업'}
-        </button>
+        <div class="btn-group">
+          <button class="btn-next" @click=${this._goBack}>
+            ${TermsUtil.tButton('go_list') || '목록으로'}
+          </button>
+        </div>
       </div>
     `
   }
 
-  /** 페이지 초기화 */
+  /** 페이지 초기화 — 오늘의 보충 지시 목록 조회 */
   pageInitialized() {
-    this._reset()
+    this._loadTaskList()
+  }
+
+  /** 오늘의 보충 지시 목록 조회 (CREATED + IN_PROGRESS + COMPLETED) */
+  async _loadTaskList() {
+    this.loading = true
+    try {
+      const query = JSON.stringify([
+        { name: 'status', operator: 'in', value: 'CREATED,IN_PROGRESS,COMPLETED' },
+        { name: 'order_date', operator: 'eq', value: ValueUtil.todayFormatted() }
+      ])
+      const result = await ServiceUtil.restGet(`replenish_orders?query=${encodeURIComponent(query)}&limit=100`)
+      this.taskList = result?.items || result || []
+    } catch (error) {
+      console.error('보충 지시 목록 조회 실패:', error)
+      this.taskList = []
+    } finally {
+      this.loading = false
+    }
+  }
+
+  /** 요약 카드 필터 토글 — 동일 카드 재클릭 시 전체(ALL)로 복귀 */
+  _toggleFilter(status) {
+    this.filterStatus = this.filterStatus === status ? 'ALL' : status
+  }
+
+  /** 목록 새로고침 */
+  async _refresh() {
+    await this._loadTaskList()
+  }
+
+  /** 목록 화면으로 복귀 — work/complete → list */
+  async _goBack() {
+    this.mode = 'list'
+    this.replenishOrder = null
+    this.replenishItems = []
+    this.currentItemIdx = 0
+    this.scannedInventory = null
+    this.scannedToLocCd = null
+    this.lastFeedback = null
+    await this._loadTaskList()
+  }
+
+  /** 보충 지시 번호 바코드 스캔으로 빠른 선택 */
+  _onScanReplenishNo(replenishNo) {
+    if (!replenishNo) return
+    const order = this.taskList.find(t => t.replenish_no === replenishNo)
+    if (order) {
+      this._selectOrder(order)
+    } else {
+      document.dispatchEvent(new CustomEvent('notify', {
+        detail: { level: 'error', message: `보충 지시를 찾을 수 없습니다: ${replenishNo}` }
+      }))
+      navigator.vibrate?.(200)
+    }
+    if (this._replenishScanInput) this._replenishScanInput.value = ''
   }
 
   /**
-   * 보충 지시 번호 스캔 핸들러
-   * GET /rest/replenish_orders?query=[replenishNo=XXX]
-   * POST /rest/replenish_orders/start/{id}
-   * @param {string} replenishNo
+   * 보충 지시 선택 → CREATED이면 시작 처리 → 아이템 로드 → work 모드 전환
+   * @param {Object} order 보충 지시 객체
    */
-  async _onScanReplenishNo(replenishNo) {
-    if (!replenishNo || this.processing) return
+  async _selectOrder(order) {
+    if (this.processing) return
+
+    if (order.status === 'COMPLETED') {
+      document.dispatchEvent(new CustomEvent('notify', {
+        detail: { level: 'warn', message: '이미 완료된 보충 지시입니다' }
+      }))
+      return
+    }
+    if (order.status === 'CANCELLED') {
+      document.dispatchEvent(new CustomEvent('notify', {
+        detail: { level: 'error', message: '취소된 보충 지시입니다' }
+      }))
+      return
+    }
+
     this.processing = true
     try {
-      // 보충 지시 조회
-      const result = await ServiceUtil.restGet(
-        `replenish_orders?query=${encodeURIComponent(JSON.stringify([{ name: 'replenishNo', value: replenishNo, operator: 'eq' }]))}&limit=1`
-      )
-      const orders = result?.items || []
-      if (!orders.length) {
-        this._showFeedback(`보충 지시를 찾을 수 없습니다: ${replenishNo}`, 'error')
-        if (this._replenishInput) this._replenishInput.value = ''
-        return
-      }
-
-      const order = orders[0]
-      if (order.status === 'COMPLETED' || order.status === 'CANCELLED') {
-        this._showFeedback(`처리할 수 없는 상태입니다: ${order.status}`, 'error')
-        if (this._replenishInput) this._replenishInput.value = ''
-        return
-      }
-
-      // CREATED 상태면 시작 처리
       if (order.status === 'CREATED') {
         await ServiceUtil.restPost(`replenish_orders/start/${order.id}`, {})
         order.status = 'IN_PROGRESS'
       }
 
-      // 아이템 조회
       const items = await ServiceUtil.restGet(`replenish_orders/${order.id}/items`)
       const enrichedItems = (Array.isArray(items) ? items : []).map(item => ({
         ...item,
@@ -635,6 +969,7 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
       this.replenishItems = enrichedItems
       this.currentItemIdx = enrichedItems.findIndex(i => !i._done)
       this.scannedToLocCd = null
+      this.scannedInventory = null
       this.lastFeedback = null
       this.mode = 'work'
 
@@ -644,10 +979,10 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
       } else {
         setTimeout(() => this._focusBarcodeInput(), 200)
       }
-
     } catch (error) {
-      this._showFeedback(error.message || '조회 실패', 'error')
-      if (this._replenishInput) this._replenishInput.value = ''
+      document.dispatchEvent(new CustomEvent('notify', {
+        detail: { level: 'error', message: error.message || '보충 작업을 시작할 수 없습니다' }
+      }))
     } finally {
       this.processing = false
     }
@@ -655,7 +990,6 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
 
   /**
    * 도착 로케이션 스캔 핸들러 (to_loc_cd가 null인 아이템용)
-   * POST /rest/inventory_trx/validate_location_for_move
    * @param {string} locCd
    */
   async _onScanToLoc(locCd) {
@@ -686,7 +1020,6 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
 
   /**
    * 재고 바코드 스캔 핸들러
-   * POST /rest/inventory_trx/validate_barcode_for_move
    * @param {string} barcode
    */
   async _onScanBarcode(barcode) {
@@ -723,8 +1056,6 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
 
   /**
    * 이동 확인 — move_inventory 후 items/{itemId}/complete 호출
-   * POST /rest/inventory_trx/{id}/move_inventory
-   * POST /rest/replenish_orders/{id}/items/{itemId}/complete
    */
   async _confirmMove() {
     const currentItem = this.replenishItems[this.currentItemIdx]
@@ -735,19 +1066,16 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
 
     this.processing = true
     try {
-      // 재고 물리 이동
       await ServiceUtil.restPost(`inventory_trx/${inv.id}/move_inventory`, {
         to_loc_cd: toLocCd,
         reason: 'REPLENISH'
       })
 
-      // 아이템 완료 기록
       const completeResult = await ServiceUtil.restPost(
         `replenish_orders/${this.replenishOrder.id}/items/${currentItem.id}/complete`,
         { result_qty: inv.inv_qty }
       )
 
-      // 로컬 상태 업데이트
       this.replenishItems = this.replenishItems.map((item, idx) =>
         idx === this.currentItemIdx
           ? { ...item, result_qty: inv.inv_qty, _done: true }
@@ -757,13 +1085,11 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
       this.scannedToLocCd = null
       this._showFeedback(`${currentItem.sku_cd} 보충 완료 (${inv.inv_qty}개)`, 'success')
 
-      // 완료 처리 여부 확인
       if (completeResult?.order_completed) {
         this.mode = 'complete'
         return
       }
 
-      // 다음 미완료 아이템으로 이동
       const updatedItems = this.replenishItems
       let nextIdx = updatedItems.findIndex((item, idx) => idx > this.currentItemIdx && !item._done)
       if (nextIdx < 0) nextIdx = updatedItems.findIndex(item => !item._done)
@@ -788,9 +1114,7 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
     }
   }
 
-  /**
-   * 스캔 취소 — 바코드 재스캔 가능하도록 초기화
-   */
+  /** 스캔 취소 — 바코드 재스캔 가능하도록 초기화 */
   _cancelScan() {
     this.scannedInventory = null
     this.lastFeedback = null
@@ -798,9 +1122,7 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
     setTimeout(() => this._focusBarcodeInput(), 150)
   }
 
-  /**
-   * 도착 로케이션 초기화 — to_loc 재스캔
-   */
+  /** 도착 로케이션 초기화 — to_loc 재스캔 */
   _clearToLoc() {
     this.scannedToLocCd = null
     this.scannedInventory = null
@@ -810,7 +1132,7 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
   }
 
   /**
-   * 아이템 선택 (대기 아이템만 선택 가능)
+   * 아이템 선택 — 대기 아이템만 선택 가능
    * @param {number} idx
    */
   _selectItem(idx) {
@@ -825,23 +1147,6 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
     } else {
       setTimeout(() => this._focusBarcodeInput(), 150)
     }
-  }
-
-  /**
-   * 전체 초기화
-   */
-  _reset() {
-    this.mode = 'ready'
-    this.replenishOrder = null
-    this.replenishItems = []
-    this.currentItemIdx = 0
-    this.scannedInventory = null
-    this.scannedToLocCd = null
-    this.lastFeedback = null
-    this.processing = false
-    setTimeout(() => {
-      if (this._replenishInput) this._replenishInput.input?.focus()
-    }, 200)
   }
 
   /**
@@ -862,16 +1167,12 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
     this.lastFeedback = { type, message }
   }
 
-  /**
-   * 도착 로케이션 입력 포커스
-   */
+  /** 도착 로케이션 입력 포커스 */
   _focusToLocInput() {
     if (this._toLocInput) this._toLocInput.input?.focus()
   }
 
-  /**
-   * 바코드 입력 포커스
-   */
+  /** 바코드 입력 포커스 */
   _focusBarcodeInput() {
     if (this._barcodeInput) this._barcodeInput.input?.focus()
   }
