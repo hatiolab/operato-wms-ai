@@ -35,9 +35,9 @@ import java.util.Map;
  *   - 슬랙/이메일/SMS 등 관리자 알림 발송 구현 필요
  */
 @Component
-public class SabangnetInvoiceSendService extends AbstractQueryService {
+public class SabangnetInvoiceService extends AbstractQueryService {
 
-    private static final Logger log = LoggerFactory.getLogger(SabangnetInvoiceSendService.class);
+    private static final Logger log = LoggerFactory.getLogger(SabangnetInvoiceService.class);
 
     @Autowired
     private SabangnetApiService sabangnetApiService;

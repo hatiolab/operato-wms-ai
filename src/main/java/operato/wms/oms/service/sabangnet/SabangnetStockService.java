@@ -33,9 +33,9 @@ import java.util.Map;
  *   - updateLocalStock(): WMS 재고 테이블(inventories) 업데이트 구현 필요
  */
 @Component
-public class SabangnetStockSyncService extends AbstractQueryService {
+public class SabangnetStockService extends AbstractQueryService {
 
-    private static final Logger log = LoggerFactory.getLogger(SabangnetStockSyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(SabangnetStockService.class);
 
     @Autowired
     private SabangnetApiService sabangnetApiService;

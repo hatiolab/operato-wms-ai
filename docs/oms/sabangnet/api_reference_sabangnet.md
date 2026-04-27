@@ -869,7 +869,17 @@ String signature = Base64.getEncoder().encodeToString(signKey.getBytes(UTF_8));
 | `upc` | string(50) | 대표바코드 |
 | `shipping_code` | string(50) | 운송장 번호 |
 | `receiver_name` | string(100) | 받는분 이름 |
-| `add_barcode_list` | array | 추가바코드 리스트 |
+| `add_barcode_list` | array | 추가바코드 리스트 (`add_barcode_object` 구조 참고) |
+
+### 10-4a. add_barcode_object 구조
+
+> 출고대상상품(`/v2/release/items`) 및 피킹리스트(`/v2/release/picking_list`) 응답의  
+> `add_barcode_list` 배열 각 항목 구조.
+
+| 필드 | 타입 | 설명 | 비고 |
+|------|------|------|------|
+| `barcode` | string(100) | 바코드 | **필수** |
+| `quantity` | integer | 매칭 수량 | **필수** |
 
 ### 10-5. 출고대상상품 재고할당 조회(벌크) 추가 응답 필드
 
@@ -916,7 +926,7 @@ String signature = Base64.getEncoder().encodeToString(signKey.getBytes(UTF_8));
 | `location_name` | string(20) | 로케이션명 |
 | `expire_date` | string(8) | 유통기한 (YYYYMMDD) |
 | `quantity` | integer | 수량 |
-| `add_barcode_list` | array | 추가바코드 리스트 |
+| `add_barcode_list` | array | 추가바코드 리스트 (`add_barcode_object` 구조 참고) |
 
 ### 10-8. DAS 번호 등록/수정(벌크) 요청 필드
 
@@ -926,6 +936,230 @@ String signature = Base64.getEncoder().encodeToString(signKey.getBytes(UTF_8));
 | `shipping_order_info_id` | integer | 출고지시 ID | **필수** |
 | `gubun` | string(1) | 자동생성 여부 | N.자동생성 사용안함(기본), Y.자동생성 사용 |
 | `request_data_list` | array | `release_id` + `das_num` | `gubun=N`인 경우 필수 |
+
+### 10-9. Response Samples
+
+#### GET `/v2/release/{릴리즈ID}` — 출고 조회(단일)
+
+```json
+{
+  "code": 200,
+  "message": "SUCCESS",
+  "response": {
+    "release_id": 40239,
+    "member_id": 1001,
+    "release_code": "R20240315001",
+    "order_id": 88512,
+    "order_code": "ORD20240315001",
+    "company_order_code": "SHOP-2024-00123",
+    "shipping_method_id": 1,
+    "request_shipping_dt": "20240316",
+    "release_date": "20240315",
+    "release_status": 7,
+    "complete_date": "20240316",
+    "shipping_order_info_id": 5210,
+    "delivery_agency_id": 4,
+    "shipping_code": "SONG102371ABA54",
+    "etc1": null,
+    "etc2": null,
+    "etc3": null,
+    "etc4": null,
+    "etc5": null,
+    "etc6": null,
+    "buyer_name": "홍길동",
+    "receiver_name": "홍길동",
+    "tel1": "010-1234-5678",
+    "tel2": null,
+    "zipcode": "06234",
+    "shipping_address1": "서울특별시 강남구 테헤란로 123",
+    "shipping_address2": "101동 202호",
+    "shipping_message": "부재시 경비실에 맡겨주세요",
+    "channel_id": 3,
+    "das_num": "A001"
+  }
+}
+```
+
+#### GET `/v2/releases` — 출고 조회(벌크)
+
+```json
+{
+  "code": 200,
+  "message": "SUCCESS",
+  "response": {
+    "total_page": 2,
+    "data_list": [
+      {
+        "release_id": 40239,
+        "member_id": 1001,
+        "release_code": "R20240315001",
+        "order_id": 88512,
+        "order_code": "ORD20240315001",
+        "company_order_code": "SHOP-2024-00123",
+        "shipping_method_id": 1,
+        "request_shipping_dt": "20240316",
+        "release_date": "20240315",
+        "release_status": 7,
+        "complete_date": "20240316",
+        "shipping_order_info_id": 5210,
+        "delivery_agency_id": 4,
+        "shipping_code": "SONG102371ABA54",
+        "buyer_name": "홍길동",
+        "receiver_name": "홍길동",
+        "tel1": "010-1234-5678",
+        "tel2": null,
+        "zipcode": "06234",
+        "shipping_address1": "서울특별시 강남구 테헤란로 123",
+        "shipping_address2": "101동 202호",
+        "shipping_message": "부재시 경비실에 맡겨주세요",
+        "channel_id": 3,
+        "das_num": "A001"
+      }
+    ]
+  }
+}
+```
+
+#### GET `/v2/release/items` — 출고대상상품 조회(벌크)
+
+```json
+{
+  "code": 200,
+  "message": "SUCCESS",
+  "response": {
+    "total_page": 1,
+    "data_list": [
+      {
+        "release_item_id": 112341,
+        "release_id": 40239,
+        "shipping_product_id": 9901,
+        "quantity": 2,
+        "release_code": "R20240315001",
+        "release_status": 7,
+        "product_name": "샘플 상품 A",
+        "product_code": "PROD-A-001",
+        "upc": "8801234567890",
+        "shipping_code": "SONG102371ABA54",
+        "receiver_name": "홍길동",
+        "add_barcode_list": [
+          { "barcode": "8801234567890", "quantity": 1 },
+          { "barcode": "8801234567891", "quantity": 1 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### GET `/v2/release/item_stocks` — 출고대상상품 재고할당 조회(벌크)
+
+```json
+{
+  "code": 200,
+  "message": "SUCCESS",
+  "response": {
+    "total_page": 1,
+    "data_list": [
+      {
+        "release_item_id": 112341,
+        "release_id": 40239,
+        "shipping_product_id": 9901,
+        "quantity": 2,
+        "release_code": "R20240315001",
+        "release_status": 7,
+        "product_name": "샘플 상품 A",
+        "product_code": "PROD-A-001",
+        "upc": "8801234567890",
+        "shipping_code": "SONG102371ABA54",
+        "receiver_name": "홍길동",
+        "add_barcode_list": [
+          { "barcode": "8801234567890", "quantity": 1 }
+        ],
+        "location_id": 310,
+        "location_name": "A-01-01",
+        "expire_date": "20251231"
+      }
+    ]
+  }
+}
+```
+
+#### GET `/v2/release/shipping_work` — 출고회차 조회(벌크)
+
+```json
+{
+  "code": 200,
+  "message": "SUCCESS",
+  "response": {
+    "total_page": 1,
+    "data_list": [
+      {
+        "shipping_order_info_id": 5210,
+        "member_id": "1001",
+        "order_date": "20240315",
+        "order_seq": 1,
+        "interconnect_shipping": 1,
+        "delivery_agency_id": 4,
+        "interconnect_work_uid": 820,
+        "error_cnt": 0,
+        "picking_id": 7,
+        "order_cnt": 50,
+        "work_cnt": 5,
+        "complete_cnt": 45,
+        "order_time": "09:00",
+        "work_start_time": "09:30",
+        "work_end_time": "11:45",
+        "work_time": "02:15"
+      }
+    ]
+  }
+}
+```
+
+#### GET `/v2/release/picking_list/{출고지시ID}` — 피킹리스트 조회(벌크)
+
+```json
+{
+  "code": 200,
+  "message": "SUCCESS",
+  "response": {
+    "total_page": 1,
+    "data_list": [
+      {
+        "shipping_order_info_id": 5210,
+        "shipping_order_name": "20240315-1회차",
+        "shipping_product_id": 9901,
+        "product_code": "PROD-A-001",
+        "product_name": "샘플 상품 A",
+        "upc": "8801234567890",
+        "location_id": 310,
+        "location_name": "A-01-01",
+        "expire_date": "20251231",
+        "quantity": 10,
+        "add_barcode_list": [
+          { "barcode": "8801234567890", "quantity": 5 },
+          { "barcode": "8801234567891", "quantity": 5 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### POST `/v2/shipping/das_work` — DAS 번호 등록/수정(벌크)
+
+```json
+{
+  "code": 200,
+  "message": "SUCCESS",
+  "response": {
+    "result_list": [
+      { "release_id": 40239, "das_num": "A001", "result": "SUCCESS" },
+      { "release_id": 40341, "das_num": "A002", "result": "SUCCESS" }
+    ]
+  }
+}
+```
 
 ---
 
@@ -1139,6 +1373,80 @@ String signature = Base64.getEncoder().encodeToString(signKey.getBytes(UTF_8));
 | `GET` | `/v2/member/partners` | 고객사 조회(벌크) |
 | `GET` | `/v2/member/sub_masters` | 물류사 추가계정 조회(벌크) |
 
+#### 고객사 기본 Object 구조
+
+| 필드명 | 타입 | 설명 | 비고 |
+|--------|------|------|------|
+| `member_id` | integer | 고객사 ID | 조회 시 출력 |
+| `partner_code` | string(4) | 고객사 코드 | 조회 시 출력 |
+| `id` | string(20) | 고객사 로그인 ID | **필수**, unique |
+| `name` | string(100) | 회사명 | **필수** |
+| `biz_num` | string(20) | 사업자번호 | **필수** |
+| `ceo` | string(30) | 대표자 | |
+| `manager` | string(30) | 담당자명 | |
+| `member_type` | string(1) | 추가계정구분 | P.마스터 / A.추가 |
+| `email` | string(100) | 이메일 | |
+| `jongmok` | string(100) | 종목 | |
+| `uptae` | string(100) | 업태 | |
+| `tel` | string(20) | 전화 | |
+| `hp` | string(20) | 휴대폰 | |
+| `fax` | string(20) | 팩스 | |
+| `zipcode` | string(10) | 주소 우편번호 | |
+| `address1` | string(150) | 주소1 | |
+| `address2` | string(150) | 주소2 | |
+| `memo` | string(150) | 특이사항 | |
+| `default_shipping_name` | string(100) | 발송자명 | |
+| `default_shipping_tel` | string(20) | CS 전화번호 | |
+| `default_shipping_zipcode` | string(10) | 발송지 우편번호 | |
+| `default_shipping_address1` | string(150) | 발송지 주소1 | |
+| `default_shipping_address2` | string(150) | 발송지 주소2 | |
+| `use_fg` | string(1) | 활성화 여부 | **필수** Y.활성화 / N.비활성화 |
+
+#### `POST /v2/member/partner` — 고객사 등록
+
+**Request Body**: 고객사 기본 Object 구조 참고 (`id`, `name`, `biz_num`, `use_fg` 필수)
+
+**응답 필드**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `member_id` | integer | 등록된 고객사 ID |
+
+#### `PUT /v2/member/partner/{member_id}` — 고객사 수정
+
+**Path 파라미터**: `member_id` (integer) — 수정할 고객사 ID
+
+**Request Body**: 고객사 기본 Object 구조 참고 (수정할 필드만 포함)
+
+#### `GET /v2/member/partner/{member_id}` — 고객사 조회(단일)
+
+**Path 파라미터**: `member_id` (integer) — 조회할 고객사 ID
+
+**응답**: 고객사 기본 Object 구조 전체 필드
+
+#### `GET /v2/member/partners` — 고객사 조회(벌크)
+
+**Query 파라미터**
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `use_fg` | string(1) | 활성화 여부 필터 (Y/N) |
+| `page` | integer | 페이지 번호 |
+
+**응답** (`data_list` 항목): 고객사 기본 Object 구조 전체 필드
+
+#### `GET /v2/member/sub_masters` — 물류사 추가계정 조회(벌크)
+
+**응답** (`data_list` 항목)
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `member_id` | integer | 추가계정 ID |
+| `id` | string(20) | 로그인 ID |
+| `name` | string(100) | 회사명 |
+| `member_type` | string(1) | 계정구분 (P.마스터 / A.추가) |
+| `use_fg` | string(1) | 활성화 여부 (Y/N) |
+
 ---
 
 ### 13-2. 매입처
@@ -1148,6 +1456,47 @@ String signature = Base64.getEncoder().encodeToString(signKey.getBytes(UTF_8));
 | `GET` | `/v2/manage/supplier/{매입처ID}` | 매입처 조회(단일) | 고객사, 물류사 |
 | `GET` | `/v2/manage/suppliers` | 매입처 조회(벌크) | 고객사, 물류사 |
 
+#### 매입처 기본 Object 구조
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `supplier_id` | integer | 매입처 ID |
+| `member_id` | integer | 고객사 ID |
+| `name` | string(100) | 매입처명 |
+| `ceo` | string(30) | 대표자 |
+| `manager` | string(30) | 담당자명 |
+| `tel` | string(20) | 전화 |
+| `hp` | string(20) | 휴대폰 |
+| `fax` | string(20) | 팩스 |
+| `email` | string(100) | 이메일 |
+| `zipcode` | string(10) | 우편번호 |
+| `address1` | string(150) | 주소1 |
+| `address2` | string(150) | 주소2 |
+| `memo` | string(150) | 메모 |
+
+#### `GET /v2/manage/supplier/{매입처ID}` — 매입처 조회(단일)
+
+**Path 파라미터**: `매입처ID` (integer) — 조회할 매입처 ID
+
+**Query 파라미터**
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `member_id` | integer | 고객사 ID (물류사 시 필수) |
+
+**응답**: 매입처 기본 Object 구조 전체 필드
+
+#### `GET /v2/manage/suppliers` — 매입처 조회(벌크)
+
+**Query 파라미터**
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `member_id` | integer | 고객사 ID (물류사 시 필수) |
+| `page` | integer | 페이지 번호 |
+
+**응답** (`data_list` 항목): 매입처 기본 Object 구조 전체 필드
+
 ---
 
 ### 13-3. 공급사
@@ -1156,6 +1505,47 @@ String signature = Base64.getEncoder().encodeToString(signKey.getBytes(UTF_8));
 |--------|-----|------|------|
 | `GET` | `/v2/manage/supply_company/{공급사ID}` | 공급사 조회(단일) | 고객사, 물류사 |
 | `GET` | `/v2/manage/supply_companys` | 공급사 조회(벌크) | 고객사, 물류사 |
+
+#### 공급사 기본 Object 구조
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `supply_company_id` | integer | 공급사 ID |
+| `member_id` | integer | 고객사 ID |
+| `name` | string(100) | 공급사명 |
+| `ceo` | string(30) | 대표자 |
+| `manager` | string(30) | 담당자명 |
+| `tel` | string(20) | 전화 |
+| `hp` | string(20) | 휴대폰 |
+| `fax` | string(20) | 팩스 |
+| `email` | string(100) | 이메일 |
+| `zipcode` | string(10) | 우편번호 |
+| `address1` | string(150) | 주소1 |
+| `address2` | string(150) | 주소2 |
+| `memo` | string(150) | 메모 |
+
+#### `GET /v2/manage/supply_company/{공급사ID}` — 공급사 조회(단일)
+
+**Path 파라미터**: `공급사ID` (integer) — 조회할 공급사 ID
+
+**Query 파라미터**
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `member_id` | integer | 고객사 ID (물류사 시 필수) |
+
+**응답**: 공급사 기본 Object 구조 전체 필드
+
+#### `GET /v2/manage/supply_companys` — 공급사 조회(벌크)
+
+**Query 파라미터**
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `member_id` | integer | 고객사 ID (물류사 시 필수) |
+| `page` | integer | 페이지 번호 |
+
+**응답** (`data_list` 항목): 공급사 기본 Object 구조 전체 필드
 
 ---
 
@@ -1174,6 +1564,29 @@ String signature = Base64.getEncoder().encodeToString(signKey.getBytes(UTF_8));
 | `member_id` | integer | 고객사 ID |
 | `channel_name` | string(100) | 발주타입명 |
 
+#### `GET /v2/manage/channel/{발주타입ID}` — 발주타입 조회(단일)
+
+**Path 파라미터**: `발주타입ID` (integer) — 조회할 발주타입 ID
+
+**Query 파라미터**
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `member_id` | integer | 고객사 ID (물류사 시 필수) |
+
+**응답**: 발주타입 기본 Object 전체 필드
+
+#### `GET /v2/manage/channels` — 발주타입 조회(벌크)
+
+**Query 파라미터**
+
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `member_id` | integer | 고객사 ID (물류사 시 필수) |
+| `page` | integer | 페이지 번호 |
+
+**응답** (`data_list` 항목): 발주타입 기본 Object 전체 필드
+
 ---
 
 ### 13-5. 로케이션
@@ -1185,13 +1598,33 @@ String signature = Base64.getEncoder().encodeToString(signKey.getBytes(UTF_8));
 | `GET` | `/v2/location/{로케이션ID}` | 로케이션 조회(단일) |
 | `GET` | `/v2/locations` | 로케이션 조회(벌크) |
 
-#### 로케이션 조회(벌크) 파라미터
+#### 로케이션 기본 Object 구조
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `location_id` | integer | 로케이션 ID |
+| `location_name` | string(20) | 로케이션명 |
+| `loc_type` | integer | 로케이션 타입 (1.입고 / 2.출고가능 / 5.반품 / 6.불량 / 7.보관) |
+| `memo` | string(150) | 메모 |
+| `use_fg` | string(1) | 활성화 여부 (Y/N) |
+
+#### `GET /v2/location/{로케이션ID}` — 로케이션 조회(단일)
+
+**Path 파라미터**: `로케이션ID` (integer) — 조회할 로케이션 ID
+
+**응답**: 로케이션 기본 Object 구조 전체 필드
+
+#### `GET /v2/locations` — 로케이션 조회(벌크)
+
+**Query 파라미터**
 
 | 파라미터 | 타입 | 설명 |
 |---------|------|------|
 | `location_ids` | array | 로케이션 ID 배열 |
-| `loc_type` | integer | 로케이션 타입 |
+| `loc_type` | integer | 로케이션 타입 필터 |
 | `page` | integer | 페이지 번호 |
+
+**응답** (`data_list` 항목): 로케이션 기본 Object 구조 전체 필드
 
 ---
 
@@ -1202,6 +1635,15 @@ String signature = Base64.getEncoder().encodeToString(signKey.getBytes(UTF_8));
 | `GET` | `/v2/code/delivery_agency` | 택배사 조회(벌크) | 고객사, 물류사 |
 
 > 운송장 등록 전 이 API로 `delivery_agency_id` 목록을 확인한다.
+
+#### `GET /v2/code/delivery_agency` — 택배사 조회(벌크)
+
+**응답** (`data_list` 항목)
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `delivery_agency_id` | integer | 택배사 ID |
+| `name` | string(100) | 택배사명 |
 
 ---
 

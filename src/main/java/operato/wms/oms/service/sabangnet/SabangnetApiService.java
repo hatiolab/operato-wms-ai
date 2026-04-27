@@ -202,6 +202,28 @@ public class SabangnetApiService extends AbstractQueryService {
     }
 
     /**
+     * PATCH 요청
+     *
+     * @param endpoint API 경로 (예: /v2/release/cancel/{releaseId})
+     * @param payload  요청 본문 (null 허용)
+     */
+    public Map<String, Object> apiPatch(String endpoint, Map<String, Object> payload,
+            String comCd, String whCd) throws Exception {
+        Map<String, String> headers = buildHeaders(comCd, whCd);
+        String body = payload != null ? OBJECT_MAPPER.writeValueAsString(payload) : "{}";
+
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(API_BASE_URL + endpoint))
+                .method("PATCH", HttpRequest.BodyPublishers.ofString(body));
+        headers.forEach(builder::header);
+
+        HttpResponse<String> response = HTTP_CLIENT.send(
+                builder.build(), HttpResponse.BodyHandlers.ofString());
+
+        return OBJECT_MAPPER.readValue(response.body(), Map.class);
+    }
+
+    /**
      * 응답 코드 성공 여부 확인
      * 사방넷 풀필먼트 성공 응답 코드: "9999"
      */
