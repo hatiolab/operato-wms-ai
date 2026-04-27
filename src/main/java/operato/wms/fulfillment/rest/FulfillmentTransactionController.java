@@ -2,6 +2,7 @@ package operato.wms.fulfillment.rest;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ import operato.wms.fulfillment.service.FulfillmentPickingService;
 import operato.wms.fulfillment.service.FulfillmentShippingService;
 import operato.wms.fulfillment.service.FulfillmentTrackingService;
 import operato.wms.fulfillment.service.FulfillmentTransactionService;
+import operato.wms.oms.entity.ShipmentOrder;
 import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
@@ -226,14 +228,16 @@ public class FulfillmentTransactionController {
 
 		// 1. 커스텀 서비스 - 전 처리
 		Map<String, Object> params = ValueUtil.newMap("id,item_id", id, itemId);
-		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_REPLENISH_FROM_SHORT, params);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_REPLENISH_FROM_SHORT,
+				params);
 
 		// 2. 본 로직 실행
 		Map<String, Object> result = this.pickingService.createReplenishFromShortItem(itemId);
 
 		// 3. 커스텀 서비스 - 후 처리
 		params.put("result", result);
-		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_REPLENISH_FROM_SHORT, params);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_REPLENISH_FROM_SHORT,
+				params);
 
 		return result;
 	}
@@ -374,63 +378,64 @@ public class FulfillmentTransactionController {
 		return this.pickingService.getWorkerTasks(workerCd);
 	}
 
-	// ==================== 9.1-B B2B 피킹 지시 생성 API ====================
+	// ==================== 9.1-B 주문 직접 피킹 지시 생성 API ====================
 
 	/**
-	 * B2B 피킹 지시 생성 (단건)
-	 * POST /rest/ful_trx/b2b_picking/create
+	 * 주문 직접 피킹 지시 생성 (단건)
+	 * POST /rest/ful_trx/direct_picking/create
 	 *
-	 * 웨이브 없이 ALLOCATED 상태의 B2B_OUT 주문을 직접 피킹 지시로 변환한다.
+	 * 웨이브 없이 ALLOCATED 상태의 주문을 직접 피킹 지시로 변환한다.
 	 */
-	@PostMapping(value = "b2b_picking/create", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description = "Create B2B picking task directly from allocated shipment order (single)")
-	public Map<String, Object> createB2bPickingTask(@RequestBody Map<String, Object> params) {
+	@PostMapping(value = "direct_picking/create", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Create picking task directly from allocated shipment order without wave (single)")
+	public Map<String, Object> createDirectPickingTask(@RequestBody ShipmentOrder order) {
 		Long domainId = Domain.currentDomainId();
-		String shipmentOrderId = (String) params.get("shipment_order_id");
+		String shipmentOrderId = order.getId();
 
 		if (ValueUtil.isEmpty(shipmentOrderId)) {
 			throw new ElidomValidationException("shipment_order_id는 필수 파라미터입니다");
 		}
 
 		// 1. 커스텀 서비스 - 전 처리
-		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_B2B_PICKING, params);
+		Map<String, Object> params = ValueUtil.newMap("order", order);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_DIRECT_PICKING, params);
 
 		// 2. 본 로직 실행
-		Map<String, Object> result = this.fulTrxService.createB2bPickingTasks(List.of(shipmentOrderId));
+		Map<String, Object> result = this.fulTrxService.createDirectPickingTasks(List.of(shipmentOrderId));
 
 		// 3. 커스텀 서비스 - 후 처리
 		params.put("result", result);
-		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_B2B_PICKING, params);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_DIRECT_PICKING, params);
 
 		return result;
 	}
 
 	/**
-	 * B2B 피킹 지시 생성 (복수)
-	 * POST /rest/ful_trx/b2b_picking/create_list
+	 * 주문 직접 피킹 지시 생성 (복수)
+	 * POST /rest/ful_trx/direct_picking/create_list
 	 *
-	 * 웨이브 없이 ALLOCATED 상태의 B2B_OUT 주문 여러 건을 일괄 피킹 지시로 변환한다.
+	 * 웨이브 없이 ALLOCATED 상태의 주문 여러 건을 일괄 피킹 지시로 변환한다.
 	 */
-	@PostMapping(value = "b2b_picking/create_list", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description = "Create B2B picking tasks directly from allocated shipment orders (batch)")
-	@SuppressWarnings("unchecked")
-	public Map<String, Object> createB2bPickingTaskList(@RequestBody Map<String, Object> params) {
+	@PostMapping(value = "direct_picking/create_list", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Create picking tasks directly from allocated shipment orders without wave (batch)")
+	public Map<String, Object> createDirectPickingTaskList(@RequestBody List<ShipmentOrder> orders) {
 		Long domainId = Domain.currentDomainId();
-		List<String> ids = (List<String>) params.get("ids");
 
-		if (ValueUtil.isEmpty(ids)) {
-			throw new ElidomValidationException("ids는 필수 파라미터입니다");
+		if (ValueUtil.isEmpty(orders)) {
+			throw new ElidomValidationException("orders는 필수 파라미터입니다");
 		}
 
 		// 1. 커스텀 서비스 - 전 처리
-		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_B2B_PICKING, params);
+		Map<String, Object> params = ValueUtil.newMap("orders", orders);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_DIRECT_PICKING, params);
 
 		// 2. 본 로직 실행
-		Map<String, Object> result = this.fulTrxService.createB2bPickingTasks(ids);
+		List<String> ids = orders.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
+		Map<String, Object> result = this.fulTrxService.createDirectPickingTasks(ids);
 
 		// 3. 커스텀 서비스 - 후 처리
 		params.put("result", result);
-		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_B2B_PICKING, params);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_DIRECT_PICKING, params);
 
 		return result;
 	}

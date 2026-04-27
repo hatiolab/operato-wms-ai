@@ -30,6 +30,6 @@ public class RuntimeConfigService {
      */
     public String getRuntimeConfigValue(String comCd, String whCd, String configName) {
         RuntimeConfig rc = this.runtimeCtrl.findEnvItem(comCd, whCd, configName);
-        return rc.getItemValue();
+        return rc != null ? rc.getItemValue() : null;
     }
 }

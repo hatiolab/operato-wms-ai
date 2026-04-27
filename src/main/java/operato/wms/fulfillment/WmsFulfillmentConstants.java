@@ -13,11 +13,11 @@ public class WmsFulfillmentConstants {
 	/** 커스텀 서비스 - 피킹 지시 생성 후 처리 */
 	public static final String TRX_FUL_POST_CREATE_PICKING = "diy-ful-post-create-picking-tasks";
 
-	// === B2B 피킹 지시 생성 (웨이브 없이 직접) ===
-	/** 커스텀 서비스 - B2B 피킹 지시 생성 전 처리 */
-	public static final String TRX_FUL_PRE_CREATE_B2B_PICKING = "diy-ful-pre-create-b2b-picking-tasks";
-	/** 커스텀 서비스 - B2B 피킹 지시 생성 후 처리 */
-	public static final String TRX_FUL_POST_CREATE_B2B_PICKING = "diy-ful-post-create-b2b-picking-tasks";
+	// === 주문 직접 피킹 지시 생성 (웨이브 없이 직접) ===
+	/** 커스텀 서비스 - 주문 직접 피킹 지시 생성 전 처리 */
+	public static final String TRX_FUL_PRE_CREATE_DIRECT_PICKING = "diy-ful-pre-create-direct-picking-tasks";
+	/** 커스텀 서비스 - 주문 직접 피킹 지시 생성 후 처리 */
+	public static final String TRX_FUL_POST_CREATE_DIRECT_PICKING = "diy-ful-post-create-direct-picking-tasks";
 
 	// === 피킹 시작 ===
 	/** 커스텀 서비스 - 피킹 시작 전 처리 */

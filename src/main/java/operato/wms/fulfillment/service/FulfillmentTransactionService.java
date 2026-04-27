@@ -9,6 +9,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import operato.wms.base.service.RuntimeConfigService;
+import operato.wms.fulfillment.WmsFulfillmentConfigConstants;
 import operato.wms.fulfillment.entity.PackingOrder;
 import operato.wms.fulfillment.entity.PackingOrderItem;
 import operato.wms.fulfillment.entity.PickingTask;
@@ -61,6 +63,11 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 	 */
 	@Autowired
 	private FulfillmentDashboardService dashboardService;
+	/**
+	 * 환경설정 서비스 (창고-화주사 별 설정 조회)
+	 */
+	@Autowired
+	private RuntimeConfigService runtimeConfSvc;
 
 	/**
 	 * 피킹 지시 생성 (OMS 웨이브 릴리스에서 호출)
@@ -506,9 +513,9 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 	}
 
 	/**
-	 * B2B 피킹 지시 생성 (웨이브 없이 주문 직접 피킹)
+	 * 주문 직접 피킹 지시 생성 (웨이브 없이 주문 직접 피킹)
 	 *
-	 * ALLOCATED 상태의 B2B_OUT 주문을 웨이브 없이 직접 피킹 지시로 변환한다.
+	 * ALLOCATED 상태의 주문을 웨이브 없이 직접 피킹 지시로 변환한다.
 	 * wave_no는 null, pick_type은 INDIVIDUAL 고정.
 	 * 완료 후 포장 지시는 수동으로 생성한다 (insp_flag 자동 판단 없음).
 	 *
@@ -516,19 +523,13 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 	 * @return { pick_task_count, item_count, pick_tasks: [...] }
 	 */
 	@SuppressWarnings("rawtypes")
-	public Map<String, Object> createB2bPickingTasks(List<String> shipmentOrderIds) {
+	public Map<String, Object> createDirectPickingTasks(List<String> shipmentOrderIds) {
 		Long domainId = Domain.currentDomainId();
 		String today = DateUtil.todayStr();
 
 		if (ValueUtil.isEmpty(shipmentOrderIds)) {
 			throw new ElidomValidationException("출하 주문 ID 목록이 없습니다");
 		}
-
-		// 당일 pick_task_no 시퀀스 조회
-		String seqSql = "SELECT COUNT(*) FROM picking_tasks WHERE domain_id = :domainId AND order_date = :orderDate";
-		Map<String, Object> seqParams = ValueUtil.newMap("domainId,orderDate", domainId, today);
-		Integer existCount = this.queryManager.selectBySql(seqSql, seqParams, Integer.class);
-		int nextSeq = (existCount != null ? existCount : 0) + 1;
 
 		int pickTaskCount = 0;
 		int totalItemCount = 0;
@@ -538,11 +539,6 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			ShipmentOrder order = this.findShipmentOrder(domainId, orderId);
 			if (order == null) {
 				throw new ElidomValidationException("출하 주문을 찾을 수 없습니다: " + orderId);
-			}
-
-			if (!"B2B_OUT".equals(order.getBizType())) {
-				throw new ElidomValidationException(
-						"주문 [" + order.getShipmentNo() + "]의 업무 유형이 B2B_OUT이 아닙니다 (현재: " + order.getBizType() + ")");
 			}
 
 			if (!ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus())) {
@@ -599,7 +595,8 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				item.setPickTaskId(task.getId());
 				item.setShipmentOrderId(orderId);
 				item.setShipmentOrderItemId(
-						alloc.get("shipment_order_item_id") != null ? alloc.get("shipment_order_item_id").toString() : null);
+						alloc.get("shipment_order_item_id") != null ? alloc.get("shipment_order_item_id").toString()
+								: null);
 				item.setStockAllocationId(alloc.get("id") != null ? alloc.get("id").toString() : null);
 				item.setInventoryId(
 						alloc.get("inventory_id") != null ? alloc.get("inventory_id").toString() : null);
@@ -637,10 +634,10 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			pickTaskResults.add(taskInfo);
 
 			pickTaskCount++;
-			nextSeq++;
 		}
 
-		return ValueUtil.newMap("pick_task_count,item_count,pick_tasks", pickTaskCount, totalItemCount, pickTaskResults);
+		return ValueUtil.newMap("pick_task_count,item_count,pick_tasks", pickTaskCount, totalItemCount,
+				pickTaskResults);
 	}
 
 	/**
@@ -821,13 +818,19 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		// 2. 피킹 지시에서 wave_no, pick_type 조회
 		PickingTask task = this.findPickingTask(domainId, pickTaskId);
 
-		// 3. 웨이브의 insp_flag 확인
+		// 3. insp_flag 결정: 웨이브 있으면 웨이브 설정, 없으면 창고-화주사 환경설정 사용
 		boolean inspFlag = false;
 		if (ValueUtil.isNotEmpty(task.getWaveNo())) {
 			String waveSql = "SELECT insp_flag FROM shipment_waves WHERE domain_id = :domainId AND wave_no = :waveNo";
 			Map<String, Object> waveParams = ValueUtil.newMap("domainId,waveNo", domainId, task.getWaveNo());
 			Boolean flag = this.queryManager.selectBySql(waveSql, waveParams, Boolean.class);
 			inspFlag = flag != null && flag;
+		} else {
+			// 직접 피킹(wave_no = null) — 창고-화주사 설정에서 포장 자동 생성 여부 조회
+			String configVal = this.runtimeConfSvc.getRuntimeConfigValue(
+					task.getComCd(), task.getWhCd(),
+					WmsFulfillmentConfigConstants.DIRECT_PICKING_INSP_FLAG);
+			inspFlag = ValueUtil.toBoolean(configVal, false);
 		}
 
 		// 4. insp_flag가 true이면 포장 지시 자동 생성
