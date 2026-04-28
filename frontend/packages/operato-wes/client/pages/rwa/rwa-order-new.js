@@ -1,6 +1,7 @@
 import { css, html, LitElement } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
+import './rwa-sku-search-popup.js'
 
 /**
  * 반품 요청 등록 팝업
@@ -249,6 +250,37 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
 
         .delete-btn:hover {
           background: #FFEBEE;
+        }
+
+        .sku-input-wrap {
+          display: flex;
+          gap: 4px;
+          align-items: center;
+        }
+
+        .sku-input-wrap input {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .sku-search-btn {
+          flex-shrink: 0;
+          width: 30px;
+          height: 30px;
+          border: 1px solid var(--md-sys-color-outline-variant);
+          border-radius: 6px;
+          background: var(--md-sys-color-surface-variant);
+          font-size: 14px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: background 0.15s;
+        }
+
+        .sku-search-btn:hover {
+          background: var(--md-sys-color-primary-container);
+          border-color: var(--md-sys-color-primary);
         }
 
         /* 합계 영역 */
@@ -608,12 +640,21 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
                     <tr>
                       <td style="text-align:center">${idx + 1}</td>
                       <td>
-                        <input
-                          type="text"
-                          placeholder="SKU"
-                          .value="${item.skuCd}"
-                          @input="${e => this._updateItem(idx, 'skuCd', e.target.value)}"
-                        />
+                        <div class="sku-input-wrap">
+                          <input
+                            type="text"
+                            placeholder="SKU"
+                            .value="${item.skuCd}"
+                            @input="${e => this._updateItem(idx, 'skuCd', e.target.value)}"
+                            @keydown="${e => e.key === 'Enter' && e.target.blur()}"
+                            @blur="${e => this._lookupSkuByCode(idx, e.target.value)}"
+                          />
+                          <button
+                            class="sku-search-btn"
+                            title="${i18next.t('button.sku_search', { defaultValue: 'SKU 검색' })}"
+                            @click="${() => this._openSkuSearch(idx)}"
+                          >🔍</button>
+                        </div>
                       </td>
                       <td>
                         <input
@@ -861,6 +902,48 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
     } finally {
       this.saving = false
     }
+  }
+
+  /**
+   * SKU 코드 blur 시 상품명 자동 조회 — 오류/미존재는 무시
+   */
+  async _lookupSkuByCode(idx, skuCd) {
+    if (!skuCd || !skuCd.trim()) return
+
+    try {
+      const filters = [{ name: 'sku_cd', value: skuCd.trim() }]
+      if (this.rwaOrder.comCd) {
+        filters.push({ name: 'com_cd', value: this.rwaOrder.comCd })
+      }
+      const data = await ServiceUtil.searchByPagination('sku', filters, null, 1, 1)
+      const sku = data?.items?.[0]
+      if (sku) {
+        this._updateItem(idx, 'skuNm', sku.sku_nm || '')
+      }
+    } catch (_) {
+      // 오류 무시
+    }
+  }
+
+  /**
+   * SKU 검색 팝업 열기 — 선택 시 해당 행의 skuCd, skuNm 자동 입력
+   */
+  _openSkuSearch(itemIndex) {
+    const element = document.createElement('rwa-sku-search-popup')
+    if (this.rwaOrder.comCd) {
+      element.comCd = this.rwaOrder.comCd
+    }
+    element.addEventListener('sku-selected', e => {
+      const sku = e.detail.sku
+      this._updateItem(itemIndex, 'skuCd', sku.sku_cd || '')
+      this._updateItem(itemIndex, 'skuNm', sku.sku_nm || '')
+    })
+    UiUtil.openPopupByElement(
+      i18next.t('title.sku_search', { defaultValue: 'SKU 검색' }),
+      'large',
+      element,
+      true
+    )
   }
 
   /**
