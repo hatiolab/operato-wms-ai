@@ -162,13 +162,16 @@
 | W23-SF-5 | 재고 조회 (PDA) | `pda-stock-inquiry.js` | PDA 바코드 스캔으로 재고 상세 정보 조회 (재고 바코드로 조회, 상품 코드, 상품 바코드로 조회, 로케이션 코드로 조회), 재고 추가 기능 | 2026-04-30 | 100% | ☑ | PDA 화면 구현 완료. W23-SF-6(재고 조정) 통합 |
 | W23-SF-6 | 재고 병합 (PDA) | `pda-stock-merge.js` | PDA 바코드 스캔으로 동일 SKU 재고 병합 | 2026-05-02 | 0% | ☐ | |
 | W23-SF-7 | 재고 실사 (PDA) | `pda-stock-count.js` | PDA 바코드 스캔으로 재고 실사 | 2026-05-02 | 0% | ☐ | |
+| W23-SF-8 | PDA 스캔 | 상품 바코드 스캔시 상품 조회 | 상품 바코드 스캔 시 상품 조회 | 2026-05-02 | 0% | ☐ | |
+| W23-SF-9 | 출고 피킹 작업 화면 | 재고 바코드로 스캔하도록 수정 | 상품 바코드 스캔이 아닌 재고 바코드 스캔으로 피킹하도록 수정 | 2026-05-02 | 0% | ☐ | |
+| W23-SF-10 | PDA 입고 화면 | 상품 바코드 스캔 하지 않으면 확정 버튼 처리할 수 없도록 수정 | | 2026-05-02 | 0% | ☐ | |
 
 ### 3-2. [OMS] 웨이브 자동 할당 완성
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W23-WA-1 | 자동 웨이브 그루핑 룰 | 배송유형·거래처·화주사 조건으로 주문 자동 그루핑 | `OmsWaveService` | 2026-04-25 | 0% | ☐ | |
-| W23-WA-2 | 자동 웨이브 생성 스케줄러 | 특정 시각 자동 웨이브 생성 스케줄러 (Spring `@Scheduled`) | `OmsWaveScheduler` (신규) | 2026-04-28 | 0% | ☐ | |
+| W23-WA-1 | 자동 웨이브 그루핑 룰 | 배송유형·거래처·화주사 조건으로 주문 자동 그루핑 | `OmsWaveService` | 2026-04-25 | 100% | ☑ | `createAutoWaves()`에 `wh_cd`/`com_cd` 필터 추가, `buildGroupKey()`에 `com_cd`/`dlv_type`/`ship_by_date` 케이스 추가 |
+| W23-WA-2 | 자동 웨이브 생성 스케줄러 | 특정 시각 자동 웨이브 생성 스케줄러 (Quartz) | `OmsWaveJob` (신규) | 2026-04-28 | 100% | ☑ | `OmsWaveJob extends AbstractJob` 신규 (handler_type=static), `WmsOmsConfigConstants`에 설정 상수 6개 추가. 트리거는 otarepo-core Quartz 프레임워크가 담당 — jobs 테이블에 handler=`operato.wms.oms.job.OmsWaveJob` 등록으로 활성화 |
 | W23-WA-3 | 웨이브 확정 팝업 연동 | 피킹 유형, 배송 유형, 택배사 코드, 검수 여부, 작업자 수 처리 | `FulfillmentTransactionController` | 2026-04-29 | 0% | ☐ | |
 
 ### 3-3. [OMS] 보충 지시 완성
@@ -189,8 +192,8 @@
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W23-IR-1 | 검수 반려 API | 입고 항목 반려 처리 → `REJECTED` 상태, 반려 사유 기록 | `InboundTransactionController` | 2026-04-30 | 0% | ☐ | |
-| W23-IR-2 | 반려 재고 처리 | 반려 항목 불량 로케이션 이동 또는 반품 처리 플로우 | `InboundTransactionService` | 2026-05-01 | 0% | ☐ | |
+| W23-IR-1 | 검수 반려 API | 입고 항목 반려 처리 → `REJECTED` 상태, 반려 사유 기록 | `InboundTransactionController` | 2026-04-30 | 100% | ☑ | `STATUS_REJECTED` 상수 추가, `rejectReceivingOrderLine()` 서비스 메서드, `POST receiving_orders/line/{id}/reject` + `POST receiving_orders/line/reject` 엔드포인트 추가, 자동 마감 체크 SQL에 REJECTED 제외 처리 |
+| W23-IR-2 | 반려 재고 처리 | 반려 항목 불량 로케이션 이동 또는 반품 처리 플로우 | `InboundTransactionService` | 2026-05-01 | 100% | ☑ | `processRejectedReceivingItem()` 신규 — DEFECT 로케이션 조회 후 불량(BAD) 재고 생성, `closeReceivingOrder()`에서 REJECTED 아이템 skip 처리, `createInventoriesByReceivingOrder()`에서 STATUS_END만 재고 생성(REJECTED 자동 제외) |
 
 ### 3-6. [STOCK] 부족 재고 알림
 
@@ -213,9 +216,9 @@
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W23-VA-1 | 세트 상품 조립 재고 처리 | VAS 완료 시 구성품 재고 차감 → 세트 SKU 재고 생성 end-to-end 테스트 | `VasTransactionService` | 2026-05-03 | 0% | ☐ | |
-| W23-VA-2 | 세트 해체 재고 처리 | 세트 SKU 재고 차감 → 구성품 재고 생성 | `VasTransactionService` | 2026-05-04 | 0% | ☐ | |
-| W23-VA-3 | 피킹 시 세트 상품 처리 | 세트 상품 피킹 시 구성품 재고 차감 vs 세트 재고 차감 정책 결정 및 구현 | `FulfillmentPickingService` | 2026-05-05 | 0% | ☐ | |
+| W23-VA-1 | 세트 상품 조립 재고 처리 | VAS 완료 시 구성품 재고 차감 → 세트 SKU 재고 생성 end-to-end 테스트 | `VasTransactionService` | 2026-05-03 | 50% | ☐ | |
+| W23-VA-2 | 세트 해체 재고 처리 | 세트 SKU 재고 차감 → 구성품 재고 생성 | `VasTransactionService` | 2026-05-04 | 50% | ☐ | |
+| W23-VA-3 | 피킹 시 세트 상품 처리 | 세트 상품 피킹 시 구성품 재고 차감 vs 세트 재고 차감 정책 결정 및 구현 | `FulfillmentPickingService` | 2026-05-05 | 50% | ☐ | |
 
 ### 3-9. [RWA] 반품 전체 플로우 테스트
 
@@ -252,21 +255,22 @@
 
 | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
 |---------|------|------|------|--------|--------|------|------|
-| W23-FL-1 | Location sortNo 피킹 동선 정렬 | 피킹 태스크 생성 시 `Location.sortNo` 순으로 정렬하여 이동 동선 최적화 | `FulfillmentPickingService` | 2026-05-02 | 0% | ☐ | |
-| W23-FL-2 | SKU hazmatFlag 위험물 로케이션 제한 | `hazmatFlag=true`인 SKU는 hazmat 허용 로케이션에만 적치 가능하도록 검증 | `InventoryTransactionService`, `InboundTransactionService` | 2026-05-03 | 0% | ☐ | |
-| W23-FL-3 | SKU reorderPoint 재주문점 알림 | 가용 재고가 `reorderPoint` 이하로 떨어지면 재고 대시보드 경고 또는 보충 지시 자동 생성 | `InventoryDashboardService` | 2026-05-05 | 0% | ☐ | |
-| W23-FL-4 | Warehouse 온도 조건 매칭 검증 | 적치 시 `SKU.tempType`과 `Warehouse.tempMin/tempMax` 호환성 검증 | `InboundTransactionService` | 2026-05-06 | 0% | ☐ | |
-| W23-FL-5 | Warehouse 수용 용량 초과 경고 | 입고 시 `Warehouse.maxPalletCnt` 기준 용량 초과 여부 사전 경고 | `InboundTransactionService` | 2026-05-07 | 0% | ☐ | |
+| W23-FL-1 | Location sortNo 피킹 동선 정렬 | 피킹 태스크 생성 시 `Location.sortNo` 순으로 정렬하여 이동 동선 최적화 | `FulfillmentPickingService` | 2026-05-02 | 100% | ☑ | |
+| W23-FL-2 | SKU hazmatFlag 위험물 로케이션 제한 | `hazmatFlag=true`인 SKU는 hazmat 허용 로케이션에만 적치 가능하도록 검증 | `StockTransactionService`, `InboundTransactionService` | 2026-05-03 | 100% | ☑ | |
+| W23-FL-3 | SKU reorderPoint 재주문점 알림 | 가용 재고가 `reorderPoint` 이하로 떨어지면 재고 대시보드 경고 또는 보충 지시 자동 생성 | `InventoryDashboardService` | 2026-05-05 | 100% | ☑ | |
+| W23-FL-4 | Warehouse 온도 조건 매칭 검증 | 적치 시 `SKU.tempType`과 `Warehouse.tempMin/tempMax` 호환성 검증 | `InboundTransactionService` | 2026-05-06 | 100% | ☑ | |
+| W23-FL-5 | Warehouse 수용 용량 초과 경고 | 입고 시 `Warehouse.maxPalletCnt` 기준 용량 초과 여부 사전 경고 | `InboundTransactionService` | 2026-05-07 | 100% | ☑ | |
+
 
 ### Week 2~3 진행 현황
 
 | 항목 | 수치 |
 |------|------|
 | 전체 작업 수 | 38개 |
-| 완료 (☑) | 22개 (W23-SF-1~5, W23-UA-1~2, W23-SA-1~2, W23-CB-1~3, W23-BF-0~5, W23-DB-1~2, W23-RE-1~2) |
+| 완료 (☑) | 31개 (W23-SF-1~5, W23-UA-1~2, W23-SA-1~2, W23-CB-1~3, W23-BF-0~5, W23-DB-1~2, W23-RE-1~2, W23-FL-1~5, W23-IR-1~2, W23-WA-1~2) |
 | 진행 중 | 0개 |
-| 미시작 (☐) | 16개 (W23-SF-6, W23-WA-1~3, W23-IR-1~2, W23-VA-1~3, W23-RW-1~2, W23-FL-1~5) |
-| 전체 진행율 | 58% (완료 22 / 전체 38) |
+| 미시작 (☐) | 7개 (W23-SF-6, W23-WA-3, W23-VA-1~3, W23-RW-1~2) |
+| 전체 진행율 | 82% (완료 31 / 전체 38) |
 
 ---
 

@@ -53,11 +53,18 @@ public class OmsWaveService extends AbstractQueryService {
 				? Integer.parseInt(params.get("max_order_count").toString())
 				: 200;
 		String orderDate = ValueUtil.isNotEmpty(params.get("order_date")) ? params.get("order_date").toString() : today;
+		String whCd = ValueUtil.isNotEmpty(params.get("wh_cd")) ? params.get("wh_cd").toString() : null;
+		String comCd = ValueUtil.isNotEmpty(params.get("com_cd")) ? params.get("com_cd").toString() : null;
 
-		// 1. ALLOCATED 상태 주문 조회
-		String orderSql = "SELECT * FROM shipment_orders WHERE domain_id = :domainId AND status = :status AND order_date = :orderDate ORDER BY priority_cd, created_at";
+		// 1. ALLOCATED 상태 주문 조회 (창고/화주사 필터 선택 적용)
+		String orderSql = "SELECT * FROM shipment_orders WHERE domain_id = :domainId AND status = :status AND order_date = :orderDate"
+				+ (whCd != null ? " AND wh_cd = :whCd" : "")
+				+ (comCd != null ? " AND com_cd = :comCd" : "")
+				+ " ORDER BY priority_cd, created_at";
 		Map<String, Object> orderParams = ValueUtil.newMap("domainId,status,orderDate", domainId,
 				ShipmentOrder.STATUS_ALLOCATED, orderDate);
+		if (whCd != null) orderParams.put("whCd", whCd);
+		if (comCd != null) orderParams.put("comCd", comCd);
 		List<ShipmentOrder> orders = this.queryManager.selectListBySql(orderSql, orderParams, ShipmentOrder.class, 0,
 				0);
 
@@ -612,6 +619,9 @@ public class OmsWaveService extends AbstractQueryService {
 			if (sb.length() > 0)
 				sb.append("||");
 			switch (field) {
+				case "com_cd":
+					sb.append(ValueUtil.isNotEmpty(order.getComCd()) ? order.getComCd() : "NONE");
+					break;
 				case "carrier_cd":
 					sb.append(ValueUtil.isNotEmpty(order.getCarrierCd()) ? order.getCarrierCd() : "NONE");
 					break;
@@ -623,6 +633,12 @@ public class OmsWaveService extends AbstractQueryService {
 					break;
 				case "ship_type":
 					sb.append(ValueUtil.isNotEmpty(order.getShipType()) ? order.getShipType() : "NONE");
+					break;
+				case "dlv_type":
+					sb.append(ValueUtil.isNotEmpty(order.getDlvType()) ? order.getDlvType() : "NONE");
+					break;
+				case "ship_by_date":
+					sb.append(ValueUtil.isNotEmpty(order.getShipByDate()) ? order.getShipByDate() : "NONE");
 					break;
 				default:
 					sb.append("UNKNOWN");

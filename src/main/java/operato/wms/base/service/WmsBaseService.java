@@ -16,7 +16,6 @@ import xyz.elidom.dbist.dml.Query;
 import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.print.entity.Printer;
 import xyz.elidom.sys.entity.Domain;
-import xyz.elidom.sys.util.EntityUtil;
 import xyz.elidom.sys.util.MessageUtil;
 import xyz.elidom.sys.util.ThrowUtil;
 import xyz.elidom.util.ClassUtil;

@@ -65,6 +65,12 @@ public class StockTransactionService extends AbstractQueryService {
         // Find SKU
         SKU sku = this.wmsBaseSvc.findSku(input.getComCd(), input.getSkuCd(), false, true);
 
+        // 위험물 상품 로케이션 허용 여부 체크
+        this.checkHazmatLocation(location, sku);
+
+        // 온도 유형 호환성 체크
+        this.checkTemperatureType(location, sku);
+
         // 로케이션 최대 수량·중량 초과 검증
         double addWeight = (sku.getSkuWt() != null) ? sku.getSkuWt() * input.getInvQty() : 0.0;
         this.checkLocationCapacity(location, input.getInvQty(), addWeight);
@@ -115,6 +121,13 @@ public class StockTransactionService extends AbstractQueryService {
 
         // 고정 SKU 로케이션 적치 제한 체크
         this.checkFixedSkuLocation(toLoc, inventory.getSkuCd());
+
+        // 위험물 상품 로케이션 허용 여부 체크
+        SKU putawaySku = this.wmsBaseSvc.findSku(inventory.getComCd(), inventory.getSkuCd(), false, false);
+        this.checkHazmatLocation(toLoc, putawaySku);
+
+        // 온도 유형 호환성 체크
+        this.checkTemperatureType(toLoc, putawaySku);
 
         // 바코드 재고 수량, 작업자 입력 수량 체크
         double invQty = inventory.getInvQty();
@@ -206,6 +219,13 @@ public class StockTransactionService extends AbstractQueryService {
 
         // 고정 SKU 로케이션 적치 제한 체크
         this.checkFixedSkuLocation(toLoc, inventory.getSkuCd());
+
+        // 위험물 상품 로케이션 허용 여부 체크
+        SKU moveSku = this.wmsBaseSvc.findSku(inventory.getComCd(), inventory.getSkuCd(), false, false);
+        this.checkHazmatLocation(toLoc, moveSku);
+
+        // 온도 유형 호환성 체크
+        this.checkTemperatureType(toLoc, moveSku);
 
         // 로케이션 최대 수량·중량 초과 검증
         double moveWeight = (inventory.getWeight() != null) ? inventory.getWeight() : 0.0;
@@ -874,6 +894,45 @@ public class StockTransactionService extends AbstractQueryService {
         if (ValueUtil.isNotEmpty(toLoc.getSkuCd()) && ValueUtil.isNotEqual(toLoc.getSkuCd(), skuCd)) {
             throw ThrowUtil.newValidationErrorWithNoLog(
                     "로케이션 [" + toLoc.getLocCd() + "]은 상품 [" + toLoc.getSkuCd() + "] 전용 고정 로케이션입니다.");
+        }
+    }
+
+    /**
+     * W23-FL-2: 위험물 상품 로케이션 허용 여부 검증
+     *
+     * SKU.hazmatFlag가 true인 경우, Location.hazmatFlag도 true여야 한다.
+     * sku가 null이거나 hazmatFlag가 false/null이면 검증을 건너뛴다.
+     *
+     * @param toLoc 대상 로케이션
+     * @param sku   적치하려는 SKU (null 허용)
+     */
+    public void checkHazmatLocation(Location toLoc, SKU sku) {
+        if (sku != null && Boolean.TRUE.equals(sku.getHazmatFlag())) {
+            if (!Boolean.TRUE.equals(toLoc.getHazmatFlag())) {
+                throw ThrowUtil.newValidationErrorWithNoLog(
+                        "위험물 상품은 위험물 허용 로케이션에만 적치 가능합니다. 로케이션 ["
+                                + toLoc.getLocCd() + "]은 위험물 적치가 불가합니다.");
+            }
+        }
+    }
+
+    /**
+     * W23-FL-4: 온도 유형 호환성 검증
+     *
+     * SKU.tempType과 Location.tempType이 모두 설정된 경우, 두 값이 일치해야 한다.
+     * 어느 한쪽이 null/empty이면 검증을 건너뛴다 (미설정 = 제한 없음).
+     *
+     * @param toLoc 대상 로케이션
+     * @param sku   적치하려는 SKU (null 허용)
+     */
+    public void checkTemperatureType(Location toLoc, SKU sku) {
+        if (sku != null && ValueUtil.isNotEmpty(sku.getTempType())
+                && ValueUtil.isNotEmpty(toLoc.getTempType())) {
+            if (!sku.getTempType().equals(toLoc.getTempType())) {
+                throw ThrowUtil.newValidationErrorWithNoLog(
+                        "상품의 보관 온도 조건(" + sku.getTempType() + ")과 "
+                                + "로케이션의 온도 유형(" + toLoc.getTempType() + ")이 맞지 않습니다.");
+            }
         }
     }
 

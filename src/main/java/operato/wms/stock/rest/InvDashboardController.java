@@ -151,4 +151,25 @@ public class InvDashboardController extends AbstractRestService {
 		return this.invDashSvc.getShortageSkus(comCd, whCd);
 	}
 
+	/**
+	 * W23-FL-3: 재주문점 도달 SKU 목록 조회
+	 *
+	 * 가용 재고가 재주문점(reorder_point) 미만인 SKU 목록을 반환한다.
+	 * reorder_point가 미설정(NULL 또는 0)인 SKU는 제외된다.
+	 * shortage_qty(부족 수량) 내림차순으로 정렬된다.
+	 *
+	 * GET /rest/inv_dashboard/reorder-point-skus
+	 *
+	 * @param comCd 화주사 코드 (optional)
+	 * @param whCd  창고 코드 (optional)
+	 * @return [{ sku_cd, com_cd, sku_nm, available_qty, reorder_point, shortage_qty }]
+	 */
+	@RequestMapping(value = "/reorder-point-skus", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get Reorder Point SKU List")
+	public List<Map<String, Object>> getReorderPointSkus(
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd", required = false) String whCd) {
+		return this.invDashSvc.getReorderPointSkus(comCd, whCd);
+	}
+
 }

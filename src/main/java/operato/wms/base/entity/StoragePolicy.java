@@ -174,6 +174,12 @@ public class StoragePolicy extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private Integer b2bWaveTriggerCnt;
 
 	/**
+	 * B2B 웨이브 생성 시 그룹핑 조건
+	 */
+	@Column(name = "b2b_wave_group_by", length = 50)
+	private String b2bWaveGroupBy;
+
+	/**
 	 * B2C 웨이브 사용 여부 - true이면 B2C 출고 시 웨이브 기반 피킹 처리.
 	 * false이면 주문별 개별 피킹
 	 */
@@ -192,6 +198,12 @@ public class StoragePolicy extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	 */
 	@Column(name = "b2c_wave_trigger_cnt")
 	private Integer b2cWaveTriggerCnt;
+
+	/**
+	 * B2C 웨이브 생성 시 그룹핑 조건
+	 */
+	@Column(name = "b2c_wave_group_by", length = 50)
+	private String b2cWaveGroupBy;
 
 	/**
 	 * 삭제 여부 - true이면 비활성화된 정책. 신규 재고 처리 시 적용 제외
@@ -365,6 +377,14 @@ public class StoragePolicy extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.b2bWaveTriggerCnt = b2bWaveTriggerCnt;
 	}
 
+	public String getB2bWaveGroupBy() {
+		return b2bWaveGroupBy;
+	}
+
+	public void setB2bWaveGroupBy(String b2bWaveGroupBy) {
+		this.b2bWaveGroupBy = b2bWaveGroupBy;
+	}
+
 	public Boolean getB2cWaveFlag() {
 		return b2cWaveFlag;
 	}
@@ -387,6 +407,14 @@ public class StoragePolicy extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setB2cWaveTriggerCnt(Integer b2cWaveTriggerCnt) {
 		this.b2cWaveTriggerCnt = b2cWaveTriggerCnt;
+	}
+
+	public String getB2cWaveGroupBy() {
+		return b2cWaveGroupBy;
+	}
+
+	public void setB2cWaveGroupBy(String b2cWaveGroupBy) {
+		this.b2cWaveGroupBy = b2cWaveGroupBy;
 	}
 
 	public String getRemarks() {

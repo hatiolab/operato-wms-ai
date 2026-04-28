@@ -6,9 +6,5 @@ package operato.wms.stock;
  * @author shortstop
  */
 public class WmsStockConfigConstants {
-    /**
-     * 바코드 라벨 출력 템플릿
-     */
-    public static final String INV_BARCODE_LABEL_TEMPLATE = "inv.barcode.label.template";
 
 }

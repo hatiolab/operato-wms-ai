@@ -149,6 +149,14 @@ public class InboundTransactionController extends AbstractRestService {
      */
     public static final String TRX_INB_POST_CLOSE_RECEIPT = "diy-inb-post-close-receiving";
     /**
+     * 커스텀 서비스 - 입고 예정 주문 라인 반려 전 처리
+     */
+    public static final String TRX_INB_PRE_REJECT_LINE_RECEIPT = "diy-inb-pre-reject-line-receiving";
+    /**
+     * 커스텀 서비스 - 입고 예정 주문 라인 반려 후 처리
+     */
+    public static final String TRX_INB_POST_REJECT_LINE_RECEIPT = "diy-inb-post-reject-line-receiving";
+    /**
      * 화주사 - 창고별 설정 조회 서비스
      */
     @Autowired
@@ -398,10 +406,10 @@ public class InboundTransactionController extends AbstractRestService {
         String rcvAutoFlag = this.runtimeConfSvc.getRuntimeConfigValue(receiving.getComCd(), receiving.getWhCd(),
                 WmsInboundConfigConstants.RECEIPT_FINISH_AUTO_FLAG);
         if (ValueUtil.toBoolean(rcvAutoFlag, true)) {
-            String sql = "select count(id) from receiving_items where domain_id = :domainId and receiving_id = :receivingId and (status != :cancelStatus and status != :endStatus)";
-            Map<String, Object> params = ValueUtil.newMap("domainId,receivingId,cancelStatus,endStatus",
+            String sql = "select count(id) from receiving_items where domain_id = :domainId and receiving_id = :receivingId and (status != :cancelStatus and status != :endStatus and status != :rejectedStatus)";
+            Map<String, Object> params = ValueUtil.newMap("domainId,receivingId,cancelStatus,endStatus,rejectedStatus",
                     receiving.getDomainId(), receiving.getId(), WmsInboundConstants.STATUS_CANCEL,
-                    WmsInboundConstants.STATUS_END);
+                    WmsInboundConstants.STATUS_END, WmsInboundConstants.STATUS_REJECTED);
             if (this.queryManager.selectBySql(sql, params, Integer.class) == 0) {
                 // 4.1 자동 마감 처리
                 this.closeReceivingOrder(receiving.getId());
@@ -448,10 +456,10 @@ public class InboundTransactionController extends AbstractRestService {
         String rcvAutoFlag = this.runtimeConfSvc.getRuntimeConfigValue(receiving.getComCd(), receiving.getWhCd(),
                 WmsInboundConfigConstants.RECEIPT_FINISH_AUTO_FLAG);
         if (ValueUtil.toBoolean(rcvAutoFlag, true)) {
-            String sql = "select count(id) from receiving_items where domain_id = :domainId and receiving_id = :receivingId and (status != :cancelStatus and status != :endStatus)";
-            Map<String, Object> params = ValueUtil.newMap("domainId,receivingId,cancelStatus,endStatus",
+            String sql = "select count(id) from receiving_items where domain_id = :domainId and receiving_id = :receivingId and (status != :cancelStatus and status != :endStatus and status != :rejectedStatus)";
+            Map<String, Object> params = ValueUtil.newMap("domainId,receivingId,cancelStatus,endStatus,rejectedStatus",
                     receiving.getDomainId(), receiving.getId(), WmsInboundConstants.STATUS_CANCEL,
-                    WmsInboundConstants.STATUS_END);
+                    WmsInboundConstants.STATUS_END, WmsInboundConstants.STATUS_REJECTED);
             if (this.queryManager.selectBySql(sql, params, Integer.class) == 0) {
                 // 4.1 자동 마감 처리
                 this.closeReceivingOrder(receiving.getId());
@@ -481,8 +489,53 @@ public class InboundTransactionController extends AbstractRestService {
     }
 
     /**
+     * 입고 라인 반려 처리 (검수 반려, 입고 상세 상태 : START -> REJECTED)
+     *
+     * @param id           입고 상세 ID
+     * @param receivingItem 반려 정보 (remarks에 반려 사유 포함)
+     * @return 반려된 입고 상세
+     */
+    @RequestMapping(value = "receiving_orders/line/{id}/reject", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Reject Receiving Order Line")
+    public ReceivingItem rejectReceivingOrderLine(
+            @PathVariable("id") String id,
+            @RequestBody ReceivingItem receivingItem) {
+
+        // 1. 입고 예정 라인 조회
+        ReceivingItem itemToReject = this.queryManager.select(ReceivingItem.class, id);
+        Receiving receiving = this.queryManager.select(Receiving.class, itemToReject.getReceivingId());
+        String rejectReason = receivingItem.getRemarks();
+
+        // 2. 전 처리 커스텀 서비스 호출
+        Map<String, Object> custSvcParams = ValueUtil.newMap("receiving,receivingItem", receiving, itemToReject);
+        this.customSvc.doCustomService(receiving.getDomainId(), TRX_INB_PRE_REJECT_LINE_RECEIPT, custSvcParams);
+
+        // 3. 반려 처리
+        itemToReject = this.inbTrxService.rejectReceivingOrderLine(receiving, itemToReject, rejectReason);
+        this.queryManager.update(itemToReject);
+
+        // 4. 후 처리 커스텀 서비스 호출
+        this.customSvc.doCustomService(receiving.getDomainId(), TRX_INB_POST_REJECT_LINE_RECEIPT, custSvcParams);
+
+        // 5. 라인 정보 리턴
+        return itemToReject;
+    }
+
+    /**
+     * 입고 라인 반려 처리 (편의 메서드, 입고 상세 상태 : START -> REJECTED)
+     *
+     * @param receivingItem 반려 정보 (id, remarks 포함)
+     * @return 반려된 입고 상세
+     */
+    @RequestMapping(value = "receiving_orders/line/reject", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Reject Receiving Order Line")
+    public ReceivingItem rejectReceivingOrderLine(@RequestBody ReceivingItem receivingItem) {
+        return this.rejectReceivingOrderLine(receivingItem.getId(), receivingItem);
+    }
+
+    /**
      * 입고 완료 처리 (상태 : START -> END)
-     * 
+     *
      * @param id
      * @return
      */

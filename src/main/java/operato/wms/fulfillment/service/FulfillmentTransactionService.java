@@ -137,8 +137,9 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				// 주문별 할당 정보 조회
 				String allocSql = "SELECT sa.*, soi.sku_cd, soi.sku_nm FROM stock_allocations sa"
 						+ " INNER JOIN shipment_order_items soi ON soi.domain_id = sa.domain_id AND soi.id = sa.shipment_order_item_id"
+						+ " LEFT JOIN locations l ON l.domain_id = sa.domain_id AND l.loc_cd = sa.loc_cd"
 						+ " WHERE sa.domain_id = :domainId AND sa.shipment_order_id = :orderId AND sa.status IN ('SOFT','HARD')"
-						+ " ORDER BY soi.line_no";
+						+ " ORDER BY COALESCE(l.sort_no, 9999), soi.line_no";
 				Map<String, Object> allocParams = ValueUtil.newMap("domainId,orderId", domainId, order.getId());
 				List<Map> allocations = this.queryManager.selectListBySql(allocSql, allocParams, Map.class, 0, 0);
 
@@ -227,9 +228,10 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 					+ " FROM stock_allocations sa"
 					+ " INNER JOIN shipment_order_items soi ON soi.domain_id = sa.domain_id AND soi.id = sa.shipment_order_item_id"
 					+ " INNER JOIN shipment_orders so ON so.domain_id = sa.domain_id AND so.id = sa.shipment_order_id"
+					+ " LEFT JOIN locations l ON l.domain_id = sa.domain_id AND l.loc_cd = sa.loc_cd"
 					+ " WHERE sa.domain_id = :domainId AND so.wave_no = :waveNo AND sa.status IN ('SOFT','HARD')"
-					+ " GROUP BY sa.inventory_id, sa.loc_cd, sa.lot_no, sa.expired_date, sa.barcode, soi.sku_cd, soi.sku_nm"
-					+ " ORDER BY sa.loc_cd, soi.sku_cd";
+					+ " GROUP BY sa.inventory_id, sa.loc_cd, sa.lot_no, sa.expired_date, sa.barcode, soi.sku_cd, soi.sku_nm, l.sort_no"
+					+ " ORDER BY COALESCE(l.sort_no, 9999), soi.sku_cd";
 			Map<String, Object> allocParams = ValueUtil.newMap("domainId,waveNo", domainId, waveNo);
 			List<Map> allocations = this.queryManager.selectListBySql(allocSql, allocParams, Map.class, 0, 0);
 

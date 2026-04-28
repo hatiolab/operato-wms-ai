@@ -412,6 +412,17 @@ public class InventoryDashboardService extends AbstractQueryService {
                     shortageList.size()));
         }
 
+        // 5. W23-FL-3: 재주문점 도달 알림 (가용 재고 < reorder_point)
+        List<Map<String, Object>> reorderList = this.getReorderPointSkus(comCd, whCd);
+        if (!reorderList.isEmpty()) {
+            alerts.add(ValueUtil.newMap(
+                    "type,icon,message,count",
+                    "warning",
+                    "📦",
+                    "재주문점 도달 SKU " + reorderList.size() + "건이 있습니다.",
+                    reorderList.size()));
+        }
+
         return alerts;
     }
 
@@ -451,6 +462,47 @@ public class InventoryDashboardService extends AbstractQueryService {
 
         sql += " GROUP BY i.sku_cd, i.com_cd" +
                 " HAVING SUM(i.inv_qty - COALESCE(i.reserved_qty, 0)) < MAX(s.safety_stock)" +
+                " ORDER BY shortage_qty DESC";
+
+        return (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+    }
+
+    /**
+     * W23-FL-3: 재주문점 도달 SKU 목록 조회
+     *
+     * 가용 재고(inv_qty - reserved_qty)가 SKU의 reorder_point 미만인 SKU 목록을 반환한다.
+     * reorder_point가 NULL이거나 0인 SKU는 제외한다.
+     *
+     * @param comCd 화주사 코드 (optional)
+     * @param whCd  창고 코드 (optional)
+     * @return [{ sku_cd, sku_nm, available_qty, reorder_point, shortage_qty }]
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getReorderPointSkus(String comCd, String whCd) {
+        Long domainId = Domain.currentDomainId();
+
+        String sql = "SELECT i.sku_cd, i.com_cd, MAX(s.sku_nm) AS sku_nm," +
+                " SUM(i.inv_qty - COALESCE(i.reserved_qty, 0)) AS available_qty," +
+                " MAX(s.reorder_point) AS reorder_point," +
+                " MAX(s.reorder_point) - SUM(i.inv_qty - COALESCE(i.reserved_qty, 0)) AS shortage_qty" +
+                " FROM inventories i" +
+                " INNER JOIN sku s ON s.domain_id = i.domain_id AND s.com_cd = i.com_cd AND s.sku_cd = i.sku_cd" +
+                " WHERE i.domain_id = :domainId" +
+                " AND (i.del_flag IS NULL OR i.del_flag = false)" +
+                " AND s.reorder_point IS NOT NULL AND s.reorder_point > 0";
+
+        Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+        if (ValueUtil.isNotEmpty(comCd)) {
+            sql += " AND i.com_cd = :comCd";
+            params.put("comCd", comCd);
+        }
+        if (ValueUtil.isNotEmpty(whCd)) {
+            sql += " AND i.wh_cd = :whCd";
+            params.put("whCd", whCd);
+        }
+
+        sql += " GROUP BY i.sku_cd, i.com_cd" +
+                " HAVING SUM(i.inv_qty - COALESCE(i.reserved_qty, 0)) < MAX(s.reorder_point)" +
                 " ORDER BY shortage_qty DESC";
 
         return (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);

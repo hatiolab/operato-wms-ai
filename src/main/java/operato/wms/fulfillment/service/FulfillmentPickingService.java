@@ -7,6 +7,7 @@ import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import operato.wms.base.entity.StoragePolicy;
 import operato.wms.base.service.RuntimeConfigService;
 import operato.wms.base.service.WmsBaseService;
 import operato.wms.fulfillment.WmsFulfillmentConfigConstants;
@@ -60,14 +61,13 @@ public class FulfillmentPickingService extends AbstractQueryService {
 	 * @return
 	 */
 	public String getPickingSheetTemplateName(String comCd, String whCd, boolean exceptionWhenEmpty) {
-		String templateName = this.runtimeConfSvc.getRuntimeConfigValue(comCd, whCd,
-				WmsFulfillmentConfigConstants.PICKING_TASK_SHEET_TEMPLATE);
+		StoragePolicy policy = this.wmsBaseSvc.findStoragePolicy(Domain.currentDomainId(), comCd, whCd);
 
-		if (exceptionWhenEmpty && ValueUtil.isEmpty(templateName)) {
-			throw new ElidomRuntimeException("피킹지시서 템플릿이 화주사-창고별 설정에 설정되지 않았습니다.");
+		if (exceptionWhenEmpty && (policy == null || ValueUtil.isEmpty(policy.getPickingSheetTmpl()))) {
+			throw new ElidomRuntimeException("피킹지시서 템플릿이 화주사-창고별 보관정책 설정에 설정되지 않았습니다.");
 		}
 
-		return templateName;
+		return policy.getPickingSheetTmpl();
 	}
 
 	/**

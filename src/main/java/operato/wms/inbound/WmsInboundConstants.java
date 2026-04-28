@@ -33,9 +33,14 @@ public class WmsInboundConstants {
 	public static final String STATUS_END = "END";
 	
 	/**
-	 * 상태 : 취소 
+	 * 상태 : 취소
 	 */
 	public static final String STATUS_CANCEL = "CANCEL";
+
+	/**
+	 * 상태 : 반려 (검수 반려)
+	 */
+	public static final String STATUS_REJECTED = "REJECTED";
 	
 	/**
 	 * 검수 결과 : 정상 (합) 

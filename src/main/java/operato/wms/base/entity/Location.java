@@ -13,7 +13,8 @@ import xyz.elidom.dbist.annotation.Table;
 	@Index(name = "ix_locations_3", columnList = "wh_cd,loc_type,domain_id"),
 	@Index(name = "ix_locations_4", columnList = "wh_cd,temp_type,domain_id"),
 	@Index(name = "ix_locations_5", columnList = "wh_cd,restrict_type,domain_id"),
-	@Index(name = "ix_locations_6", columnList = "wh_cd,mixable_flag,domain_id")
+	@Index(name = "ix_locations_6", columnList = "wh_cd,mixable_flag,domain_id"),
+	@Index(name = "ix_locations_7", columnList = "wh_cd,hazmat_flag,domain_id")
 })
 public class Location extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	/**
@@ -162,6 +163,14 @@ public class Location extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	 */
 	@Column (name = "mixable_flag")
 	private Boolean mixableFlag;
+
+	/**
+	 * 위험물 보관 허용 여부 - true이면 위험물(Hazmat) 상품 적치 가능.
+	 * false 또는 null이면 위험물 상품 적치 불가. SKU.hazmatFlag=true인 상품은
+	 * 이 값이 true인 로케이션에만 입고/이동 가능
+	 */
+	@Column (name = "hazmat_flag")
+	private Boolean hazmatFlag;
 
 	/**
 	 * 삭제 여부 - true이면 사용 중지된 로케이션. 입고/이동 대상에서 제외됨
@@ -379,6 +388,14 @@ public class Location extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setMixableFlag(Boolean mixableFlag) {
 		this.mixableFlag = mixableFlag;
+	}
+
+	public Boolean getHazmatFlag() {
+		return hazmatFlag;
+	}
+
+	public void setHazmatFlag(Boolean hazmatFlag) {
+		this.hazmatFlag = hazmatFlag;
 	}
 
 	public Boolean getDelFlag() {

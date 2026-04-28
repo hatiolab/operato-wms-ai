@@ -6,11 +6,13 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.web.WebProperties.Resources.Chain.Strategy;
 import org.springframework.stereotype.Component;
 
 import operato.wms.base.entity.Location;
 import operato.wms.base.entity.SKU;
 import operato.wms.base.entity.StoragePolicy;
+import operato.wms.base.entity.Warehouse;
 import operato.wms.base.service.RuntimeConfigService;
 import operato.wms.base.service.WmsBaseService;
 import operato.wms.inbound.WmsInboundConfigConstants;
@@ -286,6 +288,20 @@ public class InboundTransactionService extends AbstractQueryService {
             item.setStatus(WmsInboundConstants.STATUS_START);
         }
 
+        // W23-FL-5: 창고 팔레트 수용 용량 사전 경고
+        int planPalletCnt = receivingItems.stream()
+                .mapToInt(item -> item.getExpPalletQty() != null ? item.getExpPalletQty() : 0)
+                .sum();
+        String capacityWarning = this.checkWarehousePalletCapacity(
+                receiving.getDomainId(), receiving.getWhCd(), planPalletCnt);
+        if (capacityWarning != null) {
+            // 경고가 있으면 id=null + remarks에 경고 문구를 담아 반환 (입고 진행은 계속)
+            Receiving warning = new Receiving();
+            warning.setId(null);
+            warning.setRemarks(capacityWarning);
+            return warning;
+        }
+
         // 4. 입고 예정 상태 변경
         receiving.setStatus(WmsInboundConstants.STATUS_START);
         this.queryManager.update(receiving, "status", "updatedAt");
@@ -295,6 +311,41 @@ public class InboundTransactionService extends AbstractQueryService {
 
         // 6. 입고 정보 리턴
         return receiving;
+    }
+
+    /**
+     * W23-FL-5: 창고 팔레트 수용 용량 초과 여부 사전 경고
+     *
+     * Warehouse.maxPalletCnt가 설정된 경우, 현재 보관 중인 팔레트 수에
+     * 추가 입고 팔레트 수를 합산하여 초과 여부를 확인한다.
+     * 초과 시 경고 문자열 반환, 정상이거나 maxPalletCnt 미설정이면 null 반환.
+     *
+     * @param domainId     도메인 ID
+     * @param whCd         창고 코드
+     * @param addPalletCnt 추가 입고 예정 팔레트 수
+     * @return 경고 문자열 (초과 시), null (정상 시)
+     */
+    public String checkWarehousePalletCapacity(Long domainId, String whCd, int addPalletCnt) {
+        Warehouse wh = this.wmsBaseSvc.findWarehouse(whCd, false, false);
+        if (wh == null || wh.getMaxPalletCnt() == null || wh.getMaxPalletCnt() <= 0) {
+            return null;
+        }
+
+        String sql = "SELECT COALESCE(SUM(pallet_qty), 0) FROM inventories"
+                + " WHERE domain_id = :domainId AND wh_cd = :whCd"
+                + " AND (del_flag IS NULL OR del_flag = false) AND inv_qty > 0";
+        Integer currentCnt = this.queryManager.selectBySql(sql,
+                ValueUtil.newMap("domainId,whCd", domainId, whCd), Integer.class);
+        if (currentCnt == null)
+            currentCnt = 0;
+
+        int totalCnt = currentCnt + addPalletCnt;
+        if (totalCnt > wh.getMaxPalletCnt()) {
+            return "창고 [" + whCd + "] 수용 용량 초과: 현재 " + currentCnt
+                    + "개 + 입고 예정 " + addPalletCnt + "개 = " + totalCnt
+                    + "개 (최대 " + wh.getMaxPalletCnt() + "개)";
+        }
+        return null;
     }
 
     /**
@@ -468,6 +519,10 @@ public class InboundTransactionService extends AbstractQueryService {
 
         // 3. 품목 및 수량 체크
         for (ReceivingItem item : receivingItems) {
+            if (ValueUtil.isEqual(item.getStatus(), WmsInboundConstants.STATUS_REJECTED)) {
+                // 반려된 아이템은 이미 불량 재고 처리 완료, 상태 유지
+                continue;
+            }
             if (item.getRcvExpQty() <= item.getRcvQty()) {
                 item.setStatus(WmsInboundConstants.STATUS_END);
                 item.setRcvDate(rcvDate);
@@ -575,8 +630,9 @@ public class InboundTransactionService extends AbstractQueryService {
      */
     public List<Inventory> createInventoriesByReceivingOrder(Receiving receiving, List<ReceivingItem> receivingItems) {
         // 1. 기본 로케이션 설정에서 조회
-        String defaultLocCd = this.runtimeConfSvc.getRuntimeConfigValue(receiving.getComCd(), receiving.getWhCd(),
-                WmsInboundConfigConstants.RECEIPT_FINISH_LOCATION);
+        StoragePolicy policy = this.wmsBaseSvc.findStoragePolicy(receiving.getDomainId(), receiving.getComCd(),
+                receiving.getWhCd());
+        String defaultLocCd = policy.getDefaultWaitLoc();
 
         List<Inventory> inventories = new ArrayList<Inventory>();
         for (ReceivingItem item : receivingItems) {
@@ -749,8 +805,9 @@ public class InboundTransactionService extends AbstractQueryService {
         }
 
         // 3. 입고 예정 상세 조회
-        String rcvWaitLoc = this.runtimeConfSvc.getRuntimeConfigValue(rcv.getComCd(), rcv.getWhCd(),
-                WmsInboundConfigConstants.RECEIPT_FINISH_LOCATION);
+        StoragePolicy policy = this.wmsBaseSvc.findStoragePolicy(rcv.getDomainId(), rcv.getComCd(), rcv.getWhCd());
+        String rcvWaitLoc = policy.getDefaultWaitLoc();
+
         Query queryObj = AnyOrmUtil.newConditionForExecution(Domain.currentDomainId());
         queryObj.addFilter("rcvNo", rcvNo);
         queryObj.addFilter("locCd", rcvWaitLoc);
@@ -816,11 +873,17 @@ public class InboundTransactionService extends AbstractQueryService {
                 + " WHERE domain_id = :domainId AND wh_cd = :whCd"
                 + " AND (del_flag IS NULL OR del_flag = false) AND inv_qty > 0";
 
+        // W23-FL-2: 위험물 상품이면 hazmat_flag=true인 로케이션만 추천
+        String hazmatFilter = (sku != null && Boolean.TRUE.equals(sku.getHazmatFlag()))
+                ? " AND hazmat_flag = true"
+                : "";
+
         String baseSql = "SELECT * FROM locations"
                 + " WHERE domain_id = :domainId AND wh_cd = :whCd"
                 + " AND loc_type = 'STORAGE'"
                 + " AND (del_flag IS NULL OR del_flag = false)"
-                + " AND (restrict_type IS NULL OR restrict_type = '')";
+                + " AND (restrict_type IS NULL OR restrict_type = '')"
+                + hazmatFilter;
 
         Map<String, Object> params = ValueUtil.newMap("domainId,whCd,limit", domainId, whCd, limit);
         String sql;
@@ -848,20 +911,34 @@ public class InboundTransactionService extends AbstractQueryService {
             }
 
         } else if (StoragePolicy.PUTAWAY_STRATEGY_NEAREST.equals(strategy)) {
-            // NEAREST: sortNo ASC 기준 가장 가까운 빈 로케이션
+            // NEAREST: sortNo ASC 기준 가장 가까운 빈 로케이션 (W23-FL-4: tempType 필터 추가)
+            String tempType = (sku != null) ? sku.getTempType() : null;
             sql = baseSql
                     + " AND loc_cd NOT IN (" + occupiedSubSql + ")"
+                    + (ValueUtil.isNotEmpty(tempType)
+                            ? " AND (temp_type = :tempType OR temp_type IS NULL OR temp_type = '')"
+                            : "")
                     + " ORDER BY sort_no ASC NULLS LAST"
                     + " LIMIT :limit";
+            if (ValueUtil.isNotEmpty(tempType)) {
+                params.put("tempType", tempType);
+            }
 
         } else {
-            // RANDOM(기본): 화주사 전용 또는 공용(com_cd IS NULL) 빈 로케이션
+            // RANDOM(기본): 화주사 전용 또는 공용(com_cd IS NULL) 빈 로케이션 (W23-FL-4: tempType 필터 추가)
+            String tempType = (sku != null) ? sku.getTempType() : null;
             sql = baseSql
                     + " AND loc_cd NOT IN (" + occupiedSubSql + ")"
                     + " AND (com_cd = :comCd OR com_cd IS NULL OR com_cd = '')"
+                    + (ValueUtil.isNotEmpty(tempType)
+                            ? " AND (temp_type = :tempType OR temp_type IS NULL OR temp_type = '')"
+                            : "")
                     + " ORDER BY sort_no ASC NULLS LAST"
                     + " LIMIT :limit";
             params.put("comCd", comCd);
+            if (ValueUtil.isNotEmpty(tempType)) {
+                params.put("tempType", tempType);
+            }
         }
 
         return this.queryManager.selectListBySql(sql, params, Location.class, 0, 0);
@@ -1018,14 +1095,13 @@ public class InboundTransactionService extends AbstractQueryService {
      * @return
      */
     public String getRecevingLabelTemplateName(Receiving rec, boolean exceptionWhenEmpty) {
-        String templateName = this.runtimeConfSvc.getRuntimeConfigValue(rec.getComCd(), rec.getWhCd(),
-                WmsStockConfigConstants.INV_BARCODE_LABEL_TEMPLATE);
+        StoragePolicy policy = this.wmsBaseSvc.findStoragePolicy(rec.getDomainId(), rec.getComCd(), rec.getWhCd());
 
-        if (exceptionWhenEmpty && ValueUtil.isEmpty(templateName)) {
-            throw new ElidomRuntimeException("입고 라벨 템플릿이 화주사-창고별 설정에 설정되지 않았습니다.");
+        if (exceptionWhenEmpty && (policy == null || ValueUtil.isEmpty(policy.getInvLabelTmpl()))) {
+            throw new ElidomRuntimeException("재고 바코드 라벨 템플릿이 화주사-창고별 보관 정책 설정에 설정되지 않았습니다.");
         }
 
-        return templateName;
+        return policy.getInvLabelTmpl();
     }
 
     /**
@@ -1036,13 +1112,96 @@ public class InboundTransactionService extends AbstractQueryService {
      * @return
      */
     public String getReceivingSheetTemplateName(Receiving rec, boolean exceptionWhenEmpty) {
-        String templateName = this.runtimeConfSvc.getRuntimeConfigValue(rec.getComCd(), rec.getWhCd(),
-                WmsInboundConfigConstants.RECEIPT_ORDER_SHEET_TEMPLATE);
+        StoragePolicy policy = this.wmsBaseSvc.findStoragePolicy(rec.getDomainId(), rec.getComCd(), rec.getWhCd());
 
-        if (exceptionWhenEmpty && ValueUtil.isEmpty(templateName)) {
-            throw new ElidomRuntimeException("입고지지서 템플릿이 화주사-창고별 설정에 설정되지 않았습니다.");
+        if (exceptionWhenEmpty && (policy == null || ValueUtil.isEmpty(policy.getInboundSheetTmpl()))) {
+            throw new ElidomRuntimeException("입고지지서 템플릿이 화주사-창고별 보관 정책 설정에 설정되지 않았습니다.");
         }
 
-        return templateName;
+        return policy.getInboundSheetTmpl();
+    }
+
+    /********************************************************************************************************
+     * 검수 반려 트랜잭션 (W23-IR-1, W23-IR-2)
+     ********************************************************************************************************/
+
+    /**
+     * 입고 상세 라인 반려 처리 (W23-IR-1)
+     *
+     * 검수 중인(START) 라인을 REJECTED 상태로 전환하고 반려 사유를 remarks에 기록한다.
+     * 반려 수량이 있는 경우 불량(DEFECT) 로케이션에 불량 재고를 생성한다.
+     *
+     * @param receiving    입고 주문
+     * @param item         입고 상세 라인
+     * @param rejectReason 반려 사유
+     * @return 반려 처리된 입고 상세 라인
+     */
+    public ReceivingItem rejectReceivingOrderLine(Receiving receiving, ReceivingItem item, String rejectReason) {
+        if (ValueUtil.isNotEqual(item.getStatus(), WmsInboundConstants.STATUS_START)) {
+            throw new ElidomRuntimeException("입고 순번 [" + item.getRcvSeq() + "]은 작업 중인 상태가 아닙니다.");
+        }
+
+        item.setStatus(WmsInboundConstants.STATUS_REJECTED);
+        item.setRemarks(rejectReason);
+        item.setRcvDate(DateUtil.todayStr());
+
+        this.processRejectedReceivingItem(receiving, item);
+        return item;
+    }
+
+    /**
+     * 반려 재고 처리 (W23-IR-2)
+     *
+     * 반려된 입고 라인의 수량(rcvQty)이 있으면 창고의 DEFECT 로케이션에 불량 재고(STATUS_BAD)를 생성한다.
+     * DEFECT 로케이션이 없으면 재고 생성 없이 반환한다.
+     *
+     * @param receiving 입고 주문
+     * @param item      반려된 입고 상세 라인
+     */
+    public void processRejectedReceivingItem(Receiving receiving, ReceivingItem item) {
+        if (item.getRcvQty() == null || item.getRcvQty() == 0) {
+            return;
+        }
+
+        // DEFECT 로케이션 조회
+        String defectLocSql = "SELECT loc_cd FROM locations"
+                + " WHERE domain_id = :domainId AND wh_cd = :whCd AND loc_type = 'DEFECT'"
+                + " AND (del_flag IS NULL OR del_flag = false)"
+                + " LIMIT 1";
+        String defectLocCd = this.queryManager.selectBySql(defectLocSql,
+                ValueUtil.newMap("domainId,whCd", receiving.getDomainId(), receiving.getWhCd()), String.class);
+
+        if (ValueUtil.isEmpty(defectLocCd)) {
+            return;
+        }
+
+        SKU sku = this.queryManager.selectByCondition(SKU.class,
+                new SKU(receiving.getDomainId(), receiving.getComCd(), item.getSkuCd()));
+
+        Inventory inv = new Inventory();
+        inv.setBarcode(ValueUtil.isNotEmpty(item.getBarcode()) ? item.getBarcode() : Inventory.newBarcode());
+        inv.setStatus(Inventory.STATUS_BAD);
+        inv.setLastTranCd(Inventory.TRANSACTION_IN_INSP);
+        inv.setWhCd(receiving.getWhCd());
+        inv.setComCd(receiving.getComCd());
+        inv.setVendCd(receiving.getVendCd());
+        inv.setPoNo(ValueUtil.isNotEmpty(item.getPoNo()) ? item.getPoNo() : receiving.getRcvReqNo());
+        inv.setRcvNo(receiving.getRcvNo());
+        inv.setRcvSeq(item.getRcvSeq());
+        inv.setSkuCd(item.getSkuCd());
+        if (sku != null) {
+            inv.setSkuBcd(sku.getSkuBarcd());
+            inv.setSkuNm(sku.getSkuNm());
+        }
+        inv.setLocCd(defectLocCd);
+        inv.setProdDate(item.getPrdDate());
+        inv.setExpiredDate(item.getExpiredDate());
+        inv.setInvoiceNo(item.getInvoiceNo());
+        inv.setInvQty(item.getRcvQty());
+        inv.setLotNo(item.getLotNo());
+        inv.setRemarks(item.getRemarks());
+        inv.setDelFlag(false);
+
+        this.queryManager.insert(inv);
     }
 }
