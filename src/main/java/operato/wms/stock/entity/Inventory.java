@@ -750,7 +750,7 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 			this.skuNm = sku.getSkuNm();
 		}
 
-		if (sku == null || sku.getPrdExpiredPeriod() == null) {
+		if (sku == null || ValueUtil.isEmpty(sku.getPrdExpiredPeriod()) || ValueUtil.isEmpty(this.prodDate)) {
 			return;
 		}
 

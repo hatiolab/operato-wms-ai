@@ -736,12 +736,13 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
           { name: 'sku_cd', value: item.sku_cd },
           ...(this.formData.whCd ? [{ name: 'wh_cd', value: this.formData.whCd }] : [])
         ]
-        const data = await ServiceUtil.searchByPagination('inventories', filters, null, 1, 1)
+        const data = await ServiceUtil.searchByPagination('inventories', filters, null, 1, 1000)
         const items = data?.items || []
         if (items.length > 0) {
+          const totalQty = items.reduce((sum, inv) => sum + (inv.inv_qty || 0), 0)
           this.stockInfo = {
             ...this.stockInfo,
-            [item.sku_cd]: items[0].stock_qty || items[0].available_qty || 0
+            [item.sku_cd]: totalQty
           }
         }
       } catch (err) {
@@ -768,8 +769,8 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
 
     if (bomId) {
       this.selectedBom = this.bomList.find(b => b.id === bomId) || null
-      // BOM의 화주사 코드를 자동 설정
-      if (this.selectedBom && this.selectedBom.com_cd && !this.formData.comCd) {
+      // BOM의 화주사 코드를 자동 설정 (BOM에 화주사가 지정되어 있고, 현재 선택과 다르면 덮어씀)
+      if (this.selectedBom && this.selectedBom.com_cd && this.formData.comCd !== this.selectedBom.com_cd) {
         this._updateField('comCd', this.selectedBom.com_cd)
       }
       // BOM의 창고 코드를 자동 설정

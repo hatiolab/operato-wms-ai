@@ -271,7 +271,23 @@ public class VasTransactionService extends AbstractQueryService {
 					"배정 수량이 소요 수량을 초과합니다. 소요: " + item.getReqQty() + ", 배정: " + allocQty);
 		}
 
-		// 4. 배정 처리
+		// 4. srcLocCd 미입력 시 풀필먼트와 동일한 방식으로 자동 조회 (FIFO 기준)
+		if (ValueUtil.isEmpty(srcLocCd)) {
+			VasOrder order = this.queryManager.select(VasOrder.class, item.getVasOrderId());
+			if (order != null) {
+				List<Inventory> candidates = this.stockTrxSvc.searchAvailableInventory(
+						item.getDomainId(), order.getComCd(), order.getWhCd(),
+						item.getSkuCd(), allocQty, null);
+				if (!candidates.isEmpty()) {
+					srcLocCd = candidates.get(0).getLocCd();
+					if (ValueUtil.isEmpty(lotNo)) {
+						lotNo = candidates.get(0).getLotNo();
+					}
+				}
+			}
+		}
+
+		// 5. 배정 처리
 		item.setAllocQty(allocQty);
 		item.setSrcLocCd(srcLocCd);
 		item.setLotNo(lotNo);
@@ -298,8 +314,7 @@ public class VasTransactionService extends AbstractQueryService {
 		}
 
 		// 2. 상태 검증
-		if (!WmsVasConstants.ITEM_STATUS_ALLOCATED.equals(item.getStatus()) &&
-				!WmsVasConstants.ITEM_STATUS_PICKING.equals(item.getStatus())) {
+		if (!WmsVasConstants.ITEM_STATUS_ALLOCATED.equals(item.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
 					"피킹 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
 		}

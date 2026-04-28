@@ -983,7 +983,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
       const data = await ServiceUtil.restGet(`vas_trx/vas_orders/${orderId}/items`)
       this.orderItems = (data || []).map(item => ({
         ...item,
-        _picked: item.pick_status === 'PICKED',
+        _picked: false,
         _pickedQty: item.picked_qty || '',
         _active: false
       }))
@@ -1059,8 +1059,8 @@ class VasWorkPage extends localize(i18next)(PageView) {
     this.orderItems = items
   }
 
-  /** 개별 자재 피킹 확인 - API 호출 후 상태 업데이트 */
-  async _confirmPick(idx) {
+  /** 개별 자재 확인 - 작업자가 자재 보유 여부를 현장에서 확인하는 UI 동작 (API 호출 없음) */
+  _confirmPick(idx) {
     const item = this.orderItems[idx]
     const pickedQty = parseFloat(item._pickedQty)
     const reqQty = item.alloc_qty || item.req_qty || 0
@@ -1075,28 +1075,18 @@ class VasWorkPage extends localize(i18next)(PageView) {
       return
     }
 
-    try {
-      await ServiceUtil.restPost(`vas_trx/vas_order_items/${item.id}/pick`, {
-        pickedQty: pickedQty
-      })
+    const items = [...this.orderItems]
+    items[idx] = { ...items[idx], _picked: true, _active: false }
 
-      // 성공 시 UI 업데이트
-      const items = [...this.orderItems]
-      items[idx] = { ...items[idx], _picked: true, _active: false }
-
-      // 다음 미피킹 항목 활성화
-      const nextUnpicked = items.findIndex((i, i2) => i2 > idx && !i._picked)
-      if (nextUnpicked >= 0) {
-        items[nextUnpicked] = { ...items[nextUnpicked], _active: true }
-      }
-
-      this.orderItems = items
-      this._showFeedback('피킹 확인', 'success')
-      voiceService.success('피킹 완료')
-    } catch (err) {
-      this._showFeedback(err.message || '피킹 실패', 'error')
-      voiceService.error('피킹 실패')
+    // 다음 미확인 항목 활성화
+    const nextUnpicked = items.findIndex((i, i2) => i2 > idx && !i._picked)
+    if (nextUnpicked >= 0) {
+      items[nextUnpicked] = { ...items[nextUnpicked], _active: true }
     }
+
+    this.orderItems = items
+    this._showFeedback('자재 확인', 'success')
+    voiceService.success('확인 완료')
   }
 
   /* ============================================================

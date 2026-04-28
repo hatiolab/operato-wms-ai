@@ -836,7 +836,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
       'cancel'
     )
 
-    if (!result.confirmButton) return
+    if (!result) return
 
     try {
       const items = this.itemsMap[order.id] || []
