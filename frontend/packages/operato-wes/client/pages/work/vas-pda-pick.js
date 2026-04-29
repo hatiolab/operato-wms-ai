@@ -277,7 +277,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
 
         /* 주문 정보 카드 */
         .order-info-card {
-          background: var(--md-sys-color-surface, #fff);
+          background: #fff;
           border-radius: 12px;
           padding: 16px;
           margin-bottom: 16px;
@@ -305,7 +305,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
 
         /* 항목 체크리스트 */
         .item-checklist {
-          background: var(--md-sys-color-surface, #fff);
+          background: #fff;
           border-radius: 12px;
           padding: 16px;
           margin-bottom: 16px;
