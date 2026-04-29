@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import operato.wms.oms.entity.StockAllocation;
 import operato.wms.vas.entity.VasOrder;
 import operato.wms.vas.entity.VasOrderItem;
 import operato.wms.vas.entity.VasResult;
@@ -303,6 +304,20 @@ public class VasTransactionController {
 	@ApiDesc(description = "List VAS Order Items")
 	public List<VasOrderItem> listVasOrderItems(@PathVariable("id") String id) {
 		return this.vasService.listVasOrderItems(id);
+	}
+
+	/**
+	 * 자재 항목별 재고 할당 목록 조회
+	 *
+	 * GET /rest/vas_trx/vas_order_items/{itemId}/allocations
+	 *
+	 * @param itemId 작업 지시 상세 ID
+	 * @return 재고 할당 목록 (바코드, 로케이션, 할당수량 등)
+	 */
+	@GetMapping(value = "/vas_order_items/{itemId}/allocations", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "List Stock Allocations for VAS Order Item")
+	public List<StockAllocation> listVasItemAllocations(@PathVariable("itemId") String itemId) {
+		return this.vasService.listVasItemAllocations(itemId);
 	}
 
 	/********************************************************************************************************

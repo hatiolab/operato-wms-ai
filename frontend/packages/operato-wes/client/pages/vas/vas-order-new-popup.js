@@ -866,10 +866,11 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
    * 유틸리티
    * ============================================================ */
 
-  /** 1단계 필수 입력값 검증 (화주사, BOM, 요청일, 계획수량) */
+  /** 1단계 필수 입력값 검증 (화주사, 창고, BOM, 요청일, 계획수량) */
   _validateStep1() {
     const errors = []
     if (!this.formData.comCd) errors.push('화주사를 입력해주세요.')
+    if (!this.formData.whCd) errors.push('창고를 선택해주세요.')
     if (!this.formData.vasBomId) errors.push('BOM을 선택해주세요.')
     if (!this.formData.vasReqDate) errors.push('요청일을 입력해주세요.')
     if (!this.formData.planQty || parseFloat(this.formData.planQty) <= 0) {

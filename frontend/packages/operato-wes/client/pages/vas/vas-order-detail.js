@@ -160,7 +160,19 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
           background: var(--md-sys-color-surface);
           border-radius: 8px;
           overflow: hidden;
+          table-layout: fixed;
         }
+
+        /* 소요 자재 테이블 컬럼 너비 고정 */
+        /* 순번 5% | 자재명 20% | SKU 12% | 필요/할당/피킹 7%×3 | 상태 10% | 액션 12% */
+        .materials-table colgroup col:nth-child(1) { width: 5%; }
+        .materials-table colgroup col:nth-child(2) { width: 20%; }
+        .materials-table colgroup col:nth-child(3) { width: 12%; }
+        .materials-table colgroup col:nth-child(4) { width: 7%; }
+        .materials-table colgroup col:nth-child(5) { width: 7%; }
+        .materials-table colgroup col:nth-child(6) { width: 7%; }
+        .materials-table colgroup col:nth-child(7) { width: 10%; }
+        .materials-table colgroup col:nth-child(8) { width: 12%; }
 
         thead {
           background: var(--md-sys-color-surface-variant);
@@ -218,6 +230,102 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
           align-items: center;
           padding: var(--spacing-xxlarge, 48px);
         }
+
+        /* 자재 상태 배지 */
+        .item-status-badge {
+          display: inline-block;
+          padding: 2px 8px;
+          border-radius: 10px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .item-status-badge.PLANNED { background: #F5F5F5; color: #757575; }
+        .item-status-badge.ALLOCATED { background: #E3F2FD; color: #1565C0; }
+        .item-status-badge.PICKING { background: #FFF3E0; color: #E65100; }
+        .item-status-badge.PICKED { background: #E8F5E9; color: #2E7D32; }
+        .item-status-badge.IN_USE { background: #FFF8E1; color: #F57F17; }
+        .item-status-badge.COMPLETED { background: #EDE7F6; color: #4527A0; }
+
+        /* 할당 토글 버튼 */
+        .alloc-toggle-btn {
+          padding: 3px 8px;
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 4px;
+          background: var(--md-sys-color-surface, #fff);
+          font-size: 11px;
+          cursor: pointer;
+          transition: all 0.2s;
+          color: var(--md-sys-color-on-surface-variant, #555);
+        }
+
+        .alloc-toggle-btn:hover {
+          background: var(--md-sys-color-surface-variant, #f5f5f5);
+        }
+
+        .alloc-toggle-btn.active {
+          background: #E8EAF6;
+          color: #3949AB;
+          border-color: #9FA8DA;
+        }
+
+        /* 할당 서브 테이블 행 */
+        .alloc-sub-row td {
+          padding: 0 !important;
+          background: #F3F4FD;
+          border-bottom: 2px solid #9FA8DA;
+        }
+
+        .alloc-sub-table-wrap {
+          padding: 10px 16px;
+        }
+
+        .alloc-sub-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12px;
+          table-layout: fixed;
+        }
+
+        .alloc-sub-table colgroup col:nth-child(1) { width: 30%; }
+        .alloc-sub-table colgroup col:nth-child(2) { width: 20%; }
+        .alloc-sub-table colgroup col:nth-child(3) { width: 15%; }
+        .alloc-sub-table colgroup col:nth-child(4) { width: 15%; }
+        .alloc-sub-table colgroup col:nth-child(5) { width: 20%; }
+
+        .alloc-sub-table th {
+          background: #E8EAF6;
+          color: #3949AB;
+          font-weight: 600;
+          padding: 6px 10px;
+          text-align: left;
+          border-bottom: 1px solid #9FA8DA;
+        }
+
+        .alloc-sub-table th.center,
+        .alloc-sub-table td.center {
+          text-align: center;
+        }
+
+        .alloc-sub-table td {
+          padding: 6px 10px;
+          border-bottom: 1px solid #C5CAE9;
+          color: var(--md-sys-color-on-surface-variant, #555);
+          font-size: 12px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .alloc-sub-table tbody tr:last-child td {
+          border-bottom: none;
+        }
+
+        .alloc-loading {
+          padding: 8px 16px;
+          font-size: 12px;
+          color: #999;
+        }
       `
     ]
   }
@@ -229,7 +337,9 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
       vasBom: Object,
       items: Array,
       results: Array,
-      activeTab: Number
+      activeTab: Number,
+      allocationsMap: Object,
+      expandedItemIds: Object
     }
   }
 
@@ -241,6 +351,8 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
     this.items = []
     this.results = []
     this.activeTab = 0
+    this.allocationsMap = {}
+    this.expandedItemIds = {}
   }
 
   /**
@@ -277,7 +389,7 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
   }
 
   /**
-   * VAS BOM 조회
+   * VAS BOM 조회 (cold-start 대응: 실패 시 1회 재시도)
    */
   async fetchVasBom() {
     if (!this.vasOrder?.vas_bom_id) {
@@ -288,8 +400,12 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
     try {
       this.vasBom = await ServiceUtil.restGet(`vas_boms/${this.vasOrder.vas_bom_id}`)
     } catch (error) {
-      console.error('Failed to fetch VAS BOM:', error)
-      this.vasBom = null
+      try {
+        this.vasBom = await ServiceUtil.restGet(`vas_boms/${this.vasOrder.vas_bom_id}`)
+      } catch (retryErr) {
+        console.error('Failed to fetch VAS BOM:', retryErr)
+        this.vasBom = null
+      }
     }
   }
 
@@ -597,7 +713,11 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
     }
 
     return html`
-      <table>
+      <table class="materials-table">
+        <colgroup>
+          <col /><col /><col /><col />
+          <col /><col /><col /><col />
+        </colgroup>
         <thead>
           <tr>
             <th>${TermsUtil.tLabel('seq')}</th>
@@ -607,6 +727,7 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
             <th>${TermsUtil.tLabel('alloc_qty')}</th>
             <th>${TermsUtil.tLabel('pick_qty')}</th>
             <th>${TermsUtil.tLabel('status')}</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -617,13 +738,114 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
               <td>${item.sku_cd || '-'}</td>
               <td>${item.req_qty || 0}</td>
               <td>${item.alloc_qty || 0}</td>
-              <td>${item.pick_qty || 0}</td>
-              <td>${item.status || '-'}</td>
+              <td>${item.picked_qty || 0}</td>
+              <td>
+                <span class="item-status-badge ${item.status || 'PLANNED'}">
+                  ${this._itemStatusLabel(item.status)}
+                </span>
+              </td>
+              <td>
+                ${item.alloc_qty > 0 ? html`
+                  <button
+                    class="alloc-toggle-btn ${this.expandedItemIds[item.id] ? 'active' : ''}"
+                    @click="${() => this._toggleItemAllocations(item)}"
+                  >${this.expandedItemIds[item.id] ? '▲ 할당상세' : '▼ 할당상세'}</button>
+                ` : ''}
+              </td>
             </tr>
+            ${this.expandedItemIds[item.id] ? html`
+              <tr class="alloc-sub-row">
+                <td colspan="8">${this._renderAllocSubTable(item)}</td>
+              </tr>
+            ` : ''}
           `)}
         </tbody>
       </table>
     `
+  }
+
+  /**
+   * 재고 할당 서브 테이블 렌더링
+   */
+  _renderAllocSubTable(item) {
+    if (!(item.id in this.allocationsMap)) {
+      return html`<div class="alloc-loading">로딩 중...</div>`
+    }
+
+    const allocs = this.allocationsMap[item.id]
+    if (!allocs || allocs.length === 0) {
+      return html`<div class="alloc-loading">할당 내역이 없습니다.</div>`
+    }
+
+    return html`
+      <div class="alloc-sub-table-wrap">
+        <table class="alloc-sub-table">
+          <colgroup>
+            <col /><col /><col /><col /><col />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>바코드</th>
+              <th>로케이션</th>
+              <th class="center">할당수량</th>
+              <th class="center">LOT</th>
+              <th>유통기한</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${allocs.map(a => html`
+              <tr>
+                <td>${a.barcode || '-'}</td>
+                <td>${a.loc_cd || '-'}</td>
+                <td class="center">${a.alloc_qty || 0}</td>
+                <td class="center">${a.lot_no || '-'}</td>
+                <td>${a.expired_date || '-'}</td>
+              </tr>
+            `)}
+          </tbody>
+        </table>
+      </div>
+    `
+  }
+
+  /**
+   * 재고 할당 토글
+   */
+  async _toggleItemAllocations(item) {
+    const isOpen = this.expandedItemIds[item.id]
+    this.expandedItemIds = { ...this.expandedItemIds, [item.id]: !isOpen }
+
+    if (!isOpen && !(item.id in this.allocationsMap)) {
+      await this._fetchItemAllocations(item.id)
+    }
+  }
+
+  /**
+   * 재고 할당 목록 조회
+   */
+  async _fetchItemAllocations(itemId) {
+    try {
+      const allocs = await ServiceUtil.restGet(`vas_trx/vas_order_items/${itemId}/allocations`)
+      this.allocationsMap = { ...this.allocationsMap, [itemId]: allocs || [] }
+    } catch (err) {
+      console.error('재고 할당 조회 실패:', err)
+      this.allocationsMap = { ...this.allocationsMap, [itemId]: [] }
+    }
+  }
+
+  /**
+   * 자재 상태 한글 라벨
+   */
+  _itemStatusLabel(status) {
+    const map = {
+      PLANNED: '등록 중',
+      ALLOCATED: '배정됨',
+      PICKING: '피킹 중',
+      PICKED: '피킹 완료',
+      IN_USE: '투입 중',
+      COMPLETED: '완료'
+    }
+    return map[status] || status || '등록 중'
   }
 
   /**

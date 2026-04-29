@@ -243,9 +243,13 @@ public class VasTransactionService extends AbstractQueryService {
 	/**
 	 * 자재 배정
 	 *
+	 * 가용 재고를 FIFO 기준으로 조회하여 필요 수량을 분할 배정한다.
+	 * 배정된 각 재고에 대해 stock_allocations(HARD)를 생성하고 reserved_qty를 증가시킨다.
+	 * 재배정(ALLOCATED → ALLOCATED) 시 기존 할당을 먼저 해제한 후 새로 생성한다.
+	 *
 	 * @param vasOrderItemId 작업 지시 상세 ID
 	 * @param allocQty       배정 수량
-	 * @param srcLocCd       피킹 로케이션
+	 * @param srcLocCd       피킹 로케이션 (비어있으면 자동 조회)
 	 * @param lotNo          로트 번호
 	 * @return 업데이트된 작업 지시 상세
 	 */
@@ -271,31 +275,157 @@ public class VasTransactionService extends AbstractQueryService {
 					"배정 수량이 소요 수량을 초과합니다. 소요: " + item.getReqQty() + ", 배정: " + allocQty);
 		}
 
-		// 4. srcLocCd 미입력 시 풀필먼트와 동일한 방식으로 자동 조회 (FIFO 기준)
-		if (ValueUtil.isEmpty(srcLocCd)) {
-			VasOrder order = this.queryManager.select(VasOrder.class, item.getVasOrderId());
-			if (order != null) {
-				List<Inventory> candidates = this.stockTrxSvc.searchAvailableInventory(
-						item.getDomainId(), order.getComCd(), order.getWhCd(),
-						item.getSkuCd(), allocQty, null);
-				if (!candidates.isEmpty()) {
-					srcLocCd = candidates.get(0).getLocCd();
-					if (ValueUtil.isEmpty(lotNo)) {
-						lotNo = candidates.get(0).getLotNo();
-					}
-				}
-			}
+		// 4. 재배정 시 기존 stock_allocations 해제
+		if (WmsVasConstants.ITEM_STATUS_ALLOCATED.equals(item.getStatus())) {
+			this.releaseVasItemAllocations(item);
 		}
 
-		// 5. 배정 처리
-		item.setAllocQty(allocQty);
-		item.setSrcLocCd(srcLocCd);
-		item.setLotNo(lotNo);
+		// 5. 가용 재고 조회 (분할 배정 지원 — FIFO 기준)
+		VasOrder order = this.queryManager.select(VasOrder.class, item.getVasOrderId());
+		if (order == null) {
+			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시를 찾을 수 없습니다.");
+		}
+
+		List<Inventory> candidates;
+		if (ValueUtil.isNotEmpty(srcLocCd)) {
+			// 특정 로케이션 지정 시 해당 로케이션의 재고만 조회 (loc_type 무관)
+			String locSql = "SELECT * FROM inventories " +
+					"WHERE domain_id = :domainId AND com_cd = :comCd AND sku_cd = :skuCd " +
+					"AND loc_cd = :locCd AND status = :status " +
+					"AND (del_flag IS NULL OR del_flag = false) " +
+					"AND (inv_qty - COALESCE(reserved_qty, 0)) > 0 " +
+					"ORDER BY created_at ASC";
+			Map<String, Object> locParams = ValueUtil.newMap("domainId,comCd,skuCd,locCd,status",
+					item.getDomainId(), order.getComCd(), item.getSkuCd(), srcLocCd,
+					Inventory.STATUS_STORED);
+			if (ValueUtil.isNotEmpty(order.getWhCd())) {
+				locSql = locSql.replace("AND loc_cd = :locCd",
+						"AND wh_cd = :whCd AND loc_cd = :locCd");
+				locParams.put("whCd", order.getWhCd());
+			}
+			candidates = this.queryManager.selectListBySql(locSql, locParams, Inventory.class, 0, 0);
+		} else {
+			// 자동 배정: loc_type 제한 없이 STORED 재고 전체 대상 (출고용 searchAvailableInventory와 다름)
+			// wh_cd가 비어있으면 창고 조건 없이 화주사 전체 재고에서 조회
+			String autoSql = "SELECT * FROM inventories " +
+					"WHERE domain_id = :domainId AND com_cd = :comCd AND sku_cd = :skuCd " +
+					"AND status = :status " +
+					"AND (del_flag IS NULL OR del_flag = false) " +
+					"AND (inv_qty - COALESCE(reserved_qty, 0)) > 0 " +
+					"ORDER BY created_at ASC";
+			Map<String, Object> autoParams = ValueUtil.newMap("domainId,comCd,skuCd,status",
+					item.getDomainId(), order.getComCd(), item.getSkuCd(), Inventory.STATUS_STORED);
+			if (ValueUtil.isNotEmpty(order.getWhCd())) {
+				autoSql = autoSql.replace("AND status = :status",
+						"AND wh_cd = :whCd AND status = :status");
+				autoParams.put("whCd", order.getWhCd());
+			}
+			candidates = this.queryManager.selectListBySql(autoSql, autoParams, Inventory.class, 0, 0);
+		}
+
+		// 가용 재고 없으면 명확한 오류 반환
+		if (candidates == null || candidates.isEmpty()) {
+			String whInfo = ValueUtil.isNotEmpty(order.getWhCd()) ? order.getWhCd() : "전체창고";
+			throw ThrowUtil.newValidationErrorWithNoLog(
+					"배정 가능한 재고가 없습니다. [" + item.getSkuCd() + " / " + whInfo + "]");
+		}
+
+		// 6. 분할 배정 — 재고별 stock_allocations 생성 및 reserved_qty 증가
+		String now = xyz.elidom.util.DateUtil.currentTimeStr();
+		double remainQty = allocQty;
+		String firstLocCd = null;
+		String firstLotNo = null;
+
+		for (Inventory inv : candidates) {
+			if (remainQty <= 0) break;
+
+			double avail = inv.getInvQty() - (inv.getReservedQty() == null ? 0 : inv.getReservedQty());
+			if (avail <= 0) continue;
+
+			double thisQty = Math.min(avail, remainQty);
+
+			// stock_allocations 생성 (HARD)
+			operato.wms.oms.entity.StockAllocation alloc = new operato.wms.oms.entity.StockAllocation();
+			alloc.setDomainId(item.getDomainId());
+			alloc.setShipmentOrderId(order.getId());
+			alloc.setShipmentOrderItemId(item.getId());
+			alloc.setInventoryId(inv.getId());
+			alloc.setSkuCd(item.getSkuCd());
+			alloc.setBarcode(inv.getBarcode());
+			alloc.setLocCd(inv.getLocCd());
+			alloc.setLotNo(ValueUtil.isNotEmpty(lotNo) ? lotNo : inv.getLotNo());
+			alloc.setExpiredDate(inv.getExpiredDate());
+			alloc.setAllocQty(thisQty);
+			alloc.setAllocType(operato.wms.oms.entity.StockAllocation.ALLOC_TYPE_VAS);
+			alloc.setStatus(operato.wms.oms.entity.StockAllocation.STATUS_HARD);
+			alloc.setAllocatedAt(now);
+			this.queryManager.insert(alloc);
+
+			// reserved_qty 증가
+			this.stockTrxSvc.allocateInventory(inv, thisQty);
+
+			if (firstLocCd == null) {
+				firstLocCd = inv.getLocCd();
+				firstLotNo = ValueUtil.isNotEmpty(lotNo) ? lotNo : inv.getLotNo();
+			}
+			remainQty -= thisQty;
+		}
+
+		// 필요 수량만큼 재고가 없으면 오류 (부분 배정 허용 불가)
+		if (remainQty > 0) {
+			// 이미 생성된 stock_allocations 롤백 (트랜잭션 내이므로 전체 롤백됨)
+			throw ThrowUtil.newValidationErrorWithNoLog(
+					"재고 수량 부족입니다. [" + item.getSkuCd() + "] 필요: " + allocQty + ", 가용: " + (allocQty - remainQty));
+		}
+
+		// 7. vas_order_items 업데이트 (대표 로케이션은 첫 번째 재고 기준)
+		item.setAllocQty(allocQty - remainQty);
+		item.setSrcLocCd(firstLocCd);
+		item.setLotNo(firstLotNo);
 		item.setStatus(WmsVasConstants.ITEM_STATUS_ALLOCATED);
 
 		this.queryManager.update(item, "allocQty", "srcLocCd", "lotNo", "status");
 
 		return item;
+	}
+
+	/**
+	 * VAS 자재 아이템의 기존 stock_allocations 해제 (재배정 시 호출)
+	 *
+	 * @param item 작업 지시 상세
+	 */
+	private void releaseVasItemAllocations(VasOrderItem item) {
+		String sql = "SELECT * FROM stock_allocations " +
+				"WHERE domain_id = :domainId AND shipment_order_item_id = :itemId " +
+				"AND alloc_type = :allocType AND status = :status";
+		List<operato.wms.oms.entity.StockAllocation> existing = this.queryManager.selectListBySql(sql,
+				ValueUtil.newMap("domainId,itemId,allocType,status",
+						item.getDomainId(), item.getId(),
+						operato.wms.oms.entity.StockAllocation.ALLOC_TYPE_VAS,
+						operato.wms.oms.entity.StockAllocation.STATUS_HARD),
+				operato.wms.oms.entity.StockAllocation.class, 0, 0);
+
+		for (operato.wms.oms.entity.StockAllocation alloc : existing) {
+			this.stockTrxSvc.deallocateInventory(item.getDomainId(), alloc.getInventoryId(), alloc.getAllocQty());
+			this.queryManager.delete(alloc);
+		}
+	}
+
+	/**
+	 * VAS 자재 아이템의 재고 할당 목록 조회
+	 *
+	 * @param vasOrderItemId 작업 지시 상세 ID
+	 * @return 재고 할당 목록
+	 */
+	public List<operato.wms.oms.entity.StockAllocation> listVasItemAllocations(String vasOrderItemId) {
+		String sql = "SELECT * FROM stock_allocations " +
+				"WHERE domain_id = :domainId AND shipment_order_item_id = :itemId " +
+				"AND alloc_type = :allocType ORDER BY created_at ASC";
+		return this.queryManager.selectListBySql(sql,
+				ValueUtil.newMap("domainId,itemId,allocType",
+						xyz.elidom.sys.entity.Domain.currentDomainId(), vasOrderItemId,
+						operato.wms.oms.entity.StockAllocation.ALLOC_TYPE_VAS),
+				operato.wms.oms.entity.StockAllocation.class, 0, 0);
 	}
 
 	/**
@@ -805,21 +935,22 @@ public class VasTransactionService extends AbstractQueryService {
 		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
 				sql, params, Map.class, 0, 0);
 
-		// 결과를 Map으로 변환
-		Map<String, Object> statusCounts = new java.util.HashMap<>();
-		statusCounts.put("PLAN", 0);
-		statusCounts.put("APPROVED", 0);
-		statusCounts.put("MATERIAL_READY", 0);
-		statusCounts.put("IN_PROGRESS", 0);
-		statusCounts.put("COMPLETED", 0);
-		statusCounts.put("CLOSED", 0);
-		statusCounts.put("CANCELLED", 0);
-
+		// 원시 상태별 집계
+		Map<String, Long> raw = new java.util.HashMap<>();
 		for (Map<String, Object> row : results) {
 			String status = (String) row.get("status");
-			Object count = row.get("count");
-			statusCounts.put(status, count);
+			Long count = ((Number) row.get("count")).longValue();
+			raw.put(status, count);
 		}
+
+		// 대시보드 카드 기준으로 합산하여 반환
+		// 승인완료 = APPROVED + MATERIAL_READY
+		// 완료     = COMPLETED + CLOSED
+		Map<String, Object> statusCounts = new java.util.HashMap<>();
+		statusCounts.put("PLAN", raw.getOrDefault("PLAN", 0L));
+		statusCounts.put("APPROVED", raw.getOrDefault("APPROVED", 0L) + raw.getOrDefault("MATERIAL_READY", 0L));
+		statusCounts.put("IN_PROGRESS", raw.getOrDefault("IN_PROGRESS", 0L));
+		statusCounts.put("COMPLETED", raw.getOrDefault("COMPLETED", 0L) + raw.getOrDefault("CLOSED", 0L));
 
 		return statusCounts;
 	}
@@ -861,12 +992,13 @@ public class VasTransactionService extends AbstractQueryService {
 		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
 				sql, params, Map.class, 0, 0);
 
-		// 결과를 Map으로 변환
+		// 결과를 Map으로 변환 (키는 DB vas_type 값과 일치시킴)
 		Map<String, Object> typeStats = new java.util.HashMap<>();
-		typeStats.put("ASSEMBLY", 0);
+		typeStats.put("SET_ASSEMBLY", 0);
 		typeStats.put("DISASSEMBLY", 0);
 		typeStats.put("REPACK", 0);
-		typeStats.put("LABELING", 0);
+		typeStats.put("LABEL", 0);
+		typeStats.put("CUSTOM", 0);
 
 		for (Map<String, Object> row : results) {
 			String vasType = (String) row.get("vas_type");
@@ -887,13 +1019,14 @@ public class VasTransactionService extends AbstractQueryService {
 	public List<Map<String, Object>> getDashboardAlerts(String comCd, String whCd) {
 		List<Map<String, Object>> alerts = new java.util.ArrayList<>();
 
-		// 1. 자재 부족 알림
-		String sql1 = "SELECT COUNT(DISTINCT voi.vas_order_id) as count " +
+		// 1. 배정 필요 알림 (디테일 배정수량 미달 주문)
+		String sql1 = "SELECT DISTINCT vo.vas_no " +
 				"FROM vas_order_items voi " +
 				"INNER JOIN vas_orders vo ON voi.vas_order_id = vo.id " +
 				"WHERE voi.domain_id = :domainId " +
 				"AND voi.status IN (:statuses) " +
-				"AND (voi.alloc_qty IS NULL OR voi.alloc_qty < voi.req_qty)";
+				"AND (voi.alloc_qty IS NULL OR voi.alloc_qty < voi.req_qty) " +
+				"ORDER BY vo.vas_no";
 
 		Map<String, Object> params1 = ValueUtil.newMap("domainId", Domain.currentDomainId());
 		params1.put("statuses", java.util.Arrays.asList(
@@ -909,12 +1042,15 @@ public class VasTransactionService extends AbstractQueryService {
 			params1.put("whCd", whCd);
 		}
 
-		Integer materialShortageCount = this.queryManager.selectBySql(sql1, params1, Integer.class);
-		if (materialShortageCount != null && materialShortageCount > 0) {
+		@SuppressWarnings("unchecked")
+		List<String> pendingVasNos = (List<String>) (List<?>) this.queryManager.selectListBySql(
+				sql1, params1, String.class, 0, 0);
+
+		if (!pendingVasNos.isEmpty()) {
 			Map<String, Object> alert = new java.util.HashMap<>();
 			alert.put("type", "warning");
 			alert.put("icon", "📦");
-			alert.put("message", "자재 부족: " + materialShortageCount + "건 (배정 필요)");
+			alert.put("message", "배정 필요: " + pendingVasNos.size() + "건 (" + String.join(", ", pendingVasNos) + ")");
 			alerts.add(alert);
 		}
 

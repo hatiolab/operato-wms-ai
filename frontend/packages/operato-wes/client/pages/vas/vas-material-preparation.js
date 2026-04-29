@@ -310,7 +310,20 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
           width: 100%;
           border-collapse: collapse;
           font-size: 13px;
+          table-layout: fixed;
         }
+
+        /* 순번 4% | SKU 10% | 자재명 20% | 필요/할당/피킹 6%×3 | 로케이션 10% | LOT 8% | 상태 8% | 액션 16% */
+        .items-table colgroup col:nth-child(1)  { width: 4%; }
+        .items-table colgroup col:nth-child(2)  { width: 10%; }
+        .items-table colgroup col:nth-child(3)  { width: 20%; }
+        .items-table colgroup col:nth-child(4)  { width: 6%; }
+        .items-table colgroup col:nth-child(5)  { width: 6%; }
+        .items-table colgroup col:nth-child(6)  { width: 6%; }
+        .items-table colgroup col:nth-child(7)  { width: 10%; }
+        .items-table colgroup col:nth-child(8)  { width: 8%; }
+        .items-table colgroup col:nth-child(9)  { width: 8%; }
+        .items-table colgroup col:nth-child(10) { width: 22%; }
 
         .items-table thead {
           background: var(--md-sys-color-surface-variant, #f0f0f0);
@@ -407,6 +420,85 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
           cursor: not-allowed;
         }
 
+        /* 할당 토글 버튼 */
+        .alloc-toggle-btn {
+          padding: 3px 8px;
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 4px;
+          background: var(--md-sys-color-surface, #fff);
+          font-size: 11px;
+          cursor: pointer;
+          transition: all 0.2s;
+          color: var(--md-sys-color-on-surface-variant, #555);
+        }
+
+        .alloc-toggle-btn:hover {
+          background: var(--md-sys-color-surface-variant, #f5f5f5);
+        }
+
+        .alloc-toggle-btn.active {
+          background: #E8EAF6;
+          color: #3949AB;
+          border-color: #9FA8DA;
+        }
+
+        /* 할당 서브 테이블 행 */
+        .alloc-sub-row td {
+          padding: 0;
+          background: #F3F4FD;
+          border-bottom: 2px solid #9FA8DA;
+        }
+
+        .alloc-sub-table-wrap {
+          padding: 10px 16px;
+        }
+
+        .alloc-sub-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12px;
+          table-layout: fixed;
+        }
+
+        .alloc-sub-table colgroup col:nth-child(1) { width: 30%; }
+        .alloc-sub-table colgroup col:nth-child(2) { width: 20%; }
+        .alloc-sub-table colgroup col:nth-child(3) { width: 15%; }
+        .alloc-sub-table colgroup col:nth-child(4) { width: 15%; }
+        .alloc-sub-table colgroup col:nth-child(5) { width: 20%; }
+
+        .alloc-sub-table th {
+          background: #E8EAF6;
+          color: #3949AB;
+          font-weight: 600;
+          padding: 6px 10px;
+          text-align: left;
+          border-bottom: 1px solid #9FA8DA;
+        }
+
+        .alloc-sub-table th.center,
+        .alloc-sub-table td.center {
+          text-align: center;
+        }
+
+        .alloc-sub-table td {
+          padding: 6px 10px;
+          border-bottom: 1px solid #C5CAE9;
+          color: var(--md-sys-color-on-surface-variant, #555);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .alloc-sub-table tbody tr:last-child td {
+          border-bottom: none;
+        }
+
+        .alloc-loading {
+          padding: 8px 16px;
+          font-size: 12px;
+          color: #999;
+        }
+
         /* 토글 아이콘 */
         .toggle-icon {
           font-size: 18px;
@@ -480,7 +572,9 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
       bomMap: Object,
       itemsMap: Object,
       expandedOrderId: String,
-      statusFilter: String
+      statusFilter: String,
+      allocationsMap: Object,
+      expandedItemIds: Object
     }
   }
 
@@ -492,6 +586,8 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
     this.itemsMap = {}
     this.expandedOrderId = null
     this.statusFilter = 'ALL'
+    this.allocationsMap = {}
+    this.expandedItemIds = {}
   }
 
   get context() {
@@ -643,6 +739,10 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
     return html`
       <div class="items-section">
         <table class="items-table">
+          <colgroup>
+            <col /><col /><col /><col /><col />
+            <col /><col /><col /><col /><col />
+          </colgroup>
           <thead>
             <tr>
               <th>순번</th>
@@ -676,7 +776,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
                 <td>
                   <button
                     class="item-action-btn allocate"
-                    ?disabled="${item.status !== 'PLANNED'}"
+                    ?disabled="${item.status !== 'PLANNED' && item.status !== 'ALLOCATED'}"
                     @click="${() => this._allocateItem(order, item)}"
                   >할당</button>
                   <button
@@ -684,8 +784,19 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
                     ?disabled="${item.status !== 'ALLOCATED'}"
                     @click="${() => this._pickItem(order, item)}"
                   >피킹</button>
+                  ${item.alloc_qty > 0 ? html`
+                    <button
+                      class="alloc-toggle-btn ${this.expandedItemIds[item.id] ? 'active' : ''}"
+                      @click="${() => this._toggleItemAllocations(item)}"
+                    >${this.expandedItemIds[item.id] ? '▲ 할당상세' : '▼ 할당상세'}</button>
+                  ` : ''}
                 </td>
               </tr>
+              ${this.expandedItemIds[item.id] ? html`
+                <tr class="alloc-sub-row">
+                  <td colspan="10">${this._renderAllocSubTable(item)}</td>
+                </tr>
+              ` : ''}
             `)}
           </tbody>
         </table>
@@ -751,19 +862,23 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
 
     if (newBomIds.length === 0) return
 
-    try {
-      const results = await Promise.all(
-        newBomIds.map(id => ServiceUtil.restGet(`vas_boms/${id}`).catch(() => null))
-      )
-
-      const updated = { ...this.bomMap }
-      results.forEach((bom, i) => {
-        if (bom) updated[newBomIds[i]] = bom
-      })
-      this.bomMap = updated
-    } catch (err) {
-      console.error('BOM 조회 실패:', err)
+    // 서버 시작 직후 elidom ORM 메타데이터 초기화 경쟁을 피하기 위해 순차 조회
+    const updated = { ...this.bomMap }
+    for (const id of newBomIds) {
+      try {
+        const bom = await ServiceUtil.restGet(`vas_boms/${id}`)
+        if (bom) updated[id] = bom
+      } catch (err) {
+        // 첫 요청 실패 시 1회 재시도 (cold-start 대응)
+        try {
+          const bom = await ServiceUtil.restGet(`vas_boms/${id}`)
+          if (bom) updated[id] = bom
+        } catch (retryErr) {
+          console.warn('BOM 조회 실패 (재시도 포함):', id, retryErr)
+        }
+      }
     }
+    this.bomMap = updated
   }
 
   async _fetchAllItems(orders) {
@@ -790,6 +905,16 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
       this.itemsMap = { ...this.itemsMap, [orderId]: items || [] }
     } catch (err) {
       console.error('자재 항목 조회 실패:', err)
+    }
+  }
+
+  async _fetchItemAllocations(itemId) {
+    try {
+      const allocs = await ServiceUtil.restGet(`vas_trx/vas_order_items/${itemId}/allocations`)
+      this.allocationsMap = { ...this.allocationsMap, [itemId]: allocs || [] }
+    } catch (err) {
+      console.error('재고 할당 조회 실패:', err)
+      this.allocationsMap = { ...this.allocationsMap, [itemId]: [] }
     }
   }
 
@@ -940,6 +1065,56 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
     } else {
       this.expandedOrderId = order.id
     }
+  }
+
+  async _toggleItemAllocations(item) {
+    const isOpen = this.expandedItemIds[item.id]
+    this.expandedItemIds = { ...this.expandedItemIds, [item.id]: !isOpen }
+
+    if (!isOpen && !this.allocationsMap[item.id]) {
+      await this._fetchItemAllocations(item.id)
+    }
+  }
+
+  _renderAllocSubTable(item) {
+    if (!(item.id in this.allocationsMap)) {
+      return html`<div class="alloc-loading">로딩 중...</div>`
+    }
+
+    const allocs = this.allocationsMap[item.id]
+    if (!allocs || allocs.length === 0) {
+      return html`<div class="alloc-loading">할당 내역이 없습니다.</div>`
+    }
+
+    return html`
+      <div class="alloc-sub-table-wrap">
+        <table class="alloc-sub-table">
+          <colgroup>
+            <col /><col /><col /><col /><col />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>바코드</th>
+              <th>로케이션</th>
+              <th class="center">할당수량</th>
+              <th class="center">LOT</th>
+              <th>유통기한</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${allocs.map(a => html`
+              <tr>
+                <td>${a.barcode || '-'}</td>
+                <td>${a.loc_cd || '-'}</td>
+                <td class="center">${a.alloc_qty || 0}</td>
+                <td class="center">${a.lot_no || '-'}</td>
+                <td>${a.expired_date || '-'}</td>
+              </tr>
+            `)}
+          </tbody>
+        </table>
+      </div>
+    `
   }
 
   _viewDetail(order) {
