@@ -318,18 +318,22 @@ class VasPdaPick extends localize(i18next)(PageView) {
           margin-bottom: 12px;
         }
 
+        /* 체크리스트 항목 래퍼 (항목 + 상세 패널) */
+        .checklist-item-wrapper {
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
+        }
+
+        .checklist-item-wrapper:last-child {
+          border-bottom: none;
+        }
+
         .checklist-item {
           display: flex;
           align-items: center;
           gap: 12px;
           padding: 10px 0;
-          border-bottom: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
           font-size: 14px;
           cursor: pointer;
-        }
-
-        .checklist-item:last-child {
-          border-bottom: none;
         }
 
         .checklist-item.active {
@@ -370,6 +374,106 @@ class VasPdaPick extends localize(i18next)(PageView) {
         .checklist-item .qty strong {
           color: #E65100;
           font-weight: 700;
+        }
+
+        /* 토글 버튼 */
+        .toggle-detail-btn {
+          flex-shrink: 0;
+          min-width: 32px;
+          min-height: 32px;
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 6px;
+          background: var(--md-sys-color-surface-variant, #f5f5f5);
+          color: var(--md-sys-color-on-surface-variant, #666);
+          font-size: 13px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: background 0.15s;
+        }
+
+        .toggle-detail-btn:active {
+          background: var(--md-sys-color-primary-container, #e3f2fd);
+        }
+
+        .toggle-detail-btn.expanded {
+          background: var(--md-sys-color-primary-container, #e3f2fd);
+          border-color: var(--md-sys-color-primary, #1976D2);
+          color: var(--md-sys-color-primary, #1976D2);
+        }
+
+        /* 재고 상세 패널 */
+        .inv-detail-panel {
+          margin: 0 0 8px 36px;
+          border-radius: 6px;
+          overflow: hidden;
+        }
+
+        .inv-detail-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12px;
+          table-layout: fixed;
+        }
+
+        .inv-detail-table colgroup col:nth-child(1) { width: 32%; }  /* 재고바코드 */
+        .inv-detail-table colgroup col:nth-child(2) { width: 14%; }  /* 할당수량 */
+        .inv-detail-table colgroup col:nth-child(3) { width: 14%; }  /* 피킹수량 */
+        .inv-detail-table colgroup col:nth-child(4) { width: 22%; }  /* 상품코드 */
+        .inv-detail-table colgroup col:nth-child(5) { width: 18%; }  /* 로케이션 */
+
+        .inv-detail-table th {
+          background: #f0f4ff;
+          padding: 5px 6px;
+          text-align: center;
+          font-weight: 600;
+          font-size: 11px;
+          color: #4a5c9a;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .inv-detail-table td {
+          padding: 6px 6px;
+          text-align: center;
+          color: var(--md-sys-color-on-surface, #333);
+          background: transparent;
+          font-size: 12px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .inv-detail-table td.highlight {
+          font-weight: 700;
+          color: #E65100;
+        }
+
+        .inv-detail-table tr.scanned-row {
+          background: #e8f5e9;
+        }
+
+        .inv-detail-table tr.scanned-row td {
+          color: #2e7d32;
+          font-weight: 600;
+        }
+
+        .location-guide.all-scanned {
+          background: #e8f5e9;
+          border-color: #a5d6a7;
+        }
+
+        .location-guide.all-scanned .loc-value {
+          color: #2e7d32;
+        }
+
+        .scan-progress {
+          margin-top: 6px;
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--md-sys-color-primary, #1a73e8);
         }
 
         /* 현재 항목 폼 */
@@ -663,7 +767,8 @@ class VasPdaPick extends localize(i18next)(PageView) {
       pickQty: Number,
       feedbackMsg: String,
       feedbackType: String,
-      voiceEnabled: Boolean
+      voiceEnabled: Boolean,
+      expandedItems: Object
     }
   }
 
@@ -683,6 +788,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
     this.feedbackMsg = ''
     this.feedbackType = ''
     this.voiceEnabled = voiceService.enabled
+    this.expandedItems = {}
     this._scannerService = null
   }
 
@@ -859,39 +965,103 @@ class VasPdaPick extends localize(i18next)(PageView) {
   _renderBarcodeScanner() {
     return html`
       <div class="scan-input-group">
-        <label>자재 SKU 바코드 스캔</label>
+        <label>재고 바코드 스캔</label>
         <div class="scan-input">
           <ox-input-barcode
-            placeholder="SKU 바코드 스캔"
-            @change="${e => this._onSkuBarcodeScan(e.target.value)}"
+            placeholder="재고 바코드 스캔"
+            @change="${e => this._onInventoryBarcodeScan(e.target.value)}"
           ></ox-input-barcode>
         </div>
       </div>
     `
   }
 
+  /** 자재 피킹 체크리스트 렌더링 — 항목별 토글 버튼 + 재고 상세 패널 */
   _renderItemChecklist() {
     return html`
       <div class="item-checklist">
         <div class="title">자재 피킹 체크리스트</div>
         ${this.orderItems.map((item, idx) => html`
-          <div
-            class="checklist-item ${item._picked ? 'completed' : ''} ${idx === this.currentItemIndex ? 'active' : ''}"
-            @click="${() => this._focusItem(idx)}"
-          >
-            <div class="icon">
-              ${item._picked ? '\u2713' : idx === this.currentItemIndex ? '\u2192' : '\u2610'}
-            </div>
-            <div class="sku-info">
-              <div class="sku-name">${item.sku_cd} - ${item.sku_nm}</div>
-              <div class="qty">
-                ${item.picked_qty || 0} / ${item.alloc_qty || item.req_qty || 0} EA
-                ${item.src_loc_cd ? html` | <strong>${item.src_loc_cd}</strong>` : ''}
-                ${item.lot_no ? html` | LOT: ${item.lot_no}` : ''}
+          <div class="checklist-item-wrapper">
+            <!-- 항목 행 -->
+            <div
+              class="checklist-item ${item._picked ? 'completed' : ''} ${idx === this.currentItemIndex ? 'active' : ''}"
+              @click="${() => this._focusItem(idx)}"
+            >
+              <div class="icon">
+                ${item._picked ? '\u2713' : idx === this.currentItemIndex ? '\u2192' : '\u2610'}
               </div>
+              <div class="sku-info">
+                <div class="sku-name">${item.sku_cd} - ${item.sku_nm}</div>
+                <div class="qty">
+                  ${item.picked_qty || 0} / ${item.alloc_qty || item.req_qty || 0} EA
+                  ${item.src_loc_cd ? html` | <strong>${item.src_loc_cd}</strong>` : ''}
+                </div>
+              </div>
+              <!-- 재고 상세 토글 버튼 -->
+              <button
+                class="toggle-detail-btn ${this.expandedItems[idx] ? 'expanded' : ''}"
+                @click="${e => this._toggleItemDetail(idx, e)}"
+                title="재고 상세 보기"
+              >${this.expandedItems[idx] ? '\u25B2' : '\u25BC'}</button>
             </div>
+            <!-- 재고 상세 패널 (토글 시 표시) -->
+            ${this.expandedItems[idx] ? this._renderInvDetailPanel(item) : ''}
           </div>
         `)}
+      </div>
+    `
+  }
+
+  /** 재고 상세 패널 렌더링 — 멀티 로케이션 분할배정 지원 */
+  _renderInvDetailPanel(item) {
+    // inv_barcds / inv_alloc_qtys / inv_loc_cds 는 쉼표 구분 문자열
+    const barcodes = (item.inv_barcds || item.inv_barcd || item.barcode || '').split(',').filter(Boolean)
+    const allocQtys = (item.inv_alloc_qtys || '').split(',').filter(Boolean)
+    const locCds = (item.inv_loc_cds || item.src_loc_cd || '').split(',').filter(Boolean)
+
+    const rows = barcodes.length > 0
+      ? barcodes.map((bcd, i) => {
+          const qty = allocQtys[i] || (item.alloc_qty || item.req_qty || 0)
+          const loc = locCds[i] || item.src_loc_cd || '-'
+          const scanned = item._scannedBarcodes && item._scannedBarcodes.includes(bcd)
+          return html`
+            <tr class="${scanned ? 'scanned-row' : ''}">
+              <td>${bcd || '-'}</td>
+              <td>${qty} EA</td>
+              <td class="highlight">${scanned ? qty : 0} EA</td>
+              <td>${item.sku_cd || '-'}</td>
+              <td>${loc}</td>
+            </tr>`
+        })
+      : html`
+          <tr>
+            <td>-</td>
+            <td>${item.alloc_qty || item.req_qty || 0} EA</td>
+            <td class="highlight">${item._picked ? (item.picked_qty || item._pickedQty || 0) : 0} EA</td>
+            <td>${item.sku_cd || '-'}</td>
+            <td>${item.src_loc_cd || '-'}</td>
+          </tr>`
+
+    return html`
+      <div class="inv-detail-panel">
+        <table class="inv-detail-table">
+          <colgroup>
+            <col /><col /><col /><col /><col />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>재고바코드</th>
+              <th>할당수량</th>
+              <th>스캔수량</th>
+              <th>상품코드</th>
+              <th>로케이션</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
       </div>
     `
   }
@@ -901,19 +1071,76 @@ class VasPdaPick extends localize(i18next)(PageView) {
     if (!item) return ''
 
     const reqQty = item.alloc_qty || item.req_qty || 0
+    const barcodes = this._getAllocBarcodes(item)
+    const locs = (item.inv_loc_cds || item.src_loc_cd || '').split(',').filter(Boolean)
+    const scanned = item._scannedBarcodes || []
+
+    // 현재 아이템의 바코드를 모두 스캔했는지 (피킹 확인 버튼 유도 조건)
+    const allBarcodesScanned = barcodes.length > 0 && scanned.length >= barcodes.length
+
+    // 주문 전체 바코드(m개)가 모두 스캔됐는지 ('스캔 완료' 표시 조건)
+    const totalOrderBarcodes = this.orderItems.reduce(
+      (sum, oi) => sum + this._getAllocBarcodes(oi).length, 0
+    )
+    const totalScanned = this.orderItems.reduce((sum, oi) => {
+      // 이미 피킹 확인된 아이템은 모든 바코드가 스캔된 것으로 처리
+      if (oi._picked) return sum + this._getAllocBarcodes(oi).length
+      return sum + (oi._scannedBarcodes || []).length
+    }, 0)
+    const allOrderBarcodesScanned = totalOrderBarcodes > 0 && totalScanned >= totalOrderBarcodes
+
+    // 현재 아이템 내 다음 미스캔 바코드의 로케이션
+    const nextUnscannedIdx = barcodes.findIndex(b => !scanned.includes(b))
+    const currentItemNextLoc = nextUnscannedIdx >= 0
+      ? (locs[nextUnscannedIdx] || item.src_loc_cd || '미지정')
+      : null
+
+    // 주문 전체 기준 다음 미스캔 바코드의 로케이션
+    // — 현재 아이템이 완료된 경우 다음 아이템의 위치를 안내
+    let globalNextLoc = currentItemNextLoc
+    if (!globalNextLoc) {
+      for (const oi of this.orderItems) {
+        if (oi._picked) continue
+        const oiBarcodes = this._getAllocBarcodes(oi)
+        const oiLocs = (oi.inv_loc_cds || oi.src_loc_cd || '').split(',').filter(Boolean)
+        const oiScanned = oi._scannedBarcodes || []
+        const unscannedIdx = oiBarcodes.findIndex(b => !oiScanned.includes(b))
+        if (unscannedIdx >= 0) {
+          globalNextLoc = oiLocs[unscannedIdx] || oi.src_loc_cd || '미지정'
+          break
+        }
+      }
+    }
+
+    // 멀티 바코드인 경우에만 스캔 진행 표시
+    const scanProgress = barcodes.length > 1
+      ? html`<div class="scan-progress">${scanned.length} / ${barcodes.length} 바코드 스캔</div>`
+      : ''
+
+    // 로케이션 안내 문구
+    // - 현재 아이템 스캔 완료 → 피킹 확인 버튼 유도 (다음 자재 위치도 함께 표시)
+    // - 주문 전체 스캔 완료 → '스캔 완료' 표시 + 초록 박스
+    // - 진행 중 → 다음 위치 안내
+    const locLabel = allBarcodesScanned
+      ? '바코드 스캔 완료 — 피킹 확인을 눌러주세요'
+      : '다음 피킹 로케이션'
+    const locValue = allOrderBarcodesScanned
+      ? '✓ 스캔 완료'
+      : (globalNextLoc || '미지정')
 
     return html`
       <div class="current-item-form">
         <div class="title">\u{1F4E6} ${item.sku_cd} (${item.sku_nm})</div>
 
-        <div class="location-guide">
-          <div class="loc-label">피킹 로케이션</div>
-          <div class="loc-value">${item.src_loc_cd || '미지정'}</div>
+        <div class="location-guide ${allOrderBarcodesScanned ? 'all-scanned' : ''}">
+          <div class="loc-label">${locLabel}</div>
+          <div class="loc-value">${locValue}</div>
           ${item.lot_no ? html`<div class="lot-info">LOT: ${item.lot_no}</div>` : ''}
+          ${scanProgress}
         </div>
 
         <div class="form-group">
-          <label>피킹 수량</label>
+          <label>피킹 수량 (바코드 스캔 시 자동 누적)</label>
           <div class="qty-input-group">
             <input
               type="number"
@@ -1052,6 +1279,11 @@ class VasPdaPick extends localize(i18next)(PageView) {
       if (this.currentItemIndex >= 0) {
         this._initPickForm()
       }
+
+      // 토글 기본값: 모든 항목 열린 상태
+      const expanded = {}
+      this.orderItems.forEach((_, idx) => { expanded[idx] = true })
+      this.expandedItems = expanded
     } catch (err) {
       console.error('자재 항목 조회 실패:', err)
       this.orderItems = []
@@ -1065,12 +1297,13 @@ class VasPdaPick extends localize(i18next)(PageView) {
   async _selectOrder(order) {
     this.selectedOrder = order
     this.screen = 'pick-work'
+    this.expandedItems = {}
     await this._fetchOrderItems(order.id)
 
     // 능동적 안내: 주문 선택 후 첫 자재 피킹 안내
     if (this.currentItemIndex >= 0) {
       const item = this.orderItems[this.currentItemIndex]
-      voiceService.guide(`주문 ${order.vas_no} 선택. ${item.sku_nm || item.sku_cd} 자재 바코드를 스캔해주세요`)
+      voiceService.guide(`주문 ${order.vas_no} 선택. ${item.sku_nm || item.sku_cd} 재고 바코드를 스캔해주세요`)
     } else {
       voiceService.guide(`주문 ${order.vas_no} 선택. 모든 자재가 이미 피킹 완료되었습니다`)
     }
@@ -1081,6 +1314,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
     this.selectedOrder = null
     this.orderItems = []
     this.currentItemIndex = -1
+    this.expandedItems = {}
     this._refresh()
   }
 
@@ -1102,35 +1336,74 @@ class VasPdaPick extends localize(i18next)(PageView) {
     }
   }
 
-  _onSkuBarcodeScan(value) {
+  /** 아이템의 모든 할당 바코드 목록을 배열로 반환 */
+  _getAllocBarcodes(item) {
+    return (item.inv_barcds || item.inv_barcd || item.barcode || '').split(',').filter(Boolean)
+  }
+
+  /** 재고 바코드 스캔 처리 — 스캔마다 해당 바코드의 할당수량을 pickQty에 자동 누적 */
+  _onInventoryBarcodeScan(value) {
     const trimmed = (value || '').trim()
     if (!trimmed) return
 
+    // 미피킹 항목 중 해당 바코드를 가진 항목 탐색
     const matchIdx = this.orderItems.findIndex(
-      (item) => !item._picked && (item.sku_cd === trimmed || item.barcode === trimmed)
+      item => !item._picked && this._getAllocBarcodes(item).includes(trimmed)
     )
 
     if (matchIdx >= 0) {
+      const items = [...this.orderItems]
+      const item = items[matchIdx]
+      const prevScanned = item._scannedBarcodes || []
+
+      // 이미 스캔한 바코드인지 확인
+      if (prevScanned.includes(trimmed)) {
+        this._showFeedback('이미 스캔한 바코드입니다', 'info')
+        voiceService.warning('이미 스캔한 바코드입니다')
+        this._refocusBarcodeInput('.scan-input ox-input-barcode')
+        return
+      }
+
+      // 스캔된 바코드 기록 추가
+      const scanned = [...prevScanned, trimmed]
+      items[matchIdx] = { ...item, _scannedBarcodes: scanned }
+      this.orderItems = items
+
+      // 현재 아이템으로 포커스 이동 후 pickQty 누적 재계산
       this.currentItemIndex = matchIdx
-      this._initPickForm()
-      const item = this.orderItems[matchIdx]
-      this._showFeedback(`${item.sku_cd} 자재 확인`, 'success')
-      voiceService.success(`자재 확인. ${item.src_loc_cd || ''} 로케이션에서 ${item.alloc_qty || item.req_qty || 0}개 피킹해주세요`)
+      this._initPickForm()  // 스캔 누적 기반 pickQty 재계산
+
+      const barcodes = this._getAllocBarcodes(items[matchIdx])
+      const loc = this._getLocForBarcode(items[matchIdx], trimmed)
+      const addedQty = this._getAllocQtyForBarcode(items[matchIdx], trimmed)
+      this._showFeedback(
+        `${items[matchIdx].sku_cd} +${addedQty}EA → 누계 ${this.pickQty}EA (${scanned.length}/${barcodes.length} 스캔)`,
+        'success'
+      )
+      voiceService.success(`${addedQty}개 추가. 총 ${this.pickQty}개`)
     } else {
       const alreadyPicked = this.orderItems.find(
-        item => item._picked && (item.sku_cd === trimmed || item.barcode === trimmed)
+        item => item._picked && this._getAllocBarcodes(item).includes(trimmed)
       )
       if (alreadyPicked) {
-        this._showFeedback('이미 피킹 완료된 자재입니다', 'info')
-        voiceService.warning('이미 피킹 완료된 자재입니다')
+        this._showFeedback('이미 피킹 완료된 재고입니다', 'info')
+        voiceService.warning('이미 피킹 완료된 재고입니다')
       } else {
-        this._showFeedback('해당 자재를 찾을 수 없습니다', 'error')
-        voiceService.error('자재를 찾을 수 없습니다')
+        this._showFeedback('해당 재고를 찾을 수 없습니다', 'error')
+        voiceService.error('재고를 찾을 수 없습니다')
       }
     }
 
     // 연속 스캔을 위한 자동 재포커스
     this._refocusBarcodeInput('.scan-input ox-input-barcode')
+  }
+
+  /** 스캔된 바코드에 해당하는 로케이션 반환 */
+  _getLocForBarcode(item, barcode) {
+    const barcodes = (item.inv_barcds || item.inv_barcd || item.barcode || '').split(',').filter(Boolean)
+    const locs = (item.inv_loc_cds || item.src_loc_cd || '').split(',').filter(Boolean)
+    const idx = barcodes.indexOf(barcode)
+    return idx >= 0 ? (locs[idx] || item.src_loc_cd) : item.src_loc_cd
   }
 
   /* ============================================================
@@ -1148,6 +1421,12 @@ class VasPdaPick extends localize(i18next)(PageView) {
     if (!this.pickQty || this.pickQty <= 0) {
       this._showFeedback('수량을 입력해주세요', 'error')
       voiceService.error('수량을 입력해주세요')
+      return
+    }
+
+    if (this.pickQty < reqQty) {
+      this._showFeedback('자재를 모두 스캔해주세요', 'error')
+      voiceService.error('자재를 모두 스캔해주세요')
       return
     }
 
@@ -1223,10 +1502,39 @@ class VasPdaPick extends localize(i18next)(PageView) {
     }
   }
 
+  /** 피킹 폼 초기화 — 이미 스캔된 바코드가 있으면 누적 수량부터 재개, 없으면 0 */
   _initPickForm() {
     const item = this.orderItems[this.currentItemIndex]
     if (!item) return
-    this.pickQty = item.alloc_qty || item.req_qty || 0
+
+    const scannedBarcodes = item._scannedBarcodes || []
+    if (scannedBarcodes.length > 0) {
+      // 기존 스캔 바코드들의 수량을 합산
+      const barcodes = this._getAllocBarcodes(item)
+      const qtys = (item.inv_alloc_qtys || '').split(',').filter(Boolean)
+      const totalQty = item.alloc_qty || item.req_qty || 0
+      const perQty = barcodes.length > 0 ? Math.floor(totalQty / barcodes.length) : totalQty
+
+      let total = 0
+      scannedBarcodes.forEach(bcd => {
+        const idx = barcodes.indexOf(bcd)
+        total += idx >= 0 && qtys[idx] ? parseInt(qtys[idx]) : perQty
+      })
+      this.pickQty = total
+    } else {
+      this.pickQty = 0
+    }
+  }
+
+  /** 특정 바코드에 해당하는 할당 수량 반환 */
+  _getAllocQtyForBarcode(item, barcode) {
+    const barcodes = this._getAllocBarcodes(item)
+    const qtys = (item.inv_alloc_qtys || '').split(',').filter(Boolean)
+    const totalQty = item.alloc_qty || item.req_qty || 0
+    const idx = barcodes.indexOf(barcode)
+    if (idx >= 0 && qtys[idx]) return parseInt(qtys[idx])
+    // inv_alloc_qtys 없으면 균등 분배
+    return barcodes.length > 0 ? Math.floor(totalQty / barcodes.length) : totalQty
   }
 
   _completeAllPick() {
@@ -1248,8 +1556,16 @@ class VasPdaPick extends localize(i18next)(PageView) {
       this.scanValue = barcode
       this._onScanSearch()
     } else {
-      this._onSkuBarcodeScan(barcode)
+      this._onInventoryBarcodeScan(barcode)
     }
+  }
+
+  /** 항목 재고 상세 토글 — 이벤트 버블링 차단 후 토글 상태 변경 */
+  _toggleItemDetail(idx, event) {
+    event.stopPropagation()
+    const updated = { ...this.expandedItems }
+    updated[idx] = !updated[idx]
+    this.expandedItems = updated
   }
 
   /** 스캔 처리 후 OxInputBarcode 입력에 자동 재포커스 */

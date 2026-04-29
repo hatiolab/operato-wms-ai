@@ -1138,18 +1138,39 @@ public class VasTransactionService extends AbstractQueryService {
 	}
 
 	/**
-	 * 작업 지시 상세 목록 조회
+	 * 작업 지시 상세 목록 조회 (재고 바코드 포함)
+	 *
+	 * stock_allocations 테이블을 LEFT JOIN하여
+	 * 각 항목의 할당 재고 바코드(inv_barcds), 수량(inv_alloc_qtys),
+	 * 로케이션(inv_loc_cds)을 쉼표 구분 문자열로 함께 반환.
+	 * 멀티 로케이션 배정(분할 배정) 시 복수 바코드 지원.
 	 *
 	 * @param vasOrderId 작업 지시 ID
-	 * @return 작업 지시 상세 목록
+	 * @return 작업 지시 상세 목록 (inv_barcds/inv_alloc_qtys/inv_loc_cds 포함)
 	 */
-	public List<VasOrderItem> listVasOrderItems(String vasOrderId) {
-		Query query = new Query();
-		query.addFilter("domainId", Domain.currentDomainId());
-		query.addFilter("vasOrderId", vasOrderId);
-		query.addOrder("vasSeq", true);
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public List<Map<String, Object>> listVasOrderItems(String vasOrderId) {
+		Long domainId = Domain.currentDomainId();
+		String sql =
+			"SELECT voi.*, " +
+			"  allocs.inv_barcds, allocs.inv_alloc_qtys, allocs.inv_loc_cds " +
+			"FROM vas_order_items voi " +
+			"LEFT JOIN ( " +
+			"  SELECT shipment_order_item_id, " +
+			"    STRING_AGG(barcode, ',' ORDER BY created_at ASC) AS inv_barcds, " +
+			"    STRING_AGG(CAST(alloc_qty AS TEXT), ',' ORDER BY created_at ASC) AS inv_alloc_qtys, " +
+			"    STRING_AGG(loc_cd, ',' ORDER BY created_at ASC) AS inv_loc_cds " +
+			"  FROM stock_allocations " +
+			"  WHERE domain_id = :domainId AND alloc_type = 'VAS' " +
+			"  GROUP BY shipment_order_item_id " +
+			") allocs ON allocs.shipment_order_item_id = voi.id " +
+			"WHERE voi.domain_id = :domainId AND voi.vas_order_id = :vasOrderId " +
+			"ORDER BY voi.vas_seq ASC";
 
-		return this.queryManager.selectList(VasOrderItem.class, query);
+		List result = this.queryManager.selectListBySql(sql,
+				ValueUtil.newMap("domainId,vasOrderId", domainId, vasOrderId),
+				Map.class, 0, 0);
+		return (List<Map<String, Object>>) result;
 	}
 
 	/**

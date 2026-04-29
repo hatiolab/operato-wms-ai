@@ -977,8 +977,9 @@ class VasWorkPage extends localize(i18next)(PageView) {
                     inputmode="numeric"
                     placeholder="수량"
                     .value="${item._pickedQty || ''}"
-                    @input="${e => this._onPickQtyInput(idx, e.target.value)}"
+                    readonly
                     ?disabled="${item._picked}"
+                    style="cursor: default; background: var(--md-sys-color-surface-variant, #f5f5f5);"
                   />
                   <span class="req-qty">/ ${item.alloc_qty || item.req_qty || 0} EA</span>
                   <button
@@ -1367,6 +1368,11 @@ class VasWorkPage extends localize(i18next)(PageView) {
 
     if (!pickedQty || pickedQty <= 0) {
       this._showFeedback('수량을 입력해주세요', 'error')
+      return
+    }
+
+    if (pickedQty < reqQty) {
+      this._showFeedback(`피킹 수량(${pickedQty})이 목표 수량(${reqQty})에 미달합니다`, 'error')
       return
     }
 

@@ -156,7 +156,7 @@ public class VasTransactionController {
 	 */
 	@PostMapping(value = "/vas_orders/{id}/allocate_all", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Allocate All Materials for VAS Order")
-	public List<VasOrderItem> allocateAllMaterials(
+	public List<Map<String, Object>> allocateAllMaterials(
 			@PathVariable("id") String id,
 			@RequestBody List<Map<String, Object>> items) {
 
@@ -181,7 +181,7 @@ public class VasTransactionController {
 	 */
 	@PostMapping(value = "/vas_orders/{id}/pick_all", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Pick All Materials for VAS Order")
-	public List<VasOrderItem> pickAllMaterials(
+	public List<Map<String, Object>> pickAllMaterials(
 			@PathVariable("id") String id,
 			@RequestBody List<Map<String, Object>> items) {
 
@@ -301,16 +301,16 @@ public class VasTransactionController {
 	}
 
 	/**
-	 * 작업 지시 상세 항목(자재) 목록 조회
+	 * 작업 지시 상세 항목(자재) 목록 조회 (재고 바코드 포함)
 	 *
 	 * GET /rest/vas_trx/vas_orders/{id}/items
 	 *
 	 * @param id 작업 지시 ID
-	 * @return 작업 지시 상세(VasOrderItem) 목록
+	 * @return 작업 지시 상세 목록 (inv_barcd 포함)
 	 */
 	@GetMapping(value = "/vas_orders/{id}/items", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description = "List VAS Order Items")
-	public List<VasOrderItem> listVasOrderItems(@PathVariable("id") String id) {
+	@ApiDesc(description = "List VAS Order Items (with inv_barcd from stock_allocations)")
+	public List<Map<String, Object>> listVasOrderItems(@PathVariable("id") String id) {
 		return this.vasService.listVasOrderItems(id);
 	}
 
