@@ -21,7 +21,7 @@ import operato.wms.vas.service.VasSseService.VasEventData;
 import xyz.anythings.sys.service.AbstractQueryService;
 import xyz.elidom.dbist.dml.Query;
 import xyz.elidom.sys.entity.Domain;
-import xyz.elidom.sys.util.ThrowUtil;
+import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -80,17 +80,17 @@ public class VasTransactionService extends AbstractQueryService {
 		if (vasOrder.getVasBomId() != null) {
 			VasBom bom = this.queryManager.select(VasBom.class, vasOrder.getVasBomId());
 			if (bom == null || !WmsVasConstants.BOM_STATUS_ACTIVE.equals(bom.getStatus())) {
-				throw ThrowUtil.newValidationErrorWithNoLog("유효한 BOM이 아닙니다. BOM ID: " + vasOrder.getVasBomId());
+				throw new ElidomValidationException("유효한 BOM이 아닙니다. BOM ID: " + vasOrder.getVasBomId());
 			}
 
 			// BOM 유효기간 검증
 			String today = DateUtil.todayStr();
 			if (ValueUtil.isNotEmpty(bom.getValidFrom()) && today.compareTo(bom.getValidFrom()) < 0) {
-				throw ThrowUtil.newValidationErrorWithNoLog(
+				throw new ElidomValidationException(
 						"BOM 유효 시작일 이전입니다. 유효 시작일: " + bom.getValidFrom());
 			}
 			if (ValueUtil.isNotEmpty(bom.getValidTo()) && today.compareTo(bom.getValidTo()) > 0) {
-				throw ThrowUtil.newValidationErrorWithNoLog(
+				throw new ElidomValidationException(
 						"BOM 유효 종료일 이후입니다. 유효 종료일: " + bom.getValidTo());
 			}
 
@@ -137,7 +137,7 @@ public class VasTransactionService extends AbstractQueryService {
 		List<VasBomItem> bomItems = this.queryManager.selectList(VasBomItem.class, query);
 
 		if (bomItems.isEmpty()) {
-			throw ThrowUtil.newValidationErrorWithNoLog(
+			throw new ElidomValidationException(
 					"BOM에 구성 품목이 없습니다. BOM ID: " + vasOrder.getVasBomId());
 		}
 
@@ -167,12 +167,12 @@ public class VasTransactionService extends AbstractQueryService {
 		// 1. 작업 지시 조회
 		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
 		if (vasOrder == null) {
-			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
+			throw new ElidomValidationException("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
 		}
 
 		// 2. 상태 검증
 		if (!WmsVasConstants.STATUS_PLAN.equals(vasOrder.getStatus())) {
-			throw ThrowUtil.newValidationErrorWithNoLog(
+			throw new ElidomValidationException(
 					"승인 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
 		}
 
@@ -204,13 +204,13 @@ public class VasTransactionService extends AbstractQueryService {
 		// 1. 작업 지시 조회
 		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
 		if (vasOrder == null) {
-			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
+			throw new ElidomValidationException("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
 		}
 
 		// 2. 상태 검증 (승인 전까지만 취소 가능)
 		if (!WmsVasConstants.STATUS_PLAN.equals(vasOrder.getStatus()) &&
 				!WmsVasConstants.STATUS_APPROVED.equals(vasOrder.getStatus())) {
-			throw ThrowUtil.newValidationErrorWithNoLog(
+			throw new ElidomValidationException(
 					"취소 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
 		}
 
@@ -259,19 +259,19 @@ public class VasTransactionService extends AbstractQueryService {
 		// 1. 작업 지시 상세 조회
 		VasOrderItem item = this.queryManager.select(VasOrderItem.class, vasOrderItemId);
 		if (item == null) {
-			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시 상세를 찾을 수 없습니다. ID: " + vasOrderItemId);
+			throw new ElidomValidationException("작업 지시 상세를 찾을 수 없습니다. ID: " + vasOrderItemId);
 		}
 
 		// 2. 상태 검증
 		if (!WmsVasConstants.ITEM_STATUS_PLANNED.equals(item.getStatus()) &&
 				!WmsVasConstants.ITEM_STATUS_ALLOCATED.equals(item.getStatus())) {
-			throw ThrowUtil.newValidationErrorWithNoLog(
+			throw new ElidomValidationException(
 					"배정 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
 		}
 
 		// 3. 수량 검증
 		if (allocQty > item.getReqQty()) {
-			throw ThrowUtil.newValidationErrorWithNoLog(
+			throw new ElidomValidationException(
 					"배정 수량이 소요 수량을 초과합니다. 소요: " + item.getReqQty() + ", 배정: " + allocQty);
 		}
 
@@ -283,7 +283,7 @@ public class VasTransactionService extends AbstractQueryService {
 		// 5. 가용 재고 조회 (분할 배정 지원 — FIFO 기준)
 		VasOrder order = this.queryManager.select(VasOrder.class, item.getVasOrderId());
 		if (order == null) {
-			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시를 찾을 수 없습니다.");
+			throw new ElidomValidationException("작업 지시를 찾을 수 없습니다.");
 		}
 
 		List<Inventory> candidates;
@@ -326,7 +326,7 @@ public class VasTransactionService extends AbstractQueryService {
 		// 가용 재고 없으면 명확한 오류 반환
 		if (candidates == null || candidates.isEmpty()) {
 			String whInfo = ValueUtil.isNotEmpty(order.getWhCd()) ? order.getWhCd() : "전체창고";
-			throw ThrowUtil.newValidationErrorWithNoLog(
+			throw new ElidomValidationException(
 					"배정 가능한 재고가 없습니다. [" + item.getSkuCd() + " / " + whInfo + "]");
 		}
 
@@ -374,7 +374,7 @@ public class VasTransactionService extends AbstractQueryService {
 		// 필요 수량만큼 재고가 없으면 오류 (부분 배정 허용 불가)
 		if (remainQty > 0) {
 			// 이미 생성된 stock_allocations 롤백 (트랜잭션 내이므로 전체 롤백됨)
-			throw ThrowUtil.newValidationErrorWithNoLog(
+			throw new ElidomValidationException(
 					"재고 수량 부족입니다. [" + item.getSkuCd() + "] 필요: " + allocQty + ", 가용: " + (allocQty - remainQty));
 		}
 
@@ -440,18 +440,18 @@ public class VasTransactionService extends AbstractQueryService {
 		// 1. 작업 지시 상세 조회
 		VasOrderItem item = this.queryManager.select(VasOrderItem.class, vasOrderItemId);
 		if (item == null) {
-			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시 상세를 찾을 수 없습니다. ID: " + vasOrderItemId);
+			throw new ElidomValidationException("작업 지시 상세를 찾을 수 없습니다. ID: " + vasOrderItemId);
 		}
 
 		// 2. 상태 검증
 		if (!WmsVasConstants.ITEM_STATUS_ALLOCATED.equals(item.getStatus())) {
-			throw ThrowUtil.newValidationErrorWithNoLog(
+			throw new ElidomValidationException(
 					"피킹 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
 		}
 
 		// 3. 수량 검증
 		if (pickedQty > item.getAllocQty()) {
-			throw ThrowUtil.newValidationErrorWithNoLog(
+			throw new ElidomValidationException(
 					"피킹 수량이 배정 수량을 초과합니다. 배정: " + item.getAllocQty() + ", 피킹: " + pickedQty);
 		}
 
@@ -483,12 +483,12 @@ public class VasTransactionService extends AbstractQueryService {
 		// 1. 작업 지시 조회
 		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
 		if (vasOrder == null) {
-			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
+			throw new ElidomValidationException("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
 		}
 
 		// 2. 상태 검증
 		if (!WmsVasConstants.STATUS_MATERIAL_READY.equals(vasOrder.getStatus())) {
-			throw ThrowUtil.newValidationErrorWithNoLog(
+			throw new ElidomValidationException(
 					"작업 시작 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
 		}
 
@@ -533,12 +533,12 @@ public class VasTransactionService extends AbstractQueryService {
 		// 1. 작업 지시 조회
 		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
 		if (vasOrder == null) {
-			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
+			throw new ElidomValidationException("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
 		}
 
 		// 2. 상태 검증
 		if (!WmsVasConstants.STATUS_IN_PROGRESS.equals(vasOrder.getStatus())) {
-			throw ThrowUtil.newValidationErrorWithNoLog(
+			throw new ElidomValidationException(
 					"실적 등록 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
 		}
 
@@ -593,12 +593,12 @@ public class VasTransactionService extends AbstractQueryService {
 		// 1. 작업 지시 조회
 		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
 		if (vasOrder == null) {
-			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
+			throw new ElidomValidationException("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
 		}
 
 		// 2. 상태 검증
 		if (!WmsVasConstants.STATUS_IN_PROGRESS.equals(vasOrder.getStatus())) {
-			throw ThrowUtil.newValidationErrorWithNoLog(
+			throw new ElidomValidationException(
 					"완료 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
 		}
 
@@ -643,12 +643,12 @@ public class VasTransactionService extends AbstractQueryService {
 		// 1. 작업 지시 조회
 		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
 		if (vasOrder == null) {
-			throw ThrowUtil.newValidationErrorWithNoLog("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
+			throw new ElidomValidationException("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
 		}
 
 		// 2. 상태 검증
 		if (!WmsVasConstants.STATUS_COMPLETED.equals(vasOrder.getStatus())) {
-			throw ThrowUtil.newValidationErrorWithNoLog(
+			throw new ElidomValidationException(
 					"마감 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
 		}
 
@@ -762,20 +762,20 @@ public class VasTransactionService extends AbstractQueryService {
 	 */
 	private void validateVasOrder(VasOrder vasOrder) {
 		if (ValueUtil.isEmpty(vasOrder.getComCd())) {
-			throw ThrowUtil.newValidationErrorWithNoLog("화주사 코드는 필수입니다.");
+			throw new ElidomValidationException("화주사 코드는 필수입니다.");
 		}
 		if (ValueUtil.isEmpty(vasOrder.getVasType())) {
-			throw ThrowUtil.newValidationErrorWithNoLog("유통가공 유형은 필수입니다.");
+			throw new ElidomValidationException("유통가공 유형은 필수입니다.");
 		}
 		if (vasOrder.getPlanQty() == null || vasOrder.getPlanQty() <= 0) {
-			throw ThrowUtil.newValidationErrorWithNoLog("계획 수량은 0보다 커야 합니다.");
+			throw new ElidomValidationException("계획 수량은 0보다 커야 합니다.");
 		}
 
 		// SET_ASSEMBLY, DISASSEMBLY 유형은 BOM 필수
 		if ((WmsVasConstants.VAS_TYPE_SET_ASSEMBLY.equals(vasOrder.getVasType()) ||
 				WmsVasConstants.VAS_TYPE_DISASSEMBLY.equals(vasOrder.getVasType())) &&
 				ValueUtil.isEmpty(vasOrder.getVasBomId())) {
-			throw ThrowUtil.newValidationErrorWithNoLog(
+			throw new ElidomValidationException(
 					vasOrder.getVasType() + " 유형은 BOM이 필수입니다.");
 		}
 	}

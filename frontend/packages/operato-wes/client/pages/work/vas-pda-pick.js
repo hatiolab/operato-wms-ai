@@ -218,13 +218,13 @@ class VasPdaPick extends localize(i18next)(PageView) {
         }
 
         .order-badge.APPROVED {
-          background: #fff3e0;
-          color: #ff9800;
+          background: #e3f2fd;
+          color: #1976d2;
         }
 
         .order-badge.MATERIAL_READY {
-          background: #e3f2fd;
-          color: #1976d2;
+          background: #e8f5e9;
+          color: #388e3c;
         }
 
         /* 진행률 바 */
@@ -636,6 +636,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
   static get properties() {
     return {
       loading: Boolean,
+      picking: Boolean,
       screen: String,
       filterStatus: String,
       orders: Array,
@@ -654,6 +655,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
   constructor() {
     super()
     this.loading = false
+    this.picking = false
     this.screen = 'order-select'
     this.filterStatus = 'ALL'
     this.orders = []
@@ -702,30 +704,34 @@ class VasPdaPick extends localize(i18next)(PageView) {
 
   /** 주문 선택 화면 렌더링 — pda-inbound-receiving 레이아웃 */
   _renderOrderSelect() {
-    const waiting = this.orders.filter(o => o.status === 'APPROVED')
-    const working = this.orders.filter(o => o.status === 'MATERIAL_READY')
+    // APPROVED: 자재 배정됨, 피킹 가능한 상태
+    // MATERIAL_READY: 모든 자재 피킹 완료, VAS 작업 대기 상태
+    const pickable = this.orders.filter(o => o.status === 'APPROVED')
+    const done = this.orders.filter(o => o.status === 'MATERIAL_READY')
     const filtered =
-      this.filterStatus === 'WAITING' ? waiting
-        : this.filterStatus === 'WORKING' ? working
-          : [...waiting, ...working]
+      this.filterStatus === 'WORKING' ? pickable
+        : this.filterStatus === 'DONE' ? done
+          : [...pickable, ...done]  // ALL: 전체 표시
 
     return html`
       <!-- 상태 요약 카드 -->
       <div class="summary-cards">
         <div class="summary-card waiting"
-          ?active="${this.filterStatus === 'WAITING'}"
-          @click="${() => this._toggleFilter('WAITING')}">
-          <div class="count">${waiting.length}</div>
-          <div class="card-label">대기</div>
+          ?active="${this.filterStatus === 'ALL'}"
+          @click="${() => this._toggleFilter('ALL')}">
+          <div class="count">${this.orders.length}</div>
+          <div class="card-label">전체</div>
         </div>
         <div class="summary-card working"
           ?active="${this.filterStatus === 'WORKING'}"
           @click="${() => this._toggleFilter('WORKING')}">
-          <div class="count">${working.length}</div>
+          <div class="count">${pickable.length}</div>
           <div class="card-label">피킹 가능</div>
         </div>
-        <div class="summary-card done">
-          <div class="count">0</div>
+        <div class="summary-card done"
+          ?active="${this.filterStatus === 'DONE'}"
+          @click="${() => this._toggleFilter('DONE')}">
+          <div class="count">${done.length}</div>
           <div class="card-label">완료</div>
         </div>
       </div>
@@ -906,8 +912,10 @@ class VasPdaPick extends localize(i18next)(PageView) {
         </div>
 
         <div class="form-actions">
-          <button class="pda-btn primary" @click="${this._confirmPick}">피킹 확인</button>
-          <button class="pda-btn outline" @click="${this._skipItem}">스킵</button>
+          <button class="pda-btn primary" ?disabled="${this.picking}" @click="${this._confirmPick}">
+            ${this.picking ? '처리 중...' : '피킹 확인'}
+          </button>
+          <button class="pda-btn outline" ?disabled="${this.picking}" @click="${this._skipItem}">스킵</button>
         </div>
       </div>
     `
@@ -972,7 +980,11 @@ class VasPdaPick extends localize(i18next)(PageView) {
    * 상태 필터 토글 — 같은 카드를 다시 클릭하면 전체(ALL)로 복귀
    */
   _toggleFilter(status) {
-    this.filterStatus = this.filterStatus === status ? 'ALL' : status
+    if (status === 'ALL') {
+      this.filterStatus = 'ALL'
+    } else {
+      this.filterStatus = this.filterStatus === status ? 'ALL' : status
+    }
   }
 
   /* ============================================================
@@ -1111,6 +1123,8 @@ class VasPdaPick extends localize(i18next)(PageView) {
    * ============================================================ */
 
   async _confirmPick() {
+    if (this.picking) return  // 이중 클릭 방지
+
     const item = this.orderItems[this.currentItemIndex]
     if (!item) return
 
@@ -1128,6 +1142,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
       return
     }
 
+    this.picking = true  // 버튼 잠금
     try {
       await ServiceUtil.restPost(`vas_trx/vas_order_items/${item.id}/pick`, {
         pickedQty: this.pickQty
@@ -1145,10 +1160,14 @@ class VasPdaPick extends localize(i18next)(PageView) {
       this._showFeedback('피킹 완료', 'success')
       voiceService.success('피킹 완료')
 
-      setTimeout(() => this._moveToNextItem(), 500)
+      setTimeout(() => {
+        this._moveToNextItem()
+        this.picking = false  // 다음 아이템 이동 후 버튼 잠금 해제
+      }, 200)
     } catch (err) {
       this._showFeedback(err.message || '피킹 실패', 'error')
       voiceService.error('피킹 실패')
+      this.picking = false  // 실패 시에도 즉시 잠금 해제
     }
   }
 
