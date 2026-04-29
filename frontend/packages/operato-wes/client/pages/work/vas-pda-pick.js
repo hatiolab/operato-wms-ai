@@ -227,6 +227,21 @@ class VasPdaPick extends localize(i18next)(PageView) {
           color: #388e3c;
         }
 
+        .order-badge.IN_PROGRESS {
+          background: #fff8e1;
+          color: #f57f17;
+        }
+
+        .order-badge.COMPLETED {
+          background: #e8f5e9;
+          color: #2e7d32;
+        }
+
+        .order-badge.CLOSED {
+          background: #f3e5f5;
+          color: #7b1fa2;
+        }
+
         /* 진행률 바 */
         .progress-section {
           margin-bottom: 16px;
@@ -705,9 +720,9 @@ class VasPdaPick extends localize(i18next)(PageView) {
   /** 주문 선택 화면 렌더링 — pda-inbound-receiving 레이아웃 */
   _renderOrderSelect() {
     // APPROVED: 자재 배정됨, 피킹 가능한 상태
-    // MATERIAL_READY: 모든 자재 피킹 완료, VAS 작업 대기 상태
+    // MATERIAL_READY 이후: 자재 피킹 완료된 모든 상태 (VAS 작업 대기/진행/완료/마감)
     const pickable = this.orders.filter(o => o.status === 'APPROVED')
-    const done = this.orders.filter(o => o.status === 'MATERIAL_READY')
+    const done = this.orders.filter(o => ['MATERIAL_READY', 'IN_PROGRESS', 'COMPLETED', 'CLOSED'].includes(o.status))
     const filtered =
       this.filterStatus === 'WORKING' ? pickable
         : this.filterStatus === 'DONE' ? done
@@ -995,7 +1010,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
     try {
       this.loading = true
       const data = await ServiceUtil.restGet('vas_trx/monitor/orders', {
-        status: 'APPROVED,MATERIAL_READY'
+        status: 'APPROVED,MATERIAL_READY,IN_PROGRESS,COMPLETED,CLOSED'
       })
       this.orders = data || []
       await this._fetchBomMap(this.orders)
@@ -1269,7 +1284,10 @@ class VasPdaPick extends localize(i18next)(PageView) {
   _statusLabel(status) {
     const map = {
       APPROVED: '주문 확정',
-      MATERIAL_READY: '자재 준비 완료'
+      MATERIAL_READY: '자재 준비 완료',
+      IN_PROGRESS: '작업 중',
+      COMPLETED: '완료',
+      CLOSED: '마감'
     }
     return map[status] || status || '-'
   }

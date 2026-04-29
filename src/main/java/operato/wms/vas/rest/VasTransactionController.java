@@ -329,21 +329,22 @@ public class VasTransactionController {
 	 *
 	 * GET /rest/vas_trx/monitor/orders
 	 *
-	 * @param status 상태 필터 (optional, 쉼표 구분 가능. 기본값:
-	 *               IN_PROGRESS,APPROVED,MATERIAL_READY)
+	 * @param status     상태 필터 (optional, 쉼표 구분 가능. 기본값: IN_PROGRESS,APPROVED,MATERIAL_READY)
+	 * @param targetDate 기준일 (optional, 기본값: 오늘. 형식: yyyy-MM-dd)
 	 * @return 주문 목록 (자재 진행 요약 포함)
 	 */
 	@GetMapping(value = "/monitor/orders", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Get Monitor Orders with Material Summary")
 	public List<Map<String, Object>> getMonitorOrders(
-			@RequestParam(name = "status", required = false) String status) {
+			@RequestParam(name = "status", required = false) String status,
+			@RequestParam(name = "targetDate", required = false) String targetDate) {
 
 		List<String> statuses = null;
 		if (ValueUtil.isNotEmpty(status)) {
 			statuses = java.util.Arrays.asList(status.split(","));
 		}
 
-		return this.vasService.getMonitorOrders(statuses);
+		return this.vasService.getMonitorOrders(statuses, targetDate);
 	}
 
 	/********************************************************************************************************

@@ -850,16 +850,19 @@ public class VasTransactionService extends AbstractQueryService {
 	/**
 	 * 작업 진행 모니터링 - 주문 목록 조회 (자재 진행 요약 포함)
 	 *
-	 * @param statuses 조회할 상태 목록 (null이면 IN_PROGRESS, APPROVED, MATERIAL_READY)
+	 * @param statuses   조회할 상태 목록 (null이면 IN_PROGRESS, APPROVED, MATERIAL_READY)
+	 * @param targetDate 기준일 (null이면 오늘. 형식: yyyy-MM-dd)
 	 * @return 주문 목록 (자재 진행 요약 포함)
 	 */
-	public List<Map<String, Object>> getMonitorOrders(List<String> statuses) {
+	public List<Map<String, Object>> getMonitorOrders(List<String> statuses, String targetDate) {
 		if (statuses == null || statuses.isEmpty()) {
 			statuses = java.util.Arrays.asList(
 					WmsVasConstants.STATUS_IN_PROGRESS,
 					WmsVasConstants.STATUS_APPROVED,
 					WmsVasConstants.STATUS_MATERIAL_READY);
 		}
+
+		String date = ValueUtil.isNotEmpty(targetDate) ? targetDate : DateUtil.todayStr();
 
 		String sql = "SELECT vo.id, vo.vas_no, vo.vas_type, vo.status, " +
 				"vo.plan_qty, vo.completed_qty, vo.com_cd, vo.wh_cd, " +
@@ -883,6 +886,7 @@ public class VasTransactionService extends AbstractQueryService {
 				") mi ON vo.id = mi.vas_order_id " +
 				"WHERE vo.domain_id = :domainId " +
 				"AND vo.status IN (:statuses) " +
+				"AND vo.vas_req_date = :targetDate " +
 				"ORDER BY " +
 				"  CASE vo.priority WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END, " +
 				"  vo.started_at DESC NULLS LAST, vo.approved_at DESC NULLS LAST";
@@ -890,6 +894,7 @@ public class VasTransactionService extends AbstractQueryService {
 		Map<String, Object> params = new java.util.HashMap<>();
 		params.put("domainId", Domain.currentDomainId());
 		params.put("statuses", statuses);
+		params.put("targetDate", date);
 
 		@SuppressWarnings("unchecked")
 		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
