@@ -491,7 +491,7 @@ public class InboundTransactionController extends AbstractRestService {
     /**
      * 입고 라인 반려 처리 (검수 반려, 입고 상세 상태 : START -> REJECTED)
      *
-     * @param id           입고 상세 ID
+     * @param id            입고 상세 ID
      * @param receivingItem 반려 정보 (remarks에 반려 사유 포함)
      * @return 반려된 입고 상세
      */
@@ -737,17 +737,31 @@ public class InboundTransactionController extends AbstractRestService {
     }
 
     /**
+     * 적치 대기 입고 목록 조회 — 입고별 WAITING/STORED 건수 포함
+     *
+     * GET /rest/inbound_trx/putaway/receiving_list
+     *
+     * @return 입고별 적치 현황 목록 (rcv_no, rcv_req_date, com_cd, vend_cd, waiting_count,
+     *         stored_count)
+     */
+    @RequestMapping(value = "/putaway/receiving_list", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Get receiving list with putaway waiting/stored counts")
+    public List<Map> getPutawayReceivingList() {
+        return this.inbTrxService.getPutawayReceivingList(Domain.currentDomainId());
+    }
+
+    /**
      * 적치 추천 로케이션 조회
      *
      * StoragePolicy.putawayStrategy에 따라 SKU·화주사 조건에 맞는 빈 로케이션을 추천한다.
      *
      * GET /rest/inbound_trx/putaway/recommend_locations
-     *   ?com_cd={comCd}&wh_cd={whCd}&sku_cd={skuCd}&limit={limit}
+     * ?com_cd={comCd}&wh_cd={whCd}&sku_cd={skuCd}&limit={limit}
      *
-     * @param comCd  화주사 코드
-     * @param whCd   창고 코드
-     * @param skuCd  SKU 코드
-     * @param limit  최대 반환 수 (기본 5)
+     * @param comCd 화주사 코드
+     * @param whCd  창고 코드
+     * @param skuCd SKU 코드
+     * @param limit 최대 반환 수 (기본 5)
      * @return 추천 로케이션 목록
      */
     @RequestMapping(value = "/putaway/recommend_locations", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)

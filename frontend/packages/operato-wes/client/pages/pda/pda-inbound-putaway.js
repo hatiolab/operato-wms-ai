@@ -56,6 +56,12 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
   @state() waitingCount = 0
   /** 오늘 적치 완료 건수 (전체) */
   @state() storedCount = 0
+  /** 적치 대기 입고 목록 (list 모드 중단 표시) */
+  @state() receivingList = []
+  /** 추천 로케이션 목록 (work 모드 스텝 2 진입 시 조회) */
+  @state() recommendedLocations = []
+  /** 추천 로케이션 조회 중 */
+  @state() loadingLocations = false
 
   /** 재고 바코드 스캔 입력 */
   @query('#barcodeInput') _barcodeInput
@@ -237,74 +243,48 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
           font-size: 14px;
         }
 
-        /* 항목 카드 목록 (list 모드) */
-        .item-preview-list {
-          flex: 1;
-          overflow-y: auto;
-          padding: 4px 12px 8px;
-        }
-
-        .item-preview-card {
+        /* 추천 로케이션 칩 영역 */
+        .recommend-locs {
+          margin: 6px 0 2px;
           display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 10px 12px;
-          margin-bottom: 6px;
-          border-radius: 8px;
+          flex-wrap: wrap;
+          gap: 6px;
+          padding: 6px 10px;
+          background: rgba(255, 255, 255, 0.6);
+          border-radius: 6px;
+        }
+
+        .recommend-locs .rec-label {
+          width: 100%;
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-primary-container, #1565c0);
+          margin-bottom: 2px;
+        }
+
+        .loc-chip {
+          padding: 5px 12px;
+          border-radius: 16px;
+          border: 1.5px solid var(--md-sys-color-primary, #1976d2);
           background: var(--md-sys-color-surface-container-lowest, #fff);
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-          cursor: pointer;
-        }
-
-        .item-preview-card:active {
-          background: var(--md-sys-color-surface-variant, #eee);
-        }
-
-        .item-preview-card .status-dot {
-          width: 10px;
-          height: 10px;
-          border-radius: 50%;
-          flex-shrink: 0;
-          background: var(--md-sys-color-error, #d32f2f);
-        }
-
-        .item-preview-card .status-dot.done {
-          background: #4CAF50;
-        }
-
-        .item-preview-card .info {
-          flex: 1;
-          min-width: 0;
-        }
-
-        .item-preview-card .sku {
+          color: var(--md-sys-color-primary, #1976d2);
           font-size: 13px;
           font-weight: 600;
-          color: var(--md-sys-color-on-surface, #333);
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          cursor: pointer;
+          transition: background 0.15s;
+          letter-spacing: 0.5px;
         }
 
-        .item-preview-card .sub {
+        .loc-chip:active {
+          background: var(--md-sys-color-primary-container, #e3f2fd);
+        }
+
+        .loc-chip.loading-chip {
+          color: var(--md-sys-color-on-surface-variant, #999);
+          border-color: var(--md-sys-color-outline-variant, #ccc);
+          pointer-events: none;
           font-size: 12px;
-          color: var(--md-sys-color-on-surface-variant, #666);
-          margin-top: 2px;
-        }
-
-        .item-preview-card .qty-badge {
-          flex-shrink: 0;
-          padding: 3px 8px;
-          border-radius: 8px;
-          font-size: 12px;
-          font-weight: 600;
-          background: var(--md-sys-color-surface-variant, #e0e0e0);
-          color: var(--md-sys-color-on-surface-variant, #666);
-        }
-
-        .item-preview-card .qty-badge.done {
-          background: #e8f5e9;
-          color: #2e7d32;
+          font-weight: 400;
         }
 
         /* 진행률 바 */
@@ -662,6 +642,71 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
           color: var(--md-sys-color-on-surface-variant, #333);
         }
 
+        /* 입고 목록 리스트 (list 모드 중단) */
+        .rcv-list {
+          flex: 1;
+          overflow-y: auto;
+          padding: 4px 12px 8px;
+        }
+
+        .rcv-card {
+          padding: 10px 12px;
+          margin-bottom: 8px;
+          border-radius: 8px;
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          cursor: pointer;
+          transition: background 0.15s;
+        }
+
+        .rcv-card:active {
+          background: var(--md-sys-color-surface-variant, #eee);
+        }
+
+        .rcv-card .rcv-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 4px;
+        }
+
+        .rcv-card .rcv-no {
+          font-size: 14px;
+          font-weight: 700;
+          color: var(--md-sys-color-primary, #1976d2);
+        }
+
+        .rcv-card .rcv-sub {
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .rcv-card .rcv-badges {
+          display: flex;
+          gap: 6px;
+        }
+
+        .rcv-card .badge-waiting {
+          padding: 2px 8px;
+          border-radius: 10px;
+          font-size: 12px;
+          font-weight: 600;
+          background: #ffebee;
+          color: #c62828;
+        }
+
+        .rcv-card .badge-stored {
+          padding: 2px 8px;
+          border-radius: 10px;
+          font-size: 12px;
+          font-weight: 600;
+          background: #e8f5e9;
+          color: #2e7d32;
+        }
+
         /* 빈 메시지 */
         .empty-message {
           text-align: center;
@@ -729,13 +774,11 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
     `
   }
 
-  /** list 모드 렌더링 — 입고번호 스캔 입력 + 결과 미리보기 */
+  /** list 모드 렌더링 — 입고 목록 + 입고번호 스캔 입력 */
   _renderListMode() {
     if (this.loading) {
       return html`<div class="loading-overlay">${TermsUtil.tLabel('loading') || '로딩 중...'}</div>`
     }
-
-    const hasItems = this.workItems.length >= 0
 
     return html`
       <div class="summary-cards">
@@ -753,45 +796,48 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
         </div>
       </div>
 
-      <div class="item-preview-list">
-        ${this.workItems.map(item => this._renderPreviewCard(item))}
+      <div class="rcv-list">
+        ${this.receivingList.length > 0
+        ? this.receivingList.map(rcv => this._renderReceivingCard(rcv))
+        : html`
+            <div class="empty-guide">
+              <div class="guide-icon">📦</div>
+              <div class="guide-text">${TermsUtil.tLabel('scan_barcode') || '입고번호를 스캔하세요'}</div>
+            </div>
+          `}
       </div>
-        
-      ${this.workItems.length === 0 ? html`
-      <div class="empty-guide">
-        <div class="guide-icon">📦</div>
-        <div class="guide-text">${TermsUtil.tLabel('scan_barcode') || '입고번호를 스캔하세요'}</div>
-      </div>` : ''}
 
       <div class="scan-rcv-no">
         <div class="scan-row">
-        <label>${TermsUtil.tLabel('rcv_no') || '입고번호'}</label>
-        <ox-input-barcode id="rcvNoInput"
-          placeholder="입고번호 스캔"
-          @change=${e => this._onScanRcvNo(e.target.value)}>
-        </ox-input-barcode>
-        <button class="btn-refresh" @click=${this._refresh}>
-          ${TermsUtil.tButton('refresh') || '새로고침'}
-        </button>
+          <label>${TermsUtil.tLabel('rcv_no') || '입고번호'}</label>
+          <ox-input-barcode id="rcvNoInput"
+            placeholder="입고번호 스캔"
+            @change=${e => this._onScanRcvNo(e.target.value)}>
+          </ox-input-barcode>
+          <button class="btn-refresh" @click=${this._refresh}>
+            ${TermsUtil.tButton('refresh') || '새로고침'}
+          </button>
+        </div>
       </div>
     `
   }
 
-  /** list 모드 미리보기 카드 렌더링 */
-  _renderPreviewCard(item) {
-    const isDone = item.status === 'STORED'
+  /** 입고 카드 렌더링 (list 모드 중단) */
+  _renderReceivingCard(rcv) {
     return html`
-      <div class="item-preview-card" @click=${() => !isDone && this._selectItem(item)}>
-        <div class="status-dot ${isDone ? 'done' : ''}"></div>
-        <div class="info">
-          <div class="sku">${item.sku_cd}${item.sku_nm ? ` (${item.sku_nm})` : ''}</div>
-          <div class="sub">
-            바코드: ${item.barcode || '-'}
-            ${item.lot_no ? ` · LOT: ${item.lot_no}` : ''}
-            ${isDone && item.loc_cd ? ` → ${item.loc_cd}` : ''}
+      <div class="rcv-card" @click=${() => this._onScanRcvNo(rcv.rcv_no)}>
+        <div class="rcv-header">
+          <span class="rcv-no">${rcv.rcv_no}</span>
+          <div class="rcv-badges">
+            ${rcv.waiting_count > 0 ? html`<span class="badge-waiting">${TermsUtil.tLabel('wait') || '대기'} ${rcv.waiting_count}</span>` : ''}
+            ${rcv.stored_count > 0 ? html`<span class="badge-stored">${TermsUtil.tLabel('completed') || '완료'} ${rcv.stored_count}</span>` : ''}
           </div>
         </div>
-        <span class="qty-badge ${isDone ? 'done' : ''}">${item.inv_qty || 0}</span>
+        <div class="rcv-sub">
+          ${rcv.rcv_req_date ? html`<span>${rcv.rcv_req_date}</span>` : ''}
+          ${rcv.com_cd ? html`<span>${TermsUtil.tLabel('com_cd') || '화주사'}: ${rcv.com_cd}</span>` : ''}
+          ${rcv.vend_cd ? html`<span>${TermsUtil.tLabel('vend_cd') || '공급처'}: ${rcv.vend_cd}</span>` : ''}
+        </div>
       </div>
     `
   }
@@ -813,7 +859,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
 
   ${currentItem ? html`
         <div class="current-item-section">
-          <div class="barcode-display">${currentItem.barcode}</div>
+          <div class="barcode-display">재고 : ${currentItem.barcode}</div>
           <div class="item-info">
             <div class="sku">
               ${currentItem.sku_cd}
@@ -874,6 +920,8 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
         `}
       </div>
 
+      ${this._renderRecommendedLocations()}
+
       <!-- 스텝 2: 로케이션 스캔 — 뱃지 + 라벨 + input + 확정 버튼 -->
       <div class="scan-step ${this.scanStep === 'location' ? 'active' : ''}">
         <span class="step-badge ${step2Done ? 'done-badge' : ''}">${step2Done ? '✓' : '2'}</span>
@@ -892,6 +940,34 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
           @click=${this._confirmPutaway}>
           ${TermsUtil.tButton('confirm') || '확정'}
         </button>
+      </div>
+    `
+  }
+
+  /** 추천 로케이션 칩 영역 렌더링 — 스텝 1 완료 후만 표시 */
+  _renderRecommendedLocations() {
+    const step1Done = this.scanStep === 'location' || !!this.locCd
+    if (!step1Done) return ''
+
+    if (this.loadingLocations) {
+      return html`
+        <div class="recommend-locs">
+          <span class="rec-label">${TermsUtil.tLabel('recommend_location') || '추천 로케이션'}</span>
+          <span class="loc-chip loading-chip">조회 중...</span>
+        </div>
+      `
+    }
+
+    if (!this.recommendedLocations.length) return ''
+
+    return html`
+      <div class="recommend-locs">
+        <span class="rec-label">${TermsUtil.tLabel('recommend_location') || '추천 로케이션'}</span>
+        ${this.recommendedLocations.map(loc => html`
+          <button class="loc-chip" @click=${() => this._onScanLocation(loc.loc_cd)}>
+            ${loc.loc_cd}
+          </button>
+        `)}
       </div>
     `
   }
@@ -996,11 +1072,12 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
     `
   }
 
-  /** 페이지 초기화 — 요약 건수 조회 */
+  /** 페이지 초기화 — 요약 건수 및 입고 목록 조회 */
   pageInitialized() {
     this.workItems = []
     this.currentRcvNo = ''
     this._loadPutawaySummary()
+    this._loadReceivingList()
   }
 
   /**
@@ -1044,7 +1121,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
 
   /**
    * 재고 바코드 스캔 핸들러 (스텝 1)
-   * workItems 중 WAITING 상태의 항목과 매칭하여 currentItemIndex 설정
+   * inventories.barcode 값으로만 매칭 — 상품 코드/상품 바코드 입력 불허
    * @param {string} barcode
    */
   _onScanBarcode(barcode) {
@@ -1052,20 +1129,20 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
 
     const currentItem = this.currentItemIndex >= 0 ? this.workItems[this.currentItemIndex] : null
 
-    // 1. 현재 항목과 매칭
-    if (currentItem && (currentItem.barcode === barcode || currentItem.sku_cd === barcode || currentItem.sku_bcd === barcode)) {
+    // 1. 현재 항목과 재고 바코드 매칭
+    if (currentItem && currentItem.barcode === barcode) {
       this.scannedBarcode = barcode
       this.scanStep = 'location'
       this._showFeedback(`${currentItem.sku_cd} 확인 — 로케이션을 스캔하세요`, 'success')
       this._resetBarcodeInput()
+      this._loadRecommendedLocations(currentItem)
       setTimeout(() => this._focusLocationInput(), 100)
       return
     }
 
-    // 2. 전체 미완료 항목에서 검색
+    // 2. 전체 미완료 항목에서 재고 바코드 검색
     const matchIndex = this.workItems.findIndex(
-      item => item.status === 'WAITING' &&
-        (item.barcode === barcode || item.sku_cd === barcode || item.sku_bcd === barcode)
+      item => item.status === 'WAITING' && item.barcode === barcode
     )
 
     if (matchIndex >= 0) {
@@ -1074,20 +1151,20 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
       this.scanStep = 'location'
       this._showFeedback(`${this.workItems[matchIndex].sku_cd} 확인 — 로케이션을 스캔하세요`, 'success')
       this._resetBarcodeInput()
+      this._loadRecommendedLocations(this.workItems[matchIndex])
       setTimeout(() => this._focusLocationInput(), 100)
       return
     }
 
     // 3. 이미 완료된 항목인지 확인
     const doneItem = this.workItems.find(
-      item => item.status === 'STORED' &&
-        (item.barcode === barcode || item.sku_cd === barcode || item.sku_bcd === barcode)
+      item => item.status === 'STORED' && item.barcode === barcode
     )
 
     if (doneItem) {
       this._showFeedback(`이미 적치 완료된 항목입니다: ${doneItem.sku_cd} → ${doneItem.loc_cd} `, 'warning')
     } else {
-      this._showFeedback(`일치하는 재고를 찾을 수 없습니다: ${barcode} `, 'error')
+      this._showFeedback(`일치하는 재고 바코드를 찾을 수 없습니다: ${barcode} `, 'error')
       navigator.vibrate?.(200)
     }
 
@@ -1195,6 +1272,8 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
     this.currentItemIndex = -1
     this.lastFeedback = null
     this._resetScanStep()
+    this._loadPutawaySummary()
+    this._loadReceivingList()
   }
 
   /**
@@ -1218,10 +1297,10 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
   }
 
   /**
-   * 새로고침 — 대기/완료 요약 건수만 재조회 (list 모드 전용)
+   * 새로고침 — 요약 건수 + 입고 목록 재조회 (list 모드 전용)
    */
   async _refresh() {
-    await this._loadPutawaySummary()
+    await Promise.all([this._loadPutawaySummary(), this._loadReceivingList()])
   }
 
   /**
@@ -1235,6 +1314,20 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
       this.storedCount = data?.stored_count ?? 0
     } catch (error) {
       console.error('적치 요약 조회 실패:', error)
+    }
+  }
+
+  /**
+   * 적치 대기 입고 목록 조회 — 입고별 waiting/stored 건수 포함
+   * GET /rest/inbound_trx/putaway/receiving-list
+   */
+  async _loadReceivingList() {
+    try {
+      const data = await ServiceUtil.restGet('inbound_trx/putaway/receiving_list')
+      this.receivingList = data || []
+    } catch (error) {
+      console.error('입고 목록 조회 실패:', error)
+      this.receivingList = []
     }
   }
 
@@ -1283,12 +1376,38 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
   }
 
   /**
+   * 추천 로케이션 조회
+   * GET /rest/inbound_trx/putaway/recommend_locations
+   * @param {object} item - 현재 재고 항목 (com_cd, wh_cd, sku_cd 사용)
+   */
+  async _loadRecommendedLocations(item) {
+    this.recommendedLocations = []
+    this.loadingLocations = true
+    try {
+      const params = new URLSearchParams({
+        com_cd: item.com_cd || '',
+        wh_cd: item.wh_cd || '',
+        sku_cd: item.sku_cd || '',
+        limit: '5'
+      })
+      const result = await ServiceUtil.restGet(`inbound_trx/putaway/recommend_locations?${params}`)
+      this.recommendedLocations = result || []
+    } catch (_) {
+      this.recommendedLocations = []
+    } finally {
+      this.loadingLocations = false
+    }
+  }
+
+  /**
    * 스캔 단계 초기화
    */
   _resetScanStep() {
     this.scanStep = 'barcode'
     this.scannedBarcode = ''
     this.locCd = ''
+    this.recommendedLocations = []
+    this.loadingLocations = false
   }
 
   /**

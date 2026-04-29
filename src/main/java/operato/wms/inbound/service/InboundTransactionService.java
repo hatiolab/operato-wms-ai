@@ -880,7 +880,7 @@ public class InboundTransactionService extends AbstractQueryService {
 
         String baseSql = "SELECT * FROM locations"
                 + " WHERE domain_id = :domainId AND wh_cd = :whCd"
-                + " AND loc_type = 'STORAGE'"
+                + " AND loc_type = 'STORE'"
                 + " AND (del_flag IS NULL OR del_flag = false)"
                 + " AND (restrict_type IS NULL OR restrict_type = '')"
                 + hazmatFilter;
@@ -958,6 +958,31 @@ public class InboundTransactionService extends AbstractQueryService {
         queryObj.addFilter("delFlag", false);
         queryObj.addOrder("rcvSeq", true);
         return this.queryManager.selectList(Inventory.class, queryObj);
+    }
+
+    /**
+     * 적치 대기 입고 목록 조회 — 입고별 WAITING/STORED 건수 포함
+     * 적치 대기(WAITING) 건수가 1개 이상인 입고 주문만 반환한다.
+     *
+     * @param domainId 도메인 ID
+     * @return 입고별 적치 현황 목록 (rcv_no, rcv_req_date, com_cd, vend_cd, waiting_count,
+     *         stored_count)
+     */
+    public List<Map> getPutawayReceivingList(Long domainId) {
+        String sql = "SELECT r.rcv_no, r.rcv_req_date, r.com_cd, r.vend_cd" +
+                ", COUNT(CASE WHEN i.status = 'WAITING' THEN 1 END) AS waiting_count" +
+                ", COUNT(CASE WHEN i.status = 'STORED' THEN 1 END) AS stored_count" +
+                " FROM receivings r" +
+                " JOIN inventories i ON r.domain_id = i.domain_id AND r.rcv_no = i.rcv_no" +
+                " WHERE r.domain_id = :domainId" +
+                " AND r.status = 'END'" +
+                " AND (i.del_flag IS NULL OR i.del_flag = false)" +
+                " AND i.status IN ('WAITING', 'STORED')" +
+                " GROUP BY r.rcv_no, r.rcv_req_date, r.com_cd, r.vend_cd" +
+                " HAVING COUNT(CASE WHEN i.status = 'WAITING' THEN 1 END) > 0" +
+                " ORDER BY r.rcv_no DESC";
+        Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+        return (List<Map>) this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
     }
 
     /********************************************************************************************************
