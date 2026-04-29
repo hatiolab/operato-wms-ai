@@ -1,4 +1,5 @@
 import '@things-factory/barcode-ui'
+import '../../component/sku-barcode-input.js'
 import { html, css } from 'lit'
 import { customElement, query, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
@@ -49,8 +50,8 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   /** 현재 항목 바코드 스캔 완료 여부 */
   @state() barcodeScanned = false
 
-  /** 상품 바코드 스캔 입력 */
-  @query('#barcodeInput') _barcodeInput
+  /** SKU 바코드 스캔 입력 컴포넌트 */
+  @query('sku-barcode-input') _skuBarcodeInput
   /** 입고번호 스캔 입력 */
   @query('#rcvScanInput') _rcvScanInput
 
@@ -369,7 +370,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           color: var(--md-sys-color-on-primary-container, #1565c0);
         }
 
-        .barcode-input ox-input-barcode {
+        .barcode-input sku-barcode-input {
           flex: 1;
         }
 
@@ -826,11 +827,13 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
           <div class="barcode-input">
             <label>${TermsUtil.tLabel('scan_barcode') || '상품 바코드 스캔'}</label>
-            <ox-input-barcode id="barcodeInput"
-              placeholder="바코드 스캔"
+            <sku-barcode-input
+              .comCd=${this.currentReceiving?.com_cd || ''}
+              placeholder="${TermsUtil.tLabel('scan_barcode') || '상품 바코드 스캔'}"
               ?disabled=${this.processing}
-              @change=${e => this._onScanBarcode(e.target.value)}>
-            </ox-input-barcode>
+              skipInventory
+              @sku-select=${e => this._onSkuSelect(e.detail)}>
+            </sku-barcode-input>
           </div>
 
           <div class="qty-input-row">
@@ -1060,25 +1063,26 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     }
   }
 
-  /** 상품 바코드 스캔 핸들러 — 현재 항목 또는 전체에서 매칭 */
-  _onScanBarcode(barcode) {
-    if (!barcode || this.processing) return
+  /**
+   * sku-barcode-input에서 상품 선택 완료 시 — API가 이미 바코드를 sku_cd로 해석한 결과
+   * @param {{ com_cd, sku_cd, sku_nm, barcode }} detail - 선택된 상품 정보
+   */
+  _onSkuSelect({ sku_cd }) {
+    if (this.processing) return
 
     const currentItem = this.currentItemIndex >= 0 ? this.receivingItems[this.currentItemIndex] : null
 
-    // 1. 현재 항목과 매칭
-    if (currentItem && (currentItem.barcode === barcode || currentItem.sku_cd === barcode)) {
+    // 1. 현재 항목과 sku_cd 매칭
+    if (currentItem && currentItem.sku_cd === sku_cd) {
       this.rcvQty = currentItem.rcv_exp_qty || 1
       this.barcodeScanned = true
-      this._showFeedback(`${currentItem.sku_cd} 매칭 — ${this.rcvQty} 확인`, 'success')
-      this._resetBarcodeInput()
+      this._showFeedback(`${sku_cd} 매칭 — ${this.rcvQty} 확인`, 'success')
       return
     }
 
-    // 2. 전체 미완료 항목에서 검색
+    // 2. 전체 미완료 항목에서 sku_cd 검색
     const matchIndex = this.receivingItems.findIndex(
-      item => item.status !== 'END' && item.status !== 'CANCEL' &&
-        (item.barcode === barcode || item.sku_cd === barcode)
+      item => item.status !== 'END' && item.status !== 'CANCEL' && item.sku_cd === sku_cd
     )
 
     if (matchIndex >= 0) {
@@ -1086,31 +1090,25 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
       const item = this.receivingItems[matchIndex]
       this.rcvQty = item.rcv_exp_qty || 1
       this.barcodeScanned = true
-      this._showFeedback(`${item.sku_cd} 매칭${item.loc_cd ? ` (${item.loc_cd})` : ''} — ${this.rcvQty}`, 'success')
-      this._resetBarcodeInput()
+      this._showFeedback(`${sku_cd} 매칭${item.loc_cd ? ` (${item.loc_cd})` : ''} — ${this.rcvQty}`, 'success')
       return
     }
 
     // 3. 이미 완료된 항목인지 확인
-    const doneItem = this.receivingItems.find(
-      item => item.status === 'END' &&
-        (item.barcode === barcode || item.sku_cd === barcode)
-    )
+    const doneItem = this.receivingItems.find(item => item.status === 'END' && item.sku_cd === sku_cd)
 
     if (doneItem) {
-      this._showFeedback(`이미 입고 완료된 상품입니다: ${doneItem.sku_cd}`, 'warning')
+      this._showFeedback(`이미 입고 완료된 상품입니다: ${sku_cd}`, 'warning')
       document.dispatchEvent(new CustomEvent('notify', {
         detail: { level: 'warn', message: '이미 입고 완료된 상품입니다' }
       }))
     } else {
-      this._showFeedback(`일치하는 상품을 찾을 수 없습니다: ${barcode}`, 'error')
+      this._showFeedback(`입고 주문에 없는 상품입니다: ${sku_cd}`, 'error')
       document.dispatchEvent(new CustomEvent('notify', {
-        detail: { level: 'error', message: `일치하는 상품을 찾을 수 없습니다: ${barcode}` }
+        detail: { level: 'error', message: `입고 주문에 없는 상품입니다: ${sku_cd}` }
       }))
       navigator.vibrate?.(200)
     }
-
-    this._resetBarcodeInput()
   }
 
   /** 입고 확인 API 호출 — 현재 항목 수량 확정 후 라인 완료 */
@@ -1251,16 +1249,8 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     this.lastFeedback = { type, message }
   }
 
-  /** 바코드 입력 필드에 포커스 설정 */
+  /** sku-barcode-input에 포커스 — PDA 하드웨어 스캐너 연동용 */
   _focusBarcodeInput() {
-    this._resetBarcodeInput()
-  }
-
-  /** 바코드 입력 필드 초기화 및 포커스 복귀 */
-  _resetBarcodeInput() {
-    if (this._barcodeInput) {
-      this._barcodeInput.input.value = ''
-      this._barcodeInput.input.focus()
-    }
+    this._skuBarcodeInput?.focus()
   }
 }

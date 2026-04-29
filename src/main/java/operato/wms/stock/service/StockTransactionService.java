@@ -973,4 +973,63 @@ public class StockTransactionService extends AbstractQueryService {
             }
         }
     }
+
+    /**
+     * 바코드로 SKU 정보 리스트 조회 — PDA 공통 바코드 스캔 지원
+     *
+     * 항상 리스트로 반환하며, 프론트엔드에서 결과 수에 따라 처리한다:
+     * - 1건: 바로 매칭 처리
+     * - 2건 이상: 상품 선택 팝업 표시
+     *
+     * 매칭 순서:
+     * 1. inventories.barcode 직접 매칭 → 단건 (재고 바코드는 유일)
+     * 2. sku.sku_barcd / sku_barcd2 / sku_barcd3 역조회 → 복수 가능
+     * 3. sku.sku_cd 폴백 → 단건 (화주사 내 유일)
+     *
+     * @param domainId        도메인 ID
+     * @param barcode         스캔된 바코드 문자열
+     * @param comCd           화주사 코드 (null 허용 — 전체 검색)
+     * @param skipInventory   true이면 재고 바코드(inventories.barcode) 조회를 건너뜀
+     *                        — 재고 이동·출고 등 재고 바코드가 무의미한 화면에서 사용
+     * @return [{ sku_cd, sku_nm, sku_barcd }, ...] — 항상 리스트
+     */
+    public List<SKU> resolveBarcode(Long domainId, String barcode, String comCd, boolean skipInventory) {
+        ValueUtil.checkEmptyData(barcode, "label.barcode");
+
+        String comFilter = ValueUtil.isNotEmpty(comCd) ? " AND com_cd = :comCd" : "";
+        Map<String, Object> params = ValueUtil.newMap("domainId,barcode", domainId, barcode);
+        if (ValueUtil.isNotEmpty(comCd)) {
+            params.put("comCd", comCd);
+        }
+
+        // 1. 재고 바코드 직접 매칭 — skipInventory=false일 때만 시도, 재고 바코드는 유일하므로 단건만 반환
+        if (!skipInventory) {
+            String invSql = "SELECT com_cd, sku_cd, sku_nm, barcode as sku_barcd FROM inventories" +
+                    " WHERE domain_id = :domainId AND barcode = :barcode" + comFilter + " LIMIT 1";
+            SKU invResult = this.queryManager.selectBySql(invSql, params, SKU.class);
+            if (invResult != null) {
+                return List.of(invResult);
+            }
+        }
+
+        // 2. SKU 마스터 바코드(sku_barcd / sku_barcd2 / sku_barcd3) 역조회 — 복수 가능
+        String skuBarcdSql = "SELECT com_cd, sku_cd, sku_nm, sku_barcd FROM sku" +
+                " WHERE domain_id = :domainId" + comFilter +
+                " AND (sku_barcd = :barcode OR sku_barcd2 = :barcode OR sku_barcd3 = :barcode)";
+        List<SKU> skuList = (List<SKU>) this.queryManager.selectListBySql(skuBarcdSql,
+                params, SKU.class, 0, 0);
+        if (skuList != null && !skuList.isEmpty()) {
+            return skuList;
+        }
+
+        // 3. SKU 코드 폴백 — sku_cd는 화주사 내 유일하므로 단건만 반환
+        String skuCdSql = "SELECT com_cd, sku_cd, sku_nm, sku_barcd FROM sku" +
+                " WHERE domain_id = :domainId" + comFilter + " AND sku_cd = :barcode LIMIT 1";
+        SKU skuResult = this.queryManager.selectBySql(skuCdSql, params, SKU.class);
+        if (skuResult != null) {
+            return List.of(skuResult);
+        }
+
+        throw ThrowUtil.newValidationErrorWithNoLog("바코드에 해당하는 상품을 찾을 수 없습니다: " + barcode);
+    }
 }

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import operato.wms.base.entity.Location;
+import operato.wms.base.entity.SKU;
 import operato.wms.stock.entity.Inventory;
 import operato.wms.stock.model.InvTransaction;
 import operato.wms.stock.service.StockTransactionService;
@@ -176,6 +177,31 @@ public class InvTransactionController extends AbstractRestService {
         String barcode = input.get("barcode");
         String toLocCd = input.get("to_loc_cd");
         return this.invTrxSvc.validateInventoryForMove(domainId, barcode, toLocCd);
+    }
+
+    /**
+     * 바코드로 SKU 정보 조회 — PDA 공통 바코드 스캔 지원
+     *
+     * PDA 화면에서 바코드를 스캔하면 서버에서 다음 순서로 SKU를 찾아 반환한다:
+     * 1. 재고 바코드(inventories.barcode) 직접 매칭
+     * 2. SKU 마스터 바코드(sku.sku_barcd / sku_barcd2 / sku_barcd3) 역조회
+     * 3. SKU 코드(sku.sku_cd) 폴백
+     *
+     * POST /rest/inventory_trx/resolve_barcode
+     * Body: { "barcode": "...", "com_cd": "..." (선택) }
+     * 반환: { "sku_cd": "...", "sku_nm": "...", "barcode": "..." }
+     *
+     * @param input barcode와 com_cd(선택)을 포함하는 요청 바디
+     * @return sku_cd, sku_nm, barcode 를 담은 Map
+     */
+    @PostMapping(value = "/resolve_barcode", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Resolve SKU info by barcode")
+    public List<SKU> resolveBarcode(@RequestBody Map<String, String> input) {
+        Long domainId = Domain.currentDomainId();
+        String barcode = input.get("barcode");
+        String comCd = input.get("com_cd");
+        boolean skipInventory = Boolean.parseBoolean(input.get("skip_inventory"));
+        return this.invTrxSvc.resolveBarcode(domainId, barcode, comCd, skipInventory);
     }
 
     /**
