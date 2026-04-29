@@ -418,7 +418,7 @@ export class PdaStockMove extends connect(store)(PageView) {
 
   /** scan 모드 렌더링 */
   _renderScanMode() {
-    const canMove = this.toLocCd && this.scannedItems.length > 0
+    const canMove = this.toLocCd && this.scannedItems.length > 0 && this.reason.trim()
 
     return html`
       <div class="scan-area">
@@ -453,7 +453,7 @@ export class PdaStockMove extends connect(store)(PageView) {
       <!-- 이동 사유 -->
       <div class="reason-row">
         <input type="text"
-          placeholder="${TermsUtil.tLabel('reason') || '이동 사유 (선택)'}"
+          placeholder="이동 사유 (필수)"
           .value=${this.reason}
           @input=${e => (this.reason = e.target.value)}>
       </div>
@@ -540,7 +540,7 @@ export class PdaStockMove extends connect(store)(PageView) {
           </div>
           ${res?.failed > 0 ? html`
             <div class="stat-row">
-              <span class="r-label">${TermsUtil.tLabel('failed') || '실패'}</span>
+              <span class="r-label">${TermsUtil.tTitle('failure') || '실패'}</span>
               <span class="r-value error">${res.failed}건</span>
             </div>
           ` : ''}
@@ -673,12 +673,12 @@ export class PdaStockMove extends connect(store)(PageView) {
     try {
       for (const inv of this.scannedItems) {
         try {
-          let inv = await ServiceUtil.restPost(`inventory_trx/${inv.id}/move_inventory`, {
+          let result = await ServiceUtil.restPost(`inventory_trx/${inv.id}/move_inventory`, {
             to_loc_cd: this.toLocCd,
             reason: this.reason || ''
           })
 
-          if (inv && inv.id) {
+          if (result && result.id) {
             success++;
           } else {
             failed++;
@@ -702,7 +702,9 @@ export class PdaStockMove extends connect(store)(PageView) {
         }
       }))
 
-      this.mode = 'complete'
+      if (success > 0) {
+        this.mode = 'complete'
+      }
     } finally {
       this.processing = false
     }
