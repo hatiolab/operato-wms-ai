@@ -1303,7 +1303,8 @@ public class VasTransactionService extends AbstractQueryService {
 				"COALESCE(mi.total_items, 0) as total_items, " +
 				"COALESCE(mi.picked_items, 0) as picked_items, " +
 				"COALESCE(mi.total_req_qty, 0) as total_req_qty, " +
-				"COALESCE(mi.total_picked_qty, 0) as total_picked_qty " +
+				"COALESCE(mi.total_picked_qty, 0) as total_picked_qty, " +
+				"vr.dest_loc_cd " +
 				"FROM vas_orders vo " +
 				"LEFT JOIN ( " +
 				"  SELECT vas_order_id, " +
@@ -1315,6 +1316,12 @@ public class VasTransactionService extends AbstractQueryService {
 				"  WHERE domain_id = :domainId " +
 				"  GROUP BY vas_order_id " +
 				") mi ON vo.id = mi.vas_order_id " +
+				"LEFT JOIN ( " +
+				"  SELECT DISTINCT ON (vas_order_id) vas_order_id, dest_loc_cd " +
+				"  FROM vas_results " +
+				"  WHERE domain_id = :domainId AND dest_loc_cd IS NOT NULL " +
+				"  ORDER BY vas_order_id, result_seq DESC " +
+				") vr ON vo.id = vr.vas_order_id " +
 				"WHERE vo.domain_id = :domainId " +
 				"AND vo.status IN (:statuses) " +
 				"AND vo.vas_req_date = :targetDate " +

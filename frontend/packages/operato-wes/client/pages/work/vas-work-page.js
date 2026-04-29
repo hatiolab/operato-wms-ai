@@ -1036,10 +1036,12 @@ class VasWorkPage extends localize(i18next)(PageView) {
     `
   }
 
-  /** 3단계 렌더링 - 적치 로케이션 바코드 스캔 */
+  /** 3단계 렌더링 - 적치 로케이션 바코드 스캔 (완료/마감 주문은 조회 전용) */
   _renderStep3Putaway() {
+    const isReadOnly = ['COMPLETED', 'CLOSED'].includes(this.selectedOrder?.status)
+
     return html`
-      <h3 style="margin: 0 0 12px; font-size: 16px;">3단계: 적치</h3>
+      <h3 style="margin: 0 0 12px; font-size: 16px;">3단계: 적치${isReadOnly ? html` <span style="font-size:12px; color:#4CAF50; font-weight:400;">(완료됨)</span>` : ''}</h3>
 
       <div class="putaway-section">
         <div class="putaway-loc">
@@ -1049,15 +1051,17 @@ class VasWorkPage extends localize(i18next)(PageView) {
           <div class="scanned-loc">${this.putawayLoc || '-'}</div>
         </div>
 
-        <div class="scan-input-group">
-          <label>로케이션 바코드 스캔</label>
-          <div class="scan-input">
-            <ox-input-barcode
-              placeholder="로케이션 바코드 스캔"
-              @change="${e => { this.putawayLoc = e.target.value; this._onLocScanConfirm() }}"
-            ></ox-input-barcode>
+        ${isReadOnly ? '' : html`
+          <div class="scan-input-group">
+            <label>로케이션 바코드 스캔</label>
+            <div class="scan-input">
+              <ox-input-barcode
+                placeholder="로케이션 바코드 스캔"
+                @change="${e => { this.putawayLoc = e.target.value; this._onLocScanConfirm() }}"
+              ></ox-input-barcode>
+            </div>
           </div>
-        </div>
+        `}
 
         <div class="expiry-card">
           <label>완성품 유통기한</label>
@@ -1065,13 +1069,16 @@ class VasWorkPage extends localize(i18next)(PageView) {
             <input
               type="date"
               .value="${this.expiredDate || ''}"
+              ?disabled="${isReadOnly}"
               @input="${e => { this.expiredDate = e.target.value || '' }}"
             />
-            <button
-              type="button"
-              class="expiry-clear-btn"
-              @click="${() => { this.expiredDate = '' }}"
-            >초기화</button>
+            ${isReadOnly ? '' : html`
+              <button
+                type="button"
+                class="expiry-clear-btn"
+                @click="${() => { this.expiredDate = '' }}"
+              >초기화</button>
+            `}
           </div>
         </div>
       </div>
@@ -1080,6 +1087,17 @@ class VasWorkPage extends localize(i18next)(PageView) {
 
   /** 하단 액션 버튼 렌더링 (단계에 따라 이전/다음/완료 버튼) */
   _renderBottomActions() {
+    const isReadOnly = ['COMPLETED', 'CLOSED'].includes(this.selectedOrder?.status)
+
+    // 완료/마감 주문: 목록으로 버튼만 표시 (이전/다음/완료 불가)
+    if (isReadOnly) {
+      return html`
+        <div class="bottom-actions">
+          <button class="pda-btn outline" @click="${this._backToOrderSelect}">목록으로</button>
+        </div>
+      `
+    }
+
     return html`
       <div class="bottom-actions">
         ${this.step > 1
@@ -1232,7 +1250,12 @@ class VasWorkPage extends localize(i18next)(PageView) {
     this.completedQty = Number(order.completed_qty || 0)
     this.defectQty = this._calcDefectQtyFromLoss()
 
-    if (this._shouldSkipResultInputStep(order)) {
+    if (['COMPLETED', 'CLOSED'].includes(order.status)) {
+      // 완료/마감 주문은 무조건 3단계(조회 전용)로 이동, 적치 로케이션 복원
+      this.putawayLoc = order.dest_loc_cd || ''
+      this.step = 3
+      voiceService.guide(`주문 ${order.vas_no} 선택. 완료된 작업입니다`)
+    } else if (this._shouldSkipResultInputStep(order)) {
       this.step = 3
       voiceService.guide(`주문 ${order.vas_no} 선택. 적치 로케이션을 스캔해주세요`)
     } else if (this._shouldSkipMaterialInputStep(order)) {
@@ -1484,6 +1507,9 @@ class VasWorkPage extends localize(i18next)(PageView) {
       this.scanValue = barcode
       this._onScanSearch()
     } else if (this.screen === 'work') {
+      const isReadOnly = ['COMPLETED', 'CLOSED'].includes(this.selectedOrder?.status)
+      if (isReadOnly) return  // 완료/마감 주문은 스캔 입력 차단
+
       if (this.step === 1) {
         this._onSkuBarcodeScan(barcode)
       } else if (this.step === 3) {
