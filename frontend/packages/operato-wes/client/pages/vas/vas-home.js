@@ -221,10 +221,11 @@ class VasHome extends localize(i18next)(PageView) {
       COMPLETED: 0
     }
     this.typeStats = {
-      ASSEMBLY: 0,
+      SET_ASSEMBLY: 0,
       DISASSEMBLY: 0,
       REPACK: 0,
-      LABELING: 0
+      LABEL: 0,
+      CUSTOM: 0
     }
     this.alerts = []
     this._boundOnSseEvent = this._onSseEvent.bind(this)
@@ -363,10 +364,10 @@ class VasHome extends localize(i18next)(PageView) {
   async _fetchTypeStats() {
     try {
       const data = await ServiceUtil.restGet('vas_trx/dashboard/type-stats')
-      return data || { ASSEMBLY: 0, DISASSEMBLY: 0, REPACK: 0, LABELING: 0 }
+      return data || { SET_ASSEMBLY: 0, DISASSEMBLY: 0, REPACK: 0, LABEL: 0, CUSTOM: 0 }
     } catch (error) {
       console.error('유형별 통계 조회 실패:', error)
-      return { ASSEMBLY: 0, DISASSEMBLY: 0, REPACK: 0, LABELING: 0 }
+      return { SET_ASSEMBLY: 0, DISASSEMBLY: 0, REPACK: 0, LABEL: 0, CUSTOM: 0 }
     }
   }
 
@@ -400,10 +401,10 @@ class VasHome extends localize(i18next)(PageView) {
           {
             label: '작업 건수',
             data: [
-              this.typeStats.ASSEMBLY || 0,
+              this.typeStats.SET_ASSEMBLY || 0,
               this.typeStats.DISASSEMBLY || 0,
               this.typeStats.REPACK || 0,
-              this.typeStats.LABELING || 0
+              this.typeStats.LABEL || 0
             ],
             backgroundColor: ['#2196F3', '#4CAF50', '#FF9800', '#9C27B0'],
             borderRadius: 8
