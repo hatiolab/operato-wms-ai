@@ -46,6 +46,8 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   @state() lastFeedback = null
   /** 작업 시작 시각 */
   @state() startedAt = null
+  /** 현재 항목 바코드 스캔 완료 여부 */
+  @state() barcodeScanned = false
 
   /** 상품 바코드 스캔 입력 */
   @query('#barcodeInput') _barcodeInput
@@ -683,7 +685,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         </span>
         <div class="actions">
           <button class="primary"
-            ?disabled=${this.processing || !this.rcvQty}
+            ?disabled=${this.processing || !this.rcvQty || !this.barcodeScanned}
             @click=${this._confirmReceive}>
             ${TermsUtil.tButton('confirm') || '확인'}
           </button>
@@ -907,7 +909,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
       const icon = isDone ? '✅' : isCurrent ? '▶' : '☐'
 
       return html`
-            <div class="item-card" @click=${() => !isDone && (this.currentItemIndex = idx)}>
+            <div class="item-card" @click=${() => !isDone && this._selectItem(idx)}>
               <span class="icon">${icon}</span>
               <div class="info">
                 <div class="loc">
@@ -1067,6 +1069,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     // 1. 현재 항목과 매칭
     if (currentItem && (currentItem.barcode === barcode || currentItem.sku_cd === barcode)) {
       this.rcvQty = currentItem.rcv_exp_qty || 1
+      this.barcodeScanned = true
       this._showFeedback(`${currentItem.sku_cd} 매칭 — ${this.rcvQty} 확인`, 'success')
       this._resetBarcodeInput()
       return
@@ -1082,6 +1085,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
       this.currentItemIndex = matchIndex
       const item = this.receivingItems[matchIndex]
       this.rcvQty = item.rcv_exp_qty || 1
+      this.barcodeScanned = true
       this._showFeedback(`${item.sku_cd} 매칭${item.loc_cd ? ` (${item.loc_cd})` : ''} — ${this.rcvQty}`, 'success')
       this._resetBarcodeInput()
       return
@@ -1223,16 +1227,23 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     }
   }
 
+  /** 탭 목록에서 항목 직접 선택 — 바코드 스캔 상태 초기화 */
+  _selectItem(idx) {
+    this.currentItemIndex = idx
+    this.barcodeScanned = false
+  }
+
   /** 다음 미완료 항목으로 인덱스 이동 */
   _moveToNextItem() {
     const nextIdx = this.receivingItems.findIndex(i => i.status !== 'END' && i.status !== 'CANCEL')
     this.currentItemIndex = nextIdx
   }
 
-  /** 현재 항목의 rcv_exp_qty로 rcvQty 초기값 설정 */
+  /** 현재 항목의 rcv_exp_qty로 rcvQty 초기값 설정 — 항목 전환 시 바코드 스캔 상태 초기화 */
   _setInitialRcvQty() {
     const currentItem = this.currentItemIndex >= 0 ? this.receivingItems[this.currentItemIndex] : null
     this.rcvQty = currentItem ? (currentItem.rcv_exp_qty || 1) : 0
+    this.barcodeScanned = false
   }
 
   /** 피드백 메시지 표시 */
