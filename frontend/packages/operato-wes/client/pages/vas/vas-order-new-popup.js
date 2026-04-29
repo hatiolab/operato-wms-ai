@@ -1,6 +1,7 @@
 import { css, html, LitElement } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
+import './vas-bom-search-popup.js'
 
 /**
  * VAS 작업 지시 생성 팝업
@@ -155,6 +156,48 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
         .form-group textarea {
           resize: vertical;
           min-height: 60px;
+        }
+
+        /* BOM 선택 행 */
+        .bom-select-row {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .bom-input {
+          flex: 1;
+          cursor: default;
+        }
+
+        .bom-search-btn {
+          white-space: nowrap;
+          padding: 10px 16px;
+          border: none;
+          border-radius: 8px;
+          background: var(--md-sys-color-primary, #1976D2);
+          color: #fff;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .bom-search-btn:hover {
+          opacity: 0.9;
+        }
+
+        .bom-clear-btn {
+          padding: 10px 12px;
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 8px;
+          background: transparent;
+          font-size: 14px;
+          cursor: pointer;
+          color: var(--md-sys-color-on-surface-variant, #666);
+        }
+
+        .bom-clear-btn:hover {
+          background: var(--md-sys-color-surface-variant, #f5f5f5);
         }
 
         /* BOM 정보 표시 */
@@ -358,7 +401,6 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     return {
       step: Number,
       saving: Boolean,
-      bomList: Array,
       bomItems: Array,
       companies: Array,
       warehouses: Array,
@@ -375,7 +417,6 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     super()
     this.step = 1
     this.saving = false
-    this.bomList = []
     this.bomItems = []
     this.companies = []
     this.warehouses = []
@@ -395,10 +436,9 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     this.stockInfo = {}
   }
 
-  /** 컴포넌트가 DOM에 연결될 때 BOM/화주사/창고 목록 조회 */
+  /** 컴포넌트가 DOM에 연결될 때 화주사/창고/로케이션 목록 조회 */
   connectedCallback() {
     super.connectedCallback()
-    this._fetchBomList()
     this._fetchCompanies()
     this._fetchWarehouses()
     this._fetchLocations()
@@ -472,18 +512,23 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
 
         <div class="form-group full-width">
           <label>세트 상품 선택<span class="required">*</span></label>
-          <select @change="${this._onBomSelect}">
-            <option value="">-- 세트 상품을 선택하세요 --</option>
-            ${this.bomList.map(
-      bom => html`
-                <option value="${bom.id}" ?selected="${this.formData.vasBomId === bom.id}">
-                  ${bom.bom_no} : ${bom.set_sku_nm || bom.set_sku_cd} (${this._vasTypeLabel(bom.vas_type)})
-                </option>
-              `
-    )}
-          </select>
+          <div class="bom-select-row">
+            <input
+              class="bom-input"
+              type="text"
+              readonly
+              .value="${this.selectedBom
+                ? `${this.selectedBom.bom_no} : ${this.selectedBom.set_sku_nm || this.selectedBom.set_sku_cd} (${this._vasTypeLabel(this.selectedBom.vas_type)})`
+                : ''}"
+              placeholder="세트 상품을 선택하세요"
+            />
+            <button class="bom-search-btn" @click="${this._openBomSearchPopup}">🔍 검색</button>
+            ${this.selectedBom
+              ? html`<button class="bom-clear-btn" @click="${this._clearBomSelection}">✕</button>`
+              : ''}
+          </div>
           ${this.selectedBom
-        ? html`
+            ? html`
                 <div class="bom-info">
                   <div class="bom-info-item">
                     <span class="info-label">BOM번호:</span>
@@ -503,7 +548,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
                   </div>
                 </div>
               `
-        : ''}
+            : ''}
         </div>
 
         <div class="form-group">
@@ -697,18 +742,6 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     }
   }
 
-  /** 활성 상태인 BOM 목록 조회 (세트 상품 선택 드롭다운용) */
-  async _fetchBomList() {
-    try {
-      const filters = [{ name: 'status', value: 'ACTIVE' }]
-      const data = await ServiceUtil.searchByPagination('vas_boms', filters, null, 1, 100)
-      this.bomList = data?.items || []
-    } catch (err) {
-      console.error('BOM 목록 조회 실패:', err)
-      this.bomList = []
-    }
-  }
-
   /** 선택한 BOM의 구성 품목 목록 조회 및 재고 정보 연계 */
   async _fetchBomItems(bomId) {
     try {
@@ -762,29 +795,37 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     this.formData = { ...this.formData, [field]: value }
   }
 
-  /** BOM 선택 변경 시 화주사/창고 자동 설정 및 VAS 유형 반영 */
-  _onBomSelect(e) {
-    const bomId = e.target.value
-    this._updateField('vasBomId', bomId)
+  /** BOM 검색 팝업 열기 */
+  _openBomSearchPopup() {
+    const el = document.createElement('vas-bom-search-popup')
+    el.addEventListener('bom-selected', e => {
+      this._applyBomSelection(e.detail.bom)
+    })
+    UiUtil.openPopupByElement('세트 상품 검색', 'large', el, true)
+  }
 
-    if (bomId) {
-      this.selectedBom = this.bomList.find(b => b.id === bomId) || null
-      // BOM의 화주사 코드를 자동 설정 (BOM에 화주사가 지정되어 있고, 현재 선택과 다르면 덮어씀)
-      if (this.selectedBom && this.selectedBom.com_cd && this.formData.comCd !== this.selectedBom.com_cd) {
-        this._updateField('comCd', this.selectedBom.com_cd)
-      }
-      // BOM의 창고 코드를 자동 설정
-      if (this.selectedBom && this.selectedBom.wh_cd && !this.formData.whCd) {
-        this._updateField('whCd', this.selectedBom.wh_cd)
-      }
-      // VAS 유형 설정
-      if (this.selectedBom) {
-        this.formData.vasType = this.selectedBom.vas_type
-      }
-    } else {
-      this.selectedBom = null
-      this.bomItems = []
+  /** 팝업에서 선택된 BOM 적용 - 화주사/창고/유형 자동 설정 */
+  _applyBomSelection(bom) {
+    this.selectedBom = bom
+    this._updateField('vasBomId', bom.id)
+    // BOM의 화주사 코드를 자동 설정
+    if (bom.com_cd && this.formData.comCd !== bom.com_cd) {
+      this._updateField('comCd', bom.com_cd)
     }
+    // BOM의 창고 코드를 자동 설정 (현재 미선택 시에만)
+    if (bom.wh_cd && !this.formData.whCd) {
+      this._updateField('whCd', bom.wh_cd)
+    }
+    // VAS 유형 설정
+    this.formData = { ...this.formData, vasType: bom.vas_type }
+  }
+
+  /** BOM 선택 초기화 */
+  _clearBomSelection() {
+    this.selectedBom = null
+    this._updateField('vasBomId', '')
+    this.formData = { ...this.formData, vasType: null }
+    this.bomItems = []
   }
 
   /** 다음 단계로 이동 - 필수 입력값 검증 후 BOM 구성 품목 조회 */
