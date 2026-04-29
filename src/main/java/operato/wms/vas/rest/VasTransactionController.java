@@ -213,8 +213,10 @@ public class VasTransactionController {
 			@RequestBody Map<String, Object> params) {
 
 		String workerId = (String) params.get("workerId");
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> items = (List<Map<String, Object>>) params.get("items");
 
-		return this.vasService.startVasWork(id, workerId);
+		return this.vasService.startVasWork(id, workerId, items);
 	}
 
 	/********************************************************************************************************
@@ -250,8 +252,14 @@ public class VasTransactionController {
 	 */
 	@PostMapping(value = "/vas_orders/{id}/complete", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Complete VAS Work")
-	public VasOrder completeVasOrder(@PathVariable("id") String id) {
-		return this.vasService.completeVasOrder(id);
+	public VasOrder completeVasOrder(
+			@PathVariable("id") String id,
+			@RequestBody(required = false) Map<String, Object> params) {
+
+		String destLocCd = params == null ? null : (String) params.get("destLocCd");
+		String expiredDate = params == null ? null : (String) params.get("expiredDate");
+
+		return this.vasService.completeVasOrder(id, destLocCd, expiredDate);
 	}
 
 	/**
@@ -304,6 +312,20 @@ public class VasTransactionController {
 	@ApiDesc(description = "List VAS Order Items")
 	public List<VasOrderItem> listVasOrderItems(@PathVariable("id") String id) {
 		return this.vasService.listVasOrderItems(id);
+	}
+
+	/**
+	 * 완성품 유통기한 기본값 조회
+	 *
+	 * GET /rest/vas_trx/vas_orders/{id}/default_expired_date
+	 *
+	 * @param id 작업 지시 ID
+	 * @return 할당 자재 중 가장 빠른 유통기한 또는 내일 날짜
+	 */
+	@GetMapping(value = "/vas_orders/{id}/default_expired_date", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get Default Expired Date for VAS Result Inventory")
+	public Map<String, Object> getDefaultExpiredDate(@PathVariable("id") String id) {
+		return ValueUtil.newMap("expiredDate", this.vasService.getDefaultExpiredDate(id));
 	}
 
 	/**

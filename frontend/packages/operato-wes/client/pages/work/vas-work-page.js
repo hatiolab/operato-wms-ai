@@ -228,7 +228,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
 
         /* 주문 정보 카드 */
         .order-info-card {
-          background: var(--md-sys-color-surface, #fff);
+          background: #fff;
           border-radius: 12px;
           padding: 16px;
           margin-bottom: 16px;
@@ -263,7 +263,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
         }
 
         .pick-item {
-          background: var(--md-sys-color-surface, #fff);
+          background: #fff;
           border-radius: 12px;
           padding: 16px;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -437,6 +437,55 @@ class VasWorkPage extends localize(i18next)(PageView) {
           color: var(--md-sys-color-primary, #1976D2);
           margin-top: 8px;
           min-height: 40px;
+        }
+
+        .expiry-card {
+          background: #fff;
+          border-radius: 12px;
+          padding: 16px;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .expiry-card label {
+          display: block;
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          margin-bottom: 8px;
+        }
+
+        .expiry-input-row {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .expiry-input-row input {
+          flex: 1;
+          padding: 14px 16px;
+          border: 2px solid var(--md-sys-color-outline, #ccc);
+          border-radius: 8px;
+          font-size: 20px;
+          font-weight: 700;
+          box-sizing: border-box;
+          min-height: 52px;
+        }
+
+        .expiry-input-row input:focus {
+          border-color: var(--md-sys-color-primary, #1976D2);
+          outline: none;
+        }
+
+        .expiry-clear-btn {
+          min-height: 52px;
+          min-width: 88px;
+          border: 2px solid var(--md-sys-color-primary, #1976D2);
+          border-radius: 8px;
+          background: transparent;
+          color: var(--md-sys-color-primary, #1976D2);
+          font-size: 16px;
+          font-weight: 700;
+          cursor: pointer;
         }
 
         /* PDA 버튼 (44x44px 최소) */
@@ -699,6 +748,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
       completedQty: Number,
       defectQty: Number,
       putawayLoc: String,
+      expiredDate: String,
       feedbackMsg: String,
       feedbackType: String,
       voiceEnabled: Boolean
@@ -720,6 +770,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
     this.completedQty = 0
     this.defectQty = 0
     this.putawayLoc = ''
+    this.expiredDate = ''
     this.feedbackMsg = ''
     this.feedbackType = ''
     this.voiceEnabled = voiceService.enabled
@@ -887,14 +938,14 @@ class VasWorkPage extends localize(i18next)(PageView) {
     `
   }
 
-  /** 1단계 렌더링 - 자재 피킹 (품목별 바코드 스캔, 수량 입력, 확인) */
+  /** 1단계 렌더링 - 자재 투입 (품목별 바코드 스캔, 수량 입력, 확인) */
   _renderStep1Picking() {
     const pickedCount = this.orderItems.filter(i => i._picked).length
     const totalCount = this.orderItems.length
     const progressPct = totalCount > 0 ? Math.round((pickedCount / totalCount) * 100) : 0
 
     return html`
-      <h3 style="margin: 0 0 12px; font-size: 16px;">1단계: 자재 피킹</h3>
+      <h3 style="margin: 0 0 12px; font-size: 16px;">1단계: 자재 투입</h3>
 
       <!-- 진행률 -->
       <div class="progress-section">
@@ -959,7 +1010,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
             inputmode="numeric"
             placeholder="0"
             .value="${this.completedQty || ''}"
-            @input="${e => { this.completedQty = parseInt(e.target.value) || 0 }}"
+            @input="${e => { this.completedQty = parseFloat(e.target.value) || 0 }}"
           />
           <div class="unit">계획: ${planQty} EA</div>
         </div>
@@ -971,7 +1022,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
             inputmode="numeric"
             placeholder="0"
             .value="${this.defectQty || ''}"
-            @input="${e => { this.defectQty = parseInt(e.target.value) || 0 }}"
+            @input="${e => { this.defectQty = parseFloat(e.target.value) || 0 }}"
           />
           <div class="unit">EA</div>
         </div>
@@ -985,10 +1036,12 @@ class VasWorkPage extends localize(i18next)(PageView) {
     `
   }
 
-  /** 3단계 렌더링 - 적치 로케이션 바코드 스캔 */
+  /** 3단계 렌더링 - 적치 로케이션 바코드 스캔 (완료/마감 주문은 조회 전용) */
   _renderStep3Putaway() {
+    const isReadOnly = ['COMPLETED', 'CLOSED'].includes(this.selectedOrder?.status)
+
     return html`
-      <h3 style="margin: 0 0 12px; font-size: 16px;">3단계: 적치</h3>
+      <h3 style="margin: 0 0 12px; font-size: 16px;">3단계: 적치${isReadOnly ? html` <span style="font-size:12px; color:#4CAF50; font-weight:400;">(완료됨)</span>` : ''}</h3>
 
       <div class="putaway-section">
         <div class="putaway-loc">
@@ -998,13 +1051,34 @@ class VasWorkPage extends localize(i18next)(PageView) {
           <div class="scanned-loc">${this.putawayLoc || '-'}</div>
         </div>
 
-        <div class="scan-input-group">
-          <label>로케이션 바코드 스캔</label>
-          <div class="scan-input">
-            <ox-input-barcode
-              placeholder="로케이션 바코드 스캔"
-              @change="${e => { this.putawayLoc = e.target.value; this._onLocScanConfirm() }}"
-            ></ox-input-barcode>
+        ${isReadOnly ? '' : html`
+          <div class="scan-input-group">
+            <label>로케이션 바코드 스캔</label>
+            <div class="scan-input">
+              <ox-input-barcode
+                placeholder="로케이션 바코드 스캔"
+                @change="${e => { this.putawayLoc = e.target.value; this._onLocScanConfirm() }}"
+              ></ox-input-barcode>
+            </div>
+          </div>
+        `}
+
+        <div class="expiry-card">
+          <label>완성품 유통기한</label>
+          <div class="expiry-input-row">
+            <input
+              type="date"
+              .value="${this.expiredDate || ''}"
+              ?disabled="${isReadOnly}"
+              @input="${e => { this.expiredDate = e.target.value || '' }}"
+            />
+            ${isReadOnly ? '' : html`
+              <button
+                type="button"
+                class="expiry-clear-btn"
+                @click="${() => { this.expiredDate = '' }}"
+              >초기화</button>
+            `}
           </div>
         </div>
       </div>
@@ -1013,6 +1087,17 @@ class VasWorkPage extends localize(i18next)(PageView) {
 
   /** 하단 액션 버튼 렌더링 (단계에 따라 이전/다음/완료 버튼) */
   _renderBottomActions() {
+    const isReadOnly = ['COMPLETED', 'CLOSED'].includes(this.selectedOrder?.status)
+
+    // 완료/마감 주문: 목록으로 버튼만 표시 (이전/다음/완료 불가)
+    if (isReadOnly) {
+      return html`
+        <div class="bottom-actions">
+          <button class="pda-btn outline" @click="${this._backToOrderSelect}">목록으로</button>
+        </div>
+      `
+    }
+
     return html`
       <div class="bottom-actions">
         ${this.step > 1
@@ -1107,8 +1192,8 @@ class VasWorkPage extends localize(i18next)(PageView) {
       const data = await ServiceUtil.restGet(`vas_trx/vas_orders/${orderId}/items`)
       this.orderItems = (data || []).map(item => ({
         ...item,
-        _picked: false,
-        _pickedQty: item.picked_qty || '',
+        _picked: ['IN_USE', 'COMPLETED'].includes(item.status),
+        _pickedQty: item.used_qty || item.picked_qty || '',
         _active: false
       }))
 
@@ -1121,6 +1206,17 @@ class VasWorkPage extends localize(i18next)(PageView) {
     } catch (err) {
       console.error('자재 항목 조회 실패:', err)
       this.orderItems = []
+    }
+  }
+
+  /** 완성품 유통기한 기본값 조회 */
+  async _fetchDefaultExpiredDate(orderId) {
+    try {
+      const data = await ServiceUtil.restGet(`vas_trx/vas_orders/${orderId}/default_expired_date`)
+      return data?.expiredDate || ''
+    } catch (err) {
+      console.error('완성품 유통기한 기본값 조회 실패:', err)
+      return ''
     }
   }
 
@@ -1148,8 +1244,26 @@ class VasWorkPage extends localize(i18next)(PageView) {
     this.completedQty = 0
     this.defectQty = 0
     this.putawayLoc = ''
+    this.expiredDate = ''
     await this._fetchOrderItems(order.id)
-    voiceService.guide(`주문 ${order.vas_no} 선택. 자재를 피킹해주세요`)
+    this.expiredDate = await this._fetchDefaultExpiredDate(order.id)
+    this.completedQty = Number(order.completed_qty || 0)
+    this.defectQty = this._calcDefectQtyFromLoss()
+
+    if (['COMPLETED', 'CLOSED'].includes(order.status)) {
+      // 완료/마감 주문은 무조건 3단계(조회 전용)로 이동, 적치 로케이션 복원
+      this.putawayLoc = order.dest_loc_cd || ''
+      this.step = 3
+      voiceService.guide(`주문 ${order.vas_no} 선택. 완료된 작업입니다`)
+    } else if (this._shouldSkipResultInputStep(order)) {
+      this.step = 3
+      voiceService.guide(`주문 ${order.vas_no} 선택. 적치 로케이션을 스캔해주세요`)
+    } else if (this._shouldSkipMaterialInputStep(order)) {
+      this.step = 2
+      voiceService.guide(`주문 ${order.vas_no} 선택. 완성 수량과 불량 수량을 입력해주세요`)
+    } else {
+      voiceService.guide(`주문 ${order.vas_no} 선택. 자재를 투입해주세요`)
+    }
   }
 
   /** 주문 선택 화면으로 돌아가기 */
@@ -1158,6 +1272,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
     this.selectedOrder = null
     this.orderItems = []
     this.step = 1
+    this.expiredDate = ''
     this._fetchOrders()
   }
 
@@ -1179,8 +1294,62 @@ class VasWorkPage extends localize(i18next)(PageView) {
     }
   }
 
+  /** 작업중 주문의 자재가 모두 투입중이면 자재 투입 단계를 건너뛸지 판단 */
+  _shouldSkipMaterialInputStep(order) {
+    return order.status === 'IN_PROGRESS' &&
+      this._hasMaterialInputCompleted()
+  }
+
+  /** 작업중 주문의 실적이 이미 저장되어 있으면 작업 수행 단계를 건너뛸지 판단 */
+  _shouldSkipResultInputStep(order) {
+    return this._shouldSkipMaterialInputStep(order) &&
+      Number(order.completed_qty || 0) > 0
+  }
+
+  /** 모든 자재가 투입 상태인지 확인 */
+  _hasMaterialInputCompleted() {
+    return this.orderItems.length > 0 &&
+      this.orderItems.every(item => ['IN_USE', 'COMPLETED'].includes(item.status))
+  }
+
+  /** 디테일 손실 수량으로 불량 수량 계산 */
+  _calcDefectQtyFromLoss() {
+    const losses = this.orderItems
+      .map(item => Number(item.loss_qty || 0))
+      .filter(qty => qty > 0)
+
+    if (losses.length === 0) return 0
+
+    const planQty = Number(this.selectedOrder?.plan_qty || 0)
+    const totalReqQty = this.orderItems.reduce((sum, item) => sum + Number(item.req_qty || 0), 0)
+    const totalLossQty = losses.reduce((sum, qty) => sum + qty, 0)
+
+    if (planQty > 0 && totalReqQty > 0) {
+      return totalLossQty / (totalReqQty / planQty)
+    }
+
+    return Math.max(...losses)
+  }
+
+  /** 입력된 불량 수량을 디테일 손실 수량으로 반영 */
+  _applyLossQuantities(defectQty) {
+    const safeDefectQty = Number(defectQty || 0)
+    const planQty = Number(this.selectedOrder?.plan_qty || 0)
+    const items = this.orderItems.map(item => {
+      const reqQty = Number(item.req_qty || 0)
+      const lossQty = planQty > 0 ? safeDefectQty * (reqQty / planQty) : safeDefectQty
+
+      return {
+        ...item,
+        loss_qty: lossQty
+      }
+    })
+
+    this.orderItems = items
+  }
+
   /* ============================================================
-   * Step 1: 자재 피킹
+   * Step 1: 자재 투입
    * ============================================================ */
 
   /** 피킹 수량 입력 처리 */
@@ -1227,21 +1396,27 @@ class VasWorkPage extends localize(i18next)(PageView) {
   /** 다음 단계로 이동 - 각 단계별 유효성 검증 수행 */
   async _nextStep() {
     if (this.step === 1) {
-      // 모든 자재 피킹 완료 확인
+      // 모든 자재 투입 완료 확인
       const allPicked = this.orderItems.every(i => i._picked)
       if (!allPicked && this.orderItems.length > 0) {
-        this._showFeedback('모든 자재를 피킹해주세요', 'error')
+        this._showFeedback('모든 자재를 투입해주세요.', 'error')
         return
       }
 
       // 작업 시작 API 호출
       try {
         if (this.selectedOrder.status !== 'IN_PROGRESS') {
-          await ServiceUtil.restPost(`vas_trx/vas_orders/${this.selectedOrder.id}/start`, {})
+          const items = this.orderItems.map(item => ({
+            itemId: item.id,
+            usedQty: Number(item._pickedQty || item.used_qty || item.picked_qty || item.alloc_qty || item.req_qty || 0)
+          }))
+
+          await ServiceUtil.restPost(`vas_trx/vas_orders/${this.selectedOrder.id}/start`, { items })
           this.selectedOrder = { ...this.selectedOrder, status: 'IN_PROGRESS' }
         }
       } catch (err) {
-        console.error('작업 시작 실패:', err)
+        this._showFeedback(err.message || '작업 시작 실패', 'error')
+        return
       }
     }
 
@@ -1258,6 +1433,11 @@ class VasWorkPage extends localize(i18next)(PageView) {
           result_qty: this.completedQty,
           defect_qty: this.defectQty
         })
+        this.selectedOrder = {
+          ...this.selectedOrder,
+          completed_qty: this.completedQty
+        }
+        this._applyLossQuantities(this.defectQty)
         this._showFeedback('실적 등록 완료', 'success')
         voiceService.success('실적 등록 완료. 적치 로케이션을 스캔해주세요')
       } catch (err) {
@@ -1300,7 +1480,10 @@ class VasWorkPage extends localize(i18next)(PageView) {
     }
 
     try {
-      await ServiceUtil.restPost(`vas_trx/vas_orders/${this.selectedOrder.id}/complete`)
+      await ServiceUtil.restPost(`vas_trx/vas_orders/${this.selectedOrder.id}/complete`, {
+        destLocCd: this.putawayLoc,
+        expiredDate: this.expiredDate || null
+      })
       this._showFeedback('작업 완료!', 'success')
       voiceService.success('작업이 완료되었습니다')
 
@@ -1324,6 +1507,9 @@ class VasWorkPage extends localize(i18next)(PageView) {
       this.scanValue = barcode
       this._onScanSearch()
     } else if (this.screen === 'work') {
+      const isReadOnly = ['COMPLETED', 'CLOSED'].includes(this.selectedOrder?.status)
+      if (isReadOnly) return  // 완료/마감 주문은 스캔 입력 차단
+
       if (this.step === 1) {
         this._onSkuBarcodeScan(barcode)
       } else if (this.step === 3) {
@@ -1333,7 +1519,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
     }
   }
 
-  /** Step 1 피킹 중 SKU 바코드 스캔 — 자재 매칭 및 활성화 */
+  /** Step 1 투입 중 SKU 바코드 스캔 — 자재 매칭 및 활성화 */
   _onSkuBarcodeScan(barcode) {
     const trimmed = (barcode || '').trim()
     if (!trimmed) return

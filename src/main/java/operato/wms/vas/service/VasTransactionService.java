@@ -1,5 +1,6 @@
 package operato.wms.vas.service;
 
+import java.time.LocalDate;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import operato.wms.base.entity.VasBom;
 import operato.wms.base.entity.VasBomItem;
 import operato.wms.base.service.WmsBaseService;
+import operato.wms.oms.entity.StockAllocation;
 import operato.wms.stock.entity.Inventory;
 import operato.wms.stock.service.StockTransactionService;
 import operato.wms.vas.WmsVasConstants;
@@ -480,6 +482,19 @@ public class VasTransactionService extends AbstractQueryService {
 	 */
 	@Transactional
 	public VasOrder startVasWork(String vasOrderId, String workerId) {
+		return this.startVasWork(vasOrderId, workerId, null);
+	}
+
+	/**
+	 * 작업 시작
+	 *
+	 * @param vasOrderId 작업 지시 ID
+	 * @param workerId   작업자 ID
+	 * @param items      투입 수량이 포함된 작업 지시 상세 목록
+	 * @return 작업 시작된 작업 지시
+	 */
+	@Transactional
+	public VasOrder startVasWork(String vasOrderId, String workerId, List<Map<String, Object>> items) {
 		// 1. 작업 지시 조회
 		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
 		if (vasOrder == null) {
@@ -499,8 +514,12 @@ public class VasTransactionService extends AbstractQueryService {
 
 		this.queryManager.update(vasOrder, "status", "workerId", "startedAt");
 
-		// 4. 상세 항목 상태 업데이트
-		String sql = "UPDATE vas_order_items SET status = :status " +
+		// 4. 작업자가 확인한 투입 수량 업데이트
+		this.updateUsedQuantities(vasOrder, items);
+
+		// 5. 상세 항목 상태 업데이트
+		String sql = "UPDATE vas_order_items SET status = :status, " +
+				"used_qty = COALESCE(used_qty, picked_qty, alloc_qty, req_qty) " +
 				"WHERE vas_order_id = :vasOrderId AND domain_id = :domainId " +
 				"AND status = :prevStatus";
 		this.queryManager.executeBySql(sql, ValueUtil.newMap(
@@ -508,13 +527,41 @@ public class VasTransactionService extends AbstractQueryService {
 				WmsVasConstants.ITEM_STATUS_IN_USE, vasOrderId, vasOrder.getDomainId(),
 				WmsVasConstants.ITEM_STATUS_PICKED));
 
-		// SSE 이벤트 발행
+		// 6. SSE 이벤트 발행
 		vasSseService.publish(vasOrder.getDomainId(), new VasEventData(
 				"WORK_STARTED", vasOrder.getVasNo(), vasOrder.getId().toString(),
 				WmsVasConstants.STATUS_MATERIAL_READY, vasOrder.getStatus(), vasOrder.getVasType(),
 				vasOrder.getVasNo() + " 작업 시작"));
 
 		return vasOrder;
+	}
+
+	/**
+	 * 투입 수량 업데이트
+	 *
+	 * @param vasOrder 작업 지시
+	 * @param items    itemId, usedQty를 포함한 상세 목록
+	 */
+	private void updateUsedQuantities(VasOrder vasOrder, List<Map<String, Object>> items) {
+		if (items == null || items.isEmpty()) {
+			return;
+		}
+
+		String sql = "UPDATE vas_order_items SET used_qty = :usedQty " +
+				"WHERE id = :itemId AND vas_order_id = :vasOrderId AND domain_id = :domainId";
+
+		for (Map<String, Object> item : items) {
+			String itemId = (String) item.get("itemId");
+			Double usedQty = ValueUtil.toDouble(item.get("usedQty"));
+
+			if (ValueUtil.isEmpty(itemId) || usedQty == null) {
+				continue;
+			}
+
+			this.queryManager.executeBySql(sql, ValueUtil.newMap(
+					"usedQty,itemId,vasOrderId,domainId",
+					usedQty, itemId, vasOrder.getId(), vasOrder.getDomainId()));
+		}
 	}
 
 	/********************************************************************************************************
@@ -542,7 +589,15 @@ public class VasTransactionService extends AbstractQueryService {
 					"실적 등록 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
 		}
 
-		// 3. 실적 기록 생성
+		if (result.getResultQty() == null || result.getResultQty() <= 0) {
+			throw new ElidomValidationException("완성 수량은 0보다 커야 합니다.");
+		}
+
+		if (result.getDefectQty() == null) {
+			result.setDefectQty(0.0);
+		}
+
+		// 3. 실적 기록 생성 또는 갱신
 		result.setVasOrderId(vasOrderId);
 		result.setVasNo(vasOrder.getVasNo());
 		result.setResultType(vasOrder.getVasType());
@@ -559,15 +614,32 @@ public class VasTransactionService extends AbstractQueryService {
 			result.setWorkDate(DateUtil.todayStr());
 		}
 
-		this.queryManager.insert(result);
+		VasResult savedResult = this.findFirstVasResult(vasOrder);
+		boolean created = savedResult == null;
+		if (created) {
+			this.queryManager.insert(result);
+			savedResult = result;
+		} else {
+			savedResult.setResultQty(result.getResultQty());
+			savedResult.setDefectQty(result.getDefectQty());
+			savedResult.setResultType(result.getResultType());
+			savedResult.setSetSkuCd(result.getSetSkuCd());
+			savedResult.setSetSkuNm(result.getSetSkuNm());
+			savedResult.setWorkDate(result.getWorkDate());
+			savedResult.setWorkerId(result.getWorkerId());
+			savedResult.setDestLocCd(result.getDestLocCd());
+			savedResult.setLotNo(result.getLotNo());
+			savedResult.setRemarks(result.getRemarks());
+			this.queryManager.update(savedResult, "resultQty", "defectQty", "resultType", "setSkuCd", "setSkuNm",
+					"workDate", "workerId", "destLocCd", "lotNo", "remarks");
+		}
 
-		// 4. completed_qty 누적 업데이트
-		double currentCompleted = vasOrder.getCompletedQty() != null ? vasOrder.getCompletedQty() : 0.0;
-		vasOrder.setCompletedQty(currentCompleted + result.getResultQty());
+		// 4. completed_qty 갱신 업데이트
+		vasOrder.setCompletedQty(result.getResultQty());
 		this.queryManager.update(vasOrder, "completedQty");
 
-		// VAS 유형별 재고 처리
-		this.processInventoryByVasType(vasOrder, result);
+		// 5. 디테일 손실 수량 갱신
+		this.updateLossQuantities(vasOrder, result.getDefectQty());
 
 		// SSE 이벤트 발행
 		vasSseService.publish(vasOrder.getDomainId(), new VasEventData(
@@ -575,7 +647,46 @@ public class VasTransactionService extends AbstractQueryService {
 				vasOrder.getStatus(), vasOrder.getStatus(), vasOrder.getVasType(),
 				vasOrder.getVasNo() + " 실적 등록 (" + result.getResultQty() + " EA)"));
 
-		return result;
+		return savedResult;
+	}
+
+	/**
+	 * 작업 지시의 첫 번째 실적 조회
+	 *
+	 * @param vasOrder 작업 지시
+	 * @return 첫 번째 실적
+	 */
+	private VasResult findFirstVasResult(VasOrder vasOrder) {
+		Query query = new Query();
+		query.addFilter("domainId", vasOrder.getDomainId());
+		query.addFilter("vasOrderId", vasOrder.getId());
+		query.addOrder("resultSeq", true);
+
+		List<VasResult> results = this.queryManager.selectList(VasResult.class, query);
+		return results.isEmpty() ? null : results.get(0);
+	}
+
+	/**
+	 * 불량 수량을 자재별 손실 수량으로 환산하여 갱신
+	 *
+	 * @param vasOrder  작업 지시
+	 * @param defectQty 불량 수량
+	 */
+	private void updateLossQuantities(VasOrder vasOrder, Double defectQty) {
+		double safeDefectQty = defectQty != null ? defectQty : 0.0;
+		double planQty = vasOrder.getPlanQty() != null ? vasOrder.getPlanQty() : 0.0;
+
+		Query query = new Query();
+		query.addFilter("domainId", vasOrder.getDomainId());
+		query.addFilter("vasOrderId", vasOrder.getId());
+		List<VasOrderItem> items = this.queryManager.selectList(VasOrderItem.class, query);
+
+		for (VasOrderItem item : items) {
+			double reqQty = item.getReqQty() != null ? item.getReqQty() : 0.0;
+			double lossQty = planQty > 0 ? safeDefectQty * (reqQty / planQty) : safeDefectQty;
+			item.setLossQty(lossQty);
+			this.queryManager.update(item, "lossQty");
+		}
 	}
 
 	/********************************************************************************************************
@@ -590,6 +701,31 @@ public class VasTransactionService extends AbstractQueryService {
 	 */
 	@Transactional
 	public VasOrder completeVasOrder(String vasOrderId) {
+		return this.completeVasOrder(vasOrderId, null);
+	}
+
+	/**
+	 * 작업 완료 처리
+	 *
+	 * @param vasOrderId 작업 지시 ID
+	 * @param destLocCd  완성품 적치 로케이션
+	 * @return 완료된 작업 지시
+	 */
+	@Transactional
+	public VasOrder completeVasOrder(String vasOrderId, String destLocCd) {
+		return this.completeVasOrder(vasOrderId, destLocCd, null);
+	}
+
+	/**
+	 * 작업 완료 처리
+	 *
+	 * @param vasOrderId  작업 지시 ID
+	 * @param destLocCd   완성품 적치 로케이션
+	 * @param expiredDate 완성품 유통기한
+	 * @return 완료된 작업 지시
+	 */
+	@Transactional
+	public VasOrder completeVasOrder(String vasOrderId, String destLocCd, String expiredDate) {
 		// 1. 작업 지시 조회
 		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
 		if (vasOrder == null) {
@@ -609,14 +745,21 @@ public class VasTransactionService extends AbstractQueryService {
 					vasOrder.getPlanQty(), vasOrder.getCompletedQty());
 		}
 
-		// 4. 완료 처리
+		// 4. 완료 시점에 할당 원재고 차감 및 예약 해소
+		this.consumeVasAllocatedInventoriesIfNeeded(vasOrder);
+
+		// 5. 완료 시점에 재고 생성 및 적치 로케이션 이동
+		this.createVasResultInventoriesIfNeeded(vasOrder, expiredDate);
+		this.moveVasResultInventories(vasOrder, destLocCd);
+
+		// 6. 완료 처리
 		vasOrder.setStatus(WmsVasConstants.STATUS_COMPLETED);
 		vasOrder.setCompletedAt(new Date());
 		vasOrder.setVasEndDate(DateUtil.todayStr());
 
 		this.queryManager.update(vasOrder, "status", "completedAt", "vasEndDate");
 
-		// 5. 상세 항목 상태 업데이트
+		// 7. 상세 항목 상태 업데이트
 		String sql = "UPDATE vas_order_items SET status = :status " +
 				"WHERE vas_order_id = :vasOrderId AND domain_id = :domainId";
 		this.queryManager.executeBySql(sql, ValueUtil.newMap(
@@ -630,6 +773,294 @@ public class VasTransactionService extends AbstractQueryService {
 				vasOrder.getVasNo() + " 작업 완료"));
 
 		return vasOrder;
+	}
+
+	/**
+	 * 완성품 유통기한 기본값 조회
+	 *
+	 * @param vasOrderId 작업 지시 ID
+	 * @return 할당 자재 중 가장 빠른 유통기한 또는 내일 날짜
+	 */
+	public String getDefaultExpiredDate(String vasOrderId) {
+		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
+		if (vasOrder == null) {
+			throw new ElidomValidationException("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
+		}
+
+		String sql = "SELECT MIN(expired_date) FROM stock_allocations " +
+				"WHERE domain_id = :domainId AND shipment_order_id = :vasOrderId " +
+				"AND alloc_type = :allocType AND expired_date IS NOT NULL AND expired_date <> ''";
+		String expiredDate = this.queryManager.selectBySql(sql,
+				ValueUtil.newMap("domainId,vasOrderId,allocType",
+						vasOrder.getDomainId(), vasOrderId, StockAllocation.ALLOC_TYPE_VAS),
+				String.class);
+
+		return ValueUtil.isNotEmpty(expiredDate) ? expiredDate : LocalDate.now().plusDays(1).toString();
+	}
+
+	/**
+	 * VAS 완료 시점에 완성품/결과품 재고 생성
+	 *
+	 * @param vasOrder    작업 지시
+	 * @param expiredDate 완성품 유통기한
+	 */
+	private void createVasResultInventoriesIfNeeded(VasOrder vasOrder, String expiredDate) {
+		if (!this.hasVasResultInventoryTransaction(vasOrder)) {
+			return;
+		}
+
+		List<Inventory> inventories = this.findVasResultInventories(vasOrder);
+		if (!inventories.isEmpty()) {
+			this.updateVasResultInventoryExpiredDate(inventories, expiredDate);
+			return;
+		}
+
+		VasResult result = this.findFirstVasResult(vasOrder);
+		if (result == null) {
+			throw new ElidomValidationException("작업 실적을 먼저 등록해야 완료할 수 있습니다.");
+		}
+
+		this.processInventoryByVasType(vasOrder, result, expiredDate);
+	}
+
+	/**
+	 * VAS 결과 재고의 유통기한 갱신
+	 *
+	 * @param inventories 결과 재고 목록
+	 * @param expiredDate 완성품 유통기한
+	 */
+	private void updateVasResultInventoryExpiredDate(List<Inventory> inventories, String expiredDate) {
+		for (Inventory inventory : inventories) {
+			inventory.setExpiredDate(expiredDate);
+			this.queryManager.update(inventory, "expiredDate");
+		}
+	}
+
+	/**
+	 * VAS 완료 시 할당된 원재고를 소비하고 예약 수량을 해소
+	 *
+	 * @param vasOrder 작업 지시
+	 */
+	private void consumeVasAllocatedInventoriesIfNeeded(VasOrder vasOrder) {
+		if (!this.hasVasResultInventoryTransaction(vasOrder)) {
+			return;
+		}
+
+		Query query = new Query();
+		query.addFilter("domainId", vasOrder.getDomainId());
+		query.addFilter("vasOrderId", vasOrder.getId());
+		query.addOrder("vasSeq", true);
+		List<VasOrderItem> items = this.queryManager.selectList(VasOrderItem.class, query);
+
+		for (VasOrderItem item : items) {
+			this.consumeVasItemAllocations(vasOrder, item);
+		}
+	}
+
+	/**
+	 * VAS 자재 상세에 연결된 HARD 할당을 실제 소비 처리
+	 *
+	 * @param vasOrder 작업 지시
+	 * @param item     작업 지시 상세
+	 */
+	private void consumeVasItemAllocations(VasOrder vasOrder, VasOrderItem item) {
+		double targetQty = this.getVasItemConsumeQty(item);
+		if (targetQty <= 0) {
+			return;
+		}
+
+		String sql = "SELECT * FROM stock_allocations " +
+				"WHERE domain_id = :domainId AND shipment_order_id = :vasOrderId " +
+				"AND shipment_order_item_id = :itemId AND alloc_type = :allocType " +
+				"AND status = :status ORDER BY created_at ASC";
+		List<StockAllocation> allocations = this.queryManager.selectListBySql(sql,
+				ValueUtil.newMap("domainId,vasOrderId,itemId,allocType,status",
+						vasOrder.getDomainId(), vasOrder.getId(), item.getId(),
+						StockAllocation.ALLOC_TYPE_VAS, StockAllocation.STATUS_HARD),
+				StockAllocation.class, 0, 0);
+
+		double remainConsumeQty = targetQty;
+		String now = DateUtil.currentTimeStr();
+
+		for (StockAllocation allocation : allocations) {
+			double allocQty = allocation.getAllocQty() != null ? allocation.getAllocQty() : 0.0;
+			double consumeQty = Math.min(allocQty, remainConsumeQty);
+
+			this.consumeAllocatedInventory(vasOrder, allocation, consumeQty, allocQty);
+
+			allocation.setStatus(StockAllocation.STATUS_RELEASED);
+			allocation.setReleasedAt(now);
+			this.queryManager.update(allocation, "status", "releasedAt");
+
+			remainConsumeQty -= consumeQty;
+			if (remainConsumeQty <= 0.0001) {
+				remainConsumeQty = 0.0;
+			}
+		}
+
+		if (remainConsumeQty > 0.0001) {
+			throw new ElidomValidationException(
+					"할당 재고 수량이 투입 수량보다 부족합니다. SKU: " + item.getSkuCd() +
+							", 투입: " + targetQty + ", 부족: " + remainConsumeQty);
+		}
+	}
+
+	/**
+	 * VAS 자재 상세의 실제 소비 수량 결정
+	 *
+	 * @param item 작업 지시 상세
+	 * @return 소비 수량
+	 */
+	private double getVasItemConsumeQty(VasOrderItem item) {
+		if (item.getUsedQty() != null && item.getUsedQty() > 0) {
+			return item.getUsedQty();
+		}
+		if (item.getPickedQty() != null && item.getPickedQty() > 0) {
+			return item.getPickedQty();
+		}
+		if (item.getAllocQty() != null && item.getAllocQty() > 0) {
+			return item.getAllocQty();
+		}
+		return item.getReqQty() != null ? item.getReqQty() : 0.0;
+	}
+
+	/**
+	 * 할당 원재고의 재고 수량과 예약 수량을 갱신
+	 *
+	 * @param vasOrder   작업 지시
+	 * @param allocation 재고 할당
+	 * @param consumeQty 실제 차감 수량
+	 * @param releaseQty 예약 해소 수량
+	 */
+	private void consumeAllocatedInventory(
+			VasOrder vasOrder,
+			StockAllocation allocation,
+			double consumeQty,
+			double releaseQty) {
+
+		Inventory inventory = this.queryManager.select(Inventory.class, allocation.getInventoryId());
+		if (inventory == null || !ValueUtil.isEqual(inventory.getDomainId(), vasOrder.getDomainId())) {
+			throw new ElidomValidationException("할당 원재고를 찾을 수 없습니다. ID: " + allocation.getInventoryId());
+		}
+
+		double invQty = inventory.getInvQty() != null ? inventory.getInvQty() : 0.0;
+		double reservedQty = inventory.getReservedQty() != null ? inventory.getReservedQty() : 0.0;
+
+		if (consumeQty > invQty + 0.0001) {
+			throw new ElidomValidationException(
+					"할당 원재고 수량이 부족합니다. SKU: " + allocation.getSkuCd() +
+							", 재고: " + invQty + ", 차감: " + consumeQty);
+		}
+
+		inventory.setInvQty(Math.max(invQty - consumeQty, 0.0));
+		inventory.setReservedQty(Math.max(reservedQty - releaseQty, 0.0));
+		inventory.setLastTranCd(Inventory.TRANSACTION_VAS_OUT);
+		inventory.setUpdatedAt(new Date());
+		this.queryManager.update(inventory);
+	}
+
+	/**
+	 * VAS 작업장에 생성된 완성품 재고를 적치 로케이션으로 이동
+	 *
+	 * @param vasOrder  작업 지시
+	 * @param destLocCd 적치 로케이션
+	 */
+	private void moveVasResultInventories(VasOrder vasOrder, String destLocCd) {
+		if (!this.hasVasResultInventoryTransaction(vasOrder)) {
+			return;
+		}
+
+		if (ValueUtil.isEmpty(destLocCd)) {
+			return;
+		}
+
+		String workLocCd = vasOrder.getWorkLocCd();
+		if (ValueUtil.isEmpty(workLocCd) || ValueUtil.isEqualIgnoreCase(workLocCd, destLocCd)) {
+			return;
+		}
+
+		List<Inventory> inventories = this.findVasResultInventories(vasOrder);
+		if (inventories.isEmpty()) {
+			this.logger.warn("VAS 완성품 이동 대상 재고 없음: vasNo={}, fromLoc={}, toLoc={}",
+					vasOrder.getVasNo(), workLocCd, destLocCd);
+			return;
+		}
+
+		for (Inventory inventory : inventories) {
+			if (ValueUtil.isEqualIgnoreCase(inventory.getLocCd(), destLocCd)) {
+				continue;
+			}
+
+			this.stockTrxSvc.moveInventory(inventory, destLocCd, "VAS 완성품 적치 이동: " + vasOrder.getVasNo());
+		}
+
+		VasResult result = this.findFirstVasResult(vasOrder);
+		if (result != null) {
+			result.setDestLocCd(destLocCd);
+			this.queryManager.update(result, "destLocCd");
+		}
+	}
+
+	/**
+	 * VAS 유형별 결과 재고 생성/이동 대상 여부
+	 *
+	 * @param vasOrder 작업 지시
+	 * @return 결과 재고 트랜잭션 여부
+	 */
+	private boolean hasVasResultInventoryTransaction(VasOrder vasOrder) {
+		return WmsVasConstants.VAS_TYPE_SET_ASSEMBLY.equals(vasOrder.getVasType()) ||
+				WmsVasConstants.VAS_TYPE_DISASSEMBLY.equals(vasOrder.getVasType());
+	}
+
+	/**
+	 * VAS 작업으로 생성된 재고 조회
+	 *
+	 * @param vasOrder 작업 지시
+	 * @return 생성 재고 목록
+	 */
+	private List<Inventory> findVasResultInventories(VasOrder vasOrder) {
+		String sql = "SELECT * FROM inventories " +
+				"WHERE domain_id = :domainId " +
+				"AND com_cd = :comCd " +
+				"AND wh_cd = :whCd " +
+				"AND loc_cd = :workLocCd " +
+				"AND status = :status " +
+				"AND (del_flag IS NULL OR del_flag = false) " +
+				"AND remarks LIKE :remarks " +
+				"ORDER BY created_at ASC";
+
+		Map<String, Object> params = ValueUtil.newMap(
+				"domainId,comCd,whCd,workLocCd,status,remarks",
+				vasOrder.getDomainId(), vasOrder.getComCd(), vasOrder.getWhCd(), vasOrder.getWorkLocCd(),
+				Inventory.STATUS_STORED, "%" + vasOrder.getVasNo() + "%");
+
+		List<Inventory> inventories = this.queryManager.selectListBySql(sql, params, Inventory.class, 0, 0);
+		if (!inventories.isEmpty()) {
+			return inventories;
+		}
+
+		VasResult result = this.findFirstVasResult(vasOrder);
+		if (result == null || ValueUtil.isEmpty(result.getSetSkuCd())) {
+			return inventories;
+		}
+
+		String fallbackSql = "SELECT * FROM inventories " +
+				"WHERE domain_id = :domainId " +
+				"AND com_cd = :comCd " +
+				"AND wh_cd = :whCd " +
+				"AND loc_cd = :workLocCd " +
+				"AND sku_cd = :setSkuCd " +
+				"AND status = :status " +
+				"AND (del_flag IS NULL OR del_flag = false) " +
+				"AND inv_qty = :resultQty " +
+				"ORDER BY created_at DESC";
+
+		Map<String, Object> fallbackParams = ValueUtil.newMap(
+				"domainId,comCd,whCd,workLocCd,setSkuCd,status,resultQty",
+				vasOrder.getDomainId(), vasOrder.getComCd(), vasOrder.getWhCd(), vasOrder.getWorkLocCd(),
+				result.getSetSkuCd(), Inventory.STATUS_STORED, result.getResultQty());
+
+		return this.queryManager.selectListBySql(fallbackSql, fallbackParams, Inventory.class, 0, 1);
 	}
 
 	/**
@@ -872,7 +1303,8 @@ public class VasTransactionService extends AbstractQueryService {
 				"COALESCE(mi.total_items, 0) as total_items, " +
 				"COALESCE(mi.picked_items, 0) as picked_items, " +
 				"COALESCE(mi.total_req_qty, 0) as total_req_qty, " +
-				"COALESCE(mi.total_picked_qty, 0) as total_picked_qty " +
+				"COALESCE(mi.total_picked_qty, 0) as total_picked_qty, " +
+				"vr.dest_loc_cd " +
 				"FROM vas_orders vo " +
 				"LEFT JOIN ( " +
 				"  SELECT vas_order_id, " +
@@ -884,6 +1316,12 @@ public class VasTransactionService extends AbstractQueryService {
 				"  WHERE domain_id = :domainId " +
 				"  GROUP BY vas_order_id " +
 				") mi ON vo.id = mi.vas_order_id " +
+				"LEFT JOIN ( " +
+				"  SELECT DISTINCT ON (vas_order_id) vas_order_id, dest_loc_cd " +
+				"  FROM vas_results " +
+				"  WHERE domain_id = :domainId AND dest_loc_cd IS NOT NULL " +
+				"  ORDER BY vas_order_id, result_seq DESC " +
+				") vr ON vo.id = vr.vas_order_id " +
 				"WHERE vo.domain_id = :domainId " +
 				"AND vo.status IN (:statuses) " +
 				"AND vo.vas_req_date = :targetDate " +
@@ -1105,22 +1543,27 @@ public class VasTransactionService extends AbstractQueryService {
 	 * @param result   실적 정보
 	 */
 	private void processInventoryByVasType(VasOrder vasOrder, VasResult result) {
+		this.processInventoryByVasType(vasOrder, result, null);
+	}
+
+	/**
+	 * VAS 유형별 재고 처리
+	 *
+	 * @param vasOrder    작업 지시
+	 * @param result      실적 정보
+	 * @param expiredDate 완성품 유통기한
+	 */
+	private void processInventoryByVasType(VasOrder vasOrder, VasResult result, String expiredDate) {
 		String vasType = vasOrder.getVasType();
 
 		if (WmsVasConstants.VAS_TYPE_SET_ASSEMBLY.equals(vasType)) {
-			// 1. BOM 구성품 재고 차감
-			if (ValueUtil.isNotEmpty(vasOrder.getVasBomId())) {
-				this.consumeComponentInventories(vasOrder, result);
-			}
-			// 2. 세트 SKU 재고 생성
-			this.createSetSkuInventory(vasOrder, result);
+			// 할당 원재고 차감은 완료 처리 초입에서 수행하고, 여기서는 결과 재고만 생성한다.
+			this.createSetSkuInventory(vasOrder, result, expiredDate);
 
 		} else if (WmsVasConstants.VAS_TYPE_DISASSEMBLY.equals(vasType)) {
-			// 1. 세트 SKU 재고 차감
-			this.consumeSetSkuInventory(vasOrder, result);
-			// 2. BOM 구성품 재고 생성
+			// 할당 원재고 차감은 완료 처리 초입에서 수행하고, 여기서는 결과 재고만 생성한다.
 			if (ValueUtil.isNotEmpty(vasOrder.getVasBomId())) {
-				this.createComponentInventories(vasOrder, result);
+				this.createComponentInventories(vasOrder, result, expiredDate);
 			}
 		}
 		// REPACK, LABEL, CUSTOM: 재고 수량 변화 없음 — 스킵
@@ -1208,16 +1651,15 @@ public class VasTransactionService extends AbstractQueryService {
 	/**
 	 * SET_ASSEMBLY 완성품(세트 SKU) 재고 생성
 	 *
-	 * result.destLocCd 우선, 없으면 vasOrder.workLocCd 사용
+	 * 작업 완료 전에는 작업장 로케이션에 생성하고, 완료 시 적치 로케이션으로 이동한다.
 	 *
 	 * @param vasOrder 작업 지시
 	 * @param result   실적 정보
 	 */
-	private void createSetSkuInventory(VasOrder vasOrder, VasResult result) {
-		String destLocCd = ValueUtil.isNotEmpty(result.getDestLocCd()) ? result.getDestLocCd()
-				: vasOrder.getWorkLocCd();
-		if (ValueUtil.isEmpty(destLocCd)) {
-			this.logger.warn("VAS 세트 재고 생성 실패 - destLocCd 없음: vasNo={}", vasOrder.getVasNo());
+	private void createSetSkuInventory(VasOrder vasOrder, VasResult result, String expiredDate) {
+		String workLocCd = vasOrder.getWorkLocCd();
+		if (ValueUtil.isEmpty(workLocCd)) {
+			this.logger.warn("VAS 세트 재고 생성 실패 - workLocCd 없음: vasNo={}", vasOrder.getVasNo());
 			return;
 		}
 
@@ -1225,12 +1667,13 @@ public class VasTransactionService extends AbstractQueryService {
 		newInv.setDomainId(vasOrder.getDomainId());
 		newInv.setComCd(vasOrder.getComCd());
 		newInv.setWhCd(vasOrder.getWhCd());
-		newInv.setLocCd(destLocCd);
+		newInv.setLocCd(workLocCd);
 		newInv.setSkuCd(result.getSetSkuCd());
 		newInv.setInvQty(result.getResultQty());
 		newInv.setLotNo(result.getLotNo());
+		newInv.setExpiredDate(expiredDate);
 		newInv.setStatus(Inventory.STATUS_STORED);
-		newInv.setRemarks("VAS 완성품 재고 생성");
+		newInv.setRemarks("VAS 완성품 재고 생성: " + vasOrder.getVasNo());
 		this.stockTrxSvc.createInventory(vasOrder.getDomainId(), newInv);
 	}
 
@@ -1238,16 +1681,15 @@ public class VasTransactionService extends AbstractQueryService {
 	 * DISASSEMBLY 시 BOM 구성품 재고 생성
 	 *
 	 * 구성품별 생성 수량 = resultQty × componentQty
-	 * result.destLocCd 우선, 없으면 vasOrder.workLocCd 사용
+	 * 작업 완료 전에는 작업장 로케이션에 생성하고, 완료 시 적치 로케이션으로 이동한다.
 	 *
 	 * @param vasOrder 작업 지시
 	 * @param result   실적 정보
 	 */
-	private void createComponentInventories(VasOrder vasOrder, VasResult result) {
-		String destLocCd = ValueUtil.isNotEmpty(result.getDestLocCd()) ? result.getDestLocCd()
-				: vasOrder.getWorkLocCd();
-		if (ValueUtil.isEmpty(destLocCd)) {
-			this.logger.warn("VAS 구성품 재고 생성 실패 - destLocCd 없음: vasNo={}", vasOrder.getVasNo());
+	private void createComponentInventories(VasOrder vasOrder, VasResult result, String expiredDate) {
+		String workLocCd = vasOrder.getWorkLocCd();
+		if (ValueUtil.isEmpty(workLocCd)) {
+			this.logger.warn("VAS 구성품 재고 생성 실패 - workLocCd 없음: vasNo={}", vasOrder.getVasNo());
 			return;
 		}
 
@@ -1264,10 +1706,12 @@ public class VasTransactionService extends AbstractQueryService {
 			newInv.setDomainId(vasOrder.getDomainId());
 			newInv.setComCd(vasOrder.getComCd());
 			newInv.setWhCd(vasOrder.getWhCd());
-			newInv.setLocCd(destLocCd);
+			newInv.setLocCd(workLocCd);
 			newInv.setSkuCd(bomItem.getSkuCd());
 			newInv.setInvQty(compQty);
+			newInv.setExpiredDate(expiredDate);
 			newInv.setStatus(Inventory.STATUS_STORED);
+			newInv.setRemarks("VAS 해체 구성품 재고 생성: " + vasOrder.getVasNo());
 
 			this.stockTrxSvc.createInventory(vasOrder.getDomainId(), newInv);
 		}

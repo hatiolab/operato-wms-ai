@@ -14,7 +14,7 @@ import xyz.elidom.util.ValueUtil;
  *
  * 유통가공 작업 완료 후의 실적 기록
  * - 완성품 및 불량품 수량 관리
- * - 생성 후 부모 vas_orders의 completed_qty 자동 업데이트
+ * - 생성 후 부모 vas_orders의 completed_qty 갱신
  */
 @Table(name = "vas_results", idStrategy = GenerationRule.UUID, uniqueFields = "vasOrderId,resultSeq,domainId", indexes = {
 		@Index(name = "ix_vas_results_0", columnList = "vas_order_id,result_seq,domain_id", unique = true),
@@ -278,7 +278,7 @@ public class VasResult extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	}
 
 	/**
-	 * 부모 vas_orders의 completed_qty 업데이트
+	 * 부모 vas_orders의 completed_qty 갱신
 	 */
 	private void updateParentOrderCompletedQty() {
 		if (ValueUtil.isNotEmpty(this.vasOrderId)) {
@@ -286,12 +286,7 @@ public class VasResult extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 			VasOrder order = queryMgr.select(VasOrder.class, this.vasOrderId);
 
 			if (order != null) {
-				String sql = "SELECT COALESCE(SUM(result_qty), 0) FROM vas_results WHERE domain_id = :domainId AND vas_order_id = :vasOrderId";
-				Double totalResultQty = queryMgr.selectBySql(sql,
-						ValueUtil.newMap("domainId,vasOrderId", this.domainId, this.vasOrderId),
-						Double.class);
-
-				order.setCompletedQty(totalResultQty);
+				order.setCompletedQty(this.resultQty);
 				queryMgr.update(order, "completedQty");
 			}
 		}
