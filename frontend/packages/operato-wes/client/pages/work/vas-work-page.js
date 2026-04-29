@@ -27,10 +27,11 @@ class VasWorkPage extends localize(i18next)(PageView) {
     return [
       css`
         :host {
-          display: block;
-          background-color: var(--md-sys-color-background, #f5f5f5);
+          display: flex;
+          flex-direction: column;
+          background: var(--md-sys-color-surface, #fafafa);
           height: 100%;
-          overflow: auto;
+          overflow-y: auto;
           font-family: var(--md-sys-typescale-body-large-font, sans-serif);
         }
 
@@ -66,11 +67,10 @@ class VasWorkPage extends localize(i18next)(PageView) {
           justify-content: center;
         }
 
-        /* 컨텐츠 영역 */
+        /* 컨텐츠 영역 (작업 화면용) */
         .pda-content {
           padding: 16px;
-          max-width: 480px;
-          margin: 0 auto;
+          flex: 1;
         }
 
         /* 주문 선택 화면 */
@@ -118,7 +118,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
         .order-list {
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 8px;
         }
 
         .order-list-title {
@@ -129,52 +129,58 @@ class VasWorkPage extends localize(i18next)(PageView) {
         }
 
         .order-item {
-          background: var(--md-sys-color-surface, #fff);
-          border-radius: 12px;
-          padding: 16px;
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          border-radius: 8px;
+          padding: 12px;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
           cursor: pointer;
-          transition: all 0.2s ease;
-          border-left: 4px solid var(--md-sys-color-primary, #1976D2);
         }
 
         .order-item:active {
-          transform: scale(0.98);
-          background: var(--md-sys-color-surface-variant, #f0f0f0);
+          background: var(--md-sys-color-surface-variant, #eee);
+        }
+
+        .order-item .card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
         }
 
         .order-item .order-no {
-          font-size: 18px;
-          font-weight: 700;
+          font-size: 14px;
+          font-weight: bold;
           color: var(--md-sys-color-on-surface, #333);
         }
 
-        .order-item .order-info {
-          font-size: 14px;
-          color: var(--md-sys-color-on-surface-variant, #666);
-          margin-top: 4px;
+        .order-item .order-badge {
+          padding: 2px 8px;
+          border-radius: 10px;
+          font-size: 11px;
+          font-weight: 600;
         }
 
-        .order-item .order-badge {
-          display: inline-block;
-          padding: 2px 8px;
-          border-radius: 4px;
+        .order-item .sub-info {
           font-size: 12px;
-          font-weight: 600;
-          margin-top: 8px;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          margin-top: 6px;
         }
 
         .order-badge.APPROVED {
-          background: #E3F2FD;
-          color: #1565C0;
+          background: #fff3e0;
+          color: #ff9800;
         }
         .order-badge.MATERIAL_READY {
-          background: #FFF3E0;
-          color: #E65100;
+          background: #fff3e0;
+          color: #ff9800;
         }
         .order-badge.IN_PROGRESS {
-          background: #E8F5E9;
-          color: #2E7D32;
+          background: #e3f2fd;
+          color: #1976d2;
+        }
+        .order-badge.COMPLETED,
+        .order-badge.CLOSED {
+          background: #e8f5e9;
+          color: #4CAF50;
         }
 
         /* 스텝 인디케이터 */
@@ -578,6 +584,102 @@ class VasWorkPage extends localize(i18next)(PageView) {
           background: var(--md-sys-color-surface-variant, #e0e0e0);
           color: var(--md-sys-color-on-surface-variant, #666);
         }
+
+        /* 상태 요약 카드 */
+        /* 상태 요약 카드 */
+        .summary-cards {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 8px;
+          padding: 8px 12px;
+          flex-shrink: 0;
+        }
+
+        .summary-card {
+          text-align: center;
+          padding: 10px 4px;
+          border-radius: 8px;
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          cursor: pointer;
+          transition: all 0.15s;
+          border: 2px solid transparent;
+        }
+
+        .summary-card[active] {
+          border-color: var(--md-sys-color-primary, #1976D2);
+          box-shadow: 0 2px 6px rgba(25,118,210,0.25);
+        }
+
+        .summary-card:active {
+          transform: scale(0.96);
+        }
+
+        .summary-card .count {
+          font-size: 22px;
+          font-weight: bold;
+          color: var(--md-sys-color-primary, #1976D2);
+        }
+
+        .summary-card .card-label {
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          margin-top: 4px;
+        }
+
+        .summary-card.waiting .count { color: var(--md-sys-color-error, #d32f2f); }
+        .summary-card.done .count    { color: #4CAF50; }
+
+        /* 주문 목록 스크롤 영역 */
+        .task-list {
+          flex: 1;
+          overflow-y: auto;
+          padding: 8px 12px;
+        }
+
+        /* 하단 고정 스캔 영역 */
+        .scan-bottom {
+          padding: 8px 12px 12px;
+          border-top: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
+          flex-shrink: 0;
+        }
+
+        .scan-bottom label {
+          display: block;
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-surface, #333);
+          margin-bottom: 4px;
+        }
+
+        .scan-row {
+          display: flex;
+          gap: 8px;
+        }
+
+        .scan-row ox-input-barcode {
+          flex: 1;
+          --barcodescan-input-font-size: 18px;
+          --barcodescan-input-padding: 14px 16px;
+          --barcodescan-input-border-radius: 8px;
+        }
+
+        .btn-refresh {
+          flex-shrink: 0;
+          padding: 8px 12px;
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 6px;
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          color: var(--md-sys-color-primary, #1976D2);
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .btn-refresh:active {
+          background: var(--md-sys-color-primary-container, #e3f2fd);
+        }
       `
     ]
   }
@@ -586,6 +688,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
   static get properties() {
     return {
       loading: Boolean,
+      filterStatus: String,
       screen: String,
       step: Number,
       orders: Array,
@@ -606,6 +709,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
   constructor() {
     super()
     this.loading = false
+    this.filterStatus = 'ALL'
     this.screen = 'order-select'
     this.step = 1
     this.orders = []
@@ -648,48 +752,68 @@ class VasWorkPage extends localize(i18next)(PageView) {
    * 주문 선택 화면
    * ============================================================ */
 
-  /** 주문 선택 화면 렌더링 (바코드 스캔 + 작업 주문 목록) */
+  /** 주문 선택 화면 렌더링 (상태 요약 카드 + 주문 목록 + 하단 바코드 스캔) */
   _renderOrderSelect() {
-    return html`
-      <div class="pda-content">
-        <div class="order-select-section">
-          <!-- 바코드 스캔 입력 -->
-          <div class="scan-input-group">
-            <label>작업번호 스캔/입력</label>
-            <div class="scan-input">
-              <ox-input-barcode
-                placeholder="바코드 스캔 또는 번호 입력"
-                @change="${e => { this.scanValue = e.target.value; this._onScanSearch() }}"
-              ></ox-input-barcode>
-              <button class="scan-btn" @click="${this._refresh}" title="새로고침">&#x21bb;</button>
-            </div>
-          </div>
+    const waiting = this.orders.filter(o => o.status === 'MATERIAL_READY')
+    const working = this.orders.filter(o => o.status === 'IN_PROGRESS')
+    const done = this.orders.filter(o => o.status === 'COMPLETED' || o.status === 'CLOSED')
+    const filtered =
+      this.filterStatus === 'WAITING' ? waiting
+        : this.filterStatus === 'WORKING' ? working
+          : this.filterStatus === 'DONE' ? done
+            : [...waiting, ...working]
 
-          <!-- 작업 주문 목록 -->
-          ${this.loading
-        ? html`<div class="loading">주문 목록 조회 중...</div>`
-        : this.orders.length === 0
-          ? html`
-                  <div class="empty-state">
-                    <span class="empty-icon">&#x1F4CB;</span>
-                    <span class="empty-text">작업 가능한 주문이 없습니다</span>
+    return html`
+      <!-- 상태 요약 카드 -->
+      <div class="summary-cards">
+        <div class="summary-card waiting"
+          ?active="${this.filterStatus === 'WAITING'}"
+          @click="${() => this._toggleFilter('WAITING')}">
+          <div class="count">${waiting.length}</div>
+          <div class="card-label">대기</div>
+        </div>
+        <div class="summary-card working"
+          ?active="${this.filterStatus === 'WORKING'}"
+          @click="${() => this._toggleFilter('WORKING')}">
+          <div class="count">${working.length}</div>
+          <div class="card-label">작업중</div>
+        </div>
+        <div class="summary-card done"
+          ?active="${this.filterStatus === 'DONE'}"
+          @click="${() => this._toggleFilter('DONE')}">
+          <div class="count">${done.length}</div>
+          <div class="card-label">완료</div>
+        </div>
+      </div>
+
+      <!-- 주문 목록 -->
+      <div class="task-list">
+        ${this.loading
+          ? html`<div class="loading">주문 목록 조회 중...</div>`
+          : filtered.length === 0
+            ? html`<div class="empty-state"><span class="empty-icon">&#x1F4CB;</span><span class="empty-text">해당 주문이 없습니다</span></div>`
+            : html`<div class="order-list">${filtered.map(order => html`
+                <div class="order-item" @click="${() => this._selectOrder(order)}">
+                  <div class="card-header">
+                    <span class="order-no">${order.vas_no || '-'}</span>
+                    <span class="order-badge ${order.status}">${this._statusLabel(order.status)}</span>
                   </div>
-                `
-          : html`
-                  <div class="order-list">
-                    <div class="order-list-title">작업 가능 주문 (${this.orders.length}건)</div>
-                    ${this.orders.map(order => html`
-                      <div class="order-item" @click="${() => this._selectOrder(order)}">
-                        <div class="order-no">${order.vas_no || '-'}</div>
-                        <div class="order-info">
-                          ${this._vasTypeLabel(order.vas_type)} | ${this.bomMap[order.vas_bom_id]?.set_sku_cd || '-'} / ${this.bomMap[order.vas_bom_id]?.set_sku_nm || '-'} |
-                          계획: ${order.plan_qty || 0} EA
-                        </div>
-                        <span class="order-badge ${order.status}">${this._statusLabel(order.status)}</span>
-                      </div>
-                    `)}
+                  <div class="sub-info">
+                    ${this._vasTypeLabel(order.vas_type)} | ${this.bomMap[order.vas_bom_id]?.set_sku_cd || '-'} / ${this.bomMap[order.vas_bom_id]?.set_sku_nm || '-'} · 계획: ${order.plan_qty || 0} EA
                   </div>
-                `}
+                </div>
+              `)}</div>`}
+      </div>
+
+      <!-- VAS 주문번호 스캔 (하단) -->
+      <div class="scan-bottom">
+        <label>작업번호 스캔</label>
+        <div class="scan-row">
+          <ox-input-barcode
+            placeholder="바코드 스캔 또는 번호 입력"
+            @change="${e => { this.scanValue = e.target.value; this._onScanSearch() }}"
+          ></ox-input-barcode>
+          <button class="btn-refresh" @click="${this._refresh}">새로고침</button>
         </div>
       </div>
     `
@@ -940,7 +1064,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
     try {
       this.loading = true
       const data = await ServiceUtil.restGet('vas_trx/monitor/orders', {
-        status: 'APPROVED,MATERIAL_READY,IN_PROGRESS'
+        status: 'MATERIAL_READY,IN_PROGRESS,COMPLETED,CLOSED'
       })
       this.orders = data || []
 
@@ -998,6 +1122,13 @@ class VasWorkPage extends localize(i18next)(PageView) {
       console.error('자재 항목 조회 실패:', err)
       this.orderItems = []
     }
+  }
+
+  /**
+   * 상태 필터 토글 — 같은 카드를 다시 클릭하면 전체(ALL)로 복귀
+   */
+  _toggleFilter(status) {
+    this.filterStatus = this.filterStatus === status ? 'ALL' : status
   }
 
   /** 목록 새로고침 */
@@ -1248,7 +1379,8 @@ class VasWorkPage extends localize(i18next)(PageView) {
       APPROVED: '주문 확정',
       MATERIAL_READY: '자재 준비 완료',
       IN_PROGRESS: '작업 중',
-      COMPLETED: '완료'
+      COMPLETED: '완료',
+      CLOSED: '마감'
     }
     return map[status] || status || '-'
   }

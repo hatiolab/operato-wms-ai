@@ -34,18 +34,18 @@ class VasPdaPick extends localize(i18next)(PageView) {
     return [
       css`
         :host {
-          display: block;
-          background-color: var(--md-sys-color-background, #f5f5f5);
+          display: flex;
+          flex-direction: column;
+          background: var(--md-sys-color-surface, #fafafa);
           height: 100%;
-          overflow: auto;
+          overflow-y: auto;
           font-family: var(--md-sys-typescale-body-large-font, sans-serif);
         }
 
-        /* 컨텐츠 */
+        /* 컨텐츠 (작업 화면용) */
         .pda-content {
           padding: 16px;
-          max-width: 480px;
-          margin: 0 auto;
+          flex: 1;
         }
 
         /* 스캔 입력 */
@@ -73,19 +73,21 @@ class VasPdaPick extends localize(i18next)(PageView) {
           --barcodescan-input-border-radius: 8px;
         }
 
-        .refresh-btn {
-          min-width: 56px;
-          min-height: 56px;
-          background: var(--md-sys-color-surface-variant, #f0f0f0);
-          border: none;
-          border-radius: 8px;
-          font-size: 24px;
+        .btn-refresh {
+          flex-shrink: 0;
+          padding: 8px 12px;
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 6px;
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          color: var(--md-sys-color-primary, #1976D2);
+          font-size: 12px;
+          font-weight: 600;
           cursor: pointer;
-          color: var(--md-sys-color-on-surface, #333);
+          white-space: nowrap;
         }
 
-        .refresh-btn:active {
-          transform: scale(0.95);
+        .btn-refresh:active {
+          background: var(--md-sys-color-primary-container, #e3f2fd);
         }
 
         /* 주문 목록 */
@@ -102,50 +104,127 @@ class VasPdaPick extends localize(i18next)(PageView) {
           gap: 12px;
         }
 
-        .order-item {
-          background: var(--md-sys-color-surface, #fff);
-          border-radius: 12px;
-          padding: 16px;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        /* ── 상태 요약 카드 ── */
+        .summary-cards {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 8px;
+          padding: 8px 12px;
+          flex-shrink: 0;
+        }
+
+        .summary-card {
+          text-align: center;
+          padding: 10px 4px;
+          border-radius: 8px;
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
           cursor: pointer;
-          transition: all 0.2s ease;
-          border-left: 4px solid #FF9800;
+          border: 2px solid transparent;
+          transition: all 0.15s;
         }
 
-        .order-item:active {
-          transform: scale(0.98);
-          background: var(--md-sys-color-surface-variant, #f0f0f0);
+        .summary-card[active] {
+          border-color: var(--md-sys-color-primary, #1976D2);
+          box-shadow: 0 2px 6px rgba(25,118,210,0.25);
         }
 
-        .order-item .order-no {
-          font-size: 18px;
-          font-weight: 700;
-          color: var(--md-sys-color-on-surface, #333);
+        .summary-card .count {
+          font-size: 22px;
+          font-weight: bold;
+          color: var(--md-sys-color-primary, #1976D2);
         }
 
-        .order-item .order-info {
-          font-size: 14px;
+        .summary-card .card-label {
+          font-size: 12px;
           color: var(--md-sys-color-on-surface-variant, #666);
           margin-top: 4px;
         }
 
-        .order-item .order-badge {
-          display: inline-block;
-          padding: 2px 8px;
-          border-radius: 4px;
-          font-size: 12px;
+        .summary-card.waiting .count { color: #E65100; }
+        .summary-card.working .count { color: #1976D2; }
+        .summary-card.done .count { color: #4CAF50; }
+
+        /* ── 주문 목록 스크롤 영역 ── */
+        .task-list {
+          flex: 1;
+          overflow-y: auto;
+          padding: 8px 12px;
+        }
+
+        .order-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        /* ── 바코드 스캔 (하단 고정) ── */
+        .scan-bottom {
+          padding: 8px 12px 12px;
+          border-top: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
+          flex-shrink: 0;
+        }
+
+        .scan-bottom label {
+          font-size: 13px;
           font-weight: 600;
-          margin-top: 8px;
+          color: var(--md-sys-color-on-surface, #333);
+          display: block;
+          margin-bottom: 4px;
+        }
+
+        .scan-bottom .scan-row {
+          display: flex;
+          gap: 8px;
+        }
+
+        .scan-bottom ox-input-barcode { flex: 1; }
+
+        .order-item {
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          border-radius: 8px;
+          padding: 12px;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          cursor: pointer;
+        }
+
+        .order-item:active {
+          background: var(--md-sys-color-surface-variant, #eee);
+        }
+
+        .order-item .card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .order-item .order-no {
+          font-size: 14px;
+          font-weight: bold;
+          color: var(--md-sys-color-on-surface, #333);
+        }
+
+        .order-item .order-badge {
+          padding: 2px 8px;
+          border-radius: 10px;
+          font-size: 11px;
+          font-weight: 600;
+        }
+
+        .order-item .sub-info {
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          margin-top: 6px;
         }
 
         .order-badge.APPROVED {
-          background: #E3F2FD;
-          color: #1565C0;
+          background: #fff3e0;
+          color: #ff9800;
         }
 
         .order-badge.MATERIAL_READY {
-          background: #FFF3E0;
-          color: #E65100;
+          background: #e3f2fd;
+          color: #1976d2;
         }
 
         /* 진행률 바 */
@@ -558,6 +637,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
     return {
       loading: Boolean,
       screen: String,
+      filterStatus: String,
       orders: Array,
       bomMap: Object,
       scanValue: String,
@@ -575,6 +655,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
     super()
     this.loading = false
     this.screen = 'order-select'
+    this.filterStatus = 'ALL'
     this.orders = []
     this.bomMap = {}
     this.scanValue = ''
@@ -619,52 +700,72 @@ class VasPdaPick extends localize(i18next)(PageView) {
    * 주문 선택 화면
    * ============================================================ */
 
+  /** 주문 선택 화면 렌더링 — pda-inbound-receiving 레이아웃 */
   _renderOrderSelect() {
-    return html`
-      <div class="pda-content">
-        <div class="scan-input-group">
-          <label>VAS 주문번호 스캔 또는 검색</label>
-          <div class="scan-input">
-            <ox-input-barcode
-              placeholder="주문번호 스캔"
-              @change="${e => { this.scanValue = e.target.value; this._onScanSearch() }}"
-            ></ox-input-barcode>
-            <button class="refresh-btn" @click="${this._refresh}" title="새로고침">\u21bb</button>
-          </div>
-        </div>
+    const waiting = this.orders.filter(o => o.status === 'APPROVED')
+    const working = this.orders.filter(o => o.status === 'MATERIAL_READY')
+    const filtered =
+      this.filterStatus === 'WAITING' ? waiting
+        : this.filterStatus === 'WORKING' ? working
+          : [...waiting, ...working]
 
+    return html`
+      <!-- 상태 요약 카드 -->
+      <div class="summary-cards">
+        <div class="summary-card waiting"
+          ?active="${this.filterStatus === 'WAITING'}"
+          @click="${() => this._toggleFilter('WAITING')}">
+          <div class="count">${waiting.length}</div>
+          <div class="card-label">대기</div>
+        </div>
+        <div class="summary-card working"
+          ?active="${this.filterStatus === 'WORKING'}"
+          @click="${() => this._toggleFilter('WORKING')}">
+          <div class="count">${working.length}</div>
+          <div class="card-label">피킹 가능</div>
+        </div>
+        <div class="summary-card done">
+          <div class="count">0</div>
+          <div class="card-label">완료</div>
+        </div>
+      </div>
+
+      <!-- 주문 목록 -->
+      <div class="task-list">
         ${this.loading
           ? html`<div class="loading">주문 목록 조회 중...</div>`
-          : this.orders.length > 0
-            ? html`
-                <div class="order-list-title">피킹 대상 주문 (${this.orders.length}건)</div>
-                <div class="order-list">
-                  ${this.orders.map(order => this._renderOrderCard(order))}
-                </div>
-              `
-            : html`
-                <div class="empty-state">
-                  <span class="empty-icon">\u{1F4E6}</span>
-                  <span class="empty-text">피킹 대상 주문이 없습니다</span>
-                </div>
-              `}
+          : filtered.length === 0
+            ? html`<div class="empty-state"><span class="empty-icon">\u{1F4E6}</span><span class="empty-text">해당 주문이 없습니다</span></div>`
+            : html`<div class="order-list">${filtered.map(order => this._renderOrderCard(order))}</div>`}
+      </div>
+
+      <!-- VAS 주문번호 스캔 (하단) -->
+      <div class="scan-bottom">
+        <label>VAS 주문번호 스캔</label>
+        <div class="scan-row">
+          <ox-input-barcode
+            placeholder="주문번호 스캔"
+            @change="${e => { this.scanValue = e.target.value; this._onScanSearch() }}"
+          ></ox-input-barcode>
+          <button class="btn-refresh" @click="${this._refresh}">새로고침</button>
+        </div>
       </div>
     `
   }
 
+  /** 주문 카드 렌더링 — pda-inbound-receiving task-card 레이아웃 적용 */
   _renderOrderCard(order) {
     const bom = this.bomMap[order.vas_bom_id]
 
     return html`
       <div class="order-item" @click="${() => this._selectOrder(order)}">
-        <div class="order-no">${order.vas_no || '-'}</div>
-        <div class="order-info">
-          ${this._vasTypeLabel(order.vas_type)} | ${bom?.set_sku_cd || '-'} / ${bom?.set_sku_nm || '-'}
+        <div class="card-header">
+          <span class="order-no">${order.vas_no || '-'}</span>
+          <span class="order-badge ${order.status}">${this._statusLabel(order.status)}</span>
         </div>
-        <div class="order-info">
-          계획: ${order.plan_qty || 0} EA
+        <div class="sub-info">
+          ${this._vasTypeLabel(order.vas_type)} | ${bom?.set_sku_cd || '-'} / ${bom?.set_sku_nm || '-'} · 계획: ${order.plan_qty || 0} EA
         </div>
-        <span class="order-badge ${order.status}">${this._statusLabel(order.status)}</span>
       </div>
     `
   }
@@ -861,6 +962,17 @@ class VasPdaPick extends localize(i18next)(PageView) {
       this._scannerService.stop()
       this._scannerService = null
     }
+  }
+
+  /* ============================================================
+   * 필터 토글
+   * ============================================================ */
+
+  /**
+   * 상태 필터 토글 — 같은 카드를 다시 클릭하면 전체(ALL)로 복귀
+   */
+  _toggleFilter(status) {
+    this.filterStatus = this.filterStatus === status ? 'ALL' : status
   }
 
   /* ============================================================

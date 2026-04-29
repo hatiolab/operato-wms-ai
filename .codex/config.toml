@@ -1,0 +1,7 @@
+[shell_environment_policy]
+inherit = "core"
+
+[shell_environment_policy.set]
+CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE = "70"
+DISABLE_NON_ESSENTIAL_MODEL_CALLS = "1"
+JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-18.jdk/Contents/Home"
