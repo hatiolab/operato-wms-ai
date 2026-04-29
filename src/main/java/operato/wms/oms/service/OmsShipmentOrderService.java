@@ -264,6 +264,7 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 					alloc.setLotNo(inv.getLotNo());
 					alloc.setExpiredDate(inv.getExpiredDate());
 					alloc.setAllocQty(allocQty);
+					alloc.setAllocType(StockAllocation.ALLOC_TYPE_SHIPMENT);
 					alloc.setAllocStrategy(policy.getReleaseStrategy());
 					alloc.setStatus(StockAllocation.STATUS_HARD);
 					alloc.setAllocatedAt(now);

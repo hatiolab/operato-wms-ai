@@ -26,6 +26,15 @@ public class StockAllocation extends xyz.elidom.orm.entity.basic.ElidomStampHook
 	private static final long serialVersionUID = 628359147236541298L;
 
 	/**
+	 * 할당 유형 - 출고 주문
+	 */
+	public static final String ALLOC_TYPE_SHIPMENT = "SHIPMENT";
+	/**
+	 * 할당 유형 - 유통가공 주문
+	 */
+	public static final String ALLOC_TYPE_VAS = "VAS";
+
+	/**
 	 * 할당 상태 - SOFT (임시 할당)
 	 */
 	public static final String STATUS_SOFT = "SOFT";
@@ -106,6 +115,12 @@ public class StockAllocation extends xyz.elidom.orm.entity.basic.ElidomStampHook
 	 */
 	@Column (name = "alloc_qty", nullable = false)
 	private Double allocQty;
+
+	/**
+	 * 할당 유형 (SHIPMENT/VAS)
+	 */
+	@Column (name = "alloc_type", length = 20)
+	private String allocType;
 
 	/**
 	 * 할당 전략 (FEFO/FIFO/LEFO/MANUAL)
@@ -228,6 +243,14 @@ public class StockAllocation extends xyz.elidom.orm.entity.basic.ElidomStampHook
 
 	public void setAllocQty(Double allocQty) {
 		this.allocQty = allocQty;
+	}
+
+	public String getAllocType() {
+		return allocType;
+	}
+
+	public void setAllocType(String allocType) {
+		this.allocType = allocType;
 	}
 
 	public String getAllocStrategy() {
