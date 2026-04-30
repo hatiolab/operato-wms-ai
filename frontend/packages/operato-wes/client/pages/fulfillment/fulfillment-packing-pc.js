@@ -6,6 +6,7 @@ import { PageView } from '@operato/shell'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 
 import './packing-order-detail'
+import '../../component/sku-barcode-input.js'
 
 /**
  * 풀필먼트 검수/포장 PC 화면
@@ -1064,13 +1065,11 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
           <!-- 바코드 스캔 영역 -->
           <div class="barcode-area">
             <label>바코드 스캔</label>
-            <input
-              id="barcodeInput"
-              type="text"
-              placeholder="바코드를 스캔하세요"
-              @keydown="${this._onBarcodeInput}"
-              autofocus
-            />
+            <sku-barcode-input
+              .comCd="${this.selectedOrder?.com_cd || ''}"
+              placeholder="상품 바코드 스캔"
+              @sku-select="${this._onSkuSelect}"
+            ></sku-barcode-input>
             ${this.lastScannedItem ? html`
               <div class="last-scan">
                 마지막 스캔:
@@ -1402,8 +1401,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
 
     // 바코드 입력에 포커스
     await this.updateComplete
-    const input = this.shadowRoot?.getElementById('barcodeInput')
-    if (input) input.focus()
+    this.shadowRoot?.querySelector('sku-barcode-input')?.focus()
   }
 
   /** 포장번호 바코드 스캔 - 일치하는 포장 주문 자동 선택 */
@@ -1421,15 +1419,13 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
    * 우측 패널: 검수 작업
    * ============================================================== */
 
-  /** 바코드 입력 처리 - Enter 키 입력 시 항목 매칭 및 검수 수량 자동 1 증가 */
-  _onBarcodeInput(e) {
-    if (e.key !== 'Enter') return
-    const barcode = e.target.value.trim()
-    if (!barcode) return
+  /** 상품 바코드 스캔 처리 - sku-barcode-input이 SKU 해석 후 발생시키는 sku-select 이벤트 핸들러 */
+  _onSkuSelect(e) {
+    const { sku_cd, sku_nm } = e.detail
 
-    // 미완료 항목 중 바코드 매칭
+    // 미완료 항목 중 SKU 코드 매칭
     const matchIndex = this.packingItems.findIndex(
-      (item, idx) => item.status !== 'COMPLETED' && (item.barcode === barcode || item.sku_cd === barcode)
+      item => item.status !== 'COMPLETED' && (item.sku_cd === sku_cd || item.product_cd === sku_cd)
     )
 
     if (matchIndex >= 0) {
@@ -1444,8 +1440,6 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
           message: `${item.sku_cd} — 이미 검수가 완료된 상품입니다 (${currentInspQty}/${orderQty})`
         }
         this._showFeedback('warning', `${item.sku_cd} 이미 검수 완료 (${currentInspQty}/${orderQty})`)
-        e.target.value = ''
-        e.target.focus()
         return
       }
 
@@ -1461,7 +1455,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
 
       this.lastScannedItem = {
         success: true,
-        message: `${item.sku_cd} (${item.sku_nm}) — ${newInspQty}/${orderQty} ✅`
+        message: `${item.sku_cd} (${item.sku_nm || sku_nm}) — ${newInspQty}/${orderQty} ✅`
       }
 
       // 주문 수량에 도달하면 자동 검수 완료
@@ -1473,13 +1467,10 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     } else {
       this.lastScannedItem = {
         success: false,
-        message: `바코드 "${barcode}" — 일치하는 상품이 없습니다`
+        message: `상품 "${sku_cd}" — 포장 항목에 없는 상품입니다`
       }
-      this._showFeedback('error', '일치하는 상품이 없습니다')
+      this._showFeedback('error', '포장 항목에 없는 상품입니다')
     }
-
-    e.target.value = ''
-    e.target.focus()
   }
 
   /** 검수 확인 - 현재 항목 검수 완료 처리 및 다음 항목으로 이동 */
@@ -1515,8 +1506,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
         this._moveToNextItem()
         // 바코드 입력에 포커스
         await this.updateComplete
-        const input = this.shadowRoot?.getElementById('barcodeInput')
-        if (input) input.focus()
+        this.shadowRoot?.querySelector('sku-barcode-input')?.focus()
       }
     } catch (err) {
       console.error('검수 확인 실패:', err)

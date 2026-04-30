@@ -584,6 +584,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
         .picking-table .col-loc { width: 120px; font-family: 'Courier New', monospace; }
         .picking-table .col-sku { width: 140px; font-family: 'Courier New', monospace; }
         .picking-table .col-name { }
+        .picking-table .col-barcode { width: 160px; font-family: 'Courier New', monospace; font-size: 12px; }
         .picking-table .col-qty { width: 80px; text-align: right; font-variant-numeric: tabular-nums; }
         .picking-table .col-pick-qty { width: 80px; text-align: right; font-variant-numeric: tabular-nums; }
         .picking-table .col-status { width: 50px; text-align: center; font-size: 16px; }
@@ -1006,6 +1007,8 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
           <span class="value mono">${item.sku_cd || '-'}</span>
           <span class="label">상품명</span>
           <span class="value">${item.sku_nm || '-'}</span>
+          <span class="label">재고 바코드</span>
+          <span class="value mono">${item.barcode || '-'}</span>
           ${item.lot_no ? html`
             <span class="label">LOT</span>
             <span class="value">${item.lot_no}</span>
@@ -1022,7 +1025,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
           <input
             id="barcodeInput"
             type="text"
-            placeholder="상품 바코드 스캔"
+            placeholder="재고 바코드 스캔"
             @keydown="${this._onBarcodeInput}"
           />
           ${this.lastScannedItem ? html`
@@ -1070,6 +1073,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
               <th class="col-loc">로케이션</th>
               <th class="col-sku">상품 코드</th>
               <th class="col-name">상품 명</th>
+              <th class="col-barcode">재고 바코드</th>
               <th class="col-qty">지시 수량</th>
               <th class="col-pick-qty">피킹 수량</th>
               <th class="col-status">상태</th>
@@ -1088,6 +1092,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
                   <td class="col-loc">${item.from_loc_cd || '-'}</td>
                   <td class="col-sku">${item.sku_cd || '-'}</td>
                   <td class="col-name">${item.sku_nm || '-'}</td>
+                  <td class="col-barcode">${item.barcode || '-'}</td>
                   <td class="col-qty">${item.order_qty || 0}</td>
                   <td class="col-pick-qty">${isCompleted ? (item.pick_qty || 0) : '-'}</td>
                   <td class="col-status">${isCompleted ? '✅' : isCurrent ? '→' : '☐'}</td>
@@ -1286,10 +1291,10 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     let item = this.pickingItems[this.currentItemIndex]
     let matchedIndex = this.currentItemIndex
 
-    if (!item || (item.barcode !== barcode && item.sku_cd !== barcode)) {
+    if (!item || item.barcode !== barcode) {
       // 2. 현재 항목과 일치하지 않으면 미완료 항목 전체에서 검색
       matchedIndex = this.pickingItems.findIndex(
-        (it) => it.status !== 'PICKED' && (it.barcode === barcode || it.sku_cd === barcode)
+        (it) => it.status !== 'PICKED' && it.barcode === barcode
       )
 
       if (matchedIndex >= 0) {
@@ -1379,7 +1384,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
       await ServiceUtil.restPost(`ful_trx/picking_tasks/${this.selectedTaskId}/items/${item.id}/pick`, {
         pick_qty: qty,
         from_loc_cd: item.from_loc_cd,
-        barcode: item.sku_cd
+        barcode: item.barcode
       })
 
       // 피킹 완료 시 화면 데이터 즉시 갱신 (백엔드 상태값은 'PICKED')

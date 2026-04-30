@@ -5,6 +5,7 @@ import { connect } from 'pwa-helpers/connect-mixin.js'
 import { ServiceUtil, TermsUtil, UiUtil } from '@operato-app/metapage/dist-client'
 import { store, PageView } from '@operato/shell'
 import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
+import '../../component/sku-barcode-input.js'
 
 /**
  * PDA 포장 화면
@@ -54,7 +55,7 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
   /** 작업 시작 시각 */
   @state() startedAt = null
 
-  @query('#barcodeInput') _barcodeInput
+  @query('sku-barcode-input') _skuBarcodeInput
   @query('#trackingInput') _trackingInput
   @query('#packOrderScanInput') _packOrderScanInput
 
@@ -358,7 +359,7 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
           margin-bottom: 4px;
         }
 
-        .current-item-section ox-input-barcode {
+        .current-item-section sku-barcode-input {
           width: 100%;
         }
 
@@ -808,12 +809,12 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
             ${currentItem.lot_no ? html`<div class="lot">LOT: ${currentItem.lot_no} ${currentItem.expired_date ? `· ${currentItem.expired_date}` : ''}</div>` : ''}
           </div>
           <div class="barcode-input">
-            <!--label>${TermsUtil.tLabel('barcode') || '바코드 스캔'}</label-->
-            <ox-input-barcode id="barcodeInput"
+            <sku-barcode-input
+              .comCd="${this.selectedOrder?.com_cd || ''}"
               placeholder="상품 바코드 스캔"
               ?disabled=${this.processing}
-              @change=${e => this._onBarcodeInput(e.target.value)}>
-            </ox-input-barcode>
+              @sku-select=${this._onSkuSelect}>
+            </sku-barcode-input>
           </div>
           ${this.lastScannedItem ? html`
             <div class="scan-feedback ${this.lastScannedItem.success ? 'success' : 'error'}">
@@ -1101,13 +1102,14 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
     }
   }
 
-  /** 바코드 스캔 처리 — 상품 매칭, 검수 수량 증가, 자동 완료 */
-  async _onBarcodeInput(barcode) {
-    if (!barcode || this.processing) return
+  /** 상품 바코드 스캔 처리 — sku-barcode-input이 SKU 해석 후 발생시키는 sku-select 이벤트 핸들러 */
+  async _onSkuSelect(e) {
+    if (this.processing) return
+    const { sku_cd, sku_nm } = e.detail
 
     const matchIndex = this.packingItems.findIndex(
       item => item.status !== 'COMPLETED' &&
-        (item.barcode === barcode || item.sku_cd === barcode)
+        (item.sku_cd === sku_cd || item.product_cd === sku_cd)
     )
 
     if (matchIndex >= 0) {
@@ -1120,7 +1122,6 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
         document.dispatchEvent(new CustomEvent('notify', {
           detail: { level: 'warn', message: '이미 검수 완료된 상품입니다' }
         }))
-        this._resetBarcodeInput()
         return
       }
 
@@ -1133,7 +1134,7 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
 
       this.lastScannedItem = {
         success: true,
-        message: `${item.sku_cd} (${item.sku_nm || ''}) — ${newInspQty}/${orderQty} ✅`
+        message: `${item.sku_cd} (${item.sku_nm || sku_nm || ''}) — ${newInspQty}/${orderQty} ✅`
       }
 
       if (newInspQty >= orderQty) {
@@ -1144,14 +1145,12 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
         }))
       }
     } else {
-      this.lastScannedItem = { success: false, message: `일치하는 상품 없음: ${barcode}` }
+      this.lastScannedItem = { success: false, message: `포장 항목에 없는 상품: ${sku_cd}` }
       document.dispatchEvent(new CustomEvent('notify', {
-        detail: { level: 'error', message: `일치하는 상품을 찾을 수 없습니다: ${barcode}` }
+        detail: { level: 'error', message: `포장 항목에 없는 상품입니다: ${sku_cd}` }
       }))
       navigator.vibrate?.(200)
     }
-
-    this._resetBarcodeInput()
   }
 
   /** 검수 완료 API 호출 — 항목 상태 갱신 및 전체 완료 체크 */
@@ -1291,16 +1290,6 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
 
   /** 바코드 입력 필드에 포커스 설정 */
   _focusBarcodeInput() {
-    setTimeout(() => {
-      this._resetBarcodeInput();
-    }, 100)
-  }
-
-  /** 바코드 입력 필드 초기화 및 포커스 복귀 */
-  _resetBarcodeInput() {
-    if (this._barcodeInput) {
-      this._barcodeInput.input.value = ''
-      this._barcodeInput.input.focus()
-    }
+    setTimeout(() => this._skuBarcodeInput?.focus(), 100)
   }
 }

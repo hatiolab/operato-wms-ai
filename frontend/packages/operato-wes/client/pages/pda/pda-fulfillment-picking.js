@@ -818,11 +818,12 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
           <div class="location-display">${currentItem.from_loc_cd}</div>
           <div class="item-info">
             <div class="sku">상품 : ${currentItem.sku_cd} ${currentItem.sku_nm ? `(${currentItem.sku_nm})` : ''} / 예정 수량 : ${currentItem.order_qty || 0} EA</div>
+            <div class="lot">재고 바코드 : ${currentItem.barcode || '-'}</div>
             ${currentItem.lot_no ? html`<div class="lot">LOT: ${currentItem.lot_no} ${currentItem.expired_date ? `· ${currentItem.expired_date}` : ''}</div>` : ''}
           </div>
           <div class="barcode-input">
             <ox-input-barcode id="barcodeInput"
-              placeholder="상품 바코드 스캔"
+              placeholder="재고 바코드 스캔"
               ?disabled=${this.processing}
               @change=${e => this._onScanBarcode(e.target.value)}>
             </ox-input-barcode>
@@ -901,6 +902,7 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
               <div class="info">
                 <div class="loc">#${item.rank} 로케이션 : ${item.from_loc_cd}</div>
                 <div class="sku">상품 : ${item.sku_cd} ${item.sku_nm || '-'}</div>
+                <div class="name">재고 바코드 : ${item.barcode || '-'}</div>
                 <!--div class="name">${item.sku_nm || '-'}</div-->
               </div>
               <span class="qty-badge ${qtyClass}">
@@ -1041,7 +1043,7 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
     const currentItem = this.currentItemIndex >= 0 ? this.taskItems[this.currentItemIndex] : null
 
     // 1. 현재 항목과 매칭 시도
-    if (currentItem && (currentItem.barcode === barcode || currentItem.sku_cd === barcode)) {
+    if (currentItem && currentItem.barcode === barcode) {
       this.pickQty = currentItem.order_qty || 1
       this.lastFeedback = {
         type: 'success',
@@ -1054,7 +1056,7 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
     // 2. 전체 미완료 항목에서 검색
     const matchIndex = this.taskItems.findIndex(
       item => (item.status === 'RUN' || item.status === 'WAIT') &&
-        (item.barcode === barcode || item.sku_cd === barcode)
+        item.barcode === barcode
     )
 
     if (matchIndex >= 0) {
@@ -1072,7 +1074,7 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
     // 3. 이미 완료된 항목인지 확인
     const doneItem = this.taskItems.find(
       item => (item.status === 'PICKED' || item.status === 'SHORT') &&
-        (item.barcode === barcode || item.sku_cd === barcode)
+        item.barcode === barcode
     )
 
     if (doneItem) {
@@ -1121,7 +1123,7 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
     try {
       await ServiceUtil.restPost(
         `ful_trx/picking_tasks/${this.currentTask.id}/items/${item.id}/pick`,
-        { pick_qty: qty, from_loc_cd: item.from_loc_cd, barcode: item.sku_cd }
+        { pick_qty: qty, from_loc_cd: item.from_loc_cd, barcode: item.barcode }
       )
 
       this.taskItems = this.taskItems.map((it, idx) =>
