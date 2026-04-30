@@ -329,6 +329,20 @@ public class VasTransactionController {
 	}
 
 	/**
+	 * 완성품 바코드 목록 조회 (완료/마감 주문용)
+	 *
+	 * GET /rest/vas_trx/vas_orders/{id}/result_barcodes
+	 *
+	 * @param id 작업 지시 ID
+	 * @return 완성품 바코드 목록
+	 */
+	@GetMapping(value = "/vas_orders/{id}/result_barcodes", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get Result Inventory Barcodes for Completed VAS Order")
+	public List<String> getResultBarcodes(@PathVariable("id") String id) {
+		return this.vasService.getResultBarcodes(id);
+	}
+
+	/**
 	 * 자재 항목별 재고 할당 목록 조회
 	 *
 	 * GET /rest/vas_trx/vas_order_items/{itemId}/allocations

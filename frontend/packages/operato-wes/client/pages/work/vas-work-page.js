@@ -424,7 +424,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
         }
 
         .putaway-loc {
-          background: var(--md-sys-color-surface, #fff);
+          background: #fff;
           border-radius: 12px;
           padding: 24px 16px;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -751,7 +751,8 @@ class VasWorkPage extends localize(i18next)(PageView) {
       expiredDate: String,
       feedbackMsg: String,
       feedbackType: String,
-      voiceEnabled: Boolean
+      voiceEnabled: Boolean,
+      resultBarcodes: Array
     }
   }
 
@@ -774,6 +775,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
     this.feedbackMsg = ''
     this.feedbackType = ''
     this.voiceEnabled = voiceService.enabled
+    this.resultBarcodes = []
     this._scannerService = null
   }
 
@@ -919,6 +921,8 @@ class VasWorkPage extends localize(i18next)(PageView) {
     const order = this.selectedOrder
     if (!order) return ''
 
+    const isCompleted = ['COMPLETED', 'CLOSED'].includes(order.status)
+
     return html`
       <div class="order-info-card">
         <div class="title">${order.vas_no} | (${this.bomMap[order.vas_bom_id].set_sku_cd} / ${this.bomMap[order.vas_bom_id].set_sku_nm})</div>
@@ -934,6 +938,16 @@ class VasWorkPage extends localize(i18next)(PageView) {
           <span>상태</span>
           <span class="value">${this._statusLabel(order.status)}</span>
         </div>
+        ${isCompleted ? html`
+          <div class="detail-row">
+            <span>완성품 바코드</span>
+            <span class="value">
+              ${this.resultBarcodes.length > 0
+                ? this.resultBarcodes.join(', ')
+                : '-'}
+            </span>
+          </div>
+        ` : ''}
       </div>
     `
   }
@@ -1255,6 +1269,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
       // 완료/마감 주문은 무조건 3단계(조회 전용)로 이동, 적치 로케이션 복원
       this.putawayLoc = order.dest_loc_cd || ''
       this.step = 3
+      this._fetchResultBarcodes(order.id)
       voiceService.guide(`주문 ${order.vas_no} 선택. 완료된 작업입니다`)
     } else if (this._shouldSkipResultInputStep(order)) {
       this.step = 3
@@ -1274,7 +1289,18 @@ class VasWorkPage extends localize(i18next)(PageView) {
     this.orderItems = []
     this.step = 1
     this.expiredDate = ''
+    this.resultBarcodes = []
     this._fetchOrders()
+  }
+
+  /** 완성품 바코드 목록 조회 (완료/마감 주문용) */
+  async _fetchResultBarcodes(orderId) {
+    try {
+      const data = await ServiceUtil.restGet(`vas_trx/vas_orders/${orderId}/result_barcodes`)
+      this.resultBarcodes = Array.isArray(data) ? data : []
+    } catch (e) {
+      this.resultBarcodes = []
+    }
   }
 
   /** 바코드/번호로 주문 검색 후 매칭 주문 자동 선택 */
@@ -1469,12 +1495,28 @@ class VasWorkPage extends localize(i18next)(PageView) {
    * Step 3: 적치 및 작업 완료
    * ============================================================ */
 
-  /** 로케이션 바코드 스캔 확인 피드백 */
-  _onLocScanConfirm() {
+  /** 로케이션 바코드 스캔 확인 — DB에 존재하는 로케이션 코드인지 검증 */
+  async _onLocScanConfirm() {
     const value = (this.putawayLoc || '').trim()
-    if (value) {
+    if (!value) return
+
+    try {
+      const filters = [{ name: 'loc_cd', value }]
+      const data = await ServiceUtil.searchByPagination('locations', filters, [], 1, 1)
+      const exists = data?.total > 0
+
+      if (!exists) {
+        this.putawayLoc = ''
+        this._showFeedback('존재하지 않는 로케이션입니다', 'error')
+        voiceService.error('존재하지 않는 로케이션입니다')
+        return
+      }
+
       this._showFeedback(`로케이션: ${value}`, 'success')
       voiceService.success(`로케이션 ${value} 스캔 완료`)
+    } catch (e) {
+      this.putawayLoc = ''
+      this._showFeedback('로케이션 조회 중 오류가 발생했습니다', 'error')
     }
   }
 

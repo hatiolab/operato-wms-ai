@@ -1013,6 +1013,63 @@ public class VasTransactionService extends AbstractQueryService {
 	}
 
 	/**
+	 * 완성품 바코드 목록 조회 (완료/마감 주문용 API)
+	 *
+	 * @param vasOrderId 작업 지시 ID
+	 * @return 완성품 바코드 목록
+	 */
+	public List<String> getResultBarcodes(String vasOrderId) {
+		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
+		if (vasOrder == null) {
+			return List.of();
+		}
+
+		// 완료 후 재고는 destLocCd로 이동되므로, loc_cd 제한 없이 remarks로 검색
+		String sql = "SELECT * FROM inventories " +
+				"WHERE domain_id = :domainId " +
+				"AND com_cd = :comCd " +
+				"AND wh_cd = :whCd " +
+				"AND (del_flag IS NULL OR del_flag = false) " +
+				"AND remarks LIKE :remarks " +
+				"ORDER BY created_at ASC";
+
+		Map<String, Object> params = ValueUtil.newMap(
+				"domainId,comCd,whCd,remarks",
+				vasOrder.getDomainId(), vasOrder.getComCd(), vasOrder.getWhCd(),
+				"%" + vasOrder.getVasNo() + "%");
+
+		List<Inventory> inventories = this.queryManager.selectListBySql(sql, params, Inventory.class, 0, 0);
+
+		// remarks 조회 실패 시 vas_results의 dest_loc_cd + sku_cd 기반 fallback
+		if (inventories.isEmpty()) {
+			VasResult result = this.findFirstVasResult(vasOrder);
+			if (result != null && ValueUtil.isNotEmpty(result.getSetSkuCd()) && ValueUtil.isNotEmpty(result.getDestLocCd())) {
+				String fallbackSql = "SELECT * FROM inventories " +
+						"WHERE domain_id = :domainId " +
+						"AND com_cd = :comCd " +
+						"AND wh_cd = :whCd " +
+						"AND loc_cd = :destLocCd " +
+						"AND sku_cd = :setSkuCd " +
+						"AND (del_flag IS NULL OR del_flag = false) " +
+						"AND inv_qty = :resultQty " +
+						"ORDER BY created_at DESC";
+
+				Map<String, Object> fallbackParams = ValueUtil.newMap(
+						"domainId,comCd,whCd,destLocCd,setSkuCd,resultQty",
+						vasOrder.getDomainId(), vasOrder.getComCd(), vasOrder.getWhCd(),
+						result.getDestLocCd(), result.getSetSkuCd(), result.getResultQty());
+
+				inventories = this.queryManager.selectListBySql(fallbackSql, fallbackParams, Inventory.class, 0, 0);
+			}
+		}
+
+		return inventories.stream()
+				.map(Inventory::getBarcode)
+				.filter(b -> b != null && !b.isEmpty())
+				.toList();
+	}
+
+	/**
 	 * VAS 작업으로 생성된 재고 조회
 	 *
 	 * @param vasOrder 작업 지시
