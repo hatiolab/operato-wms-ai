@@ -458,10 +458,12 @@ class VasWorkPage extends localize(i18next)(PageView) {
           display: flex;
           gap: 8px;
           align-items: center;
+          flex-wrap: wrap;
         }
 
         .expiry-input-row input {
           flex: 1;
+          min-width: 0;
           padding: 14px 16px;
           border: 2px solid var(--md-sys-color-outline, #ccc);
           border-radius: 8px;
@@ -469,6 +471,16 @@ class VasWorkPage extends localize(i18next)(PageView) {
           font-weight: 700;
           box-sizing: border-box;
           min-height: 52px;
+        }
+
+        @media (max-width: 760px) {
+          .expiry-input-row input {
+            flex-basis: 100%;
+          }
+
+          .expiry-clear-btn {
+            width: 100%;
+          }
         }
 
         .expiry-input-row input:focus {

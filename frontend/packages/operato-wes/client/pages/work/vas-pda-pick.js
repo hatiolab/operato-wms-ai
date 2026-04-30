@@ -410,54 +410,90 @@ class VasPdaPick extends localize(i18next)(PageView) {
           overflow: hidden;
         }
 
-        .inv-detail-table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 12px;
-          table-layout: fixed;
+        /* 할당 바코드 카드 리스트 */
+        .alloc-card-list {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
         }
 
-        .inv-detail-table colgroup col:nth-child(1) { width: 32%; }  /* 재고바코드 */
-        .inv-detail-table colgroup col:nth-child(2) { width: 14%; }  /* 할당수량 */
-        .inv-detail-table colgroup col:nth-child(3) { width: 14%; }  /* 피킹수량 */
-        .inv-detail-table colgroup col:nth-child(4) { width: 22%; }  /* 상품코드 */
-        .inv-detail-table colgroup col:nth-child(5) { width: 18%; }  /* 로케이션 */
-
-        .inv-detail-table th {
-          background: #f0f4ff;
-          padding: 5px 6px;
-          text-align: center;
-          font-weight: 600;
-          font-size: 11px;
-          color: #4a5c9a;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+        .alloc-card {
+          background: #f8f9ff;
+          border: 1px solid #dde3f5;
+          border-radius: 8px;
+          padding: 10px 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
         }
 
-        .inv-detail-table td {
-          padding: 6px 6px;
-          text-align: center;
-          color: var(--md-sys-color-on-surface, #333);
-          background: transparent;
-          font-size: 12px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+        .alloc-card.scanned {
+          background: #e8f5e9;
+          border-color: #a5d6a7;
         }
 
-        .inv-detail-table td.highlight {
+        .alloc-card-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .alloc-barcode {
+          font-size: 13px;
           font-weight: 700;
+          color: #1a237e;
+          word-break: break-all;
+          flex: 1;
+          min-width: 0;
+        }
+
+        .alloc-card.scanned .alloc-barcode {
+          color: #2e7d32;
+        }
+
+        .alloc-loc {
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--md-sys-color-primary, #1976D2);
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+
+        .alloc-card-bottom {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .alloc-qty {
+          font-size: 13px;
+          color: #555;
+        }
+
+        .alloc-qty strong {
           color: #E65100;
         }
 
-        .inv-detail-table tr.scanned-row {
-          background: #e8f5e9;
+        .alloc-card.scanned .alloc-qty strong {
+          color: #2e7d32;
         }
 
-        .inv-detail-table tr.scanned-row td {
+        .alloc-badge {
+          font-size: 11px;
+          font-weight: 700;
+          padding: 3px 8px;
+          border-radius: 10px;
+        }
+
+        .alloc-badge.pending {
+          background: #fff3e0;
+          color: #E65100;
+        }
+
+        .alloc-badge.done {
+          background: #e8f5e9;
           color: #2e7d32;
-          font-weight: 600;
         }
 
         .location-guide.all-scanned {
@@ -1013,55 +1049,54 @@ class VasPdaPick extends localize(i18next)(PageView) {
     `
   }
 
-  /** 재고 상세 패널 렌더링 — 멀티 로케이션 분할배정 지원 */
+  /** 재고 상세 패널 렌더링 — 카드형 레이아웃 (멀티 로케이션 분할배정 지원) */
   _renderInvDetailPanel(item) {
-    // inv_barcds / inv_alloc_qtys / inv_loc_cds 는 쉼표 구분 문자열
     const barcodes = (item.inv_barcds || item.inv_barcd || item.barcode || '').split(',').filter(Boolean)
     const allocQtys = (item.inv_alloc_qtys || '').split(',').filter(Boolean)
     const locCds = (item.inv_loc_cds || item.src_loc_cd || '').split(',').filter(Boolean)
 
-    const rows = barcodes.length > 0
+    const cards = barcodes.length > 0
       ? barcodes.map((bcd, i) => {
-          const qty = allocQtys[i] || (item.alloc_qty || item.req_qty || 0)
+          const qty = Number(allocQtys[i] || item.alloc_qty || item.req_qty || 0)
           const loc = locCds[i] || item.src_loc_cd || '-'
-          const scanned = item._scannedBarcodes && item._scannedBarcodes.includes(bcd)
+          const scanned = !!(item._scannedBarcodes && item._scannedBarcodes.includes(bcd))
           return html`
-            <tr class="${scanned ? 'scanned-row' : ''}">
-              <td>${bcd || '-'}</td>
-              <td>${qty} EA</td>
-              <td class="highlight">${scanned ? qty : 0} EA</td>
-              <td>${item.sku_cd || '-'}</td>
-              <td>${loc}</td>
-            </tr>`
+            <div class="alloc-card ${scanned ? 'scanned' : ''}">
+              <div class="alloc-card-top">
+                <span class="alloc-barcode">${bcd}</span>
+                <span class="alloc-loc">${loc}</span>
+              </div>
+              <div class="alloc-card-bottom">
+                <span class="alloc-qty">
+                  스캔: <strong>${scanned ? qty : 0}</strong> / ${qty} EA
+                </span>
+                <span class="alloc-badge ${scanned ? 'done' : 'pending'}">
+                  ${scanned ? '✓ 스캔완료' : '미스캔'}
+                </span>
+              </div>
+            </div>`
         })
       : html`
-          <tr>
-            <td>-</td>
-            <td>${item.alloc_qty || item.req_qty || 0} EA</td>
-            <td class="highlight">${item._picked ? (item.picked_qty || item._pickedQty || 0) : 0} EA</td>
-            <td>${item.sku_cd || '-'}</td>
-            <td>${item.src_loc_cd || '-'}</td>
-          </tr>`
+          <div class="alloc-card ${item._picked ? 'scanned' : ''}">
+            <div class="alloc-card-top">
+              <span class="alloc-barcode">-</span>
+              <span class="alloc-loc">${item.src_loc_cd || '-'}</span>
+            </div>
+            <div class="alloc-card-bottom">
+              <span class="alloc-qty">
+                스캔: <strong>${item._picked ? (item.picked_qty || item._pickedQty || 0) : 0}</strong> / ${item.alloc_qty || item.req_qty || 0} EA
+              </span>
+              <span class="alloc-badge ${item._picked ? 'done' : 'pending'}">
+                ${item._picked ? '✓ 스캔완료' : '미스캔'}
+              </span>
+            </div>
+          </div>`
 
     return html`
       <div class="inv-detail-panel">
-        <table class="inv-detail-table">
-          <colgroup>
-            <col /><col /><col /><col /><col />
-          </colgroup>
-          <thead>
-            <tr>
-              <th>재고바코드</th>
-              <th>할당수량</th>
-              <th>스캔수량</th>
-              <th>상품코드</th>
-              <th>로케이션</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows}
-          </tbody>
-        </table>
+        <div class="alloc-card-list">
+          ${cards}
+        </div>
       </div>
     `
   }
