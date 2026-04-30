@@ -1046,6 +1046,10 @@ class VasWorkPage extends localize(i18next)(PageView) {
         ? html`<div style="color: #F44336; font-size: 14px; font-weight: 600; text-align: center;">
               &#x26A0; 완성 + 불량 수량이 계획 수량(${planQty})을 초과합니다
             </div>`
+        : this.completedQty > 0 && this.completedQty + this.defectQty < planQty
+        ? html`<div style="color: #FF9800; font-size: 14px; font-weight: 600; text-align: center;">
+              &#x26A0; 완성 + 불량 수량(${this.completedQty + this.defectQty})이 계획 수량(${planQty})보다 부족합니다
+            </div>`
         : ''}
       </div>
     `
@@ -1456,6 +1460,17 @@ class VasWorkPage extends localize(i18next)(PageView) {
       // 실적 수량 검증
       if (this.completedQty <= 0) {
         this._showFeedback('완성 수량을 입력해주세요', 'error')
+        return
+      }
+
+      const planQty = Number(this.selectedOrder?.plan_qty || 0)
+      const totalResultQty = this.completedQty + (this.defectQty || 0)
+      if (totalResultQty !== planQty) {
+        this._showFeedback(
+          `완성 + 불량 수량(${totalResultQty})이 계획 수량(${planQty})과 일치해야 합니다`,
+          'error'
+        )
+        voiceService.error('완성 수량과 불량 수량의 합이 계획 수량과 일치해야 합니다')
         return
       }
 
