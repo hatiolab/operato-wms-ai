@@ -1320,18 +1320,31 @@ class VasWorkPage extends localize(i18next)(PageView) {
   }
 
   /** 바코드/번호로 주문 검색 후 매칭 주문 자동 선택 */
-  _onScanSearch() {
+  /** 주문번호 바코드 스캔 — 오늘 목록에 없으면 날짜 무관 API 추가 조회 */
+  async _onScanSearch() {
     const value = (this.scanValue || '').trim()
     if (!value) return
 
-    const found = this.orders.find(
-      o => o.vas_no === value || o.id === value
-    )
-
+    // 1. 오늘 목록에서 먼저 탐색
+    const found = this.orders.find(o => o.vas_no === value || o.id === value)
     if (found) {
       this._selectOrder(found)
       this.scanValue = ''
-    } else {
+      return
+    }
+
+    // 2. 오늘 목록에 없으면 날짜 무관 API 조회
+    try {
+      const order = await ServiceUtil.restGet('vas_trx/vas_orders/find_by_no', { vas_no: value })
+      if (order) {
+        await this._fetchBomMap([order])
+        this._selectOrder(order)
+        this.scanValue = ''
+      } else {
+        this._showFeedback('주문을 찾을 수 없습니다', 'error')
+        voiceService.error('주문을 찾을 수 없습니다')
+      }
+    } catch (e) {
       this._showFeedback('주문을 찾을 수 없습니다', 'error')
       voiceService.error('주문을 찾을 수 없습니다')
     }

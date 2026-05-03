@@ -1419,6 +1419,60 @@ public class VasTransactionService extends AbstractQueryService {
 		return results;
 	}
 
+	/**
+	 * 주문번호(vas_no)로 작업 지시 단건 조회 — 날짜 무관 (PDA 바코드 스캔용)
+	 *
+	 * getMonitorOrders()와 동일한 응답 구조를 반환하되, targetDate 조건 없이 vas_no로만 조회.
+	 *
+	 * @param vasNo 작업 지시 번호
+	 * @return 주문 정보 Map (없으면 null)
+	 */
+	public Map<String, Object> findOrderByVasNo(String vasNo) {
+		if (ValueUtil.isEmpty(vasNo)) {
+			return null;
+		}
+
+		String sql = "SELECT vo.id, vo.vas_no, vo.vas_type, vo.status, " +
+				"vo.plan_qty, vo.completed_qty, vo.com_cd, vo.wh_cd, " +
+				"vo.worker_id, vo.priority, vo.work_loc_cd, " +
+				"vo.started_at, vo.approved_at, vo.vas_req_date, " +
+				"vo.vas_bom_id, vo.remarks, " +
+				"COALESCE(mi.total_items, 0) as total_items, " +
+				"COALESCE(mi.picked_items, 0) as picked_items, " +
+				"COALESCE(mi.total_req_qty, 0) as total_req_qty, " +
+				"COALESCE(mi.total_picked_qty, 0) as total_picked_qty, " +
+				"vr.dest_loc_cd " +
+				"FROM vas_orders vo " +
+				"LEFT JOIN ( " +
+				"  SELECT vas_order_id, " +
+				"    COUNT(*) as total_items, " +
+				"    SUM(CASE WHEN status IN ('PICKED','IN_USE','COMPLETED') THEN 1 ELSE 0 END) as picked_items, " +
+				"    SUM(COALESCE(req_qty, 0)) as total_req_qty, " +
+				"    SUM(COALESCE(picked_qty, 0)) as total_picked_qty " +
+				"  FROM vas_order_items " +
+				"  WHERE domain_id = :domainId " +
+				"  GROUP BY vas_order_id " +
+				") mi ON vo.id = mi.vas_order_id " +
+				"LEFT JOIN ( " +
+				"  SELECT DISTINCT ON (vas_order_id) vas_order_id, dest_loc_cd " +
+				"  FROM vas_results " +
+				"  WHERE domain_id = :domainId AND dest_loc_cd IS NOT NULL " +
+				"  ORDER BY vas_order_id, result_seq DESC " +
+				") vr ON vo.id = vr.vas_order_id " +
+				"WHERE vo.domain_id = :domainId " +
+				"AND vo.vas_no = :vasNo";
+
+		Map<String, Object> params = new java.util.HashMap<>();
+		params.put("domainId", Domain.currentDomainId());
+		params.put("vasNo", vasNo);
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
+				sql, params, Map.class, 0, 1);
+
+		return results.isEmpty() ? null : results.get(0);
+	}
+
 	/********************************************************************************************************
 	 * 9. 대시보드 통계 API
 	 ********************************************************************************************************/

@@ -301,6 +301,20 @@ public class VasTransactionController {
 	}
 
 	/**
+	 * 주문번호로 작업 지시 단건 조회 (날짜 무관 — PDA 바코드 스캔용)
+	 *
+	 * GET /rest/vas_trx/vas_orders/find_by_no?vas_no={vasNo}
+	 *
+	 * @param vasNo 작업 지시 번호
+	 * @return 주문 정보 (getMonitorOrders 동일 구조), 없으면 null
+	 */
+	@GetMapping(value = "/vas_orders/find_by_no", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Find VAS Order by vas_no (date-independent, for PDA barcode scan)")
+	public Map<String, Object> findOrderByVasNo(@RequestParam(name = "vas_no") String vasNo) {
+		return this.vasService.findOrderByVasNo(vasNo);
+	}
+
+	/**
 	 * 작업 지시 상세 항목(자재) 목록 조회 (재고 바코드 포함)
 	 *
 	 * GET /rest/vas_trx/vas_orders/{id}/items
