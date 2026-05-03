@@ -369,7 +369,6 @@ class VasBomSearchPopup extends localize(i18next)(LitElement) {
                       <th>상품명</th>
                       <th style="width:110px">유형</th>
                       <th style="width:100px">화주사</th>
-                      <th style="width:80px" class="center">상태</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -384,11 +383,6 @@ class VasBomSearchPopup extends localize(i18next)(LitElement) {
                             <span class="type-badge">${this._vasTypeLabel(bom.vas_type)}</span>
                           </td>
                           <td>${bom.com_cd || '-'}</td>
-                          <td class="center">
-                            <span class="status-badge ${bom.status === 'ACTIVE' ? 'active' : 'inactive'}">
-                              ${bom.status === 'ACTIVE' ? '활성' : '비활성'}
-                            </span>
-                          </td>
                         </tr>
                       `
                     )}
@@ -458,7 +452,7 @@ class VasBomSearchPopup extends localize(i18next)(LitElement) {
   async _search() {
     this.loading = true
     try {
-      const filters = []
+      const filters = [{ name: 'status', value: 'ACTIVE' }]
 
       if (this.searchForm.bomNo && this.searchForm.bomNo.trim()) {
         filters.push({ name: 'bom_no', value: this.searchForm.bomNo.trim() })
