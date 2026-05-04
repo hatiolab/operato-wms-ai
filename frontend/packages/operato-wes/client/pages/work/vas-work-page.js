@@ -1094,6 +1094,11 @@ class VasWorkPage extends localize(i18next)(PageView) {
           </div>
         `}
 
+        <!-- [비활성화] 완성품 유통기한 입력 박스
+             세트 상품 구성 자재의 유통기한이 각각 다를 수 있어
+             세트 상품 자체의 유통기한을 단일 값으로 표현하는 것이 의미 없음.
+             유통기한은 completeVasOrder() 시점에 자재별 할당 바코드 중
+             가장 임박한 날짜를 vas_order_items.expired_date 에 자동 반영함.
         <div class="expiry-card">
           <label>완성품 유통기한</label>
           <div class="expiry-input-row">
@@ -1112,6 +1117,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
             `}
           </div>
         </div>
+        -->
       </div>
     `
   }
@@ -1240,16 +1246,22 @@ class VasWorkPage extends localize(i18next)(PageView) {
     }
   }
 
-  /** 완성품 유통기한 기본값 조회 */
-  async _fetchDefaultExpiredDate(orderId) {
-    try {
-      const data = await ServiceUtil.restGet(`vas_trx/vas_orders/${orderId}/default_expired_date`)
-      return data?.expiredDate || ''
-    } catch (err) {
-      console.error('완성품 유통기한 기본값 조회 실패:', err)
-      return ''
-    }
-  }
+  /**
+   * [비활성화] 완성품 유통기한 기본값 조회
+   * 세트 상품 구성 자재의 유통기한이 각각 다를 수 있어
+   * 세트 상품 자체의 유통기한을 단일 값으로 표현하는 것이 의미 없음.
+   * 유통기한은 completeVasOrder() 시점에 자재별 할당 바코드 중
+   * 가장 임박한 날짜를 vas_order_items.expired_date 에 자동 반영함.
+   */
+  // async _fetchDefaultExpiredDate(orderId) {
+  //   try {
+  //     const data = await ServiceUtil.restGet(`vas_trx/vas_orders/${orderId}/default_expired_date`)
+  //     return data?.expiredDate || ''
+  //   } catch (err) {
+  //     console.error('완성품 유통기한 기본값 조회 실패:', err)
+  //     return ''
+  //   }
+  // }
 
   /**
    * 상태 필터 토글 — 같은 카드를 다시 클릭하면 전체(ALL)로 복귀
@@ -1277,7 +1289,8 @@ class VasWorkPage extends localize(i18next)(PageView) {
     this.putawayLoc = ''
     this.expiredDate = ''
     await this._fetchOrderItems(order.id)
-    this.expiredDate = await this._fetchDefaultExpiredDate(order.id)
+    // [비활성화] 완성품 유통기한 자동 계산 — 유통기한은 완료 시점에 백엔드에서 자동 반영
+    // this.expiredDate = await this._fetchDefaultExpiredDate(order.id)
     this.completedQty = Number(order.completed_qty || 0)
     this.defectQty = this._calcDefectQtyFromLoss()
 
@@ -1569,8 +1582,9 @@ class VasWorkPage extends localize(i18next)(PageView) {
 
     try {
       await ServiceUtil.restPost(`vas_trx/vas_orders/${this.selectedOrder.id}/complete`, {
-        destLocCd: this.putawayLoc,
-        expiredDate: this.expiredDate || null
+        destLocCd: this.putawayLoc
+        // [비활성화] expiredDate — 유통기한은 백엔드 completeVasOrder()에서 자동 계산하여 반영
+        // expiredDate: this.expiredDate || null
       })
       this._showFeedback('작업 완료!', 'success')
       voiceService.success('작업이 완료되었습니다')
