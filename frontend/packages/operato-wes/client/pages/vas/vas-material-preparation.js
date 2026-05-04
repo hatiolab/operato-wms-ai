@@ -107,6 +107,47 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
           font-size: 12px;
         }
 
+        /* 날짜 네비게이터 */
+        .date-nav {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 16px;
+        }
+
+        .date-nav-btn {
+          background: none;
+          border: none;
+          padding: 6px 10px;
+          font-size: 18px;
+          font-weight: 500;
+          color: var(--md-sys-color-on-surface-variant, #555);
+          cursor: pointer;
+          transition: color 0.15s;
+          line-height: 1;
+        }
+
+        .date-nav-btn:hover {
+          color: var(--md-sys-color-primary, #1976D2);
+        }
+
+        .date-nav input[type="date"] {
+          border: 1px solid var(--md-sys-color-outline-variant, #ddd);
+          border-radius: 10px;
+          padding: 9px 16px;
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-surface, #222);
+          background: var(--md-sys-color-surface, #fff);
+          box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+          cursor: pointer;
+          outline: none;
+        }
+
+        .date-nav input[type="date"]:focus {
+          border-color: var(--md-sys-color-primary, #1976D2);
+        }
+
         /* 주문 카드 */
         .order-cards {
           display: flex;
@@ -574,7 +615,8 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
       expandedOrderId: String,
       statusFilter: String,
       allocationsMap: Object,
-      expandedItemIds: Object
+      expandedItemIds: Object,
+      targetDate: String
     }
   }
 
@@ -588,6 +630,12 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
     this.statusFilter = 'ALL'
     this.allocationsMap = {}
     this.expandedItemIds = {}
+    this.targetDate = this._todayStr()
+  }
+
+  /** 오늘 날짜를 YYYY-MM-DD 형식으로 반환 */
+  _todayStr() {
+    return new Date().toISOString().slice(0, 10)
   }
 
   get context() {
@@ -607,6 +655,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
         <button class="btn-icon" @click="${this._refresh}">🔍 새로고침</button>
       </div>
 
+      ${this._renderDateNav()}
       ${this._renderFilterBar()}
 
       ${this.loading
@@ -618,6 +667,22 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
                 ${this._filteredOrders.map(order => this._renderOrderCard(order))}
               </div>
             `}
+    `
+  }
+
+  /** 날짜 네비게이터 렌더링 — 이전/다음 버튼 + 날짜 입력 + 오늘 버튼 */
+  /** 날짜 네비게이터 렌더링 */
+  _renderDateNav() {
+    return html`
+      <div class="date-nav">
+        <button class="date-nav-btn" @click="${this._prevDay}" title="이전 날짜">‹</button>
+        <input
+          type="date"
+          .value="${this.targetDate}"
+          @change="${e => this._changeDate(e.target.value)}"
+        />
+        <button class="date-nav-btn" @click="${this._nextDay}" title="다음 날짜">›</button>
+      </div>
     `
   }
 
@@ -833,12 +898,35 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
    * 데이터 조회
    * ============================================================ */
 
+  /** 날짜 변경 후 목록 재조회 */
+  _changeDate(dateStr) {
+    this.targetDate = dateStr
+    this._refresh()
+  }
+
+  /** 하루 전으로 이동 */
+  _prevDay() {
+    const d = new Date(this.targetDate)
+    d.setDate(d.getDate() - 1)
+    this._changeDate(d.toISOString().slice(0, 10))
+  }
+
+  /** 하루 후로 이동 */
+  _nextDay() {
+    const d = new Date(this.targetDate)
+    d.setDate(d.getDate() + 1)
+    this._changeDate(d.toISOString().slice(0, 10))
+  }
+
+
   async _refresh() {
     try {
       this.loading = this.orders.length === 0
 
-      // APPROVED, MATERIAL_READY 상태 주문 조회
-      const data = await ServiceUtil.restGet('vas_trx/monitor/orders')
+      // APPROVED, MATERIAL_READY 상태 주문 조회 (선택한 날짜 기준)
+      const data = await ServiceUtil.restGet('vas_trx/monitor/orders', {
+        targetDate: this.targetDate
+      })
       this.orders = (data || []).filter(o =>
         o.status === 'APPROVED' || o.status === 'MATERIAL_READY'
       )
@@ -970,7 +1058,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
         .map(i => ({
           itemId: i.id,
           allocQty: i.req_qty,
-          srcLocCd: i.src_loc_cd || '',
+          srcLocCd: '',
           lotNo: i.lot_no || ''
         }))
 
