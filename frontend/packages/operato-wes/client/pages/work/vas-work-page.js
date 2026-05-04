@@ -1301,6 +1301,8 @@ class VasWorkPage extends localize(i18next)(PageView) {
       this._fetchResultBarcodes(order.id)
       voiceService.guide(`주문 ${order.vas_no} 선택. 완료된 작업입니다`)
     } else if (this._shouldSkipResultInputStep(order)) {
+      // 작업장(work_loc_cd)을 적치 로케이션 기본값으로 설정
+      this.putawayLoc = order.work_loc_cd || ''
       this.step = 3
       voiceService.guide(`주문 ${order.vas_no} 선택. 적치 로케이션을 스캔해주세요`)
     } else if (this._shouldSkipMaterialInputStep(order)) {
@@ -1536,6 +1538,12 @@ class VasWorkPage extends localize(i18next)(PageView) {
     // 능동적 단계 안내
     if (this.step === 2) {
       voiceService.guide('완성 수량과 불량 수량을 입력해주세요')
+    }
+
+    // 3단계 진입 시 적치 로케이션 기본값으로 작업장(work_loc_cd) 설정
+    // — 별도 스캔 없이 완료하면 작업장에 완성품이 생성됨
+    if (this.step === 3 && !this.putawayLoc) {
+      this.putawayLoc = this.selectedOrder?.work_loc_cd || ''
     }
   }
 
