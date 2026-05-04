@@ -339,7 +339,8 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
       results: Array,
       activeTab: Number,
       allocationsMap: Object,
-      expandedItemIds: Object
+      expandedItemIds: Object,
+      parent_id: String
     }
   }
 
@@ -353,6 +354,7 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
     this.activeTab = 0
     this.allocationsMap = {}
     this.expandedItemIds = {}
+    this.parent_id = null
   }
 
   /**
@@ -360,6 +362,11 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
    */
   connectedCallback() {
     super.connectedCallback()
+
+    if (this.parent_id) {
+      this.vasOrderId = this.parent_id
+    }
+
     if (this.vasOrderId) {
       this.fetchVasOrder()
     }

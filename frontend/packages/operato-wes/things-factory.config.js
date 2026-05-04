@@ -50,6 +50,7 @@ export default {
     { tagname: 'vas-work-page', page: 'vas-work' },
     { tagname: 'vas-pda-pick', page: 'vas-pda-pick' },
     { tagname: 'vas-pda-result', page: 'vas-pda-result' },
+    { tagname: 'vas-order-detail', page: 'vas-order-detail' },
 
     { tagname: 'pda-wms-shipment-barcode', page: 'pda-wms-shipment-barcode' },
     { tagname: 'pda-wms-shipment-quantity', page: 'pda-wms-shipment-quantity' },
