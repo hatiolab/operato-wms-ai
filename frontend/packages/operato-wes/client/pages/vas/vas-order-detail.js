@@ -617,17 +617,6 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
               </button>
             ` : ''}
 
-            ${this.canStartWork() ? html`
-              <button class="action-btn primary" @click="${this.startWork}">
-                ${TermsUtil.tButton('start_work')}
-              </button>
-            ` : ''}
-
-            ${this.canCancel() ? html`
-              <button class="action-btn danger" @click="${this.cancelOrder}">
-                ${TermsUtil.tButton('cancel')}
-              </button>
-            ` : ''}
           </div>
         </div>
 
