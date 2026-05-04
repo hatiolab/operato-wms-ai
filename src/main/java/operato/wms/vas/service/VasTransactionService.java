@@ -759,7 +759,26 @@ public class VasTransactionService extends AbstractQueryService {
 
 		this.queryManager.update(vasOrder, "status", "completedAt", "vasEndDate");
 
-		// 7. 상세 항목 상태 업데이트
+		// 7. 상세 항목 유통기한 업데이트 — 완료 시점에 할당 바코드 중 가장 임박한 유통기한 반영
+		String expiredDateSql = "UPDATE vas_order_items voi " +
+				"SET expired_date = subq.min_exp " +
+				"FROM ( " +
+				"    SELECT shipment_order_item_id, MIN(NULLIF(expired_date, '')) AS min_exp " +
+				"    FROM stock_allocations " +
+				"    WHERE domain_id = :domainId " +
+				"      AND shipment_order_id = :vasOrderId " +
+				"      AND alloc_type = :allocType " +
+				"    GROUP BY shipment_order_item_id " +
+				") subq " +
+				"WHERE voi.id = subq.shipment_order_item_id " +
+				"  AND voi.vas_order_id = :vasOrderId " +
+				"  AND voi.domain_id = :domainId " +
+				"  AND subq.min_exp IS NOT NULL";
+		this.queryManager.executeBySql(expiredDateSql, ValueUtil.newMap(
+				"domainId,vasOrderId,allocType",
+				vasOrder.getDomainId(), vasOrderId, StockAllocation.ALLOC_TYPE_VAS));
+
+		// 8. 상세 항목 상태 업데이트
 		String sql = "UPDATE vas_order_items SET status = :status " +
 				"WHERE vas_order_id = :vasOrderId AND domain_id = :domainId";
 		this.queryManager.executeBySql(sql, ValueUtil.newMap(
