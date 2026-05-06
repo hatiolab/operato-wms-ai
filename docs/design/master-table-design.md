@@ -114,8 +114,12 @@ CourierContract (택배 계약)
 | `mgr_email` | VARCHAR(50) | NULL | — | 담당자 이메일 |
 | `tracking_url` | VARCHAR(255) | NULL | — | 배송 추적 URL 템플릿. `{invoice_no}` 치환자 포함 (예: `https://trace.cjlogistics.com/web/detail.jsp?slipno={invoice_no}`) |
 | `api_yn` | BOOLEAN | NULL | false | API 자동 연동 여부. true이면 운송장 자동 발급 지원 |
-| `api_endpoint` | VARCHAR(255) | NULL | — | 운송장 발급 API endpoint URL |
 | `api_key` | VARCHAR(255) | NULL | — | API 인증 키 (암호화 저장 권장) |
+| `secret_key` | VARCHAR(255) | NULL | — | 시크릿 키 (암호화 저장 권장) |
+| `validation_endpoint` | VARCHAR(255) | NULL | — | 운송장 유효성 체크 endpoint URL |
+| `issue_endpoint` | VARCHAR(255) | NULL | — | 운송장 발급 endpoint URL |
+| `print_endpoint` | VARCHAR(255) | NULL | — | 운송장 출력 endpoint URL |
+| `cancel_endpoint` | VARCHAR(255) | NULL | — | 운송장 취소 endpoint URL |
 | `del_flag` | BOOLEAN | NULL | false | 삭제 여부 |
 | `remarks` | VARCHAR(1000) | NULL | — | 비고 |
 | `attr01` | VARCHAR(100) | NULL | — | 커스텀 속성 1 |
@@ -147,9 +151,13 @@ CREATE TABLE carriers (
     mgr_phone       VARCHAR(20),
     mgr_email       VARCHAR(50),
     tracking_url    VARCHAR(255),
-    api_yn          BOOLEAN DEFAULT FALSE,
-    api_endpoint    VARCHAR(255),
+    api_flag        BOOLEAN  DEFAULT false,
     api_key         VARCHAR(255),
+    secret_key      VARCHAR(255),
+    validation_endpoint VARCHAR(255),
+    issue_endpoint      VARCHAR(255),
+    print_endpoint      VARCHAR(255),
+    cancel_endpoint     VARCHAR(255),
     del_flag        BOOLEAN DEFAULT FALSE,
     remarks         VARCHAR(1000),
     attr01          VARCHAR(100),
