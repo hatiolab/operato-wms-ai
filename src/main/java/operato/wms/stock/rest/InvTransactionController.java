@@ -27,6 +27,7 @@ import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.sys.SysConstants;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.system.service.AbstractRestService;
+import xyz.elidom.sys.util.ThrowUtil;
 import xyz.elidom.util.ValueUtil;
 
 /**
@@ -153,8 +154,18 @@ public class InvTransactionController extends AbstractRestService {
     @ApiDesc(description = "Validate Location for Move")
     public Location validateLocationForMove(@RequestBody Map<String, String> input) {
         Long domainId = Domain.currentDomainId();
-        String toLocCd = input.get("to_loc_cd");
-        return this.invTrxSvc.validateLocationForMove(domainId, toLocCd);
+        String fromLocCd = input.get("from_loc_cd");
+
+        if (ValueUtil.isNotEmpty(fromLocCd)) {
+            return this.invTrxSvc.validateLocationForMoveOut(domainId, fromLocCd);
+        } else {
+            String toLocCd = input.get("to_loc_cd");
+            if (ValueUtil.isNotEmpty(toLocCd)) {
+                return this.invTrxSvc.validateLocationForMoveIn(domainId, toLocCd);
+            }
+        }
+
+        throw ThrowUtil.newValidationErrorWithNoLog("이동할 로케이션 정보가 없습니다.");
     }
 
     /**
@@ -165,7 +176,8 @@ public class InvTransactionController extends AbstractRestService {
      * 유효하면 재고 정보를 반환하고, 이동 불가한 경우 오류를 반환한다.
      *
      * POST /rest/inventory_trx/validate_barcode_for_move
-     * Body: { "barcode": "BARCODE123", "to_loc_cd": "A-01-01" }
+     * Body: { "from_loc_cd": "A-01-02", "barcode": "BARCODE123", "to_loc_cd":
+     * "A-01-01" }
      *
      * @param input barcode와 to_loc_cd를 포함하는 요청 바디
      * @return 유효한 Inventory 엔티티
@@ -176,7 +188,8 @@ public class InvTransactionController extends AbstractRestService {
         Long domainId = Domain.currentDomainId();
         String barcode = input.get("barcode");
         String toLocCd = input.get("to_loc_cd");
-        return this.invTrxSvc.validateInventoryForMove(domainId, barcode, toLocCd);
+        String fromLocCd = input.get("from_loc_cd");
+        return this.invTrxSvc.validateInventoryForMove(domainId, fromLocCd, barcode, toLocCd);
     }
 
     /**

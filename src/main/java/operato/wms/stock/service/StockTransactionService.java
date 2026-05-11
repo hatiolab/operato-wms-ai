@@ -528,7 +528,7 @@ public class StockTransactionService extends AbstractQueryService {
      * @param toLocCd  목적지 로케이션 코드
      * @return 유효한 Location 엔티티
      */
-    public Location validateLocationForMove(Long domainId, String toLocCd) {
+    public Location validateLocationForMoveIn(Long domainId, String toLocCd) {
         // 목적지 로케이션 코드 값 체크
         ValueUtil.checkEmptyData(toLocCd, "label.to_loc_cd");
         // 로케이션 조회
@@ -536,6 +536,30 @@ public class StockTransactionService extends AbstractQueryService {
 
         if (ValueUtil.isEqualIgnoreCase(location.getRestrictType(), Inventory.TRANSACTION_IN)) {
             throw ThrowUtil.newValidationErrorWithNoLog("입고 제한이 걸린 로케이션이라 " + toLocCd + " 으로 이동이 불가합니다.");
+        }
+
+        // 로케이션 리턴
+        return location;
+    }
+
+    /**
+     * 이동 출고 로케이션 유효성 사전 검증
+     *
+     * 로케이션 존재 여부, 삭제 여부, 이동 제한(restrictType=OUT) 여부를 체크한다.
+     * 유효한 경우 로케이션 정보를 반환한다.
+     *
+     * @param domainId  도메인 ID
+     * @param fromLocCd 출고 로케이션 코드
+     * @return 유효한 Location 엔티티
+     */
+    public Location validateLocationForMoveOut(Long domainId, String fromLocCd) {
+        // 목적지 로케이션 코드 값 체크
+        ValueUtil.checkEmptyData(fromLocCd, "label.from_loc_cd");
+        // 로케이션 조회
+        Location location = this.wmsBaseSvc.findLocation(fromLocCd, false, true);
+
+        if (ValueUtil.isEqualIgnoreCase(location.getRestrictType(), Inventory.TRANSACTION_OUT)) {
+            throw ThrowUtil.newValidationErrorWithNoLog("출고 제한이 걸린 로케이션이라 " + fromLocCd + " 에서 출고가 불가합니다.");
         }
 
         // 로케이션 리턴
@@ -555,21 +579,30 @@ public class StockTransactionService extends AbstractQueryService {
      * 7. 고정 SKU 로케이션 체크
      * 8. 혼적 가능 여부 체크
      *
-     * @param domainId 도메인 ID
-     * @param barcode  재고 바코드
-     * @param toLocCd  목적지 로케이션 코드
+     * @param domainId  도메인 ID
+     * @param fromLocCd 출고 로케이션 코드
+     * @param barcode   재고 바코드
+     * @param toLocCd   목적지 로케이션 코드
      * @return 유효한 Inventory 엔티티
      */
-    public Inventory validateInventoryForMove(Long domainId, String barcode, String toLocCd) {
+    public Inventory validateInventoryForMove(Long domainId, String fromLocCd, String barcode, String toLocCd) {
+        // 출고 로케이션 코드 존재 여부 체크
+        ValueUtil.checkEmptyData(fromLocCd, "label.from_loc_cd");
         // 바코드 존재 여부 체크
         ValueUtil.checkEmptyData(barcode, "label.barcode");
         // 목적지 로케이션 코드 존재 여부 체크
         ValueUtil.checkEmptyData(toLocCd, "label.to_loc_cd");
 
         // 바코드로 재고 조회 (삭제되지 않은 재고만)
-        String sql = "SELECT * FROM inventories WHERE domain_id = :domainId AND barcode = :barcode AND (del_flag IS NULL OR del_flag = false) LIMIT 1";
+        String sql = "SELECT * FROM inventories WHERE domain_id = :domainId AND loc_cd = :locCd AND barcode = :barcode AND (del_flag IS NULL OR del_flag = false) LIMIT 1";
         Inventory inventory = this.queryManager.selectBySql(
-                sql, ValueUtil.newMap("domainId,barcode", domainId, barcode), Inventory.class);
+                sql, ValueUtil.newMap("domainId,locCd,barcode", domainId, fromLocCd, barcode), Inventory.class);
+
+        // 존재하지 않는 재고
+        if (inventory == null) {
+            throw ThrowUtil
+                    .newValidationErrorWithNoLog("해당 로케이션[" + fromLocCd + "]에 재고 바코드[" + barcode + "]가 존재하지 않습니다.");
+        }
 
         // 재고 예약 수량이 있는지 체크
         if (inventory.getReservedQty() != null && inventory.getReservedQty() > 0) {
@@ -580,7 +613,7 @@ public class StockTransactionService extends AbstractQueryService {
         this.checkInventoryForTrx(inventory, Inventory.TRANSACTION_MOVE);
 
         // 목적지 로케이션 조회 & 이동 제한(restrict_type=MOVE) 체크
-        Location toLoc = this.validateLocationForMove(domainId, toLocCd);
+        Location toLoc = this.validateLocationForMoveIn(domainId, toLocCd);
 
         // 현재 로케이션과 목적지 동일 여부 체크
         if (ValueUtil.isEqualIgnoreCase(inventory.getLocCd(), toLocCd)) {
@@ -986,11 +1019,11 @@ public class StockTransactionService extends AbstractQueryService {
      * 2. sku.sku_barcd / sku_barcd2 / sku_barcd3 역조회 → 복수 가능
      * 3. sku.sku_cd 폴백 → 단건 (화주사 내 유일)
      *
-     * @param domainId        도메인 ID
-     * @param barcode         스캔된 바코드 문자열
-     * @param comCd           화주사 코드 (null 허용 — 전체 검색)
-     * @param skipInventory   true이면 재고 바코드(inventories.barcode) 조회를 건너뜀
-     *                        — 재고 이동·출고 등 재고 바코드가 무의미한 화면에서 사용
+     * @param domainId      도메인 ID
+     * @param barcode       스캔된 바코드 문자열
+     * @param comCd         화주사 코드 (null 허용 — 전체 검색)
+     * @param skipInventory true이면 재고 바코드(inventories.barcode) 조회를 건너뜀
+     *                      — 재고 이동·출고 등 재고 바코드가 무의미한 화면에서 사용
      * @return [{ sku_cd, sku_nm, sku_barcd }, ...] — 항상 리스트
      */
     public List<SKU> resolveBarcode(Long domainId, String barcode, String comCd, boolean skipInventory) {
