@@ -668,15 +668,16 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       <div class="detail-body">
         <div class="detail-card">
           <div class="detail-barcode-area">
-            <div class="detail-barcode">${inv.barcode}</div>
+            <div class="detail-barcode">${inv.barcode} / ${inv.loc_cd}</div>
             <span class="status-badge ${statusCls}">${inv.status || '-'}</span>
           </div>
 
-          ${this._detailRow(TermsUtil.tLabel('sku_cd') || 'SKU', `${inv.sku_cd || '-'}${inv.sku_nm ? ` (${inv.sku_nm})` : ''}`)}
           ${this._detailRow(TermsUtil.tLabel('loc_cd') || '로케이션', inv.loc_cd || '-', 'highlight')}
+          ${this._detailRow(TermsUtil.tLabel('sku_cd') || 'SKU', `${inv.sku_cd || '-'}`)}
+          ${this._detailRow(TermsUtil.tLabel('sku_nm') || '품명', `${inv.sku_nm}`)}
           ${this._detailRow(TermsUtil.tLabel('inv_qty') || '재고 수량', inv.inv_qty ?? '-')}
-          ${this._detailRow(TermsUtil.tLabel('reserved_qty') || '할당 수량', inv.reserved_qty ?? '0', inv.reserved_qty > 0 ? 'danger' : '')}
           ${this._detailRow(TermsUtil.tLabel('available_qty') || '가용 수량', (inv.inv_qty ?? 0) - (inv.reserved_qty ?? 0), 'highlight')}
+          ${this._detailRow(TermsUtil.tLabel('reserved_qty') || '할당 수량', inv.reserved_qty ?? '0', inv.reserved_qty > 0 ? 'danger' : '')}
           ${this._detailRow(TermsUtil.tLabel('lot_no') || 'LOT 번호', inv.lot_no || '-')}
           ${this._detailRow(TermsUtil.tLabel('expired_date') || '유효기간', inv.expired_date || '-')}
           ${this._detailRow(TermsUtil.tLabel('com_cd') || '화주사', inv.com_cd || '-')}

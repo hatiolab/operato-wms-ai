@@ -1,8 +1,6 @@
 package operato.wms.stock.entity;
 
 import operato.wms.base.entity.SKU;
-import operato.wms.inbound.entity.Receiving;
-import operato.wms.inbound.entity.ReceivingItem;
 import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
@@ -18,7 +16,7 @@ import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
 @Table(name = "inventories", idStrategy = GenerationRule.UUID, indexes = {
-		@Index(name = "ix_inventories_0", columnList = "domain_id,barcode,loc_cd"),
+		@Index(name = "ix_inventories_0", columnList = "domain_id,barcode,loc_cd", unique = true),
 		@Index(name = "ix_inventories_1", columnList = "domain_id,wh_cd,com_cd"),
 		@Index(name = "ix_inventories_2", columnList = "domain_id,wh_cd,vend_cd,maker_cd"),
 		@Index(name = "ix_inventories_3", columnList = "domain_id,wh_cd,com_cd,loc_cd,sku_cd"),

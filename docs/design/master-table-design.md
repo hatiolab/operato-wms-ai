@@ -28,18 +28,18 @@
 
 ### 1.1 추가 마스터 테이블 구성 요약
 
-| # | 테이블 | 엔티티 | 우선순위 | 설명 |
-|---|--------|--------|----------|------|
-| 1 | `carriers` | Carrier | 즉시 | 운송사(택배사/화물사) 마스터 |
-| 2 | `sku_barcodes` | SkuBarcode | 즉시 | 상품 다중 바코드 마스터 |
-| 3 | `sku_uoms` | SkuUom | 즉시 | 상품 단위 환산 마스터 |
-| 4 | `holidays` | Holiday | 단기 | 공휴일·휴무일 마스터 |
-| 5 | `inspection_specs` | InspectionSpec | 단기 | 화주사·SKU별 검수 기준 마스터 |
-| 6 | `replenish_rules` | ReplenishRule | 단기 | 피킹존 자동 보충 규칙 마스터 |
-| 7 | `return_policies` | ReturnPolicy | 단기 | 화주사별 반품 처리 정책 마스터 |
-| 8 | `slotting_rules` | SlottingRule | 단기 | 로케이션 자동 배정 규칙 마스터 |
-| 9 | `billing_policies` | BillingPolicy | 3PL | 화주사별 청구 항목 정책 마스터 |
-| 10 | `storage_policies` | StoragePolicy | 3PL | 화주사별 보관 운영 정책 마스터 |
+| # | 테이블 | 엔티티 | 우선순위 | 완료 | 설명 |
+|---|--------|--------|----------|------|------|
+| 1 | `carriers` | Carrier | 즉시 | ☑ | 운송사(택배사/화물사) 마스터 |
+| 2 | `sku_barcodes` | SkuBarcode | 즉시 | ☑ | 상품 다중 바코드 마스터 |
+| 3 | `sku_uoms` | SkuUom | 즉시 | ☑ | 상품 단위 환산 마스터 |
+| 4 | `holidays` | Holiday | 단기 | ☐ | 공휴일·휴무일 마스터 |
+| 5 | `inspection_specs` | InspectionSpec | 단기 | ☐ | 화주사·SKU별 검수 기준 마스터 |
+| 6 | `replenish_rules` | ReplenishRule | 단기 | ☑ | 피킹존 자동 보충 규칙 마스터 |
+| 7 | `return_policies` | ReturnPolicy | 단기 | ☑ | 화주사별 반품 처리 정책 마스터 |
+| 8 | `slotting_rules` | SlottingRule | 단기 | ☑ | 로케이션 자동 배정 규칙 마스터 |
+| 9 | `billing_policies` | BillingPolicy | 3PL | ☐ | 화주사별 청구 항목 정책 마스터 |
+| 10 | `storage_policies` | StoragePolicy | 3PL | ☑ | 화주사별 보관 운영 정책 마스터 |
 
 ### 1.2 기존 마스터와의 연계
 

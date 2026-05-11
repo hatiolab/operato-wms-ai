@@ -365,8 +365,8 @@ class InventoryHome extends localize(i18next)(PageView) {
                   <div class="header-actions">
                     <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">🔍 새로고침</button>
                     <button class="btn btn-outline" @click="${() => this._navigateTo('inventories')}">📦 재고 조회</button>
-                    <button class="btn btn-outline" @click="${() => this._navigateTo('stock-adjust')}">⚙️ 재고 조정</button>
-                    <button class="btn btn-outline" @click="${() => this._navigateTo('inventories-by-expired')}">🔄 유통기한별 재고</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('inventory-adjust')}">⚙️ 재고 조정</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('inventories-by-expired')}">🔄 소비기한별 재고</button>
                     <button class="btn btn-outline" @click="${() => this._navigateTo('stocktakes')}">📋 실사 작업</button>
                   </div>
                 </div>
