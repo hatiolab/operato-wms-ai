@@ -9,8 +9,15 @@ import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
 /**
  * PDA 재고 이동 작업 화면 (W23-SF-4)
  *
- * 목적지 로케이션을 먼저 스캔하고, 이동할 재고 바코드를 여러 개 스캔하여
- * 리스트에 추가한 뒤 '이동' 버튼으로 일괄 처리한다.
+ * 스캔 순서:
+ * 1. To 로케이션 스캔 (목적지 — 1회 확정 후 잠금)
+ * 2. From 로케이션 스캔 (이동 출발지)
+ * 3. 바코드 스캔 → 성공 시 목록 추가 후 From + 바코드 클리어, From 포커스
+ *                → 실패 시 바코드만 클리어, 바코드 포커스 유지
+ * 4. 2~3 반복 → 이동 사유 입력 → 이동 버튼
+ *
+ * Inventory는 (domainId, locCd, barcode) 복합 유니크이므로 From 로케이션으로
+ * 이동 대상 재고를 정확히 특정한다.
  *
  * 화면 모드: scan(스캔 + 목록) → complete(완료 결과)
  */
@@ -19,11 +26,17 @@ export class PdaStockMove extends connect(store)(PageView) {
   /** 화면 모드: scan / complete */
   @state() mode = 'scan'
 
-  /** 목적지 로케이션 코드 */
+  /** 목적지 로케이션 코드 (1회 확정) */
   @state() toLocCd = ''
 
   /** 목적지 로케이션 전체 정보 */
   @state() toLocation = null
+
+  /** From 로케이션 코드 (바코드 스캔 성공마다 초기화) */
+  @state() fromLocCd = ''
+
+  /** From 로케이션 전체 정보 */
+  @state() fromLocation = null
 
   /** 스캔하여 추가된 재고 목록 */
   @state() scannedItems = []
@@ -41,7 +54,10 @@ export class PdaStockMove extends connect(store)(PageView) {
   @state() reason = ''
 
   /** 목적지 로케이션 스캔 입력 */
-  @query('#locationInput') _locationInput
+  @query('#toLocationInput') _toLocationInput
+
+  /** From 로케이션 스캔 입력 */
+  @query('#fromLocationInput') _fromLocationInput
 
   /** 재고 바코드 스캔 입력 */
   @query('#barcodeInput') _barcodeInput
@@ -60,7 +76,6 @@ export class PdaStockMove extends connect(store)(PageView) {
           overflow: hidden;
         }
 
-        /* 스캔 영역 */
         .scan-area {
           padding: 8px 12px 4px;
           display: flex;
@@ -94,17 +109,12 @@ export class PdaStockMove extends connect(store)(PageView) {
           font-size: 12px;
           font-weight: 700;
           color: var(--md-sys-color-on-surface-variant, #666);
-          min-width: 64px;
+          min-width: 72px;
           white-space: nowrap;
         }
 
-        .scan-row.active .row-label {
-          color: var(--md-sys-color-primary, #1976D2);
-        }
-
-        .scan-row.done .row-label {
-          color: #2e7d32;
-        }
+        .scan-row.active .row-label { color: var(--md-sys-color-primary, #1976D2); }
+        .scan-row.done .row-label { color: #2e7d32; }
 
         .scan-row ox-input-barcode {
           flex: 1;
@@ -134,22 +144,12 @@ export class PdaStockMove extends connect(store)(PageView) {
           cursor: pointer;
         }
 
-        /* 이동 사유 */
         .reason-row {
           display: flex;
           align-items: center;
           gap: 8px;
           padding: 0 12px 4px;
           flex-shrink: 0;
-        }
-
-        .reason-row label {
-          flex-shrink: 0;
-          font-size: 12px;
-          font-weight: 600;
-          color: var(--md-sys-color-on-surface-variant, #666);
-          min-width: 64px;
-          white-space: nowrap;
         }
 
         .reason-row input {
@@ -167,7 +167,6 @@ export class PdaStockMove extends connect(store)(PageView) {
           border-color: var(--md-sys-color-primary, #1976D2);
         }
 
-        /* 구분선 */
         .divider {
           height: 1px;
           background: var(--md-sys-color-outline-variant, #e0e0e0);
@@ -175,7 +174,6 @@ export class PdaStockMove extends connect(store)(PageView) {
           margin: 2px 0;
         }
 
-        /* 피드백 */
         .scan-feedback {
           margin: 2px 12px;
           padding: 6px 12px;
@@ -189,7 +187,6 @@ export class PdaStockMove extends connect(store)(PageView) {
         .scan-feedback.error { background: #ffebee; color: #c62828; }
         .scan-feedback.warning { background: #fff8e1; color: #f57f17; }
 
-        /* 스캔 목록 헤더 */
         .list-header {
           display: flex;
           align-items: center;
@@ -203,7 +200,6 @@ export class PdaStockMove extends connect(store)(PageView) {
           color: var(--md-sys-color-on-surface-variant, #888);
         }
 
-        /* 스캔된 재고 목록 */
         .scanned-list {
           flex: 1;
           overflow-y: auto;
@@ -277,7 +273,6 @@ export class PdaStockMove extends connect(store)(PageView) {
           cursor: pointer;
         }
 
-        /* 빈 안내 */
         .empty-guide {
           flex: 1;
           display: flex;
@@ -292,7 +287,6 @@ export class PdaStockMove extends connect(store)(PageView) {
         .empty-guide .guide-icon { font-size: 44px; margin-bottom: 10px; }
         .empty-guide .guide-text { font-size: 13px; }
 
-        /* 하단 버튼 */
         .footer-area {
           display: flex;
           gap: 8px;
@@ -326,7 +320,6 @@ export class PdaStockMove extends connect(store)(PageView) {
 
         .btn-secondary:active { opacity: 0.8; }
 
-        /* 완료 화면 */
         .complete-section {
           flex: 1;
           display: flex;
@@ -391,7 +384,6 @@ export class PdaStockMove extends connect(store)(PageView) {
           cursor: pointer;
         }
 
-        /* 로딩 */
         .loading-overlay {
           text-align: center;
           padding: 16px;
@@ -419,32 +411,51 @@ export class PdaStockMove extends connect(store)(PageView) {
   /** scan 모드 렌더링 */
   _renderScanMode() {
     const canMove = this.toLocCd && this.scannedItems.length > 0 && this.reason.trim()
+    const fromActive = this.toLocCd && !this.fromLocCd
+    const barcodeActive = this.toLocCd && this.fromLocCd
 
     return html`
       <div class="scan-area">
-        <!-- 목적지 로케이션 -->
+        <!-- 1단계: 목적지(To) 로케이션 — 최초 1회 확정 -->
         <div class="scan-row ${this.toLocCd ? 'done' : 'active'}">
-          <span class="row-label">${TermsUtil.tLabel('to_loc_cd') || '이동 로케이션'}</span>
+          <span class="row-label">${TermsUtil.tLabel('to_loc_cd') || 'To 로케이션'}</span>
           ${this.toLocCd ? html`
             <span class="confirmed-value">${this.toLocCd}</span>
-            <button class="btn-clear" @click=${this._clearLocation}>변경</button>
+            <button class="btn-clear" @click=${this._clearToLocation}>변경</button>
           ` : html`
-            <ox-input-barcode id="locationInput"
+            <ox-input-barcode id="toLocationInput"
               placeholder="${TermsUtil.tLabel('scan_location') || '목적지 로케이션 스캔'}"
               ?disabled=${this.processing}
-              @change=${e => this._onScanLocation(e.target.value)}>
+              @change=${e => this._onScanToLocation(e.target.value)}>
             </ox-input-barcode>
           `}
         </div>
 
-        <!-- 재고 바코드 스캔 -->
-        <div class="scan-row ${this.toLocCd ? 'active' : ''}">
+        <!-- 2단계: From 로케이션 — 바코드 스캔 성공마다 초기화 -->
+        <div class="scan-row ${this.fromLocCd ? 'done' : (fromActive ? 'active' : '')}">
+          <span class="row-label">${TermsUtil.tLabel('from_loc_cd') || 'From 로케이션'}</span>
+          ${this.fromLocCd ? html`
+            <span class="confirmed-value">${this.fromLocCd}</span>
+            <button class="btn-clear" @click=${this._clearFromLocation}>변경</button>
+          ` : html`
+            <ox-input-barcode id="fromLocationInput"
+              placeholder="${this.toLocCd
+          ? (TermsUtil.tLabel('scan_from_location') || 'From 로케이션 스캔')
+          : 'To 로케이션 스캔 후 입력 가능'}"
+              ?disabled=${this.processing || !this.toLocCd}
+              @change=${e => this._onScanFromLocation(e.target.value)}>
+            </ox-input-barcode>
+          `}
+        </div>
+
+        <!-- 3단계: 바코드 — From + To 모두 확정 후 활성화 -->
+        <div class="scan-row ${barcodeActive ? 'active' : ''}">
           <span class="row-label">${TermsUtil.tLabel('barcode') || '바코드'}</span>
           <ox-input-barcode id="barcodeInput"
-            placeholder="${this.toLocCd
+            placeholder="${barcodeActive
         ? (TermsUtil.tLabel('scan_barcode') || '재고 바코드 스캔')
         : '로케이션 스캔 후 입력 가능'}"
-            ?disabled=${this.processing || !this.toLocCd}
+            ?disabled=${this.processing || !barcodeActive}
             @change=${e => this._onScanBarcode(e.target.value)}>
           </ox-input-barcode>
         </div>
@@ -486,7 +497,7 @@ export class PdaStockMove extends connect(store)(PageView) {
                   · ${TermsUtil.tLabel('inv_qty') || '수량'}: ${item.inv_qty ?? '-'}
                 </div>
               </div>
-              <span class="loc-arrow">${item.loc_cd} →</span>
+              <span class="loc-arrow">${item.loc_cd} → ${this.toLocCd}</span>
               <button class="btn-remove" @click=${() => this._removeItem(idx)}>✕</button>
             </div>
           `)}
@@ -495,9 +506,11 @@ export class PdaStockMove extends connect(store)(PageView) {
         <div class="empty-guide">
           <div class="guide-icon">📦</div>
           <div class="guide-text">
-            ${this.toLocCd
-          ? (TermsUtil.tLabel('scan_barcode') || '이동할 재고의 바코드를 스캔하세요')
-          : (TermsUtil.tLabel('scan_location') || '먼저 목적지 로케이션을 스캔하세요')}
+            ${!this.toLocCd
+          ? (TermsUtil.tLabel('scan_location') || '먼저 목적지 로케이션을 스캔하세요')
+          : !this.fromLocCd
+            ? (TermsUtil.tLabel('scan_from_location') || 'From 로케이션을 스캔하세요')
+            : (TermsUtil.tLabel('scan_barcode') || '재고 바코드를 스캔하세요')}
           </div>
         </div>
       `}
@@ -561,11 +574,11 @@ export class PdaStockMove extends connect(store)(PageView) {
   }
 
   /**
-   * 목적지 로케이션 스캔 핸들러 — 백엔드 유효성 검사 후 로케이션 확정
+   * 목적지(To) 로케이션 스캔 핸들러
    * POST /rest/inventory_trx/validate_location_for_move
    * @param {string} locCd
    */
-  async _onScanLocation(locCd) {
+  async _onScanToLocation(locCd) {
     if (!locCd || this.processing) return
 
     this.processing = true
@@ -578,64 +591,109 @@ export class PdaStockMove extends connect(store)(PageView) {
         this.toLocCd = location.loc_cd
         this.toLocation = location
         const locInfo = location.loc_type ? ` (${location.loc_type})` : ''
-        this._showFeedback(`목적지: ${location.loc_cd}${locInfo} — 재고 바코드를 스캔하세요`, 'success')
-        if (this._locationInput) this._locationInput.value = ''
-        setTimeout(() => this._focusBarcodeInput(), 150)
-
+        this._showFeedback(`목적지: ${location.loc_cd}${locInfo} — From 로케이션을 스캔하세요`, 'success')
+        if (this._toLocationInput) this._toLocationInput.value = ''
+        setTimeout(() => this._focusFromLocationInput(), 150)
       } else {
         this._showFeedback('유효하지 않은 로케이션입니다', 'error')
         navigator.vibrate?.(200)
-        if (this._locationInput) this._locationInput.value = ''
+        if (this._toLocationInput) this._toLocationInput.value = ''
       }
 
     } catch (error) {
       this._showFeedback(error.message || '유효하지 않은 로케이션입니다', 'error')
       navigator.vibrate?.(200)
-      if (this._locationInput) this._locationInput.value = ''
-
+      if (this._toLocationInput) this._toLocationInput.value = ''
     } finally {
       this.processing = false
     }
   }
 
   /**
-   * 재고 바코드 스캔 핸들러 — 백엔드 유효성 검사 후 목록에 추가
+   * From 로케이션 스캔 핸들러
+   * POST /rest/inventory_trx/validate_location_for_move
+   * @param {string} locCd
+   */
+  async _onScanFromLocation(locCd) {
+    if (!locCd || this.processing) return
+
+    this.processing = true
+    try {
+      const location = await ServiceUtil.restPost('inventory_trx/validate_location_for_move', {
+        from_loc_cd: locCd
+      })
+
+      if (location && location.id) {
+        this.fromLocCd = location.loc_cd
+        this.fromLocation = location
+        const locInfo = location.loc_type ? ` (${location.loc_type})` : ''
+        this._showFeedback(`From: ${location.loc_cd}${locInfo} — 바코드를 스캔하세요`, 'success')
+        if (this._fromLocationInput) this._fromLocationInput.value = ''
+        setTimeout(() => this._focusBarcodeInput(), 150)
+      } else {
+        this._showFeedback('유효하지 않은 로케이션입니다', 'error')
+        navigator.vibrate?.(200)
+        if (this._fromLocationInput) this._fromLocationInput.value = ''
+      }
+
+    } catch (error) {
+      this._showFeedback(error.message || '유효하지 않은 로케이션입니다', 'error')
+      navigator.vibrate?.(200)
+      if (this._fromLocationInput) this._fromLocationInput.value = ''
+    } finally {
+      this.processing = false
+    }
+  }
+
+  /**
+   * 재고 바코드 스캔 핸들러
+   * - 성공: 목록 추가 → From 로케이션 + 바코드 초기화 → From 포커스
+   * - 실패: 바코드만 초기화 → 바코드 포커스 유지
    * POST /rest/inventory_trx/validate_barcode_for_move
    * @param {string} barcode
    */
   async _onScanBarcode(barcode) {
-    if (!barcode || this.processing || !this.toLocCd) return
+    if (!barcode || this.processing || !this.fromLocCd || !this.toLocCd) return
 
-    // 이미 목록에 있는지 확인 (중복 스캔 방지)
-    if (this.scannedItems.some(i => i.barcode === barcode)) {
+    if (this.scannedItems.some(i => i.barcode === barcode && i.loc_cd === this.fromLocCd)) {
       this._showFeedback(`이미 추가된 바코드입니다: ${barcode}`, 'warning')
       navigator.vibrate?.(200)
-      this._resetBarcodeInput()
+      if (this._barcodeInput) this._barcodeInput.value = ''
+      setTimeout(() => this._focusBarcodeInput(), 100)
       return
     }
 
     this.processing = true
     try {
-      // 백엔드에서 재고 상태, 로케이션 제한, 창고 일치, 화주사·SKU 전용 여부 등 일괄 검증
       const inv = await ServiceUtil.restPost('inventory_trx/validate_barcode_for_move', {
         barcode,
+        from_loc_cd: this.fromLocCd,
         to_loc_cd: this.toLocCd
       })
 
       if (inv && inv.id) {
         this.scannedItems = [...this.scannedItems, inv]
-        this._showFeedback(`추가됨: ${inv.sku_cd} (${inv.loc_cd} → ${this.toLocCd})`, 'success')
-        this._resetBarcodeInput()
+        this._showFeedback(`추가됨: ${inv.sku_cd} (${this.fromLocCd} → ${this.toLocCd})`, 'success')
+        // 성공: From 로케이션 + 바코드 모두 초기화, From 포커스
+        this.fromLocCd = ''
+        this.fromLocation = null
+        if (this._fromLocationInput) this._fromLocationInput.value = ''
+        if (this._barcodeInput) this._barcodeInput.value = ''
+        setTimeout(() => this._focusFromLocationInput(), 100)
       } else {
         this._showFeedback('이동 불가한 재고입니다', 'error')
         navigator.vibrate?.(200)
-        this._resetBarcodeInput()
+        // 실패: 바코드만 초기화, 바코드 포커스 유지
+        if (this._barcodeInput) this._barcodeInput.value = ''
+        setTimeout(() => this._focusBarcodeInput(), 100)
       }
 
     } catch (error) {
       this._showFeedback(error.message || '이동 불가한 재고입니다', 'error')
       navigator.vibrate?.(200)
-      this._resetBarcodeInput()
+      // 실패: 바코드만 초기화, 바코드 포커스 유지
+      if (this._barcodeInput) this._barcodeInput.value = ''
+      setTimeout(() => this._focusBarcodeInput(), 100)
     } finally {
       this.processing = false
     }
@@ -650,13 +708,26 @@ export class PdaStockMove extends connect(store)(PageView) {
   }
 
   /**
-   * 목적지 로케이션 초기화
+   * 목적지 로케이션 초기화 — From + 스캔 목록도 함께 초기화
    */
-  _clearLocation() {
+  _clearToLocation() {
     this.toLocCd = ''
     this.toLocation = null
+    this.fromLocCd = ''
+    this.fromLocation = null
+    this.scannedItems = []
     this.lastFeedback = null
-    setTimeout(() => this._focusLocationInput(), 150)
+    setTimeout(() => this._focusToLocationInput(), 150)
+  }
+
+  /**
+   * From 로케이션만 초기화
+   */
+  _clearFromLocation() {
+    this.fromLocCd = ''
+    this.fromLocation = null
+    this.lastFeedback = null
+    setTimeout(() => this._focusFromLocationInput(), 150)
   }
 
   /**
@@ -673,15 +744,16 @@ export class PdaStockMove extends connect(store)(PageView) {
     try {
       for (const inv of this.scannedItems) {
         try {
-          let result = await ServiceUtil.restPost(`inventory_trx/${inv.id}/move_inventory`, {
+          const result = await ServiceUtil.restPost(`inventory_trx/${inv.id}/move_inventory`, {
+            from_loc_cd: inv.loc_cd,
             to_loc_cd: this.toLocCd,
             reason: this.reason || ''
           })
 
           if (result && result.id) {
-            success++;
+            success++
           } else {
-            failed++;
+            failed++
           }
         } catch {
           failed++
@@ -717,11 +789,13 @@ export class PdaStockMove extends connect(store)(PageView) {
     this.mode = 'scan'
     this.toLocCd = ''
     this.toLocation = null
+    this.fromLocCd = ''
+    this.fromLocation = null
     this.scannedItems = []
     this.reason = ''
     this.lastFeedback = null
     this.moveResult = null
-    setTimeout(() => this._focusLocationInput(), 200)
+    setTimeout(() => this._focusToLocationInput(), 200)
   }
 
   /**
@@ -733,24 +807,18 @@ export class PdaStockMove extends connect(store)(PageView) {
     this.lastFeedback = { type, message }
   }
 
-  /**
-   * 바코드 입력 필드 초기화
-   */
-  _resetBarcodeInput() {
-    if (this._barcodeInput) this._barcodeInput.value = ''
+  /** 목적지 로케이션 입력 필드 포커스 */
+  _focusToLocationInput() {
+    if (this._toLocationInput) this._toLocationInput.input?.focus()
   }
 
-  /**
-   * 바코드 입력 필드 포커스
-   */
+  /** From 로케이션 입력 필드 포커스 */
+  _focusFromLocationInput() {
+    if (this._fromLocationInput) this._fromLocationInput.input?.focus()
+  }
+
+  /** 바코드 입력 필드 포커스 */
   _focusBarcodeInput() {
     if (this._barcodeInput) this._barcodeInput.input?.focus()
-  }
-
-  /**
-   * 로케이션 입력 필드 포커스
-   */
-  _focusLocationInput() {
-    if (this._locationInput) this._locationInput.input?.focus()
   }
 }
