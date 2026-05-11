@@ -67,6 +67,15 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   /** 재고 조정 원인 입력값 */
   @state() _adjReason = ''
 
+  /** 재고 이동 To 로케이션 코드 */
+  @state() _moveToLocCd = ''
+  /** 재고 이동 수량 입력값 */
+  @state() _moveQty = ''
+  /** 재고 이동 사유 입력값 */
+  @state() _moveReason = ''
+  /** 재고 이동 To 로케이션 유효성 검증 결과 */
+  @state() _moveToLocation = null
+
   /** 피드백 메시지 */
   @state() lastFeedback = null
 
@@ -492,6 +501,10 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           margin-left: 2px;
         }
 
+        .form-field ox-input-barcode {
+          flex: 1;
+        }
+
         .form-field input,
         .form-field select {
           flex: 1;
@@ -549,6 +562,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       case 'history': return this._renderHistoryMode()
       case 'add': return this._renderAddMode()
       case 'adjust': return this._renderAdjustMode()
+      case 'move': return this._renderMoveMode()
       default: return this._renderListMode()
     }
   }
@@ -560,6 +574,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         <div class="search-row">
           <span class="s-label">${TermsUtil.tLabel('barcode') || '바코드'}</span>
           <ox-input-barcode
+            id="barcodeInput"
             placeholder="${TermsUtil.tLabel('scan_barcode') || '재고 바코드 스캔/입력'}"
             @change=${e => this._onBarcodeChange(e.target.value)}>
           </ox-input-barcode>
@@ -567,15 +582,17 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         <div class="search-row">
           <span class="s-label">${TermsUtil.tLabel('loc_cd') || '로케이션'}</span>
           <ox-input-barcode
+            id="locCdInput"
             placeholder="${TermsUtil.tLabel('loc_cd') || '로케이션 코드 스캔/입력'}"
-            @change=${e => { this.searchLocCd = e.target.value; this._search() }}>
+            @change=${e => this._onLocCdChange(e.target.value)}>
           </ox-input-barcode>
         </div>
         <div class="search-row">
           <span class="s-label">${TermsUtil.tLabel('sku_cd') || '상품코드'}</span>
           <ox-input-barcode
+            id="skuCdInput"
             placeholder="${TermsUtil.tLabel('sku_cd') || '상품 코드/바코드 스캔/입력'}"
-            @change=${e => { this.searchSkuCd = e.target.value; this._search() }}>
+            @change=${e => this._onSkuCdChange(e.target.value)}>
           </ox-input-barcode>
         </div>
       </div>
@@ -689,15 +706,18 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         </div>
       </div>
 
-      <div class="footer-area">
+      <div class="footer-area compact">
         <button class="btn-secondary" @click=${this._goHistory}>
-          ${TermsUtil.tMenu('InventoryHist') || '이력 보기'}
+          ${TermsUtil.tMenu('InventoryHist') || '이력'}
+        </button>
+        <button class="btn-secondary" @click=${this._goMove}>
+          ${TermsUtil.tButton('move') || '이동'}
         </button>
         <button class="btn-secondary" @click=${this._goAdjust}>
-          ${TermsUtil.tButton('adjust') || '재고 조정'}
+          ${TermsUtil.tButton('adjust') || '조정'}
         </button>
         <button class="btn-primary" @click=${this._goList}>
-          ${TermsUtil.tButton('go_list') || '메인 화면'}
+          ${TermsUtil.tButton('go_list') || '메인'}
         </button>
       </div>
     `
@@ -975,6 +995,97 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     `
   }
 
+  /** move 모드 렌더링 — 재고 부분/전체 이동 폼 */
+  _renderMoveMode() {
+    const inv = this.selectedInventory
+    const availableQty = (inv?.inv_qty ?? 0) - (inv?.reserved_qty ?? 0)
+    return html`
+      <div class="header-bar">
+        <button class="back-btn" @click=${() => (this.mode = 'detail')}>◀</button>
+        <span class="title">${TermsUtil.tButton('move') || '재고 이동'}</span>
+      </div>
+
+      ${this.lastFeedback ? html`
+        <div class="scan-feedback ${this.lastFeedback.type}">${this.lastFeedback.message}</div>
+      ` : ''}
+
+      <div class="add-form">
+        <!-- 현재 재고 정보 (읽기 전용) -->
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('barcode') || '바코드'}</label>
+          <input type="text" readonly .value=${inv?.barcode || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('sku_cd') || 'SKU'}</label>
+          <input type="text" readonly .value=${inv?.sku_cd || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('loc_cd') || 'From'}</label>
+          <input type="text" readonly .value=${inv?.loc_cd || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('available_qty') || '가용 수량'}</label>
+          <input type="text" readonly .value=${availableQty}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-primary, #1976D2); font-weight: 600;">
+        </div>
+
+        <div style="height:1px; background: var(--md-sys-color-outline-variant,#e0e0e0); margin: 4px 0;"></div>
+
+        <!-- 이동 입력 -->
+        <div class="form-field">
+          <label>
+            ${TermsUtil.tLabel('to_loc_cd') || 'To 로케이션'}
+            <span class="required">*</span>
+          </label>
+          <ox-input-barcode
+            id="moveToLocInput"
+            placeholder="${TermsUtil.tLabel('to_loc_cd') || 'To 로케이션 스캔/입력'}"
+            @change=${e => this._onMoveToLocCdChange(e.target.value)}>
+          </ox-input-barcode>
+        </div>
+        <div class="form-field">
+          <label>
+            ${TermsUtil.tLabel('move_qty') || '이동 수량'}
+            <span class="required">*</span>
+          </label>
+          <input type="number"
+            id="moveQtyInput"
+            min="1"
+            .value=${this._moveQty}
+            placeholder="${availableQty}"
+            @input=${e => (this._moveQty = e.target.value)}>
+        </div>
+        <div class="form-field">
+          <label>
+            ${TermsUtil.tLabel('reason') || '이동 사유'}
+            <span class="required">*</span>
+          </label>
+          <input type="text"
+            placeholder="${TermsUtil.tLabel('reason') || '이동 사유 입력'}"
+            .value=${this._moveReason}
+            @input=${e => (this._moveReason = e.target.value)}>
+        </div>
+      </div>
+
+      <div class="footer-area">
+        <button class="btn-primary"
+          ?disabled=${this.processing}
+          @click=${this._submitMove}>
+          ${this.processing
+        ? (TermsUtil.tText('processing') || '처리 중...')
+        : (TermsUtil.tButton('move') || '이동')}
+        </button>
+        <button class="btn-secondary" ?disabled=${this.processing}
+          @click=${() => (this.mode = 'detail')}>
+          ${TermsUtil.tButton('cancel') || '취소'}
+        </button>
+      </div>
+    `
+  }
+
   /** 페이지 초기화 */
   pageInitialized() {
     this.mode = 'list'
@@ -987,12 +1098,50 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
   /**
    * 바코드 스캔/입력 시 자동 조회 트리거
+   * 조회 결과가 없으면 바코드 입력 박스를 초기화한다
    * @param {string} barcode
    */
   async _onBarcodeChange(barcode) {
     if (!barcode) return
     this.searchBarcode = barcode
     await this._search()
+    if (!this.inventories.length) {
+      this.searchBarcode = ''
+      const input = this.shadowRoot?.querySelector('#barcodeInput')
+      if (input) input.value = ''
+    }
+  }
+
+  /**
+   * 로케이션 스캔/입력 시 자동 조회 트리거
+   * 조회 결과가 없으면 로케이션 입력 박스를 초기화한다
+   * @param {string} locCd
+   */
+  async _onLocCdChange(locCd) {
+    if (!locCd) return
+    this.searchLocCd = locCd
+    await this._search()
+    if (!this.inventories.length) {
+      this.searchLocCd = ''
+      const input = this.shadowRoot?.querySelector('#locCdInput')
+      if (input) input.value = ''
+    }
+  }
+
+  /**
+   * 상품 코드 스캔/입력 시 자동 조회 트리거
+   * 조회 결과가 없으면 상품 코드 입력 박스를 초기화한다
+   * @param {string} skuCd
+   */
+  async _onSkuCdChange(skuCd) {
+    if (!skuCd) return
+    this.searchSkuCd = skuCd
+    await this._search()
+    if (!this.inventories.length) {
+      this.searchSkuCd = ''
+      const input = this.shadowRoot?.querySelector('#skuCdInput')
+      if (input) input.value = ''
+    }
   }
 
   /**
@@ -1039,6 +1188,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
   /**
    * 검색 조건 및 결과 초기화
+   * state와 함께 ox-input-barcode DOM 값도 직접 클리어한다
    */
   _resetSearch() {
     this.searchBarcode = ''
@@ -1046,6 +1196,10 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     this.searchSkuCd = ''
     this.inventories = []
     this.lastFeedback = null
+    for (const id of ['#barcodeInput', '#locCdInput', '#skuCdInput']) {
+      const el = this.shadowRoot?.querySelector(id)
+      if (el) el.value = ''
+    }
   }
 
   /**
@@ -1176,6 +1330,101 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     this._adjReason = ''
     this.lastFeedback = null
     this.mode = 'adjust'
+  }
+
+  /**
+   * 재고 이동 화면으로 이동
+   * 가용 수량을 이동 수량 기본값으로 설정하고 To 로케이션에 포커스
+   */
+  _goMove() {
+    const inv = this.selectedInventory
+    this._moveToLocCd = ''
+    this._moveQty = String((inv?.inv_qty ?? 0) - (inv?.reserved_qty ?? 0))
+    this._moveReason = ''
+    this._moveToLocation = null
+    this.lastFeedback = null
+    this.mode = 'move'
+    setTimeout(() => {
+      const input = this.shadowRoot?.querySelector('#moveToLocInput')
+      if (input) input.focus()
+    }, 100)
+  }
+
+  /**
+   * To 로케이션 스캔/입력 — inventory_trx/validate_location_for_move로 유효성 검증
+   * 유효하지 않으면 입력 박스를 초기화하고 오류 피드백 표시
+   * @param {string} locCd
+   */
+  async _onMoveToLocCdChange(locCd) {
+    if (!locCd) return
+    try {
+      const location = await ServiceUtil.restPost('inventory_trx/validate_location_for_move', {
+        to_loc_cd: locCd
+      })
+      this._moveToLocCd = locCd
+      this._moveToLocation = location
+      this._showFeedback(`${locCd} 로케이션 확인`, 'success')
+    } catch (error) {
+      this._moveToLocCd = ''
+      this._moveToLocation = null
+      const input = this.shadowRoot?.querySelector('#moveToLocInput')
+      if (input) input.value = ''
+      this._showFeedback(error.message || '유효하지 않은 로케이션입니다', 'error')
+      navigator.vibrate?.(200)
+    }
+  }
+
+  /**
+   * 재고 이동 확정 API 호출
+   * POST /rest/inventory_trx/{id}/move_inventory
+   * to_qty 지정 시 서비스 레이어에서 자동 분할 처리
+   */
+  async _submitMove() {
+    if (!this._moveToLocCd || !this._moveToLocation) {
+      this._showFeedback('To 로케이션을 입력하고 유효성을 확인하세요', 'warning')
+      return
+    }
+    if (!this._moveQty) {
+      this._showFeedback('이동 수량을 입력하세요', 'warning')
+      return
+    }
+    if (!this._moveReason || !this._moveReason.trim()) {
+      this._showFeedback('이동 사유를 입력하세요', 'warning')
+      return
+    }
+
+    const qty = parseFloat(this._moveQty)
+    if (isNaN(qty) || qty <= 0) {
+      this._showFeedback('이동 수량은 1 이상이어야 합니다', 'warning')
+      return
+    }
+
+    const inv = this.selectedInventory
+    const availableQty = (inv?.inv_qty ?? 0) - (inv?.reserved_qty ?? 0)
+    if (qty > availableQty) {
+      this._showFeedback(`이동 수량(${qty})이 가용 수량(${availableQty})을 초과합니다`, 'warning')
+      return
+    }
+
+    this.processing = true
+    try {
+      await ServiceUtil.restPost(`inventory_trx/${inv.id}/move_inventory`, {
+        to_loc_cd: this._moveToLocCd,
+        to_qty: qty,
+        reason: this._moveReason.trim()
+      })
+
+      document.dispatchEvent(new CustomEvent('notify', {
+        detail: { level: 'info', message: `재고 이동 완료: ${inv.barcode} → ${this._moveToLocCd} (${qty})` }
+      }))
+
+      this._goList()
+    } catch (error) {
+      this._showFeedback(error.message || '재고 이동에 실패했습니다', 'error')
+      navigator.vibrate?.(200)
+    } finally {
+      this.processing = false
+    }
   }
 
   /**
