@@ -1,8 +1,10 @@
 package operato.wms.vas.rest;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import xyz.elidom.dbist.dml.Filter;
+import xyz.elidom.util.ValueUtil;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -18,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import operato.wms.stock.entity.Inventory;
+import operato.wms.vas.WmsVasConstants;
 import operato.wms.vas.entity.VasOrder;
 import operato.wms.vas.entity.VasOrderItem;
 import operato.wms.vas.entity.VasResult;
@@ -117,7 +121,45 @@ public class VasOrderController extends AbstractRestService {
 	public List<VasResult> findVasOrderResults(@PathVariable("id") String id) {
 		xyz.elidom.dbist.dml.Query query = new xyz.elidom.dbist.dml.Query();
 		query.addFilter(new Filter("vasOrderId", id));
-		return this.queryManager.selectList(VasResult.class, query);
+		List<VasResult> results = this.queryManager.selectList(VasResult.class, query);
+
+		if (!results.isEmpty()) {
+			return results;
+		}
+
+		// VasResult가 없는 DISASSEMBLY 주문의 경우 재고 기록으로 합성 결과 반환
+		VasOrder vasOrder = this.queryManager.select(VasOrder.class, id);
+		if (vasOrder == null || !WmsVasConstants.VAS_TYPE_DISASSEMBLY.equals(vasOrder.getVasType())) {
+			return results;
+		}
+
+		String remarkPattern = "VAS 해체 구성품 재고 생성: " + vasOrder.getVasNo();
+		xyz.elidom.dbist.dml.Query invQuery = new xyz.elidom.dbist.dml.Query();
+		invQuery.addFilter(new Filter("domainId", vasOrder.getDomainId()));
+		invQuery.addFilter(new Filter("remarks", "like", remarkPattern));
+		invQuery.addOrder("createdAt", true);
+		List<Inventory> inventories = this.queryManager.selectList(Inventory.class, invQuery);
+
+		List<VasResult> synthResults = new ArrayList<>();
+		int seq = 1;
+		for (Inventory inv : inventories) {
+			VasResult vr = new VasResult();
+			vr.setVasOrderId(id);
+			vr.setVasNo(vasOrder.getVasNo());
+			vr.setResultSeq(seq++);
+			vr.setResultType(WmsVasConstants.RESULT_TYPE_DISASSEMBLY);
+			vr.setSetSkuCd(inv.getSkuCd());
+			vr.setSetSkuNm(inv.getSkuNm());
+			vr.setResultQty(inv.getInvQty());
+			vr.setDestLocCd(inv.getLocCd());
+			String exp = inv.getExpiredDate();
+			vr.setRemarks(ValueUtil.isEmpty(exp) ? null : "유통기한: " + exp);
+			vr.setWorkDate(inv.getCreatedAt() != null
+					? new java.text.SimpleDateFormat("yyyy-MM-dd").format(inv.getCreatedAt())
+					: null);
+			synthResults.add(vr);
+		}
+		return synthResults;
 	}
 
 	@PostMapping(value = "/{id}/results/update_multiple", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)

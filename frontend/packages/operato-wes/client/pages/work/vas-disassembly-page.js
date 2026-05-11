@@ -1368,12 +1368,13 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
       return
     }
 
-    // 3. 산출 행 목록 구성 [{skuCd, qty, expiryDate}]
+    // 3. 산출 행 목록 구성 [{skuCd, skuNm, qty, expiryDate}]
     const outputs = []
     for (const item of this.bomItems) {
       for (const row of item._rows) {
         outputs.push({
           skuCd: item.sku_cd,
+          skuNm: item.sku_nm,
           qty: Number(row.qty),
           expiryDate: row.expiry || null
         })

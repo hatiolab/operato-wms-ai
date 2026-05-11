@@ -1916,9 +1916,10 @@ public class VasTransactionService extends AbstractQueryService {
 		// 할당 원재고(세트 상품) 소비
 		this.consumeVasAllocatedInventoriesIfNeeded(vasOrder);
 
-		// 산출 행별 개별 재고 생성
+		// 산출 행별 개별 재고 및 실적 생성
 		for (Map<String, Object> output : outputs) {
 			String skuCd = (String) output.get("skuCd");
+			String skuNm = (String) output.get("skuNm");
 			double qty = ((Number) output.get("qty")).doubleValue();
 			String expiryDate = (String) output.get("expiryDate");
 
@@ -1932,8 +1933,19 @@ public class VasTransactionService extends AbstractQueryService {
 			newInv.setExpiredDate(expiryDate);
 			newInv.setStatus(Inventory.STATUS_STORED);
 			newInv.setRemarks("VAS 해체 구성품 재고 생성: " + vasOrder.getVasNo());
-
 			this.stockTrxSvc.createInventory(vasOrder.getDomainId(), newInv);
+
+			VasResult result = new VasResult();
+			result.setDomainId(vasOrder.getDomainId());
+			result.setVasOrderId(vasOrderId);
+			result.setVasNo(vasOrder.getVasNo());
+			result.setResultType(WmsVasConstants.RESULT_TYPE_DISASSEMBLY);
+			result.setSetSkuCd(skuCd);
+			result.setSetSkuNm(skuNm);
+			result.setResultQty(qty);
+			result.setDestLocCd(workLocCd);
+			result.setRemarks(ValueUtil.isEmpty(expiryDate) ? null : "유통기한: " + expiryDate);
+			this.queryManager.insert(result);
 		}
 
 		// 완료 처리

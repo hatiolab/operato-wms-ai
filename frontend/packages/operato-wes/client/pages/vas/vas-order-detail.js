@@ -857,6 +857,39 @@ class VasOrderDetail extends localize(i18next)(LitElement) {
       `
     }
 
+    const isDisassembly = this.vasOrder?.vas_type === 'DISASSEMBLY'
+
+    if (isDisassembly) {
+      return html`
+        <table>
+          <thead>
+            <tr>
+              <th>${TermsUtil.tLabel('seq')}</th>
+              <th>${TermsUtil.tLabel('sku_nm')}</th>
+              <th>${TermsUtil.tLabel('sku_cd')}</th>
+              <th>${TermsUtil.tLabel('result_qty')}</th>
+              <th>${TermsUtil.tLabel('dest_loc_cd')}</th>
+              <th>유통기한</th>
+              <th>${TermsUtil.tLabel('work_date')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${this.results.map((result, idx) => html`
+              <tr>
+                <td>${idx + 1}</td>
+                <td>${result.set_sku_nm || '-'}</td>
+                <td>${result.set_sku_cd || '-'}</td>
+                <td>${result.result_qty || 0}</td>
+                <td>${result.dest_loc_cd || '-'}</td>
+                <td>${result.remarks ? result.remarks.replace('유통기한: ', '') : '-'}</td>
+                <td>${result.work_date || '-'}</td>
+              </tr>
+            `)}
+          </tbody>
+        </table>
+      `
+    }
+
     return html`
       <table>
         <thead>
