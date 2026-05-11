@@ -48,6 +48,7 @@ export default {
     { tagname: 'vas-material-preparation', page: 'vas-material-preparation' },
     { tagname: 'vas-result-analysis', page: 'vas-result-analysis' },
     { tagname: 'vas-work-page', page: 'vas-work' },
+    { tagname: 'vas-disassembly-page', page: 'vas-disassembly' },
     { tagname: 'vas-pda-pick', page: 'vas-pda-pick' },
     { tagname: 'vas-pda-result', page: 'vas-pda-result' },
     { tagname: 'vas-order-detail', page: 'vas-order-detail' },

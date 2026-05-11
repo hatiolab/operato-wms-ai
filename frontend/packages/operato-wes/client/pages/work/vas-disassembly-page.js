@@ -9,19 +9,17 @@ import { HardwareScannerService } from './hardware-scanner-service.js'
 import { voiceService } from './voice-service.js'
 
 /**
- * VAS PDA 작업 화면
+ * VAS 해체 PDA 작업 화면
  *
- * 3단계 위자드:
- * - 1단계: 자재 피킹 (바코드 스캔, 수량 입력)
- * - 2단계: 작업 수행 (완성 수량, 불량 수량 입력)
- * - 3단계: 적치 (로케이션 바코드 스캔, 작업 완료)
+ * 세트 해체(DISASSEMBLY) 유형 주문만 표시.
+ * 작업 단계는 1단계(자재 투입)만 제공.
  *
  * PDA 특화:
  * - 큰 터치 버튼 (최소 44x44px)
  * - 바코드 스캐너 입력 연동
  * - 음성 안내 (성공/실패 피드백)
  */
-class VasWorkPage extends localize(i18next)(PageView) {
+class VasDisassemblyPage extends localize(i18next)(PageView) {
   /** 컴포넌트 스타일 정의 */
   static get styles() {
     return [
@@ -183,49 +181,6 @@ class VasWorkPage extends localize(i18next)(PageView) {
           color: #4CAF50;
         }
 
-        /* 스텝 인디케이터 */
-        .step-indicator {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0;
-          padding: 16px 0;
-        }
-
-        .step-dot {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 14px;
-          font-weight: 700;
-          color: #fff;
-          background: var(--md-sys-color-outline, #bbb);
-          transition: all 0.3s ease;
-        }
-
-        .step-dot.active {
-          background: var(--md-sys-color-primary, #1976D2);
-          transform: scale(1.1);
-        }
-
-        .step-dot.completed {
-          background: #4CAF50;
-        }
-
-        .step-line {
-          width: 40px;
-          height: 3px;
-          background: var(--md-sys-color-outline, #ddd);
-          transition: all 0.3s ease;
-        }
-
-        .step-line.active {
-          background: #4CAF50;
-        }
-
         /* 주문 정보 카드 */
         .order-info-card {
           background: #fff;
@@ -369,135 +324,6 @@ class VasWorkPage extends localize(i18next)(PageView) {
           font-size: 13px;
           color: var(--md-sys-color-on-surface-variant, #666);
           margin-top: 4px;
-        }
-
-        /* 작업 수행 (Step 2) */
-        .work-section {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .work-input-group {
-          background: var(--md-sys-color-surface, #fff);
-          border-radius: 12px;
-          padding: 16px;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-
-        .work-input-group label {
-          display: block;
-          font-size: 14px;
-          font-weight: 600;
-          color: var(--md-sys-color-on-surface-variant, #666);
-          margin-bottom: 8px;
-        }
-
-        .work-input-group input {
-          width: 100%;
-          padding: 14px 16px;
-          border: 2px solid var(--md-sys-color-outline, #ccc);
-          border-radius: 8px;
-          font-size: 24px;
-          font-weight: 700;
-          text-align: center;
-          box-sizing: border-box;
-        }
-
-        .work-input-group input:focus {
-          border-color: var(--md-sys-color-primary, #1976D2);
-          outline: none;
-        }
-
-        .work-input-group .unit {
-          text-align: center;
-          font-size: 14px;
-          color: var(--md-sys-color-on-surface-variant, #666);
-          margin-top: 4px;
-        }
-
-        /* 적치 (Step 3) */
-        .putaway-section {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .putaway-loc {
-          background: #fff;
-          border-radius: 12px;
-          padding: 24px 16px;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-          text-align: center;
-        }
-
-        .putaway-loc .scanned-loc {
-          font-size: 28px;
-          font-weight: 700;
-          color: var(--md-sys-color-primary, #1976D2);
-          margin-top: 8px;
-          min-height: 40px;
-        }
-
-        .expiry-card {
-          background: #fff;
-          border-radius: 12px;
-          padding: 16px;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-
-        .expiry-card label {
-          display: block;
-          font-size: 14px;
-          font-weight: 600;
-          color: var(--md-sys-color-on-surface-variant, #666);
-          margin-bottom: 8px;
-        }
-
-        .expiry-input-row {
-          display: flex;
-          gap: 8px;
-          align-items: center;
-          flex-wrap: wrap;
-        }
-
-        .expiry-input-row input {
-          flex: 1;
-          min-width: 0;
-          padding: 14px 16px;
-          border: 2px solid var(--md-sys-color-outline, #ccc);
-          border-radius: 8px;
-          font-size: 20px;
-          font-weight: 700;
-          box-sizing: border-box;
-          min-height: 52px;
-        }
-
-        @media (max-width: 760px) {
-          .expiry-input-row input {
-            flex-basis: 100%;
-          }
-
-          .expiry-clear-btn {
-            width: 100%;
-          }
-        }
-
-        .expiry-input-row input:focus {
-          border-color: var(--md-sys-color-primary, #1976D2);
-          outline: none;
-        }
-
-        .expiry-clear-btn {
-          min-height: 52px;
-          min-width: 88px;
-          border: 2px solid var(--md-sys-color-primary, #1976D2);
-          border-radius: 8px;
-          background: transparent;
-          color: var(--md-sys-color-primary, #1976D2);
-          font-size: 16px;
-          font-weight: 700;
-          cursor: pointer;
         }
 
         /* PDA 버튼 (44x44px 최소) */
@@ -647,7 +473,6 @@ class VasWorkPage extends localize(i18next)(PageView) {
         }
 
         /* 상태 요약 카드 */
-        /* 상태 요약 카드 */
         .summary-cards {
           display: grid;
           grid-template-columns: 1fr 1fr 1fr;
@@ -741,6 +566,232 @@ class VasWorkPage extends localize(i18next)(PageView) {
         .btn-refresh:active {
           background: var(--md-sys-color-primary-container, #e3f2fd);
         }
+
+        /* 산출 품목 카드 헤더 (품목명 + + 버튼) */
+        .item-card-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 8px;
+        }
+
+        .item-card-header .item-info {
+          flex: 1;
+        }
+
+        .add-row-btn {
+          flex-shrink: 0;
+          min-width: 44px;
+          min-height: 44px;
+          background: var(--md-sys-color-primary, #1976D2);
+          color: #fff;
+          border: none;
+          border-radius: 8px;
+          font-size: 22px;
+          font-weight: 700;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          line-height: 1;
+          transition: all 0.15s;
+        }
+
+        .add-row-btn:active {
+          transform: scale(0.93);
+        }
+
+        /* 산출 행 목록 */
+        .output-rows {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          margin-top: 12px;
+        }
+
+        .output-row {
+          display: flex;
+          align-items: stretch;
+          gap: 8px;
+          background: var(--md-sys-color-surface-variant, #f5f5f5);
+          border-radius: 8px;
+          padding: 5px 10px;
+        }
+
+        .output-row.confirmed {
+          background: #e8f5e9;
+          border-left: 3px solid #4CAF50;
+        }
+
+        /* 입력 필드 영역 (수량 + 날짜 세로 배치) */
+        .output-row .row-fields {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          min-width: 0;
+        }
+
+        .output-row .row-field-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .output-row .row-field-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          width: 47px;
+          flex-shrink: 0;
+        }
+
+        .output-row .row-qty-input {
+          flex: 1;
+          padding: 5px 12px;
+          border: 2px solid var(--md-sys-color-outline, #ccc);
+          border-radius: 8px;
+          font-size: 17px;
+          font-weight: 700;
+          text-align: center;
+          background: #fff;
+          min-width: 0;
+        }
+
+        .output-row .row-qty-input:focus {
+          border-color: var(--md-sys-color-primary, #1976D2);
+          outline: none;
+        }
+
+        .output-row .row-qty-input:disabled {
+          background: var(--md-sys-color-surface-variant, #f0f0f0);
+          color: var(--md-sys-color-on-surface, #333);
+        }
+
+        .output-row .date-wrap {
+          flex: 1;
+          position: relative;
+          display: flex;
+          align-items: center;
+          min-width: 0;
+        }
+
+        .output-row .row-date-input {
+          width: 100%;
+          padding: 5px 36px 5px 12px;
+          border: 2px solid var(--md-sys-color-outline, #ccc);
+          border-radius: 8px;
+          font-size: 15px;
+          background: #fff;
+          box-sizing: border-box;
+          appearance: none;
+          -webkit-appearance: none;
+          color: var(--md-sys-color-on-surface, #333);
+        }
+
+        .output-row .row-date-input::-webkit-calendar-picker-indicator {
+          display: none;
+        }
+
+        .output-row .row-date-input:focus {
+          border-color: var(--md-sys-color-primary, #1976D2);
+          outline: none;
+        }
+
+        .output-row .row-date-input:disabled {
+          background: var(--md-sys-color-surface-variant, #f0f0f0);
+          color: var(--md-sys-color-on-surface, #333);
+        }
+
+        .output-row .date-icon-btn {
+          position: absolute;
+          right: 6px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          font-size: 18px;
+          cursor: pointer;
+          padding: 4px;
+          line-height: 1;
+          color: var(--md-sys-color-primary, #1976D2);
+        }
+
+        .output-row .date-icon-btn:disabled {
+          opacity: 0.4;
+          pointer-events: none;
+        }
+
+        /* 하단 버튼 행 (우측 정렬) */
+        .output-row .row-bottom-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 4px;
+        }
+
+        .output-row .confirm-row-btn {
+          min-width: 47px;
+          min-height: 31px;
+          border: none;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          background: var(--md-sys-color-primary, #1976D2);
+          color: #fff;
+          padding: 4px 8px;
+          transition: all 0.15s;
+        }
+
+        .output-row .confirm-row-btn.done {
+          background: #4CAF50;
+        }
+
+        .output-row .confirm-row-btn:active {
+          transform: scale(0.95);
+        }
+
+        .output-row .confirm-row-btn:disabled {
+          opacity: 0.5;
+          pointer-events: none;
+        }
+
+        .output-row .remove-row-btn {
+          min-width: 47px;
+          min-height: 27px;
+          border: 1px solid currentColor;
+          border-radius: 8px;
+          font-size: 14px;
+          cursor: pointer;
+          background: transparent;
+          color: var(--md-sys-color-error, #d32f2f);
+          padding: 4px;
+          line-height: 1;
+          transition: all 0.15s;
+        }
+
+        .output-row .remove-row-btn.cancel {
+          color: var(--md-sys-color-on-surface-variant, #888);
+          border-color: var(--md-sys-color-on-surface-variant, #888);
+        }
+
+        .output-row .remove-row-btn:active {
+          transform: scale(0.93);
+        }
+
+        /* 수량 합계 표시 */
+        .qty-summary {
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          margin-top: 6px;
+          text-align: right;
+        }
+
+        .qty-summary.over {
+          color: var(--md-sys-color-error, #d32f2f);
+          font-weight: 700;
+        }
       `
     ]
   }
@@ -751,54 +802,44 @@ class VasWorkPage extends localize(i18next)(PageView) {
       loading: Boolean,
       filterStatus: String,
       screen: String,
-      step: Number,
       orders: Array,
       bomMap: Object,
       selectedOrder: Object,
       orderItems: Array,
+      bomItems: Array,
       scanValue: String,
-      completedQty: Number,
-      defectQty: Number,
-      putawayLoc: String,
-      expiredDate: String,
       feedbackMsg: String,
       feedbackType: String,
-      voiceEnabled: Boolean,
-      resultBarcodes: Array
+      voiceEnabled: Boolean
     }
   }
 
-  /** 생성자 - PDA 작업 화면 초기값 설정 */
+  /** 생성자 - 해체 작업 화면 초기값 설정 */
   constructor() {
     super()
     this.loading = false
     this.filterStatus = 'ALL'
     this.screen = 'order-select'
-    this.step = 1
     this.orders = []
     this.bomMap = {}
     this.selectedOrder = null
     this.orderItems = []
+    this.bomItems = []
     this.scanValue = ''
-    this.completedQty = 0
-    this.defectQty = 0
-    this.putawayLoc = ''
-    this.expiredDate = ''
     this.feedbackMsg = ''
     this.feedbackType = ''
     this.voiceEnabled = voiceService.enabled
-    this.resultBarcodes = []
     this._scannerService = null
   }
 
   /** 페이지 컨텍스트 반환 - 브라우저 타이틀 등에 사용 */
   get context() {
     return {
-      title: TermsUtil.tMenu('VasWorkPage')
+      title: TermsUtil.tMenu('VasDisassemblyPage')
     }
   }
 
-  /** 화면 렌더링 - 주문 선택 또는 3단계 작업 화면 분기 */
+  /** 화면 렌더링 - 주문 선택 또는 작업 화면 분기 */
   render() {
     return html`
       <button
@@ -885,48 +926,21 @@ class VasWorkPage extends localize(i18next)(PageView) {
   }
 
   /* ============================================================
-   * 3단계 작업 화면
+   * 작업 화면 (1단계만)
    * ============================================================ */
 
-  /** 작업 화면 렌더링 (스텝 인디케이터 + 주문 정보 + 단계별 내용) */
+  /** 작업 화면 렌더링 (주문 정보 + 1단계 자재 투입) */
   _renderWorkScreen() {
     return html`
       <div class="pda-content">
-        <!-- 스텝 인디케이터 -->
-        ${this._renderStepIndicator()}
-
         <!-- 주문 요약 정보 -->
         ${this._renderOrderInfoCard()}
 
-        <!-- 단계별 내용 -->
-        ${this.step === 1
-        ? this._renderStep1Picking()
-        : this.step === 2
-          ? this._renderStep2Work()
-          : this._renderStep3Putaway()}
+        <!-- 1단계: 자재 투입 -->
+        ${this._renderStep1Picking()}
 
         <!-- 하단 버튼 -->
         ${this._renderBottomActions()}
-      </div>
-    `
-  }
-
-  /** 3단계 스텝 인디케이터 렌더링 (피킹 → 작업 → 적치) */
-  _renderStepIndicator() {
-    const isOrderDone = ['COMPLETED', 'CLOSED'].includes(this.selectedOrder?.status)
-    return html`
-      <div class="step-indicator">
-        <div class="step-dot ${this.step === 1 ? 'active' : this.step > 1 ? 'completed' : ''}">
-          ${this.step > 1 ? '\u2713' : '1'}
-        </div>
-        <div class="step-line ${this.step > 1 ? 'active' : ''}"></div>
-        <div class="step-dot ${this.step === 2 ? 'active' : this.step > 2 ? 'completed' : ''}">
-          ${this.step > 2 ? '\u2713' : '2'}
-        </div>
-        <div class="step-line ${this.step > 2 ? 'active' : ''}"></div>
-        <div class="step-dot ${isOrderDone ? 'completed' : this.step === 3 ? 'active' : ''}">
-          ${isOrderDone ? '\u2713' : '3'}
-        </div>
       </div>
     `
   }
@@ -936,11 +950,9 @@ class VasWorkPage extends localize(i18next)(PageView) {
     const order = this.selectedOrder
     if (!order) return ''
 
-    const isCompleted = ['COMPLETED', 'CLOSED'].includes(order.status)
-
     return html`
       <div class="order-info-card">
-        <div class="title">${order.vas_no} | (${this.bomMap[order.vas_bom_id].set_sku_cd} / ${this.bomMap[order.vas_bom_id].set_sku_nm})</div>
+        <div class="title">${order.vas_no} | (${this.bomMap[order.vas_bom_id]?.set_sku_cd || '-'} / ${this.bomMap[order.vas_bom_id]?.set_sku_nm || '-'})</div>
         <div class="detail-row">
           <span>유형</span>
           <span class="value">${this._vasTypeLabel(order.vas_type)}</span>
@@ -953,183 +965,112 @@ class VasWorkPage extends localize(i18next)(PageView) {
           <span>상태</span>
           <span class="value">${this._statusLabel(order.status)}</span>
         </div>
-        ${isCompleted ? html`
-          <div class="detail-row">
-            <span>완성품 바코드</span>
-            <span class="value">
-              ${this.resultBarcodes.length > 0
-                ? this.resultBarcodes.join(', ')
-                : '-'}
-            </span>
-          </div>
-        ` : ''}
       </div>
     `
   }
 
-  /** 1단계 렌더링 - 자재 투입 (품목별 바코드 스캔, 수량 입력, 확인) */
+  /** 해체 산출 품목 렌더링 - BOM 하위품목 기준으로 해체 시 나오는 품목 리스트 표시 */
   _renderStep1Picking() {
-    const pickedCount = this.orderItems.filter(i => i._picked).length
-    const totalCount = this.orderItems.length
-    const progressPct = totalCount > 0 ? Math.round((pickedCount / totalCount) * 100) : 0
-
-    return html`
-      <h3 style="margin: 0 0 12px; font-size: 16px;">1단계: 자재 투입</h3>
-
-      <!-- 진행률 -->
-      <div class="progress-section">
-        <div class="progress-bar-container">
-          <div
-            class="progress-bar-fill ${progressPct === 100 ? 'complete' : ''}"
-            style="width: ${progressPct}%"
-          ></div>
-        </div>
-        <div class="progress-label">
-          <span>진행: ${pickedCount}/${totalCount} 품목</span>
-          <span>${progressPct}%</span>
-        </div>
-      </div>
-
-      <!-- 자재 목록 -->
-      <div class="pick-list">
-        ${this.orderItems.length === 0
-        ? html`<div class="loading">자재 정보 조회 중...</div>`
-        : this.orderItems.map((item, idx) => html`
-              <div class="pick-item ${item._picked ? 'picked' : ''} ${item._active ? 'active' : ''}">
-                <div class="sku-name">${item.sku_cd} / ${item.sku_nm}</div>
-                <div class="sku-info">
-                  로케이션: ${item.src_loc_cd || '-'}
-                </div>
-                <div class="pick-input-row">
-                  <input
-                    type="number"
-                    inputmode="numeric"
-                    placeholder="수량"
-                    .value="${item._pickedQty || ''}"
-                    readonly
-                    ?disabled="${item._picked}"
-                    style="cursor: default; background: var(--md-sys-color-surface-variant, #f5f5f5);"
-                  />
-                  <span class="req-qty">/ ${item.alloc_qty || item.req_qty || 0} EA</span>
-                  <button
-                    class="pick-confirm-btn ${item._picked ? 'done' : ''}"
-                    @click="${() => this._confirmPick(idx)}"
-                    ?disabled="${item._picked}"
-                  >
-                    ${item._picked ? '\u2713' : '확인'}
-                  </button>
-                </div>
-              </div>
-            `)}
-      </div>
-    `
-  }
-
-  /** 2단계 렌더링 - 작업 수행 (완성 수량, 불량 수량 입력) */
-  _renderStep2Work() {
     const planQty = this.selectedOrder?.plan_qty || 0
-
-    return html`
-      <h3 style="margin: 0 0 12px; font-size: 16px;">2단계: 작업 수행</h3>
-
-      <div class="work-section">
-        <div class="work-input-group">
-          <label>완성 수량</label>
-          <input
-            type="number"
-            inputmode="numeric"
-            placeholder="0"
-            .value="${this.completedQty || ''}"
-            @input="${e => { this.completedQty = parseFloat(e.target.value) || 0 }}"
-          />
-          <div class="unit">계획: ${planQty} EA</div>
-        </div>
-
-        <div class="work-input-group">
-          <label>불량 수량</label>
-          <input
-            type="number"
-            inputmode="numeric"
-            placeholder="0"
-            .value="${this.defectQty || ''}"
-            @input="${e => { this.defectQty = parseFloat(e.target.value) || 0 }}"
-          />
-          <div class="unit">EA</div>
-        </div>
-
-        ${this.completedQty + this.defectQty > planQty
-        ? html`<div style="color: #F44336; font-size: 14px; font-weight: 600; text-align: center;">
-              &#x26A0; 완성 + 불량 수량이 계획 수량(${planQty})을 초과합니다
-            </div>`
-        : this.completedQty > 0 && this.completedQty + this.defectQty < planQty
-        ? html`<div style="color: #FF9800; font-size: 14px; font-weight: 600; text-align: center;">
-              &#x26A0; 완성 + 불량 수량(${this.completedQty + this.defectQty})이 계획 수량(${planQty})보다 부족합니다
-            </div>`
-        : ''}
-      </div>
-    `
-  }
-
-  /** 3단계 렌더링 - 적치 로케이션 바코드 스캔 (완료/마감 주문은 조회 전용) */
-  _renderStep3Putaway() {
     const isReadOnly = ['COMPLETED', 'CLOSED'].includes(this.selectedOrder?.status)
 
     return html`
-      <h3 style="margin: 0 0 12px; font-size: 16px;">3단계: 적치${isReadOnly ? html` <span style="font-size:12px; color:#4CAF50; font-weight:400;">(완료됨)</span>` : ''}</h3>
+      <h3 style="margin: 0 0 12px; font-size: 16px;">해체 산출 품목</h3>
 
-      <div class="putaway-section">
-        <div class="putaway-loc">
-          <label style="font-size: 14px; color: var(--md-sys-color-on-surface-variant, #666);">
-            적치 로케이션
-          </label>
-          <div class="scanned-loc">${this.putawayLoc || '-'}</div>
-        </div>
+      <!-- 품목 목록 -->
+      <div class="pick-list">
+        ${this.bomItems.length === 0
+        ? html`<div class="loading">산출 품목 조회 중...</div>`
+        : this.bomItems.map((item, itemIdx) => {
+            const totalQty = (item.component_qty || 0) * planQty
+            const confirmedSum = (item._rows || []).filter(r => r.confirmed).reduce((s, r) => s + (Number(r.qty) || 0), 0)
+            const isOver = confirmedSum > totalQty
+            return html`
+              <div class="pick-item">
+                <div class="item-card-header">
+                  <div class="item-info">
+                    <div class="sku-name">${item.sku_cd} / ${item.sku_nm}</div>
+                    <div class="sku-info">세트 1개당: ${item.component_qty || 0} ${item.unit || 'EA'}</div>
+                    <div class="pick-input-row" style="margin-top: 8px;">
+                      <span class="req-qty" style="font-size: 20px; font-weight: 700; color: var(--md-sys-color-on-surface, #333);">
+                        ${totalQty} ${item.unit || 'EA'}
+                      </span>
+                    </div>
+                  </div>
+                  ${isReadOnly ? '' : html`
+                    <button class="add-row-btn" @click="${() => this._addRow(itemIdx)}" title="행 추가">+</button>
+                  `}
+                </div>
 
-        ${isReadOnly ? '' : html`
-          <div class="scan-input-group">
-            <label>로케이션 바코드 스캔</label>
-            <div class="scan-input">
-              <ox-input-barcode
-                placeholder="로케이션 바코드 스캔"
-                @change="${e => { this.putawayLoc = e.target.value; this._onLocScanConfirm() }}"
-              ></ox-input-barcode>
-            </div>
-          </div>
-        `}
-
-        <!-- [비활성화] 완성품 유통기한 입력 박스
-             세트 상품 구성 자재의 유통기한이 각각 다를 수 있어
-             세트 상품 자체의 유통기한을 단일 값으로 표현하는 것이 의미 없음.
-             유통기한은 completeVasOrder() 시점에 자재별 할당 바코드 중
-             가장 임박한 날짜를 vas_order_items.expired_date 에 자동 반영함.
-        <div class="expiry-card">
-          <label>완성품 유통기한</label>
-          <div class="expiry-input-row">
-            <input
-              type="date"
-              .value="${this.expiredDate || ''}"
-              ?disabled="${isReadOnly}"
-              @input="${e => { this.expiredDate = e.target.value || '' }}"
-            />
-            ${isReadOnly ? '' : html`
-              <button
-                type="button"
-                class="expiry-clear-btn"
-                @click="${() => { this.expiredDate = '' }}"
-              >초기화</button>
-            `}
-          </div>
-        </div>
-        -->
+                <!-- 입력 행 목록 -->
+                ${(item._rows || []).length > 0 ? html`
+                  <div class="output-rows">
+                    ${(item._rows).map((row, rowIdx) => html`
+                      <div class="output-row ${row.confirmed ? 'confirmed' : ''}">
+                        <div class="row-fields">
+                          <div class="row-field-item">
+                            <span class="row-field-label">수량</span>
+                            <input
+                              class="row-qty-input"
+                              type="number"
+                              inputmode="numeric"
+                              min="1"
+                              placeholder="수량 입력"
+                              .value="${row.qty}"
+                              ?disabled="${row.confirmed}"
+                              @input="${e => this._updateRow(itemIdx, rowIdx, 'qty', e.target.value)}"
+                            />
+                          </div>
+                          <div class="row-field-item">
+                            <span class="row-field-label">유통기한</span>
+                            <div class="date-wrap">
+                              <input
+                                class="row-date-input"
+                                type="date"
+                                id="date-${itemIdx}-${rowIdx}"
+                                .value="${row.expiry}"
+                                ?disabled="${row.confirmed}"
+                                @change="${e => this._updateRow(itemIdx, rowIdx, 'expiry', e.target.value)}"
+                              />
+                              <button
+                                class="date-icon-btn"
+                                ?disabled="${row.confirmed}"
+                                @click="${() => this._openDatePicker(itemIdx, rowIdx)}"
+                              >&#x1F4C5;</button>
+                            </div>
+                          </div>
+                          <div class="row-bottom-actions">
+                            ${row.confirmed
+                              ? html`
+                                <button class="confirm-row-btn done" disabled>✓</button>
+                                <button class="remove-row-btn cancel" @click="${() => this._cancelConfirmRow(itemIdx, rowIdx)}" title="확정 취소">↩</button>
+                              `
+                              : html`
+                                <button class="confirm-row-btn" @click="${() => this._confirmRow(itemIdx, rowIdx, totalQty)}">확정</button>
+                                <button class="remove-row-btn" @click="${() => this._removeRow(itemIdx, rowIdx)}" title="삭제">✕</button>
+                              `
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    `)}
+                  </div>
+                  <div class="qty-summary ${isOver ? 'over' : ''}">
+                    확정 합계: ${confirmedSum} / ${totalQty} ${item.unit || 'EA'}
+                    ${isOver ? ' ⚠ 초과' : ''}
+                  </div>
+                ` : ''}
+              </div>
+            `
+          })}
       </div>
     `
   }
 
-  /** 하단 액션 버튼 렌더링 (단계에 따라 이전/다음/완료 버튼) */
+  /** 하단 액션 버튼 렌더링 */
   _renderBottomActions() {
     const isReadOnly = ['COMPLETED', 'CLOSED'].includes(this.selectedOrder?.status)
 
-    // 완료/마감 주문: 목록으로 버튼만 표시 (이전/다음/완료 불가)
     if (isReadOnly) {
       return html`
         <div class="bottom-actions">
@@ -1140,13 +1081,8 @@ class VasWorkPage extends localize(i18next)(PageView) {
 
     return html`
       <div class="bottom-actions">
-        ${this.step > 1
-        ? html`<button class="pda-btn outline" @click="${this._prevStep}">&#x2190; 이전</button>`
-        : html`<button class="pda-btn outline" @click="${this._backToOrderSelect}">취소</button>`}
-
-        ${this.step < 3
-        ? html`<button class="pda-btn primary" @click="${this._nextStep}">다음 &#x2192;</button>`
-        : html`<button class="pda-btn success" @click="${this._completeWork}">완료</button>`}
+        <button class="pda-btn outline" @click="${this._backToOrderSelect}">취소</button>
+        <button class="pda-btn primary" @click="${this._nextStep}">완료</button>
       </div>
     `
   }
@@ -1158,7 +1094,6 @@ class VasWorkPage extends localize(i18next)(PageView) {
   /** 페이지 활성화 시 작업 주문 목록 조회 + 스캐너 서비스 시작 */
   async pageUpdated(changes, lifecycle, before) {
     if (this.active) {
-      // 하드웨어 스캐너 서비스 시작
       if (!this._scannerService) {
         this._scannerService = new HardwareScannerService({
           onScan: barcode => this._handleGlobalScan(barcode)
@@ -1184,17 +1119,16 @@ class VasWorkPage extends localize(i18next)(PageView) {
    * 데이터 조회
    * ============================================================ */
 
-  /** 작업 가능한 VAS 주문 목록 조회 (주문 확정/자재 준비 완료/작업 중) */
+  /** 세트 해체 VAS 주문 목록 조회 */
   async _fetchOrders() {
     try {
       this.loading = true
       const data = await ServiceUtil.restGet('vas_trx/monitor/orders', {
         status: 'MATERIAL_READY,IN_PROGRESS,COMPLETED,CLOSED',
-        vasType: 'SET_ASSEMBLY'
+        vasType: 'DISASSEMBLY'
       })
       this.orders = data || []
 
-      // BOM 정보 일괄 조회
       await this._fetchBomMap(this.orders)
 
       this.loading = false
@@ -1233,14 +1167,11 @@ class VasWorkPage extends localize(i18next)(PageView) {
       const data = await ServiceUtil.restGet(`vas_trx/vas_orders/${orderId}/items`)
       this.orderItems = (data || []).map(item => ({
         ...item,
-        // PICKED = 창고에서 꺼낸 상태 (작업장 투입 전) → 1단계에서 아직 확인 필요
-        // IN_USE / COMPLETED = 작업장 투입 확인 완료 → 1단계 done
         _picked: ['IN_USE', 'COMPLETED'].includes(item.status),
         _pickedQty: item.used_qty || item.picked_qty || '',
         _active: false
       }))
 
-      // 첫 번째 미피킹 항목 활성화
       const firstUnpicked = this.orderItems.findIndex(i => !i._picked)
       if (firstUnpicked >= 0) {
         this.orderItems[firstUnpicked]._active = true
@@ -1252,26 +1183,22 @@ class VasWorkPage extends localize(i18next)(PageView) {
     }
   }
 
-  /**
-   * [비활성화] 완성품 유통기한 기본값 조회
-   * 세트 상품 구성 자재의 유통기한이 각각 다를 수 있어
-   * 세트 상품 자체의 유통기한을 단일 값으로 표현하는 것이 의미 없음.
-   * 유통기한은 completeVasOrder() 시점에 자재별 할당 바코드 중
-   * 가장 임박한 날짜를 vas_order_items.expired_date 에 자동 반영함.
-   */
-  // async _fetchDefaultExpiredDate(orderId) {
-  //   try {
-  //     const data = await ServiceUtil.restGet(`vas_trx/vas_orders/${orderId}/default_expired_date`)
-  //     return data?.expiredDate || ''
-  //   } catch (err) {
-  //     console.error('완성품 유통기한 기본값 조회 실패:', err)
-  //     return ''
-  //   }
-  // }
+  /** 해체 BOM 하위품목(VasBomItem) 조회 - 해체 시 산출되는 품목 목록 */
+  async _fetchBomItems(bomId) {
+    if (!bomId) {
+      this.bomItems = []
+      return
+    }
+    try {
+      const data = await ServiceUtil.restGet(`vas_boms/${bomId}/items`)
+      this.bomItems = (data || []).map(item => ({ ...item, _rows: [] }))
+    } catch (err) {
+      console.error('BOM 하위품목 조회 실패:', err)
+      this.bomItems = []
+    }
+  }
 
-  /**
-   * 상태 필터 토글 — 같은 카드를 다시 클릭하면 전체(ALL)로 복귀
-   */
+  /** 상태 필터 토글 — 같은 카드를 다시 클릭하면 전체(ALL)로 복귀 */
   _toggleFilter(status) {
     this.filterStatus = this.filterStatus === status ? 'ALL' : status
   }
@@ -1289,33 +1216,15 @@ class VasWorkPage extends localize(i18next)(PageView) {
   async _selectOrder(order) {
     this.selectedOrder = order
     this.screen = 'work'
-    this.step = 1
-    this.completedQty = 0
-    this.defectQty = 0
-    this.putawayLoc = ''
-    this.expiredDate = ''
-    await this._fetchOrderItems(order.id)
-    // [비활성화] 완성품 유통기한 자동 계산 — 유통기한은 완료 시점에 백엔드에서 자동 반영
-    // this.expiredDate = await this._fetchDefaultExpiredDate(order.id)
-    this.completedQty = Number(order.completed_qty || 0)
-    this.defectQty = this._calcDefectQtyFromLoss()
+    await Promise.all([
+      this._fetchOrderItems(order.id),
+      this._fetchBomItems(order.vas_bom_id)
+    ])
 
     if (['COMPLETED', 'CLOSED'].includes(order.status)) {
-      // 완료/마감 주문은 무조건 3단계(조회 전용)로 이동, 적치 로케이션 복원
-      this.putawayLoc = order.dest_loc_cd || ''
-      this.step = 3
-      this._fetchResultBarcodes(order.id)
       voiceService.guide(`주문 ${order.vas_no} 선택. 완료된 작업입니다`)
-    } else if (this._shouldSkipResultInputStep(order)) {
-      // 작업장(work_loc_cd)을 적치 로케이션 기본값으로 설정
-      this.putawayLoc = order.work_loc_cd || ''
-      this.step = 3
-      voiceService.guide(`주문 ${order.vas_no} 선택. 적치 로케이션을 스캔해주세요`)
-    } else if (this._shouldSkipMaterialInputStep(order)) {
-      this.step = 2
-      voiceService.guide(`주문 ${order.vas_no} 선택. 완성 수량과 불량 수량을 입력해주세요`)
     } else {
-      voiceService.guide(`주문 ${order.vas_no} 선택. 자재를 투입해주세요`)
+      voiceService.guide(`주문 ${order.vas_no} 선택. 해체 산출 품목을 확인해주세요`)
     }
   }
 
@@ -1324,29 +1233,15 @@ class VasWorkPage extends localize(i18next)(PageView) {
     this.screen = 'order-select'
     this.selectedOrder = null
     this.orderItems = []
-    this.step = 1
-    this.expiredDate = ''
-    this.resultBarcodes = []
+    this.bomItems = []
     this._fetchOrders()
   }
 
-  /** 완성품 바코드 목록 조회 (완료/마감 주문용) */
-  async _fetchResultBarcodes(orderId) {
-    try {
-      const data = await ServiceUtil.restGet(`vas_trx/vas_orders/${orderId}/result_barcodes`)
-      this.resultBarcodes = Array.isArray(data) ? data : []
-    } catch (e) {
-      this.resultBarcodes = []
-    }
-  }
-
   /** 바코드/번호로 주문 검색 후 매칭 주문 자동 선택 */
-  /** 주문번호 바코드 스캔 — 오늘 목록에 없으면 날짜 무관 API 추가 조회 */
   async _onScanSearch() {
     const value = (this.scanValue || '').trim()
     if (!value) return
 
-    // 1. 오늘 목록에서 먼저 탐색
     const found = this.orders.find(o => o.vas_no === value || o.id === value)
     if (found) {
       this._selectOrder(found)
@@ -1354,7 +1249,6 @@ class VasWorkPage extends localize(i18next)(PageView) {
       return
     }
 
-    // 2. 오늘 목록에 없으면 날짜 무관 API 조회
     try {
       const order = await ServiceUtil.restGet('vas_trx/vas_orders/find_by_no', { vas_no: value })
       if (order) {
@@ -1371,245 +1265,131 @@ class VasWorkPage extends localize(i18next)(PageView) {
     }
   }
 
-  /** 작업중 주문의 자재가 모두 투입중이면 자재 투입 단계를 건너뛸지 판단 */
-  _shouldSkipMaterialInputStep(order) {
-    return order.status === 'IN_PROGRESS' &&
-      this._hasMaterialInputCompleted()
-  }
-
-  /** 작업중 주문의 실적이 이미 저장되어 있으면 작업 수행 단계를 건너뛸지 판단 */
-  _shouldSkipResultInputStep(order) {
-    return this._shouldSkipMaterialInputStep(order) &&
-      Number(order.completed_qty || 0) > 0
-  }
-
-  /** 모든 자재가 투입 상태인지 확인 */
-  _hasMaterialInputCompleted() {
-    return this.orderItems.length > 0 &&
-      this.orderItems.every(item => ['IN_USE', 'COMPLETED'].includes(item.status))
-  }
-
-  /** 디테일 손실 수량으로 불량 수량 계산 */
-  _calcDefectQtyFromLoss() {
-    const losses = this.orderItems
-      .map(item => Number(item.loss_qty || 0))
-      .filter(qty => qty > 0)
-
-    if (losses.length === 0) return 0
-
-    const planQty = Number(this.selectedOrder?.plan_qty || 0)
-    const totalReqQty = this.orderItems.reduce((sum, item) => sum + Number(item.req_qty || 0), 0)
-    const totalLossQty = losses.reduce((sum, qty) => sum + qty, 0)
-
-    if (planQty > 0 && totalReqQty > 0) {
-      return totalLossQty / (totalReqQty / planQty)
-    }
-
-    return Math.max(...losses)
-  }
-
-  /** 입력된 불량 수량을 디테일 손실 수량으로 반영 */
-  _applyLossQuantities(defectQty) {
-    const safeDefectQty = Number(defectQty || 0)
-    const planQty = Number(this.selectedOrder?.plan_qty || 0)
-    const items = this.orderItems.map(item => {
-      const reqQty = Number(item.req_qty || 0)
-      const lossQty = planQty > 0 ? safeDefectQty * (reqQty / planQty) : safeDefectQty
-
-      return {
-        ...item,
-        loss_qty: lossQty
-      }
-    })
-
-    this.orderItems = items
-  }
-
   /* ============================================================
-   * Step 1: 자재 투입
+   * 산출 행 관리
    * ============================================================ */
 
-  /** 피킹 수량 입력 처리 */
-  _onPickQtyInput(idx, value) {
-    const items = [...this.orderItems]
-    items[idx] = { ...items[idx], _pickedQty: value }
-    this.orderItems = items
+  /** 품목에 새 입력 행 추가 */
+  _addRow(itemIdx) {
+    const items = [...this.bomItems]
+    const item = { ...items[itemIdx] }
+    item._rows = [...(item._rows || []), { qty: '', expiry: '', confirmed: false }]
+    items[itemIdx] = item
+    this.bomItems = items
   }
 
-  /** 개별 자재 확인 - 작업자가 자재 보유 여부를 현장에서 확인하는 UI 동작 (API 호출 없음) */
-  _confirmPick(idx) {
-    const item = this.orderItems[idx]
-    const pickedQty = parseFloat(item._pickedQty)
-    const reqQty = item.alloc_qty || item.req_qty || 0
+  /** 행의 필드 값 업데이트 */
+  _updateRow(itemIdx, rowIdx, field, value) {
+    const items = [...this.bomItems]
+    const item = { ...items[itemIdx] }
+    const rows = [...item._rows]
+    rows[rowIdx] = { ...rows[rowIdx], [field]: value }
+    item._rows = rows
+    items[itemIdx] = item
+    this.bomItems = items
+  }
 
-    if (!pickedQty || pickedQty <= 0) {
+  /** 행 확정 - 수량 검증 후 confirmed 처리 */
+  _confirmRow(itemIdx, rowIdx, totalQty) {
+    const item = this.bomItems[itemIdx]
+    const row = item._rows[rowIdx]
+    const qty = Number(row.qty)
+
+    if (!qty || qty <= 0) {
       this._showFeedback('수량을 입력해주세요', 'error')
       return
     }
 
-    if (pickedQty < reqQty) {
-      this._showFeedback(`피킹 수량(${pickedQty})이 목표 수량(${reqQty})에 미달합니다`, 'error')
+    const confirmedSum = item._rows
+      .filter((r, i) => r.confirmed && i !== rowIdx)
+      .reduce((s, r) => s + (Number(r.qty) || 0), 0)
+
+    if (confirmedSum + qty > totalQty) {
+      this._showFeedback(`수량 합계(${confirmedSum + qty})가 산출 수량(${totalQty})을 초과합니다`, 'error')
       return
     }
 
-    if (pickedQty > reqQty) {
-      this._showFeedback('요청 수량을 초과할 수 없습니다', 'error')
-      return
-    }
-
-    const items = [...this.orderItems]
-    items[idx] = { ...items[idx], _picked: true, _active: false }
-
-    // 다음 미확인 항목 활성화
-    const nextUnpicked = items.findIndex((i, i2) => i2 > idx && !i._picked)
-    if (nextUnpicked >= 0) {
-      items[nextUnpicked] = { ...items[nextUnpicked], _active: true }
-    }
-
-    this.orderItems = items
-    this._showFeedback('자재 확인', 'success')
-    voiceService.success('확인 완료')
+    const items = [...this.bomItems]
+    const updItem = { ...items[itemIdx] }
+    const rows = [...updItem._rows]
+    rows[rowIdx] = { ...rows[rowIdx], confirmed: true }
+    updItem._rows = rows
+    items[itemIdx] = updItem
+    this.bomItems = items
+    voiceService.success('확정 완료')
   }
 
-  /* ============================================================
-   * 단계 이동
-   * ============================================================ */
+  /** 행 확정 취소 */
+  _cancelConfirmRow(itemIdx, rowIdx) {
+    const items = [...this.bomItems]
+    const item = { ...items[itemIdx] }
+    const rows = [...item._rows]
+    rows[rowIdx] = { ...rows[rowIdx], confirmed: false }
+    item._rows = rows
+    items[itemIdx] = item
+    this.bomItems = items
+  }
 
-  /** 다음 단계로 이동 - 각 단계별 유효성 검증 수행 */
+  /** 행 삭제 */
+  _removeRow(itemIdx, rowIdx) {
+    const items = [...this.bomItems]
+    const item = { ...items[itemIdx] }
+    item._rows = item._rows.filter((_, i) => i !== rowIdx)
+    items[itemIdx] = item
+    this.bomItems = items
+  }
+
+  /** 달력 날짜 선택기 열기 */
+  _openDatePicker(itemIdx, rowIdx) {
+    const input = this.shadowRoot.querySelector(`#date-${itemIdx}-${rowIdx}`)
+    if (!input) return
+    if (input.showPicker) {
+      input.showPicker()
+    } else {
+      input.click()
+    }
+  }
+
+  /** 완료 버튼 - 확정 행 검증 후 해체 완료 API 호출 */
   async _nextStep() {
-    if (this.step === 1) {
-      // 모든 자재 투입 완료 확인
-      const allPicked = this.orderItems.every(i => i._picked)
-      if (!allPicked && this.orderItems.length > 0) {
-        this._showFeedback('모든 자재를 투입해주세요.', 'error')
-        return
-      }
-
-      // 작업 시작 API 호출
-      try {
-        if (this.selectedOrder.status !== 'IN_PROGRESS') {
-          const items = this.orderItems.map(item => ({
-            itemId: item.id,
-            usedQty: Number(item._pickedQty || item.used_qty || item.picked_qty || item.alloc_qty || item.req_qty || 0)
-          }))
-
-          await ServiceUtil.restPost(`vas_trx/vas_orders/${this.selectedOrder.id}/start`, { items })
-          this.selectedOrder = { ...this.selectedOrder, status: 'IN_PROGRESS' }
-        }
-      } catch (err) {
-        this._showFeedback(err.message || '작업 시작 실패', 'error')
-        return
-      }
-    }
-
-    if (this.step === 2) {
-      // 실적 수량 검증
-      if (this.completedQty <= 0) {
-        this._showFeedback('완성 수량을 입력해주세요', 'error')
-        return
-      }
-
-      const planQty = Number(this.selectedOrder?.plan_qty || 0)
-      const totalResultQty = this.completedQty + (this.defectQty || 0)
-      if (totalResultQty !== planQty) {
-        this._showFeedback(
-          `완성 + 불량 수량(${totalResultQty})이 계획 수량(${planQty})과 일치해야 합니다`,
-          'error'
-        )
-        voiceService.error('완성 수량과 불량 수량의 합이 계획 수량과 일치해야 합니다')
-        return
-      }
-
-      // 실적 등록 API 호출
-      try {
-        await ServiceUtil.restPost(`vas_trx/vas_orders/${this.selectedOrder.id}/results`, {
-          result_qty: this.completedQty,
-          defect_qty: this.defectQty
-        })
-        this.selectedOrder = {
-          ...this.selectedOrder,
-          completed_qty: this.completedQty
-        }
-        this._applyLossQuantities(this.defectQty)
-        this._showFeedback('실적 등록 완료', 'success')
-        voiceService.success('실적 등록 완료. 적치 로케이션을 스캔해주세요')
-      } catch (err) {
-        this._showFeedback(err.message || '실적 등록 실패', 'error')
-        return
-      }
-    }
-
-    this.step = Math.min(this.step + 1, 3)
-
-    // 능동적 단계 안내
-    if (this.step === 2) {
-      voiceService.guide('완성 수량과 불량 수량을 입력해주세요')
-    }
-
-    // 3단계 진입 시 적치 로케이션 기본값으로 작업장(work_loc_cd) 설정
-    // — 별도 스캔 없이 완료하면 작업장에 완성품이 생성됨
-    if (this.step === 3 && !this.putawayLoc) {
-      this.putawayLoc = this.selectedOrder?.work_loc_cd || ''
-    }
-  }
-
-  /** 이전 단계로 돌아가기 */
-  _prevStep() {
-    this.step = Math.max(this.step - 1, 1)
-  }
-
-  /* ============================================================
-   * Step 3: 적치 및 작업 완료
-   * ============================================================ */
-
-  /** 로케이션 바코드 스캔 확인 — DB에 존재하는 로케이션 코드인지 검증 */
-  async _onLocScanConfirm() {
-    const value = (this.putawayLoc || '').trim()
-    if (!value) return
-
-    try {
-      const filters = [{ name: 'loc_cd', value }]
-      const data = await ServiceUtil.searchByPagination('locations', filters, [], 1, 1)
-      const exists = data?.total > 0
-
-      if (!exists) {
-        this.putawayLoc = ''
-        this._showFeedback('존재하지 않는 로케이션입니다', 'error')
-        voiceService.error('존재하지 않는 로케이션입니다')
-        return
-      }
-
-      this._showFeedback(`로케이션: ${value}`, 'success')
-      voiceService.success(`로케이션 ${value} 스캔 완료`)
-    } catch (e) {
-      this.putawayLoc = ''
-      this._showFeedback('로케이션 조회 중 오류가 발생했습니다', 'error')
-    }
-  }
-
-  /** 작업 완료 - 완료 API 호출 후 주문 선택 화면으로 복귀 */
-  async _completeWork() {
-    if (!this.putawayLoc) {
-      this._showFeedback('적치 로케이션을 스캔해주세요', 'error')
+    // 1. 모든 품목에 확정 행이 최소 1개 이상 있는지 검증
+    const noRows = this.bomItems.find(item => !(item._rows || []).some(r => r.confirmed))
+    if (noRows) {
+      this._showFeedback(`'${noRows.sku_nm}' 품목에 확정된 행이 없습니다`, 'error')
       return
     }
 
-    try {
-      await ServiceUtil.restPost(`vas_trx/vas_orders/${this.selectedOrder.id}/complete`, {
-        destLocCd: this.putawayLoc
-        // [비활성화] expiredDate — 유통기한은 백엔드 completeVasOrder()에서 자동 계산하여 반영
-        // expiredDate: this.expiredDate || null
-      })
-      this._showFeedback('작업 완료!', 'success')
-      voiceService.success('작업이 완료되었습니다')
+    // 2. 미확정 행(입력 중인 행)이 남아있으면 경고
+    const pendingRows = this.bomItems.some(item =>
+      (item._rows || []).some(r => !r.confirmed)
+    )
+    if (pendingRows) {
+      this._showFeedback('확정되지 않은 행이 있습니다. 확정 후 완료해주세요', 'error')
+      return
+    }
 
-      // 2초 후 주문 선택 화면으로 복귀
-      setTimeout(() => {
-        this._backToOrderSelect()
-      }, 2000)
+    // 3. 산출 행 목록 구성 [{skuCd, qty, expiryDate}]
+    const outputs = []
+    for (const item of this.bomItems) {
+      for (const row of item._rows) {
+        outputs.push({
+          skuCd: item.sku_cd,
+          qty: Number(row.qty),
+          expiryDate: row.expiry || null
+        })
+      }
+    }
+
+    try {
+      await ServiceUtil.restPost(
+        `vas_trx/vas_orders/${this.selectedOrder.id}/complete_disassembly`,
+        outputs
+      )
+      this._showFeedback('해체 작업이 완료되었습니다', 'success')
+      voiceService.success('작업 완료')
+      setTimeout(() => this._backToOrderSelect(), 1500)
     } catch (err) {
-      this._showFeedback(err.message || '작업 완료 실패', 'error')
-      voiceService.error('작업 완료 실패')
+      this._showFeedback(err.message || '완료 처리 실패', 'error')
     }
   }
 
@@ -1617,44 +1397,11 @@ class VasWorkPage extends localize(i18next)(PageView) {
    * 하드웨어 스캐너 전역 핸들링
    * ============================================================ */
 
-  /** 전역 스캔 라우팅 — 화면/단계 컨텍스트에 따라 적절한 핸들러로 전달 */
+  /** 전역 스캔 라우팅 — 화면 컨텍스트에 따라 적절한 핸들러로 전달 */
   _handleGlobalScan(barcode) {
     if (this.screen === 'order-select') {
       this.scanValue = barcode
       this._onScanSearch()
-    } else if (this.screen === 'work') {
-      const isReadOnly = ['COMPLETED', 'CLOSED'].includes(this.selectedOrder?.status)
-      if (isReadOnly) return  // 완료/마감 주문은 스캔 입력 차단
-
-      if (this.step === 1) {
-        this._onSkuBarcodeScan(barcode)
-      } else if (this.step === 3) {
-        this.putawayLoc = barcode
-        this._onLocScanConfirm()
-      }
-    }
-  }
-
-  /** Step 1 투입 중 SKU 바코드 스캔 — 자재 매칭 및 활성화 */
-  _onSkuBarcodeScan(barcode) {
-    const trimmed = (barcode || '').trim()
-    if (!trimmed) return
-
-    const matchIdx = this.orderItems.findIndex(
-      item => !item._picked && (item.sku_cd === trimmed || item.barcode === trimmed)
-    )
-
-    if (matchIdx >= 0) {
-      const items = this.orderItems.map((item, idx) => ({
-        ...item,
-        _active: idx === matchIdx
-      }))
-      this.orderItems = items
-      this._showFeedback(`${this.orderItems[matchIdx].sku_cd} 자재 확인`, 'success')
-      voiceService.success('자재 확인')
-    } else {
-      this._showFeedback('해당 자재를 찾을 수 없습니다', 'error')
-      voiceService.error('자재를 찾을 수 없습니다')
     }
   }
 
@@ -1706,4 +1453,4 @@ class VasWorkPage extends localize(i18next)(PageView) {
   }
 }
 
-window.customElements.define('vas-work-page', VasWorkPage)
+window.customElements.define('vas-disassembly-page', VasDisassemblyPage)

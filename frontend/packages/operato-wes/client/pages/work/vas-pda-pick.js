@@ -1304,11 +1304,20 @@ class VasPdaPick extends localize(i18next)(PageView) {
   async _fetchOrderItems(orderId) {
     try {
       const data = await ServiceUtil.restGet(`vas_trx/vas_orders/${orderId}/items`)
-      this.orderItems = (data || []).map(item => ({
-        ...item,
-        _picked: item.pick_status === 'PICKED' || (item.picked_qty > 0 && item.picked_qty >= (item.alloc_qty || item.req_qty)),
-        _pickedQty: item.picked_qty || 0
-      }))
+      this.orderItems = (data || []).map(item => {
+        const isPicked = item.pick_status === 'PICKED'
+          || ['PICKED', 'IN_USE', 'COMPLETED'].includes(item.status)
+          || (item.picked_qty > 0 && item.picked_qty >= (item.alloc_qty || item.req_qty))
+        // 이미 피킹 완료된 경우(PC 피킹 포함) 모든 할당 바코드를 스캔 완료로 처리
+        const allBarcodes = (item.inv_barcds || item.inv_barcd || item.barcode || '')
+          .split(',').filter(Boolean)
+        return {
+          ...item,
+          _picked: isPicked,
+          _pickedQty: item.picked_qty || 0,
+          _scannedBarcodes: isPicked ? allBarcodes : []
+        }
+      })
 
       this.currentItemIndex = this.orderItems.findIndex(i => !i._picked)
       if (this.currentItemIndex >= 0) {

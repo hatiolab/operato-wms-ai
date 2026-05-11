@@ -3,7 +3,6 @@ import { css, html } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
-import { OxPrompt } from '@operato/popup/ox-prompt.js'
 
 /**
  * VAS 자재 준비 관리 화면
@@ -633,9 +632,13 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
     this.targetDate = this._todayStr()
   }
 
-  /** 오늘 날짜를 YYYY-MM-DD 형식으로 반환 */
+  /** 오늘 날짜를 YYYY-MM-DD 형식으로 반환 (로컬 시간 기준 — UTC 사용 시 한국 오전에 전날 날짜가 뜨는 문제 방지) */
   _todayStr() {
-    return new Date().toISOString().slice(0, 10)
+    const d = new Date()
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
   }
 
   get context() {
@@ -724,7 +727,9 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
     const progressPct = totalItems > 0 ? Math.round((pickedCount / totalItems) * 100) : 0
     const bom = this.bomMap[order.vas_bom_id]
 
-    const canAllocate = order.status === 'APPROVED' && items.some(i => !i.alloc_qty || i.alloc_qty === 0)
+    // 미할당 아이템이 하나라도 있으면 활성 (아이템 미로드 시에도 활성)
+    const canAllocate = items.length === 0 || items.some(i => !i.alloc_qty || i.alloc_qty === 0)
+    // 할당됐지만 미피킹인 아이템이 하나라도 있으면 활성
     const canPick = items.some(i => i.alloc_qty > 0 && (!i.picked_qty || i.picked_qty === 0))
 
     return html`
@@ -778,10 +783,6 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
             ?disabled="${!canPick}"
             @click="${e => { e.stopPropagation(); this._pickAll(order) }}"
           >전체 피킹</button>
-          <button
-            class="card-action-btn"
-            @click="${e => { e.stopPropagation(); this._viewDetail(order) }}"
-          >상세 보기</button>
         </div>
 
         <!-- 확장: 자재 테이블 -->
@@ -969,6 +970,23 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
     this.bomMap = updated
   }
 
+  /**
+   * DISASSEMBLY 주문 방어 필터 — 세트 상품(set_sku_cd) 1건만 남기고 구성품 제거
+   * 백엔드 수정 이전에 잘못 생성된 구성품 아이템이 화면에 노출되는 것을 방지
+   */
+  _filterItemsByOrderType(order, items) {
+    if (order.vas_type !== 'DISASSEMBLY') return items
+    const bom = this.bomMap[order.vas_bom_id]
+    if (!bom || !bom.set_sku_cd) return items.slice(0, 1)  // BOM 미로드 시 첫 행만
+    // 세트 상품 SKU 코드와 일치하는 항목만 표시
+    const setItems = items.filter(i => i.sku_cd === bom.set_sku_cd)
+    return setItems.length > 0 ? setItems : items.slice(0, 1)
+  }
+
+  /**
+   * 모든 주문의 자재 항목 일괄 조회 — 각 주문별로 기존 행 순서를 유지하며 데이터만 갱신
+   * _fetchItems와 동일한 순서 보존 병합 로직 적용
+   */
   async _fetchAllItems(orders) {
     try {
       const results = await Promise.all(
@@ -979,7 +997,18 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
 
       const updated = { ...this.itemsMap }
       orders.forEach((order, i) => {
-        updated[order.id] = results[i] || []
+        const newItems = this._filterItemsByOrderType(order, results[i] || [])
+        const existing = updated[order.id]
+
+        if (existing && existing.length > 0) {
+          // 기존 순서 유지: 새 데이터를 id 맵으로 변환 후 기존 순서대로 교체
+          const newMap = Object.fromEntries(newItems.map(item => [item.id, item]))
+          const merged = existing.map(item => newMap[item.id] || item)
+          const addedItems = newItems.filter(item => !existing.some(e => e.id === item.id))
+          updated[order.id] = [...merged, ...addedItems]
+        } else {
+          updated[order.id] = newItems
+        }
       })
       this.itemsMap = updated
     } catch (err) {
@@ -987,13 +1016,39 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
     }
   }
 
+  /**
+   * 주문의 자재 항목 목록 조회 — 기존 행 순서를 유지하며 데이터만 갱신
+   * 최초 조회 시: 서버 반환 순서 그대로 저장
+   * 재조회 시: 기존 ID 순서를 유지하고 데이터만 새 값으로 교체 (행 이동 방지)
+   */
   async _fetchItems(orderId) {
     try {
-      const items = await ServiceUtil.restGet(`vas_orders/${orderId}/items`)
-      this.itemsMap = { ...this.itemsMap, [orderId]: items || [] }
+      const fetched = await ServiceUtil.restGet(`vas_orders/${orderId}/items`)
+      const order = this.orders.find(o => o.id === orderId)
+      const newItems = this._filterItemsByOrderType(order, fetched || [])
+      const existing = this.itemsMap[orderId]
+
+      if (existing && existing.length > 0) {
+        // 기존 순서 유지: 새 데이터를 id 맵으로 변환 후 기존 순서대로 교체
+        const newMap = Object.fromEntries(newItems.map(i => [i.id, i]))
+        const merged = existing.map(i => newMap[i.id] || i)
+        // 서버에서 새로 추가된 항목은 뒤에 붙임
+        const addedItems = newItems.filter(i => !existing.some(e => e.id === i.id))
+        this.itemsMap = { ...this.itemsMap, [orderId]: [...merged, ...addedItems] }
+      } else {
+        this.itemsMap = { ...this.itemsMap, [orderId]: newItems }
+      }
     } catch (err) {
       console.error('자재 항목 조회 실패:', err)
     }
+  }
+
+  /**
+   * 특정 아이템 한 건만 제자리에서 갱신 — 행 순서를 유지하기 위해 사용
+   * 전체 재조회 후 기존 순서 보존 병합 (_fetchItems와 동일한 방식)
+   */
+  async _refreshItem(orderId, itemId) {
+    await this._fetchItems(orderId)
   }
 
   async _fetchItemAllocations(itemId) {
@@ -1010,31 +1065,26 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
    * 자재 할당
    * ============================================================ */
 
+  /** 개별 자재 할당 — 재고 바코드 자동 탐색으로 req_qty 기준 할당 (수동 입력 불필요) */
   async _allocateItem(order, item) {
-    const result = await OxPrompt.open({
-      title: `${item.sku_cd} 자재 할당`,
-      text: `필요수량: ${item.req_qty}\n할당수량, 소스 로케이션, LOT을 입력하세요.`,
-      type: 'prompt',
-      fields: [
-        { name: 'allocQty', label: '할당수량', type: 'number', value: String(item.req_qty || 0) },
-        { name: 'srcLocCd', label: '소스 로케이션', type: 'text', value: item.src_loc_cd || '' },
-        { name: 'lotNo', label: 'LOT 번호', type: 'text', value: item.lot_no || '' }
-      ],
-      confirmButton: { text: '할당' },
-      cancelButton: { text: '취소' }
-    })
-
-    if (!result.confirmButton) return
+    if (!item.req_qty || item.req_qty === 0) {
+      UiUtil.showToast('info', '필요수량이 없습니다.')
+      return
+    }
 
     try {
-      await ServiceUtil.restPost(`vas_trx/vas_order_items/${item.id}/allocate`, {
-        allocQty: Number(result.fields?.allocQty || item.req_qty),
-        srcLocCd: result.fields?.srcLocCd || '',
-        lotNo: result.fields?.lotNo || ''
-      })
+      await ServiceUtil.restPost(`vas_trx/vas_orders/${order.id}/allocate_all`, [
+        {
+          itemId: item.id,
+          allocQty: item.req_qty,
+          srcLocCd: '',
+          lotNo: item.lot_no || ''
+        }
+      ])
 
-      UiUtil.showToast('success', `${item.sku_cd} 할당 완료`)
-      await this._fetchItems(order.id)
+      UiUtil.showToast('success', `${item.sku_cd} 할당 완료 (${item.req_qty}EA)`)
+      // 행 순서 유지를 위해 해당 아이템만 제자리 갱신
+      await this._refreshItem(order.id, item.id)
     } catch (err) {
       UiUtil.showToast('error', err.message || '자재 할당 실패')
     }
@@ -1080,27 +1130,21 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
    * 자재 피킹
    * ============================================================ */
 
+  /** 개별 자재 피킹 — 할당된 alloc_qty 기준으로 자동 피킹 (수량 입력 불필요) */
   async _pickItem(order, item) {
-    const result = await OxPrompt.open({
-      title: `${item.sku_cd} 피킹`,
-      text: `할당수량: ${item.alloc_qty}\n피킹수량을 입력하세요.`,
-      type: 'prompt',
-      fields: [
-        { name: 'pickedQty', label: '피킹수량', type: 'number', value: String(item.alloc_qty || 0) }
-      ],
-      confirmButton: { text: '피킹' },
-      cancelButton: { text: '취소' }
-    })
-
-    if (!result.confirmButton) return
+    if (!item.alloc_qty || item.alloc_qty === 0) {
+      UiUtil.showToast('info', '할당된 수량이 없습니다. 먼저 자재를 할당해주세요.')
+      return
+    }
 
     try {
       await ServiceUtil.restPost(`vas_trx/vas_order_items/${item.id}/pick`, {
-        pickedQty: Number(result.fields?.pickedQty || item.alloc_qty)
+        pickedQty: item.alloc_qty
       })
 
-      UiUtil.showToast('success', `${item.sku_cd} 피킹 완료`)
-      await this._fetchItems(order.id)
+      UiUtil.showToast('success', `${item.sku_cd} 피킹 완료 (${item.alloc_qty}EA)`)
+      // 행 순서 유지를 위해 해당 아이템만 제자리 갱신
+      await this._refreshItem(order.id, item.id)
       // 모든 자재 피킹 완료 시 주문 상태가 자동 전환될 수 있으므로 주문 목록도 갱신
       await this._refresh()
     } catch (err) {
@@ -1117,12 +1161,12 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
       'cancel'
     )
 
-    if (!result.confirmButton) return
+    if (!result) return
 
     try {
       const items = this.itemsMap[order.id] || []
       const pickItems = items
-        .filter(i => i.alloc_qty > 0 && (!i.picked_qty || i.picked_qty === 0))
+        .filter(i => i.id && i.alloc_qty > 0 && (!i.picked_qty || i.picked_qty === 0))
         .map(i => ({
           itemId: i.id,
           pickedQty: i.alloc_qty

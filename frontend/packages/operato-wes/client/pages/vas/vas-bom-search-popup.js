@@ -97,14 +97,18 @@ class VasBomSearchPopup extends localize(i18next)(LitElement) {
           opacity: 0.9;
         }
 
-        .btn-reset {
+        /* 유형 고정 뱃지 (부모에서 주입, 변경 불가) */
+        .type-fixed-badge {
+          padding: 8px 10px;
+          border: 1px solid var(--md-sys-color-outline-variant);
+          border-radius: 8px;
+          font-size: 13px;
+          color: var(--md-sys-color-on-surface);
           background: var(--md-sys-color-surface-variant);
-          color: var(--md-sys-color-on-surface-variant);
-          border: 1px solid var(--md-sys-color-outline-variant) !important;
-        }
-
-        .btn-reset:hover {
-          background: #e0e0e0;
+          font-weight: 600;
+          width: 100%;
+          box-sizing: border-box;
+          text-align: center;
         }
 
         /* 목록 영역 */
@@ -245,6 +249,7 @@ class VasBomSearchPopup extends localize(i18next)(LitElement) {
   /** 컴포넌트 반응형 속성 정의 */
   static get properties() {
     return {
+      vasType: String,    // 부모(vas-order-new-popup)에서 주입 — 변경 불가
       boms: Array,
       loading: Boolean,
       searchForm: Object,
@@ -256,13 +261,13 @@ class VasBomSearchPopup extends localize(i18next)(LitElement) {
   /** 생성자 - 검색 폼 및 목록 초기화 */
   constructor() {
     super()
+    this.vasType = 'SET_ASSEMBLY'   // 부모에서 덮어씌워짐
     this.boms = []
     this.loading = false
     this.searchForm = {
       bomNo: '',
       setSkuCd: '',
       setSkuNm: '',
-      vasType: 'SET_ASSEMBLY',
       comCd: ''
     }
     this.page = 1
@@ -329,21 +334,10 @@ class VasBomSearchPopup extends localize(i18next)(LitElement) {
 
         <div class="search-field f-type">
           <label>유형</label>
-          <select
-            .value="${this.searchForm.vasType}"
-            @change="${e => this._updateSearchForm('vasType', e.target.value)}"
-          >
-            <option value="">전체</option>
-            <option value="SET_ASSEMBLY" ?selected="${this.searchForm.vasType === 'SET_ASSEMBLY'}">세트 구성</option>
-            <option value="DISASSEMBLY" ?selected="${this.searchForm.vasType === 'DISASSEMBLY'}">세트 해체</option>
-            <option value="REPACK" ?selected="${this.searchForm.vasType === 'REPACK'}">재포장</option>
-            <option value="LABEL" ?selected="${this.searchForm.vasType === 'LABEL'}">라벨링</option>
-            <option value="CUSTOM" ?selected="${this.searchForm.vasType === 'CUSTOM'}">기타</option>
-          </select>
+          <div class="type-fixed-badge">${this._vasTypeLabel(this.vasType)}</div>
         </div>
 
         <div class="search-actions">
-          <button class="btn-reset" @click="${this._onReset}">초기화</button>
           <button class="btn-search" @click="${this._onSearch}">🔍 검색</button>
         </div>
       </div>
@@ -414,19 +408,6 @@ class VasBomSearchPopup extends localize(i18next)(LitElement) {
     this._search()
   }
 
-  /** 초기화 버튼 클릭 - 검색 폼 초기화 후 세트 구성 기준 검색 */
-  _onReset() {
-    this.searchForm = {
-      bomNo: '',
-      setSkuCd: '',
-      setSkuNm: '',
-      vasType: 'SET_ASSEMBLY',
-      comCd: ''
-    }
-    this.page = 1
-    this._search()
-  }
-
   /** 이전 페이지 이동 */
   _prevPage() {
     if (this.page > 1) {
@@ -463,8 +444,9 @@ class VasBomSearchPopup extends localize(i18next)(LitElement) {
       if (this.searchForm.setSkuNm && this.searchForm.setSkuNm.trim()) {
         filters.push({ name: 'set_sku_nm', value: this.searchForm.setSkuNm.trim() })
       }
-      if (this.searchForm.vasType) {
-        filters.push({ name: 'vas_type', value: this.searchForm.vasType })
+      // 유형은 부모에서 고정 주입 — 항상 필터에 적용
+      if (this.vasType) {
+        filters.push({ name: 'vas_type', value: this.vasType })
       }
       if (this.searchForm.comCd && this.searchForm.comCd.trim()) {
         filters.push({ name: 'com_cd', value: this.searchForm.comCd.trim() })

@@ -263,6 +263,22 @@ public class VasTransactionController {
 	}
 
 	/**
+	 * 세트 해체 작업 완료 — 품목별 수량/유통기한 행 단위 재고 생성
+	 *
+	 * @param id      작업 지시 ID
+	 * @param outputs 산출 행 목록 [{skuCd, qty, expiryDate}, ...]
+	 * @return 완료된 작업 지시
+	 */
+	@PostMapping(value = "/vas_orders/{id}/complete_disassembly", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Complete Disassembly VAS Work with per-row inventory creation")
+	public VasOrder completeDisassembly(
+			@PathVariable("id") String id,
+			@RequestBody List<Map<String, Object>> outputs) {
+
+		return this.vasService.completeDisassembly(id, outputs);
+	}
+
+	/**
 	 * 작업 마감
 	 *
 	 * @param id 작업 지시 ID
@@ -381,20 +397,27 @@ public class VasTransactionController {
 	 *
 	 * @param status     상태 필터 (optional, 쉼표 구분 가능. 기본값: IN_PROGRESS,APPROVED,MATERIAL_READY)
 	 * @param targetDate 기준일 (optional, 기본값: 오늘. 형식: yyyy-MM-dd)
+	 * @param vasType    유통가공 유형 필터 (optional, 쉼표 구분 가능. 예: SET_ASSEMBLY,DISASSEMBLY)
 	 * @return 주문 목록 (자재 진행 요약 포함)
 	 */
 	@GetMapping(value = "/monitor/orders", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Get Monitor Orders with Material Summary")
 	public List<Map<String, Object>> getMonitorOrders(
 			@RequestParam(name = "status", required = false) String status,
-			@RequestParam(name = "targetDate", required = false) String targetDate) {
+			@RequestParam(name = "targetDate", required = false) String targetDate,
+			@RequestParam(name = "vasType", required = false) String vasType) {
 
 		List<String> statuses = null;
 		if (ValueUtil.isNotEmpty(status)) {
 			statuses = java.util.Arrays.asList(status.split(","));
 		}
 
-		return this.vasService.getMonitorOrders(statuses, targetDate);
+		List<String> vasTypes = null;
+		if (ValueUtil.isNotEmpty(vasType)) {
+			vasTypes = java.util.Arrays.asList(vasType.split(","));
+		}
+
+		return this.vasService.getMonitorOrders(statuses, targetDate, vasTypes);
 	}
 
 	/********************************************************************************************************

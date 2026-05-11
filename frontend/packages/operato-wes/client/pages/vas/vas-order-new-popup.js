@@ -158,6 +158,37 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
           min-height: 60px;
         }
 
+        /* 세트 상품 선택 레이블 행 (레이블 + 토글 버튼 같은 줄) */
+        .bom-label-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        /* 구성/해체 토글 버튼 */
+        .vas-type-toggle {
+          display: flex;
+          gap: 6px;
+        }
+
+        .vas-type-btn {
+          padding: 4px 16px;
+          font-size: 12px;
+          font-weight: 600;
+          border-radius: 16px;
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          background: transparent;
+          cursor: pointer;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          transition: all 0.15s;
+        }
+
+        .vas-type-btn.active {
+          background: var(--md-sys-color-primary, #1976D2);
+          color: #fff;
+          border-color: var(--md-sys-color-primary, #1976D2);
+        }
+
         /* BOM 선택 행 */
         .bom-select-row {
           display: flex;
@@ -401,6 +432,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     return {
       step: Number,
       saving: Boolean,
+      vasTypeMode: String,   // 'SET_ASSEMBLY' | 'DISASSEMBLY' — 구성/해체 토글 상태
       bomItems: Array,
       companies: Array,
       warehouses: Array,
@@ -418,6 +450,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     super()
     this.step = 1
     this.saving = false
+    this.vasTypeMode = 'SET_ASSEMBLY'  // 기본값: 구성
     this.bomItems = []
     this.companies = []
     this.warehouses = []
@@ -513,7 +546,19 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
         </div>
 
         <div class="form-group full-width">
-          <label>세트 상품 선택<span class="required">*</span></label>
+          <div class="bom-label-row">
+            <label>세트 상품 선택<span class="required">*</span></label>
+            <div class="vas-type-toggle">
+              <button
+                class="vas-type-btn ${this.vasTypeMode === 'SET_ASSEMBLY' ? 'active' : ''}"
+                @click="${() => this._onVasTypeToggle('SET_ASSEMBLY')}"
+              >구성</button>
+              <button
+                class="vas-type-btn ${this.vasTypeMode === 'DISASSEMBLY' ? 'active' : ''}"
+                @click="${() => this._onVasTypeToggle('DISASSEMBLY')}"
+              >해체</button>
+            </div>
+          </div>
           <div class="bom-select-row">
             <input
               class="bom-input"
@@ -608,28 +653,40 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     `
   }
 
-  /** 2단계 렌더링 - BOM 유형에 따라 분기 */
+  /** 2단계 렌더링 - vasTypeMode(구성/해체)에 따라 분기 */
   _renderStep2() {
     if (this.loadingBomItems) {
-      const loadingMsg = this.formData.vasType === 'DISASSEMBLY'
+      const loadingMsg = this.vasTypeMode === 'DISASSEMBLY'
         ? '세트 상품 재고를 조회하고 있습니다...'
         : '소요 자재를 조회하고 있습니다...'
       return html`<div class="loading-overlay">${loadingMsg}</div>`
     }
 
-    return this.formData.vasType === 'DISASSEMBLY'
+    return this.vasTypeMode === 'DISASSEMBLY'
       ? this._renderStep2Disassembly()
       : this._renderStep2Assembly()
   }
 
-  /** 2단계 렌더링 - 세트 해체: 완성된 세트 상품 재고 확인 */
+  /** 2단계 렌더링 - 세트 해체: 완성된 세트 상품 재고 확인 (구성과 동일한 컬럼 구조) */
   _renderStep2Disassembly() {
     const planQty = parseFloat(this.formData.planQty) || 0
-    const totalStock = this.setSkuStockList.reduce((sum, inv) => sum + (inv.inv_qty || 0), 0)
-    const sufficient = totalStock >= planQty
+
+    // 로케이션별 재고를 SKU 단위로 합산
+    const skuMap = {}
+    for (const inv of this.setSkuStockList) {
+      const cd = inv.sku_cd
+      if (!skuMap[cd]) {
+        skuMap[cd] = { sku_cd: cd, sku_nm: inv.sku_nm, inv_qty: 0 }
+      }
+      skuMap[cd].inv_qty += inv.inv_qty || 0
+    }
+    const skuRows = Object.values(skuMap)
+    const totalStock = skuRows.reduce((sum, r) => sum + r.inv_qty, 0)
+
+    const shortageItems = skuRows.filter(r => r.inv_qty < planQty)
 
     return html`
-      <div class="form-section-title">세트 상품 재고 확인</div>
+      <div class="form-section-title">소요 자재 확인</div>
 
       <div class="bom-info">
         <div class="bom-info-item">
@@ -645,31 +702,39 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
       <table class="material-table">
         <thead>
           <tr>
-            <th>로케이션</th>
+            <th>순번</th>
             <th>SKU</th>
             <th>상품명</th>
-            <th class="right">재고수량</th>
+            <th class="right">단위수량</th>
+            <th class="right">소요량</th>
+            <th class="right">재고</th>
             <th>상태</th>
           </tr>
         </thead>
         <tbody>
-          ${this.setSkuStockList.length > 0
-            ? this.setSkuStockList.map(inv => html`
-                <tr>
-                  <td>${inv.loc_cd || '-'}</td>
-                  <td>${inv.sku_cd || '-'}</td>
-                  <td>${inv.sku_nm || '-'}</td>
-                  <td class="right">${(inv.inv_qty || 0).toLocaleString()}</td>
-                  <td>
-                    <span class="stock-badge ${inv.inv_qty > 0 ? 'sufficient' : 'shortage'}">
-                      ${inv.inv_qty > 0 ? '✓ 보유' : '⚠ 없음'}
-                    </span>
-                  </td>
-                </tr>
-              `)
+          ${skuRows.length > 0
+            ? skuRows.map((row, idx) => {
+                const stockQty = row.inv_qty
+                const sufficient = stockQty >= planQty
+                return html`
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td>${row.sku_cd || '-'}</td>
+                    <td>${row.sku_nm || '-'}</td>
+                    <td class="right">1 EA</td>
+                    <td class="right">${planQty.toLocaleString()}</td>
+                    <td class="right">${stockQty.toLocaleString()}</td>
+                    <td>
+                      ${sufficient
+                        ? html`<span class="stock-badge sufficient">✓ 충분</span>`
+                        : html`<span class="stock-badge shortage">⚠ 부족 (${(planQty - stockQty).toLocaleString()})</span>`}
+                    </td>
+                  </tr>
+                `
+              })
             : html`
                 <tr>
-                  <td colspan="5" style="text-align:center; color:#999; padding: 24px;">
+                  <td colspan="7" style="text-align:center; color:#999; padding: 24px;">
                     해당 세트 상품의 재고가 없습니다
                   </td>
                 </tr>
@@ -677,33 +742,10 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
         </tbody>
       </table>
 
-      <div class="bom-info" style="margin-top: 8px;">
-        <div class="bom-info-item">
-          <span class="info-label">총 재고:</span>
-          <span class="info-value" style="font-weight:700; color:${sufficient ? '#2e7d32' : '#c62828'};">
-            ${totalStock.toLocaleString()} EA
-          </span>
-        </div>
-        <div class="bom-info-item">
-          <span class="info-label">상태:</span>
-          <span class="info-value">
-            ${sufficient
-              ? html`<span class="stock-badge sufficient">✓ 충분</span>`
-              : html`<span class="stock-badge shortage">⚠ 부족 (${(planQty - totalStock).toLocaleString()} EA 부족)</span>`}
-          </span>
-        </div>
-      </div>
-
-      ${!sufficient && totalStock > 0
+      ${shortageItems.length > 0
         ? html`
             <div class="warning-message">
-              ⚠ 세트 상품 재고(${totalStock} EA)가 계획 수량(${planQty} EA)보다 부족합니다.
-            </div>
-          `
-        : !sufficient && totalStock === 0
-        ? html`
-            <div class="warning-message">
-              ⚠ 해당 창고에 해체할 세트 상품 재고가 없습니다.
+              ⚠ 재고 부족 자재가 ${shortageItems.length}건 있습니다. 작업 지시를 생성하면 자재 배정 시 부족이 발생할 수 있습니다.
             </div>
           `
         : ''}
@@ -922,16 +964,25 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     this.formData = { ...this.formData, [field]: value }
   }
 
-  /** BOM 검색 팝업 열기 */
+  /** 구성/해체 토글 버튼 클릭 — BOM 선택은 유지, 2단계 조회 결과만 초기화 */
+  _onVasTypeToggle(mode) {
+    if (this.vasTypeMode === mode) return
+    this.vasTypeMode = mode
+    this.bomItems = []
+    this.setSkuStockList = []
+  }
+
+  /** BOM 검색 팝업 열기 — 구성/해체 모드 무관하게 항상 SET_ASSEMBLY 유형으로 검색 */
   _openBomSearchPopup() {
     const el = document.createElement('vas-bom-search-popup')
+    el.vasType = 'SET_ASSEMBLY'   // 구성/해체 모드 무관하게 항상 세트 구성 BOM에서 검색
     el.addEventListener('bom-selected', e => {
       this._applyBomSelection(e.detail.bom)
     })
     UiUtil.openPopupByElement('세트 상품 검색', 'large', el, true)
   }
 
-  /** 팝업에서 선택된 BOM 적용 - 화주사/창고/유형 자동 설정 */
+  /** 팝업에서 선택된 BOM 적용 - 화주사/창고 자동 설정, 유형은 vasTypeMode 기준 */
   _applyBomSelection(bom) {
     this.selectedBom = bom
     this._updateField('vasBomId', bom.id)
@@ -943,15 +994,14 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     if (bom.wh_cd && !this.formData.whCd) {
       this._updateField('whCd', bom.wh_cd)
     }
-    // VAS 유형 설정
-    this.formData = { ...this.formData, vasType: bom.vas_type }
+    // 유형은 BOM 자체가 아닌 토글 버튼(vasTypeMode) 기준으로 설정
+    this.formData = { ...this.formData, vasType: this.vasTypeMode }
   }
 
   /** BOM 선택 초기화 */
   _clearBomSelection() {
     this.selectedBom = null
-    this._updateField('vasBomId', '')
-    this.formData = { ...this.formData, vasType: null }
+    this.formData = { ...this.formData, vasBomId: '', vasType: this.vasTypeMode }
     this.bomItems = []
     this.setSkuStockList = []
   }
@@ -965,14 +1015,14 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
       return
     }
 
-    // 2단계로 이동하며 BOM 유형에 따라 다른 재고 조회
+    // 2단계로 이동 — vasTypeMode 기준으로 재고 조회 분기
     this.step = 2
     if (this.formData.vasBomId) {
-      if (this.formData.vasType === 'DISASSEMBLY') {
-        // 세트 해체: 세트 상품 자체의 재고 조회
+      if (this.vasTypeMode === 'DISASSEMBLY') {
+        // 세트 해체: 완성된 세트 상품(set_sku_cd)의 재고 조회
         this._fetchSetSkuStock()
       } else {
-        // 세트 구성 등: BOM 하위 자재 목록 및 재고 조회
+        // 세트 구성: BOM 하위 구성품 자재 목록 및 재고 조회
         this._fetchBomItems(this.formData.vasBomId)
       }
     }
@@ -1010,7 +1060,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
         plan_qty: parseFloat(this.formData.planQty),
         priority: this.formData.priority,
         work_loc_cd: this.formData.workLocCd || null,
-        vas_type: this.formData.vasType || this.selectedBom?.vas_type || 'SET_ASSEMBLY',
+        vas_type: this.vasTypeMode || 'SET_ASSEMBLY',
         remarks: this.formData.remarks || null
       }
 

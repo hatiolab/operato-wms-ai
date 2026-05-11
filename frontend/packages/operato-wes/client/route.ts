@@ -47,6 +47,7 @@ import './pages/vas/vas-material-preparation'
 import './pages/vas/vas-result-analysis'
 
 import './pages/work/vas-work-page'
+import './pages/work/vas-disassembly-page'
 import './pages/work/vas-pda-pick'
 import './pages/work/vas-pda-result'
 import './pages/work/rwa-receive-work'
