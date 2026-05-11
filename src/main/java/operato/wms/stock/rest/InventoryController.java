@@ -3,6 +3,7 @@ package operato.wms.stock.rest;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import operato.wms.stock.entity.Inventory;
 import xyz.elidom.dbist.dml.Filter;
 import xyz.elidom.dbist.dml.Page;
@@ -21,6 +24,7 @@ import xyz.elidom.dbist.dml.Query;
 import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
+import xyz.elidom.print.rest.PrintoutController;
 import xyz.elidom.sys.system.service.AbstractRestService;
 import xyz.elidom.util.ValueUtil;
 
@@ -30,6 +34,11 @@ import xyz.elidom.util.ValueUtil;
 @RequestMapping("/rest/inventories")
 @ServiceDesc(description = "Inventory Service API")
 public class InventoryController extends AbstractRestService {
+	/**
+	 * 리포트 컨트롤러
+	 */
+	@Autowired
+	private PrintoutController printoutCtrl;
 
 	@Override
 	protected Class<?> entityClass() {
@@ -43,23 +52,23 @@ public class InventoryController extends AbstractRestService {
 			@RequestParam(name = "select", required = false) String select,
 			@RequestParam(name = "sort", required = false) String sort,
 			@RequestParam(name = "query", required = false) String query) {
-	    
-	    Query queryObj = this.parseQuery(this.entityClass(), page, limit, select, sort, query);
-	    List<Filter> filters = queryObj.getFilter();
-	    boolean delFlagExist = false;
-	    for(Filter filter : filters) {
-	        if(ValueUtil.isEqualIgnoreCase("del_flag", filter.getName())) {
-	            delFlagExist = true;
-	            break;
-	        }
-	    }
-	    
-	    if(!delFlagExist) {
-	        Filter delFlagFilter = new Filter("del_flag", "=", "false");
-	        filters.add(delFlagFilter);
-	    }
-		
-	    return queryManager.selectPage(this.entityClass(), queryObj);
+
+		Query queryObj = this.parseQuery(this.entityClass(), page, limit, select, sort, query);
+		List<Filter> filters = queryObj.getFilter();
+		boolean delFlagExist = false;
+		for (Filter filter : filters) {
+			if (ValueUtil.isEqualIgnoreCase("del_flag", filter.getName())) {
+				delFlagExist = true;
+				break;
+			}
+		}
+
+		if (!delFlagExist) {
+			Filter delFlagFilter = new Filter("del_flag", "=", "false");
+			filters.add(delFlagFilter);
+		}
+
+		return queryManager.selectPage(this.entityClass(), queryObj);
 	}
 
 	@RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -67,7 +76,7 @@ public class InventoryController extends AbstractRestService {
 	public Inventory findOne(@PathVariable("id") String id) {
 		return this.getOne(this.entityClass(), id);
 	}
-	
+
 	@RequestMapping(value = "/{id}/exist", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Check exists By ID")
 	public Boolean isExist(@PathVariable("id") String id) {
@@ -86,9 +95,10 @@ public class InventoryController extends AbstractRestService {
 	public Inventory update(@PathVariable("id") String id, @RequestBody Inventory input) {
 		return this.updateOne(input);
 	}
-	
+
 	/**
-	 * PDA : 작업 화면 > 입고 적치 > 적치  
+	 * PDA : 작업 화면 > 입고 적치 > 적치
+	 * 
 	 * @param id
 	 * @param input
 	 * @return
@@ -99,14 +109,14 @@ public class InventoryController extends AbstractRestService {
 		Inventory inv = null;
 
 		input.setId(id);
-		
+
 		List<Inventory> list = new ArrayList<Inventory>();
 		list.add(input);
-		
-		if ( this.MultipleUpdateLoad(list) ) {
+
+		if (this.MultipleUpdateLoad(list)) {
 			inv = this.findOne(id);
 		}
-		
+
 		return inv;
 	}
 
@@ -121,57 +131,74 @@ public class InventoryController extends AbstractRestService {
 	public Boolean multipleUpdate(@RequestBody List<Inventory> list) {
 		return this.cudMultipleData(this.entityClass(), list);
 	}
-	
+
+	@RequestMapping(value = "/{id}/download_barcode", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Download Inventory Barcode")
+	public void downloadInventoryBarcode(
+			HttpServletRequest req,
+			HttpServletResponse res,
+			@PathVariable("id") String id) {
+
+		// 1. 조회
+		Inventory inventory = this.queryManager.select(Inventory.class, id);
+
+		// 2. 로케이션 바코드 생성을 위한 PDF 다운로드
+		this.printoutCtrl.showPdfByPrintTemplateName(req, res, "GENERAL_BARCODE_SHEET",
+				ValueUtil.newMap("barcode", inventory.getBarcode()));
+	}
+
 	/**
-	 * 재고 관리 > 입고 적치 작업 처리  
-	 * 상태 : 입고 대기 > 보관 중 
-	 * 로케이션 : 입력 받은 로케이션으로 변경 
+	 * 재고 관리 > 입고 적치 작업 처리
+	 * 상태 : 입고 대기 > 보관 중
+	 * 로케이션 : 입력 받은 로케이션으로 변경
+	 * 
 	 * @param list
 	 * @return
 	 */
 	@RequestMapping(value = "/load/update_multiple", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Create, Update or Delete multiple at one time")
 	public Boolean MultipleUpdateLoad(@RequestBody List<Inventory> list) {
-		
+
 		List<Inventory> updateList = new ArrayList<Inventory>();
-		
-		for ( Inventory item : list ) {
-			if ( ValueUtil.isEqual(item.getCudFlag_(), "u") && ValueUtil.isNotEmpty(item.getLocCd()) ) {
-				
+
+		for (Inventory item : list) {
+			if (ValueUtil.isEqual(item.getCudFlag_(), "u") && ValueUtil.isNotEmpty(item.getLocCd())) {
+
 				item.setStatus(Inventory.STATUS_STORED);
 				item.setLastTranCd(Inventory.TRANSACTION_IN);
-				
+
 				updateList.add(item);
 			}
 		}
-		
+
 		queryManager.updateBatch(this.entityClass(), updateList, "status", "lastTranCd", "locCd");
-		
+
 		return true;
 	}
-	
+
 	/**
-	 * 재고 관리 > 재고 조정 
+	 * 재고 관리 > 재고 조정
+	 * 
 	 * @param list
 	 * @return
 	 */
 	@RequestMapping(value = "/adjust/update_multiple", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Create, Update or Delete multiple at one time")
 	public Boolean MultipleUpdateAdjust(@RequestBody List<Inventory> list) {
-		
+
 		List<Inventory> updateList = new ArrayList<Inventory>();
-		
-		for ( Inventory item : list ) {
-			if ( ValueUtil.isEqual(item.getCudFlag_(), "u") && ValueUtil.isNotEmpty(item.getInvQty()) ) {
-				if ( ValueUtil.isNotEqual(this.findOne(item.getId()), item.getInvQty()) ) {
-					if ( ValueUtil.isEmpty(item.getRemarks()) ) {
+
+		for (Inventory item : list) {
+			if (ValueUtil.isEqual(item.getCudFlag_(), "u") && ValueUtil.isNotEmpty(item.getInvQty())) {
+				if (ValueUtil.isNotEqual(this.findOne(item.getId()), item.getInvQty())) {
+					if (ValueUtil.isEmpty(item.getRemarks())) {
 						throw new ElidomRuntimeException("재고 조정 사유를 반드시 입력해야 합니다.");
 					}
-					
-					// 재고 정보 변경 
+
+					// 재고 정보 변경
 					item.setLastTranCd(Inventory.TRANSACTION_ADJUST);
-					if ( item.getInvQty() <= 0 ) {
-						// 재고가 0보다 작으면 상태 변경 : 비어있음 
+					if (item.getInvQty() <= 0) {
+						// 재고가 0보다 작으면 상태 변경 : 비어있음
 						item.setStatus(Inventory.STATUS_EMPTY);
 						item.setDelFlag(true);
 					}
@@ -179,10 +206,10 @@ public class InventoryController extends AbstractRestService {
 				}
 			}
 		}
-		
-		queryManager.updateBatch(this.entityClass(), updateList, "status", "lastTranCd", "delFlag", "invQty", "remarks");
-		
+
+		queryManager.updateBatch(this.entityClass(), updateList, "status", "lastTranCd", "delFlag", "invQty",
+				"remarks");
+
 		return true;
 	}
-	
 }

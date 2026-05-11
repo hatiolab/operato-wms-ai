@@ -2,6 +2,7 @@ package operato.wms.base.rest;
 
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,11 +14,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import operato.wms.base.entity.Location;
-
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
+import xyz.elidom.print.rest.PrintoutController;
 import xyz.elidom.sys.system.service.AbstractRestService;
+import xyz.elidom.util.ValueUtil;
 import xyz.elidom.dbist.dml.Page;
 
 @RestController
@@ -26,6 +30,11 @@ import xyz.elidom.dbist.dml.Page;
 @RequestMapping("/rest/locations")
 @ServiceDesc(description = "Location Service API")
 public class LocationController extends AbstractRestService {
+	/**
+	 * 리포트 컨트롤러
+	 */
+	@Autowired
+	private PrintoutController printoutCtrl;
 
 	@Override
 	protected Class<?> entityClass() {
@@ -78,5 +87,20 @@ public class LocationController extends AbstractRestService {
 	@ApiDesc(description = "Create, Update or Delete multiple at one time")
 	public Boolean multipleUpdate(@RequestBody List<Location> list) {
 		return this.cudMultipleData(this.entityClass(), list);
+	}
+
+	@RequestMapping(value = "/{id}/download_barcode", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Download Location Barcode")
+	public void downloadLocationBarcode(
+			HttpServletRequest req,
+			HttpServletResponse res,
+			@PathVariable("id") String id) {
+
+		// 1. 조회
+		Location location = this.queryManager.select(Location.class, id);
+
+		// 2. 로케이션 바코드 생성을 위한 PDF 다운로드
+		this.printoutCtrl.showPdfByPrintTemplateName(req, res, "GENERAL_BARCODE_SHEET",
+				ValueUtil.newMap("barcode", location.getLocCd()));
 	}
 }

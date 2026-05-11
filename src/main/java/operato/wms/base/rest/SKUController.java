@@ -15,11 +15,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import operato.wms.base.entity.SKU;
 import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.dbist.dml.Page;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
+import xyz.elidom.print.rest.PrintoutController;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.system.service.AbstractRestService;
 import xyz.elidom.util.ValueUtil;
@@ -30,8 +33,13 @@ import xyz.elidom.util.ValueUtil;
 @RequestMapping("/rest/sku")
 @ServiceDesc(description = "SKU Service API")
 public class SKUController extends AbstractRestService {
-	
-	/**
+    /**
+     * 리포트 컨트롤러
+     */
+    @Autowired
+    private PrintoutController printoutCtrl;
+
+    /**
      * 커스텀 서비스 - MultipleUpdate 전 처리
      */
     public static final String TRX_SKU_PRE_MULTIPLE_UPDATE = "diy-sku-pre-multiple-update";
@@ -39,8 +47,8 @@ public class SKUController extends AbstractRestService {
      * 커스텀 서비스 - MultipleUpdate 후 처리
      */
     public static final String TRX_SKU_POST_MULTIPLE_UPDATE = "diy-sku-post-multiple-update";
-	
-	/**
+
+    /**
      * 커스텀 서비스
      */
     @Autowired
@@ -96,16 +104,46 @@ public class SKUController extends AbstractRestService {
     @RequestMapping(value = "/update_multiple", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiDesc(description = "Create, Update or Delete multiple at one time")
     public Boolean multipleUpdate(@RequestBody List<SKU> list) {
-    	// 1. 전 처리 커스텀 서비스 호출
+        // 1. 전 처리 커스텀 서비스 호출
         Map<String, Object> custSvcParams = ValueUtil.newMap("domain_id,list", Domain.currentDomainId(), list);
         this.customSvc.doCustomService(Domain.currentDomainId(), TRX_SKU_PRE_MULTIPLE_UPDATE, custSvcParams);
-        
-        // 2. 업데이트 
+
+        // 2. 업데이트
         this.cudMultipleData(this.entityClass(), list);
-        
+
         // 3. 후 처리 커스텀 서비스 호출
         this.customSvc.doCustomService(Domain.currentDomainId(), TRX_SKU_POST_MULTIPLE_UPDATE, custSvcParams);
-    	
+
         return true;
+    }
+
+    @RequestMapping(value = "/{id}/download_sku_code", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Download SKU Code")
+    public void downloadSKUCode(
+            HttpServletRequest req,
+            HttpServletResponse res,
+            @PathVariable("id") String id) {
+
+        // 1. 조회
+        SKU sku = this.queryManager.select(SKU.class, id);
+
+        // 2. 로케이션 바코드 생성을 위한 PDF 다운로드
+        this.printoutCtrl.showPdfByPrintTemplateName(req, res, "GENERAL_BARCODE_SHEET",
+                ValueUtil.newMap("barcode", sku.getSkuCd()));
+    }
+
+    @RequestMapping(value = "/{id}/download_sku_barcode", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Download SKU Barcode")
+    public void downloadSKUBarcode(
+            HttpServletRequest req,
+            HttpServletResponse res,
+            @PathVariable("id") String id) {
+
+        // 1. 조회
+        SKU sku = this.queryManager.select(SKU.class, id);
+
+        // 2. 로케이션 바코드 생성을 위한 PDF 다운로드
+        this.printoutCtrl.showPdfByPrintTemplateName(req, res, "GENERAL_BARCODE_SHEET",
+                ValueUtil.newMap("barcode", sku.getSkuBarcd()));
     }
 }
