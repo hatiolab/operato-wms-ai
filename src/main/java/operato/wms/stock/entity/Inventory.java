@@ -125,6 +125,10 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	 */
 	public static final String TRANSACTION_MERGE = "MERGE";
 	/**
+	 * 재고 트렌젝션 - MERGED (병합된 재고)
+	 */
+	public static final String TRANSACTION_MERGED = "MERGED";
+	/**
 	 * 재고 트렌젝션 - ADJUST (재고 조정)
 	 */
 	public static final String TRANSACTION_ADJUST = "ADJUST";
