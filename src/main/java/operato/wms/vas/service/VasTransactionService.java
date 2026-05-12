@@ -314,7 +314,7 @@ public class VasTransactionService extends AbstractQueryService {
 					"AND loc_cd = :locCd AND status = :status " +
 					"AND (del_flag IS NULL OR del_flag = false) " +
 					"AND (inv_qty - COALESCE(reserved_qty, 0)) > 0 " +
-					"ORDER BY created_at ASC";
+					"ORDER BY CASE WHEN expired_date IS NULL THEN 1 ELSE 0 END, expired_date ASC, created_at ASC";
 			Map<String, Object> locParams = ValueUtil.newMap("domainId,comCd,skuCd,locCd,status",
 					item.getDomainId(), order.getComCd(), item.getSkuCd(), srcLocCd,
 					Inventory.STATUS_STORED);
@@ -332,7 +332,7 @@ public class VasTransactionService extends AbstractQueryService {
 					"AND status = :status " +
 					"AND (del_flag IS NULL OR del_flag = false) " +
 					"AND (inv_qty - COALESCE(reserved_qty, 0)) > 0 " +
-					"ORDER BY created_at ASC";
+					"ORDER BY CASE WHEN expired_date IS NULL THEN 1 ELSE 0 END, expired_date ASC, created_at ASC";
 			Map<String, Object> autoParams = ValueUtil.newMap("domainId,comCd,skuCd,status",
 					item.getDomainId(), order.getComCd(), item.getSkuCd(), Inventory.STATUS_STORED);
 			if (ValueUtil.isNotEmpty(order.getWhCd())) {
