@@ -169,6 +169,29 @@ public class InvTransactionController extends AbstractRestService {
     }
 
     /**
+     * 재고 병합 대상 유효성 사전 검증
+     *
+     * PDA 재고 병합 화면에서 병합 바코드·로케이션 스캔 후 호출한다.
+     * 재고 존재 여부, 수량, 상태(LOCKED 여부), 기준 재고와의 동일성을 체크한다.
+     * 유효하면 병합 대상 재고 정보를 반환하고, 불가한 경우 오류를 반환한다.
+     *
+     * POST /rest/inventory_trx/validate_inventory_for_merge
+     * Body: { "merge_barcode": "BARCODE123", "merge_loc_cd": "A-01-02", "base_inventory_id": "uuid" }
+     *
+     * @param input merge_barcode, merge_loc_cd, base_inventory_id(선택)를 포함하는 요청 바디
+     * @return 유효한 병합 대상 Inventory 엔티티
+     */
+    @PostMapping(value = "/validate_inventory_for_merge", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Validate Inventory for Merge")
+    public Inventory validateInventoryForMerge(@RequestBody Map<String, String> input) {
+        Long domainId = Domain.currentDomainId();
+        String mergeBarcode = input.get("merge_barcode");
+        String mergeLocCd = input.get("merge_loc_cd");
+        String baseInventoryId = input.get("base_inventory_id");
+        return this.invTrxSvc.validateInventoryForMerge(domainId, mergeBarcode, mergeLocCd, baseInventoryId);
+    }
+
+    /**
      * 재고 바코드 이동 가능 여부 사전 검증
      *
      * PDA 재고 이동 화면에서 재고 바코드 스캔 후 호출한다.

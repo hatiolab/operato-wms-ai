@@ -287,14 +287,20 @@ public class StockTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory mergeInventory(Inventory mainInv, Inventory mergeInv, String remark) {
+        // 1. 원본 재고 수량 업데이트
         mainInv.setInvQty(mainInv.getInvQty() + mergeInv.getInvQty());
         mainInv.setLastTranCd(Inventory.TRANSACTION_MERGE);
         if (ValueUtil.isNotEmpty(remark)) {
             mainInv.setRemarks(remark);
         }
+        this.queryManager.update(mainInv, "lastTranCd", "invQty", "remarks", "updatedAt");
 
-        this.queryManager.update(mainInv, "lastTranCd", "invQty", "updatedAt");
-        this.queryManager.delete(mergeInv);
+        // 2. 병합되는 재고 수량 0 처리
+        mergeInv.setLastTranCd(Inventory.TRANSACTION_MERGED);
+        mergeInv.setInvQty(0.0);
+        mergeInv.setRemarks(
+                "Merged to barcode : " + mainInv.getBarcode() + ", location : " + mainInv.getLocCd() + "," + remark);
+        this.queryManager.update(mergeInv, "lastTranCd", "invQty", "status", "remarks", "updatedAt", "delFlag");
         return mainInv;
     }
 
@@ -315,6 +321,29 @@ public class StockTransactionService extends AbstractQueryService {
         // 병합할 재고 조회 & 기본 체크 포인트 체크
         Inventory mergeInventory = this.findAndCheckInventory(domainId, input.getMergeBarcode(), input.getMergeLocCd(),
                 Inventory.TRANSACTION_MERGE);
+
+        // 동일 재고 체크
+        if (mainInventory.getId().equals(mergeInventory.getId())) {
+            throw ThrowUtil.newValidationErrorWithNoLog("동일한 재고를 병합할 수 없습니다.");
+        }
+
+        // 동일 SKU 체크
+        if (!mainInventory.getSkuCd().equals(mergeInventory.getSkuCd())) {
+            throw ThrowUtil.newValidationErrorWithNoLog("동일한 SKU만 병합할 수 있습니다.");
+        }
+
+        // 소비기한이 있는 경우, 동일 소비기한 체크
+        if (ValueUtil.isNotEmpty(mainInventory.getExpiredDate())) {
+            if (!mainInventory.getExpiredDate().equals(mergeInventory.getExpiredDate())) {
+                throw ThrowUtil.newValidationErrorWithNoLog("동일한 소비기한을 가진 재고만 병합할 수 있습니다.");
+            }
+        }
+
+        // 할당 수량이 있다면 병합 불가
+        if (mainInventory.getReservedQty() > 0 || mergeInventory.getReservedQty() > 0) {
+            throw ThrowUtil.newValidationErrorWithNoLog("할당 수량이 있는 재고는 병합할 수 없습니다.");
+        }
+
         // 병합 처리 & 결과 리턴
         return this.mergeInventory(mainInventory, mergeInventory, input.getReason());
     }
@@ -640,6 +669,65 @@ public class StockTransactionService extends AbstractQueryService {
 
         // toLocCd로 이동 가능한 재고 리턴
         return inventory;
+    }
+
+    /**
+     * 재고 병합 대상 유효성 사전 검증
+     *
+     * 아래 항목을 순서대로 체크한다.
+     * 1. merge_barcode, merge_loc_cd 값 존재 여부
+     * 2. (barcode, loc_cd)로 재고 조회
+     * 3. 재고 기본 유효성 체크 (존재, 삭제, 수량, LOCKED 상태)
+     * 4. 기준 재고(base_inventory_id)와 동일 여부 — 자기 자신 병합 차단
+     *
+     * @param domainId        도메인 ID
+     * @param mergeBarcode    병합 대상 바코드
+     * @param mergeLocCd      병합 대상 로케이션 코드
+     * @param baseInventoryId 기준 재고 ID (null 허용 — 동일성 체크 생략)
+     * @return 유효한 병합 대상 Inventory 엔티티
+     */
+    public Inventory validateInventoryForMerge(Long domainId, String mergeBarcode, String mergeLocCd,
+            String baseInventoryId) {
+        // 병합 바코드 값 체크
+        ValueUtil.checkEmptyData(mergeBarcode, "label.merge_barcode");
+        // 병합 로케이션 값 체크
+        ValueUtil.checkEmptyData(mergeLocCd, "label.merge_loc_cd");
+
+        // (barcode, loc_cd)로 재고 조회 & 기본 체크
+        Inventory target = this.findAndCheckInventory(domainId, mergeBarcode, mergeLocCd,
+                Inventory.TRANSACTION_MERGE);
+
+        // 기준 재고와 동일한지 체크 (자기 자신 병합 불가)
+        if (ValueUtil.isNotEmpty(baseInventoryId) && ValueUtil.isEqualIgnoreCase(target.getId(), baseInventoryId)) {
+            throw ThrowUtil.newValidationErrorWithNoLog("기준 재고와 동일한 재고는 병합할 수 없습니다.");
+        }
+
+        // 원본 재고 조회 & 기본 체크 포인트 체크
+        Inventory mainInventory = this.findAndCheckInventory(domainId, baseInventoryId, Inventory.TRANSACTION_MERGE);
+
+        // 동일 재고 체크
+        if (mainInventory.getId().equals(target.getId())) {
+            throw ThrowUtil.newValidationErrorWithNoLog("동일한 재고를 병합할 수 없습니다.");
+        }
+
+        // 동일 SKU 체크
+        if (!mainInventory.getSkuCd().equals(target.getSkuCd())) {
+            throw ThrowUtil.newValidationErrorWithNoLog("동일한 SKU만 병합할 수 있습니다.");
+        }
+
+        // 소비기한이 있는 경우, 동일 소비기한 체크
+        if (ValueUtil.isNotEmpty(mainInventory.getExpiredDate())) {
+            if (!mainInventory.getExpiredDate().equals(target.getExpiredDate())) {
+                throw ThrowUtil.newValidationErrorWithNoLog("동일한 소비기한을 가진 재고만 병합할 수 있습니다.");
+            }
+        }
+
+        // 할당 수량이 있다면 병합 불가
+        if (mainInventory.getReservedQty() > 0 || target.getReservedQty() > 0) {
+            throw ThrowUtil.newValidationErrorWithNoLog("할당 수량이 있는 재고는 병합할 수 없습니다.");
+        }
+
+        return target;
     }
 
     /**

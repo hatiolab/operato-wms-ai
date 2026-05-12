@@ -76,6 +76,15 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   /** 재고 이동 To 로케이션 유효성 검증 결과 */
   @state() _moveToLocation = null
 
+  /** 재고 병합 대상 바코드 입력값 */
+  @state() _mergeBarcode = ''
+  /** 재고 병합 대상 로케이션 코드 입력값 */
+  @state() _mergeMergeLocCd = ''
+  /** 재고 병합 사유 입력값 */
+  @state() _mergeReason = ''
+  /** 재고 병합 대상 재고 유효성 검증 결과 */
+  @state() _mergeInventory = null
+
   /** 피드백 메시지 */
   @state() lastFeedback = null
 
@@ -563,6 +572,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       case 'add': return this._renderAddMode()
       case 'adjust': return this._renderAdjustMode()
       case 'move': return this._renderMoveMode()
+      case 'merge': return this._renderMergeMode()
       default: return this._renderListMode()
     }
   }
@@ -706,19 +716,21 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         </div>
       </div>
 
-      <div class="footer-area compact">
-        <button class="btn-secondary" @click=${this._goHistory}>
-          ${TermsUtil.tMenu('InventoryHist') || '이력'}
-        </button>
-        <button class="btn-secondary" @click=${this._goMove}>
-          ${TermsUtil.tButton('move') || '이동'}
-        </button>
-        <button class="btn-secondary" @click=${this._goAdjust}>
-          ${TermsUtil.tButton('adjust') || '조정'}
-        </button>
-        <button class="btn-primary" @click=${this._goList}>
-          ${TermsUtil.tButton('go_list') || '메인'}
-        </button>
+      <div style="display:flex; flex-direction:column; gap:6px; padding: 8px 12px 12px; border-top: 1px solid var(--md-sys-color-outline-variant, #e0e0e0); flex-shrink:0;">
+        <div class="footer-area compact" style="padding:0; border:none;">
+          <button class="btn-secondary" @click=${this._goHistory}>
+            ${TermsUtil.tMenu('InventoryHist') || '이력'}
+          </button>
+          <button class="btn-secondary" @click=${this._goMove}>
+            ${TermsUtil.tButton('move') || '이동'}
+          </button>
+          <button class="btn-secondary" @click=${this._goMerge}>
+            ${TermsUtil.tButton('merge') || '병합'}
+          </button>
+          <button class="btn-secondary" @click=${this._goAdjust}>
+            ${TermsUtil.tButton('adjust') || '조정'}
+          </button>
+        </div>
       </div>
     `
   }
@@ -780,12 +792,6 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           <div class="guide-text">${TermsUtil.tText('No Data') || '이력 데이터가 없습니다'}</div>
         </div>
       `}
-
-      <div class="footer-area">
-        <button class="btn-secondary" @click=${() => (this.mode = 'detail')}>
-          ${TermsUtil.tButton('back') || '뒤로'}
-        </button>
-      </div>
     `
   }
 
@@ -1086,6 +1092,101 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     `
   }
 
+  /** merge 모드 렌더링 — 재고 병합 폼 */
+  _renderMergeMode() {
+    const inv = this.selectedInventory
+    const validated = !!this._mergeInventory
+    return html`
+      <div class="header-bar">
+        <button class="back-btn" @click=${() => (this.mode = 'detail')}>◀</button>
+        <span class="title">${TermsUtil.tButton('merge') || '재고 병합'}</span>
+      </div>
+
+      ${this.lastFeedback ? html`
+        <div class="scan-feedback ${this.lastFeedback.type}">${this.lastFeedback.message}</div>
+      ` : ''}
+
+      <div class="add-form">
+        <!-- 기준 재고 정보 (읽기 전용) -->
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('barcode') || '바코드'}</label>
+          <input type="text" readonly .value=${inv?.barcode || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('sku_cd') || 'SKU'}</label>
+          <input type="text" readonly .value=${inv?.sku_cd || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('loc_cd') || '로케이션'}</label>
+          <input type="text" readonly .value=${inv?.loc_cd || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('inv_qty') || '재고 수량'}</label>
+          <input type="text" readonly .value=${inv?.inv_qty ?? '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+
+        <div style="height:1px; background: var(--md-sys-color-outline-variant,#e0e0e0); margin: 4px 0;"></div>
+
+        <!-- 병합 대상 입력 -->
+        <div class="form-field">
+          <label>
+            ${TermsUtil.tLabel('merge_barcode') || '병합 바코드'}
+            <span class="required">*</span>
+          </label>
+          <ox-input-barcode
+            id="mergeBarcodeInput"
+            placeholder="${TermsUtil.tLabel('merge_barcode') || '병합 바코드 스캔/입력'}"
+            @change=${e => this._onMergeBarcodeChange(e.target.value)}>
+          </ox-input-barcode>
+        </div>
+        <div class="form-field">
+          <label>
+            ${TermsUtil.tLabel('loc_cd') || '로케이션'}
+            <span class="required">*</span>
+          </label>
+          <ox-input-barcode
+            id="mergeLocCdInput"
+            placeholder="${TermsUtil.tLabel('loc_cd') || '로케이션 스캔/입력'}"
+            @change=${e => this._onMergeLocCdChange(e.target.value)}>
+          </ox-input-barcode>
+        </div>
+        ${validated ? html`
+          <div class="scan-feedback success" style="margin:0;">
+            ${this._mergeInventory.sku_cd || ''} · ${this._mergeInventory.loc_cd || ''} · ${this._mergeInventory.inv_qty ?? 0}개 확인
+          </div>
+        ` : ''}
+        <div class="form-field">
+          <label>
+            ${TermsUtil.tLabel('reason') || '사유'}
+            <span class="required">*</span>
+          </label>
+          <input type="text"
+            placeholder="${TermsUtil.tLabel('reason') || '병합 사유 입력'}"
+            .value=${this._mergeReason}
+            @input=${e => (this._mergeReason = e.target.value)}>
+        </div>
+      </div>
+
+      <div class="footer-area">
+        <button class="btn-primary"
+          ?disabled=${this.processing || !validated}
+          @click=${this._submitMerge}>
+          ${this.processing
+        ? (TermsUtil.tText('processing') || '처리 중...')
+        : (TermsUtil.tButton('merge') || '병합')}
+        </button>
+        <button class="btn-secondary" ?disabled=${this.processing}
+          @click=${() => (this.mode = 'detail')}>
+          ${TermsUtil.tButton('cancel') || '취소'}
+        </button>
+      </div>
+    `
+  }
+
   /** 페이지 초기화 */
   pageInitialized() {
     this.mode = 'list'
@@ -1094,6 +1195,12 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     this.searchLocCd = ''
     this.searchSkuCd = ''
     this.lastFeedback = null
+
+    setTimeout(() => {
+      const oxInput = this.shadowRoot?.querySelector('#barcodeInput')
+      const innerInput = oxInput?.shadowRoot?.querySelector('input')
+      if (innerInput) innerInput.focus()
+    }, 100)
   }
 
   /**
@@ -1103,12 +1210,20 @@ export class PdaStockInquiry extends connect(store)(PageView) {
    */
   async _onBarcodeChange(barcode) {
     if (!barcode) return
+
     this.searchBarcode = barcode
     await this._search()
+
     if (!this.inventories.length) {
       this.searchBarcode = ''
-      const input = this.shadowRoot?.querySelector('#barcodeInput')
-      if (input) input.value = ''
+      const oxInput = this.shadowRoot?.querySelector('#barcodeInput')
+      const innerInput = oxInput?.shadowRoot?.querySelector('input')
+      if (innerInput) innerInput.value = ''
+
+    } else {
+      const oxInput = this.shadowRoot?.querySelector('#locCdInput')
+      const innerInput = oxInput?.shadowRoot?.querySelector('input')
+      if (innerInput) innerInput.focus()
     }
   }
 
@@ -1119,12 +1234,15 @@ export class PdaStockInquiry extends connect(store)(PageView) {
    */
   async _onLocCdChange(locCd) {
     if (!locCd) return
+
     this.searchLocCd = locCd
     await this._search()
+
     if (!this.inventories.length) {
       this.searchLocCd = ''
       const input = this.shadowRoot?.querySelector('#locCdInput')
-      if (input) input.value = ''
+      const innerInput = input?.shadowRoot?.querySelector('input')
+      if (innerInput) innerInput.value = ''
     }
   }
 
@@ -1135,12 +1253,15 @@ export class PdaStockInquiry extends connect(store)(PageView) {
    */
   async _onSkuCdChange(skuCd) {
     if (!skuCd) return
+
     this.searchSkuCd = skuCd
     await this._search()
+
     if (!this.inventories.length) {
       this.searchSkuCd = ''
       const input = this.shadowRoot?.querySelector('#skuCdInput')
-      if (input) input.value = ''
+      const innerInput = input?.shadowRoot?.querySelector('input')
+      if (innerInput) innerInput.value = ''
     }
   }
 
@@ -1179,8 +1300,10 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       if (!this.inventories.length) {
         this._showFeedback('조회 결과가 없습니다', 'warning')
       }
+
     } catch (error) {
-      this._showFeedback(error.message || '재고 조회에 실패했습니다', 'error')
+      this._updateErrorFeedback(error.message || '재고 조회에 실패했습니다')
+
     } finally {
       this.loading = false
     }
@@ -1196,10 +1319,16 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     this.searchSkuCd = ''
     this.inventories = []
     this.lastFeedback = null
+
     for (const id of ['#barcodeInput', '#locCdInput', '#skuCdInput']) {
       const el = this.shadowRoot?.querySelector(id)
-      if (el) el.value = ''
+      const innerEl = el?.shadowRoot?.querySelector('input')
+      if (innerEl) innerEl.value = ''
     }
+
+    const oxInput = this.shadowRoot?.querySelector('#barcodeInput')
+    const innerInput = oxInput?.shadowRoot?.querySelector('input')
+    if (innerInput) innerInput.focus()
   }
 
   /**
@@ -1227,8 +1356,10 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         `inventory_hists/by_inventory_id/${this.selectedInventory.id}`
       )
       this.historyItems = result || []
+
     } catch (error) {
-      this._showFeedback(error.message || '이력 조회에 실패했습니다', 'error')
+      this._updateErrorFeedback(error.message || '이력 조회에 실패했습니다')
+
     } finally {
       this.historyLoading = false
     }
@@ -1299,7 +1430,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
     this.processing = true
     try {
-      await ServiceUtil.restPost('inventory_trx/create_inventory', {
+      const result = await ServiceUtil.restPost('inventory_trx/create_inventory', {
         wh_cd,
         com_cd,
         sku_cd,
@@ -1310,13 +1441,19 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         remarks: this.addForm.remarks || null
       })
 
-      document.dispatchEvent(new CustomEvent('notify', {
-        detail: { level: 'info', message: `재고 추가 완료: ${sku_cd} → ${loc_cd}` }
-      }))
+      if (result && result.id) {
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: { level: 'info', message: `재고 추가 완료: ${sku_cd} → ${loc_cd}` }
+        }))
+        this._goList()
 
-      this._goList()
+      } else {
+        this._updateErrorFeedback('재고 추가에 실패했습니다')
+      }
+
     } catch (error) {
-      this._showFeedback(error.message || '재고 추가에 실패했습니다', 'error')
+      this._updateErrorFeedback(error.message || '재고 추가에 실패했습니다')
+
     } finally {
       this.processing = false
     }
@@ -1330,6 +1467,10 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     this._adjReason = ''
     this.lastFeedback = null
     this.mode = 'adjust'
+    setTimeout(() => {
+      const input = this.shadowRoot?.querySelector('#adjQtyInput')
+      if (input) input.focus()
+    }, 100)
   }
 
   /**
@@ -1345,8 +1486,9 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     this.lastFeedback = null
     this.mode = 'move'
     setTimeout(() => {
-      const input = this.shadowRoot?.querySelector('#moveToLocInput')
-      if (input) input.focus()
+      const oxInput = this.shadowRoot?.querySelector('#moveToLocInput')
+      const innerInput = oxInput?.shadowRoot?.querySelector('input')
+      if (innerInput) innerInput.focus()
     }, 100)
   }
 
@@ -1361,17 +1503,31 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       const location = await ServiceUtil.restPost('inventory_trx/validate_location_for_move', {
         to_loc_cd: locCd
       })
-      this._moveToLocCd = locCd
-      this._moveToLocation = location
-      this._showFeedback(`${locCd} 로케이션 확인`, 'success')
+
+      if (location && location.id) {
+        this._moveToLocCd = locCd
+        this._moveToLocation = location
+        this._showFeedback(`${locCd} 로케이션 확인`, 'success')
+
+      } else {
+        this.clearForValidateMoveFailed()
+      }
+
     } catch (error) {
-      this._moveToLocCd = ''
-      this._moveToLocation = null
-      const input = this.shadowRoot?.querySelector('#moveToLocInput')
-      if (input) input.value = ''
-      this._showFeedback(error.message || '유효하지 않은 로케이션입니다', 'error')
-      navigator.vibrate?.(200)
+      this.clearForValidateMoveFailed()
     }
+  }
+
+  /**
+   * To 로케이션 입력값 초기화
+   */
+  clearForValidateMoveFailed() {
+    this._moveToLocCd = ''
+    this._moveToLocation = null
+    const oxLocInput = this.shadowRoot?.querySelector('#moveToLocInput')
+    const innerInput = oxLocInput?.shadowRoot?.querySelector('input')
+    if (innerInput) innerInput.value = ''
+    this._updateErrorFeedback(error.message || '유효하지 않은 로케이션입니다')
   }
 
   /**
@@ -1408,20 +1564,174 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
     this.processing = true
     try {
-      await ServiceUtil.restPost(`inventory_trx/${inv.id}/move_inventory`, {
+      const result = await ServiceUtil.restPost(`inventory_trx/${inv.id}/move_inventory`, {
         to_loc_cd: this._moveToLocCd,
         to_qty: qty,
         reason: this._moveReason.trim()
       })
 
-      document.dispatchEvent(new CustomEvent('notify', {
-        detail: { level: 'info', message: `재고 이동 완료: ${inv.barcode} → ${this._moveToLocCd} (${qty})` }
-      }))
+      if (result && result.id) {
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: { level: 'info', message: `재고 이동 완료: ${inv.barcode} → ${this._moveToLocCd} (${qty})` }
+        }))
+      } else {
+        this._updateErrorFeedback('재고 이동에 실패했습니다')
+      }
 
-      this._goList()
     } catch (error) {
-      this._showFeedback(error.message || '재고 이동에 실패했습니다', 'error')
-      navigator.vibrate?.(200)
+      this._updateErrorFeedback(error.message || '재고 이동에 실패했습니다')
+
+    } finally {
+      this.processing = false
+    }
+  }
+
+  /**
+   * 재고 병합 화면으로 이동
+   * 병합 대상 입력 초기화 후 병합 바코드 입력에 포커스
+   */
+  _goMerge() {
+    this._mergeBarcode = ''
+    this._mergeMergeLocCd = ''
+    this._mergeReason = ''
+    this._mergeInventory = null
+    this.lastFeedback = null
+    this.mode = 'merge'
+    setTimeout(() => {
+      const oxInput = this.shadowRoot?.querySelector('#mergeBarcodeInput')
+      const innerInput = oxInput?.shadowRoot?.querySelector('input')
+      if (innerInput) innerInput.focus()
+    }, 100)
+  }
+
+  /**
+   * 병합 바코드 스캔/입력 처리
+   * 로케이션도 입력된 경우 재고 존재 여부 즉시 검증
+   * @param {string} barcode
+   */
+  async _onMergeBarcodeChange(barcode) {
+    if (!barcode) return
+    this._mergeBarcode = barcode
+    this._mergeInventory = null
+    if (this._mergeMergeLocCd) {
+      await this._validateMergeInventory()
+    } else {
+      const oxInput = this.shadowRoot?.querySelector('#mergeLocCdInput')
+      const innerInput = oxInput?.shadowRoot?.querySelector('input')
+      if (innerInput) innerInput.focus()
+    }
+  }
+
+  /**
+   * 병합 로케이션 스캔/입력 처리
+   * 바코드도 입력된 경우 재고 존재 여부 즉시 검증
+   * 유효하지 않으면 입력 초기화
+   * @param {string} locCd
+   */
+  async _onMergeLocCdChange(locCd) {
+    if (!locCd) return
+    this._mergeMergeLocCd = locCd
+    this._mergeInventory = null
+    if (this._mergeBarcode) {
+      await this._validateMergeInventory()
+    }
+  }
+
+  /**
+   * 병합 대상 재고 존재 여부 검증 - TODO inventory_trx/validate_inventory_for_merge 로 변경 필요
+   * POST /rest/inventory_trx/validate_inventory_for_merge
+   * 존재하면 _mergeInventory에 저장, 오류 시 입력 초기화
+   */
+  async _validateMergeInventory() {
+    const inv = this.selectedInventory
+    try {
+      const found = await ServiceUtil.restPost('inventory_trx/validate_inventory_for_merge', {
+        merge_barcode: this._mergeBarcode,
+        merge_loc_cd: this._mergeMergeLocCd,
+        base_inventory_id: inv?.id
+      })
+
+      if (found && found.id) {
+        this._mergeInventory = found
+        this._showFeedback(
+          `${found.sku_cd || ''} · ${found.loc_cd || ''} · ${found.inv_qty ?? 0}개 확인`,
+          'success'
+        )
+      } else {
+        this.clearForValidateMergeFailed()
+      }
+
+    } catch (error) {
+      this.clearForValidateMergeFailed()
+    }
+  }
+
+  /**
+   * 병합 대상 재고 검증 실패 시 입력값 초기화
+   */
+  clearForValidateMergeFailed() {
+    this._mergeInventory = null
+    this._mergeBarcode = ''
+    this._mergeMergeLocCd = ''
+
+    const barcodeOx = this.shadowRoot?.querySelector('#mergeBarcodeInput')
+    const innerBarcode = barcodeOx?.shadowRoot?.querySelector('input')
+    if (innerBarcode) innerBarcode.value = ''
+
+    const locOx = this.shadowRoot?.querySelector('#mergeLocCdInput')
+    const innerLoc = locOx?.shadowRoot?.querySelector('input')
+    if (innerLoc) innerLoc.value = ''
+
+    this._updateErrorFeedback('병합 처리를 할 수 있는 재고가 아닙니다.')
+  }
+
+  /**
+   * 피드백 메시지 표시
+   * @param {*} msg
+   */
+  _updateErrorFeedback(msg) {
+    this._showFeedback(msg, 'error')
+    navigator.vibrate?.(200)
+  }
+
+  /**
+   * 재고 병합 확정 API 호출
+   * POST /rest/inventory_trx/{id}/merge_inventory
+   */
+  async _submitMerge() {
+    if (!this._mergeInventory) {
+      this._showFeedback('병합 대상 재고를 확인하세요', 'warning')
+      return
+    }
+    if (!this._mergeReason || !this._mergeReason.trim()) {
+      this._showFeedback('병합 사유를 입력하세요', 'warning')
+      return
+    }
+
+    const inv = this.selectedInventory
+    this.processing = true
+    try {
+      const result = await ServiceUtil.restPost(`inventory_trx/${inv.id}/merge_inventory`, {
+        merge_barcode: this._mergeBarcode,
+        merge_loc_cd: this._mergeMergeLocCd,
+        reason: this._mergeReason.trim()
+      })
+
+      if (result && result.id) {
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: {
+            level: 'info',
+            message: `재고 병합 완료: ${this._mergeBarcode}(${this._mergeMergeLocCd}) → ${inv.barcode}`
+          }
+        }))
+
+      } else {
+        this._updateErrorFeedback('재고 병합에 실패했습니다')
+      }
+
+    } catch (error) {
+      this._updateErrorFeedback(error.message || '재고 병합에 실패했습니다')
+
     } finally {
       this.processing = false
     }
@@ -1464,11 +1774,14 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         this.selectedInventory = result || inv
         this.lastFeedback = null
         this.mode = 'detail'
+
+      } else {
+        this._updateErrorFeedback('재고 조정에 실패했습니다')
       }
 
     } catch (error) {
-      this._showFeedback(error.message || '재고 조정에 실패했습니다', 'error')
-      navigator.vibrate?.(200)
+      this._updateErrorFeedback(error.message || '재고 조정에 실패했습니다')
+
     } finally {
       this.processing = false
     }
