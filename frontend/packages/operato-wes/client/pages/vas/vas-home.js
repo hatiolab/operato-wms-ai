@@ -251,8 +251,7 @@ class VasHome extends localize(i18next)(PageView) {
                 <div class="header-actions">
                   <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">🔍 ${i18next.t('button.refresh', { defaultValue: '새로고침' })}</button>
                   <button class="btn btn-outline" @click="${this._openOrderNewPopup}">📝 ${i18next.t('button.vas_order_new', { defaultValue: '작업 지시 생성' })}</button>
-                  <button class="btn btn-outline" @click="${() => this._navigateTo('vas-work-monitor', { status: 'IN_PROGRESS', vas_req_date: ValueUtil.todayFormatted() })}">📊 ${i18next.t('button.vas_work_monitor', { defaultValue: '작업 진행 현황' })}</button>
-                  <button class="btn btn-outline" @click="${() => this._navigateTo('vas-results')}">📋 ${i18next.t('button.vas_results', { defaultValue: '실적 조회' })}</button>
+<button class="btn btn-outline" @click="${() => this._navigateTo('vas-results')}">📋 ${i18next.t('button.vas_results', { defaultValue: '실적 조회' })}</button>
                   <button class="btn btn-outline" @click="${() => this._navigateTo('vas-boms')}">📦 ${i18next.t('button.vas_boms', { defaultValue: '세트 상품 관리' })}</button>
                 </div>
               </div>
@@ -270,7 +269,7 @@ class VasHome extends localize(i18next)(PageView) {
                     <div class="count">${this.statusCounts.APPROVED || 0}</div>
                     <div class="subtitle">작업 대기</div>
                   </div>
-                  <div class="status-card in-progress" @click="${() => this._navigateTo('vas-work-monitor', { status: 'IN_PROGRESS', vas_req_date: ValueUtil.todayFormatted() })}">
+                  <div class="status-card in-progress">
                     <div class="label">작업 중</div>
                     <div class="count">${this.statusCounts.IN_PROGRESS || 0}</div>
                     <div class="subtitle">진행 중</div>
