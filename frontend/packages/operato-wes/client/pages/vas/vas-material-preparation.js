@@ -353,7 +353,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
           table-layout: fixed;
         }
 
-        /* 순번 4% | SKU 10% | 자재명 20% | 필요/할당/피킹 6%×3 | 로케이션 10% | LOT 8% | 상태 8% | 액션 16% */
+        /* 순번 4% | SKU 10% | 자재명 20% | 필요/할당/피킹 6%×3 | 로케이션 10% | LOT 0%(숨김) | 상태 8% | 액션 30% */
         .items-table colgroup col:nth-child(1)  { width: 4%; }
         .items-table colgroup col:nth-child(2)  { width: 10%; }
         .items-table colgroup col:nth-child(3)  { width: 20%; }
@@ -361,9 +361,9 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
         .items-table colgroup col:nth-child(5)  { width: 6%; }
         .items-table colgroup col:nth-child(6)  { width: 6%; }
         .items-table colgroup col:nth-child(7)  { width: 10%; }
-        .items-table colgroup col:nth-child(8)  { width: 8%; }
+        .items-table colgroup col:nth-child(8)  { width: 0; }
         .items-table colgroup col:nth-child(9)  { width: 8%; }
-        .items-table colgroup col:nth-child(10) { width: 22%; }
+        .items-table colgroup col:nth-child(10) { width: 30%; }
 
         .items-table thead {
           background: var(--md-sys-color-surface-variant, #f0f0f0);
@@ -503,8 +503,8 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
         .alloc-sub-table colgroup col:nth-child(1) { width: 30%; }
         .alloc-sub-table colgroup col:nth-child(2) { width: 20%; }
         .alloc-sub-table colgroup col:nth-child(3) { width: 15%; }
-        .alloc-sub-table colgroup col:nth-child(4) { width: 15%; }
-        .alloc-sub-table colgroup col:nth-child(5) { width: 20%; }
+        .alloc-sub-table colgroup col:nth-child(4) { width: 0; }
+        .alloc-sub-table colgroup col:nth-child(5) { width: 35%; }
 
         .alloc-sub-table th {
           background: #E8EAF6;
@@ -818,7 +818,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
               <th style="text-align:right">할당수량</th>
               <th style="text-align:right">피킹수량</th>
               <th>소스 로케이션</th>
-              <th>LOT</th>
+              <th style="width:0;padding:0;overflow:hidden;border:none"></th>
               <th>상태</th>
               <th>액션</th>
             </tr>
@@ -833,7 +833,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
                 <td class="number">${item.alloc_qty || 0}</td>
                 <td class="number">${item.picked_qty || 0}</td>
                 <td>${item.src_loc_cd || '-'}</td>
-                <td>${item.lot_no || '-'}</td>
+                <td style="width:0;padding:0;overflow:hidden;border:none"></td>
                 <td>
                   <span class="item-status-badge ${item.status || 'PLANNED'}">
                     ${this._itemStatusLabel(item.status)}
@@ -1229,7 +1229,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
               <th>바코드</th>
               <th>로케이션</th>
               <th class="center">할당수량</th>
-              <th class="center">LOT</th>
+              <th class="center" style="width:0;padding:0;overflow:hidden;border:none"></th>
               <th>유통기한</th>
             </tr>
           </thead>
@@ -1239,7 +1239,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
                 <td>${a.barcode || '-'}</td>
                 <td>${a.loc_cd || '-'}</td>
                 <td class="center">${a.alloc_qty || 0}</td>
-                <td class="center">${a.lot_no || '-'}</td>
+                <td class="center" style="width:0;padding:0;overflow:hidden;border:none"></td>
                 <td>${a.expired_date || '-'}</td>
               </tr>
             `)}
