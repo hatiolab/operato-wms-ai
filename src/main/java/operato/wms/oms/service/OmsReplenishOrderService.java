@@ -222,13 +222,15 @@ public class OmsReplenishOrderService extends AbstractQueryService {
 
 		// 헤더 planItem/planTotal 업데이트
 		String updateSql = """
-				UPDATE replenish_orders SET plan_item = :planItem,
-				  plan_total = (SELECT COALESCE(SUM(order_qty), 0) FROM replenish_order_items WHERE domain_id = :domainId AND replenish_order_id = :orderId),
-				  updated_at = now()
+				UPDATE replenish_orders SET
+					plan_item = :planItem,
+					plan_total = (SELECT COALESCE(SUM(order_qty), 0) FROM replenish_order_items WHERE domain_id = :domainId AND replenish_order_id = :orderId),
+					wave_no = (select so.wave_no from shipment_orders so where so.id = :shipmentOrderId and so.domain_id = :domainId),
+					updated_at = now()
 				WHERE domain_id = :domainId AND id = :orderId
 				""";
-		Map<String, Object> updateParams = ValueUtil.newMap("domainId,orderId,planItem", domainId,
-				replenishOrder.getId(), itemCount);
+		Map<String, Object> updateParams = ValueUtil.newMap("domainId,orderId,planItem,shipmentOrderId", domainId,
+				replenishOrder.getId(), itemCount, shipmentOrderId);
 		this.queryManager.executeBySql(updateSql, updateParams);
 
 		Map<String, Object> result = ValueUtil.newMap("replenish_created,replenish_no,item_count", true,
@@ -236,6 +238,7 @@ public class OmsReplenishOrderService extends AbstractQueryService {
 		if (!noStockSkus.isEmpty()) {
 			result.put("no_stock_skus", noStockSkus);
 		}
+
 		return result;
 	}
 

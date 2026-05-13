@@ -567,7 +567,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
 
         <div class="wave-info">
           <div class="wave-info-item">
-            <span class="label">${i18next.t('label.wave_date', { defaultValue: '웨이브일' })}:</span>
+            <span class="label">${i18next.t('label.wave_date', { defaultValue: '웨이브 일자' })}:</span>
             <span class="value">${w.wave_date || '-'}</span>
           </div>
           <div class="wave-info-item">
@@ -575,8 +575,8 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
             <span class="value">${w.wave_seq || '-'}</span>
           </div>
           <div class="wave-info-item">
-            <span class="label">${i18next.t('label.pick_method', { defaultValue: '피킹방식' })}:</span>
-            <span class="value">${this._pickMethodLabel(w.pick_method)}</span>
+            <span class="label">${i18next.t('label.pick_type', { defaultValue: '피킹유형' })}:</span>
+            <span class="value">${this._pickTypeLabel(w.pick_type)}</span>
           </div>
           <div class="wave-info-item">
             <span class="label">${i18next.t('label.carrier', { defaultValue: '택배사' })}:</span>
@@ -1253,20 +1253,9 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
   /** 피킹유형 코드를 한글 라벨로 변환 */
   _pickTypeLabel(type) {
     const labels = {
-      TOTAL: i18next.t('label.total_picking', { defaultValue: '토털 피킹' }),
-      INDIVIDUAL: i18next.t('label.individual_picking', { defaultValue: '개별 피킹' }),
-      ZONE: i18next.t('label.zone_picking', { defaultValue: '존 피킹' })
-    }
-    return labels[type] || type || '-'
-  }
-
-  /** 피킹방식 코드를 한글 라벨로 변환 */
-  _pickMethodLabel(type) {
-    const labels = {
-      WCS: i18next.t('label.pick_method_wcs', { defaultValue: 'WCS 위임' }),
-      PAPER: i18next.t('label.pick_method_paper', { defaultValue: '페이퍼 처리' }),
-      INSPECT: i18next.t('label.pick_method_inspect', { defaultValue: '검수와 함께 피킹' }),
-      PICK: i18next.t('label.pick_method_pick', { defaultValue: '피킹' })
+      TOTAL: i18next.t('label.total_pick', { defaultValue: '토털 피킹' }),
+      INDIVIDUAL: i18next.t('label.individual_pick', { defaultValue: '개별 피킹' }),
+      ZONE: i18next.t('label.zone_pick', { defaultValue: '존 피킹' })
     }
     return labels[type] || type || '-'
   }
