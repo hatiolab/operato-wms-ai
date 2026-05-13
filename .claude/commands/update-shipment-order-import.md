@@ -16,22 +16,28 @@
 ## 인자
 
 ```
-update-shipment-order-import <파일경로>
+update-shipment-order-import <파일명>
 ```
 
-- `<파일경로>`: 업데이트할 엑셀 파일 경로 (기본값: `templates/B2C-출고주문-O1-임포트.xlsx`)
+- `<파일명>`: `templates/` 폴더 아래의 파일명 (예: `LOGION-B2C-출고주문-템플릿.xlsx`)
+- 파일명만 입력하면 되며, `templates/` 경로는 자동으로 붙습니다
+- 인자 생략 시 기본값: `LOGION-B2C-출고주문-템플릿.xlsx`
 
 ## 처리 절차
 
 ### 1. 파일 확인
+
+인자로 받은 `$ARGUMENTS`가 있으면 `templates/$ARGUMENTS`를 사용하고, 없으면 `templates/LOGION-B2C-출고주문-템플릿.xlsx`를 기본값으로 사용합니다.
 
 ```python
 import openpyxl
 from datetime import datetime
 from collections import OrderedDict
 import re
+import sys
 
-file_path = '{파일경로}'
+file_name = sys.argv[1] if len(sys.argv) > 1 else 'LOGION-B2C-출고주문-템플릿.xlsx'
+file_path = f'templates/{file_name}'
 wb = openpyxl.load_workbook(file_path)
 ws = wb.active
 ```
@@ -143,16 +149,16 @@ wb.save(file_path)
 /update-shipment-order-import
 ```
 
-### 특정 파일 지정
+### 특정 파일 지정 (파일명만)
 
 ```bash
-/update-shipment-order-import templates/B2C-출고주문-CJ-임포트.xlsx
+/update-shipment-order-import LOGION-B2C-출고주문-템플릿.xlsx
 ```
 
 ## 실행 결과 예시
 
 ```
-📂 파일: templates/B2C-출고주문-O1-임포트.xlsx
+📂 파일: templates/LOGION-B2C-출고주문-템플릿.xlsx
 
 현재 '원주문 번호' 값들:
   행 2: DO-260329-0010
