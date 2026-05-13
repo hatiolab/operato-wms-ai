@@ -7,6 +7,7 @@ import xyz.elidom.dbist.annotation.GenerationRule;
 import xyz.elidom.dbist.annotation.Index;
 import xyz.elidom.dbist.annotation.PrimaryKey;
 import xyz.elidom.dbist.annotation.Table;
+import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.orm.IQueryManager;
 import xyz.elidom.sys.SysConstants;
 import xyz.elidom.sys.entity.Domain;
@@ -465,12 +466,27 @@ public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		// 당일 최대 wave_seq 조회
 		String seqSql = "SELECT COALESCE(MAX(wave_seq), 0) FROM shipment_waves WHERE domain_id = :domainId AND wave_date = :waveDate";
 		Map<String, Object> seqParams = ValueUtil.newMap("domainId,waveDate", domainId, this.waveDate);
-		Integer maxSeq = BeanUtil.get(IQueryManager.class).selectBySql(seqSql, seqParams, Integer.class);
+		IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
+		Integer maxSeq = queryMgr.selectBySql(seqSql, seqParams, Integer.class);
 		this.waveSeq = (maxSeq != null ? maxSeq : 0) + 1;
 
-		// 웨이브 번호 생성
-		this.waveNo = "W" + Domain.currentDomainId()
-				+ this.waveDate.replace(SysConstants.DASH, SysConstants.EMPTY_STRING).substring(2)
-				+ SysConstants.DASH + String.format("%03d", this.waveSeq);
+		// 웨이브 번호가 없다면 생성
+		if (ValueUtil.isEmpty(this.waveNo)) {
+			this.waveNo = "W" + Domain.currentDomainId()
+					+ this.waveDate.replace(SysConstants.DASH, SysConstants.EMPTY_STRING).substring(2)
+					+ SysConstants.DASH + String.format("%03d", this.waveSeq);
+
+			// 있다면 이미 웨이브가 생성되어 있는지 체크하여 있으면 중복 에러 발생
+		} else {
+			ShipmentWave wave = queryMgr.selectByCondition(ShipmentWave.class,
+					ValueUtil.newMap("domainId,waveNo", domainId, this.waveNo));
+			if (wave != null) {
+				if (!ShipmentWave.STATUS_CANCELLED.equalsIgnoreCase(wave.getStatus())) {
+					throw new ElidomRuntimeException("이미 존재하는 웨이브 번호입니다.");
+				} else {
+					queryMgr.delete(wave);
+				}
+			}
+		}
 	}
 }

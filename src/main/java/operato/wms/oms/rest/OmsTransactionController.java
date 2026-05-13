@@ -100,7 +100,7 @@ public class OmsTransactionController extends AbstractRestService {
 		// 1. 커스텀 서비스 - 전 처리
 		Map<String, Object> params = ValueUtil.newMap("biz_type,list",
 				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2C_OUT, list);
-		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_IMPORT_SHIPMENT, params);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CHECK_IMPORT_SHIPMENT, params);
 
 		// 2. 본 로직 실행
 		Map<String, Object> result = this.importService.validateImportData(list,
@@ -108,7 +108,7 @@ public class OmsTransactionController extends AbstractRestService {
 
 		// 3. 커스텀 서비스 - 후 처리
 		params.put("result", result);
-		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_IMPORT_SHIPMENT, params);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CHECK_IMPORT_SHIPMENT, params);
 
 		return result;
 	}
@@ -129,7 +129,7 @@ public class OmsTransactionController extends AbstractRestService {
 		// 1. 커스텀 서비스 - 전 처리
 		Map<String, Object> params = ValueUtil.newMap("biz_type,list",
 				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT, list);
-		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_IMPORT_SHIPMENT, params);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CHECK_IMPORT_SHIPMENT, params);
 
 		// 2. 본 로직 실행
 		Map<String, Object> result = this.importService.validateImportData(list,
@@ -137,7 +137,7 @@ public class OmsTransactionController extends AbstractRestService {
 
 		// 3. 커스텀 서비스 - 후 처리
 		params.put("result", result);
-		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_IMPORT_SHIPMENT, params);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CHECK_IMPORT_SHIPMENT, params);
 
 		return result;
 	}
@@ -220,7 +220,7 @@ public class OmsTransactionController extends AbstractRestService {
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CREATE_WAVE, params);
 
 		// 2. 본 로직 실행
-		Map<String, Object> result = this.waveService.createWave(list, null, null);
+		Map<String, Object> result = this.waveService.createWave(list, null);
 
 		// 3. 커스텀 서비스 - 후 처리
 		params.put("wave", result);

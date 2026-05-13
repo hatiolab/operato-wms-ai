@@ -63,8 +63,10 @@ public class OmsWaveService extends AbstractQueryService {
 				+ " ORDER BY priority_cd, created_at";
 		Map<String, Object> orderParams = ValueUtil.newMap("domainId,status,orderDate", domainId,
 				ShipmentOrder.STATUS_ALLOCATED, orderDate);
-		if (whCd != null) orderParams.put("whCd", whCd);
-		if (comCd != null) orderParams.put("comCd", comCd);
+		if (whCd != null)
+			orderParams.put("whCd", whCd);
+		if (comCd != null)
+			orderParams.put("comCd", comCd);
 		List<ShipmentOrder> orders = this.queryManager.selectListBySql(orderSql, orderParams, ShipmentOrder.class, 0,
 				0);
 
@@ -161,7 +163,7 @@ public class OmsWaveService extends AbstractQueryService {
 	 * 화면에서 직접 선택한 주문 리스트를 하나의 웨이브로 묶는다.
 	 * ALLOCATED 상태의 주문만 웨이브에 포함할 수 있다.
 	 *
-	 * @param params { orders: [{ id, ... }], pick_type, pick_method }
+	 * @param params { orders: [{ id, ... }], pick_type }
 	 * @return { wave_no, wave_seq, order_count, sku_count, total_qty,
 	 *         skipped_count, errors }
 	 */
@@ -172,8 +174,6 @@ public class OmsWaveService extends AbstractQueryService {
 				? (List<Map<String, Object>>) params.get("orders")
 				: new ArrayList<>();
 		String pickType = ValueUtil.isNotEmpty(params.get("pick_type")) ? params.get("pick_type").toString() : "TOTAL";
-		String pickMethod = ValueUtil.isNotEmpty(params.get("pick_method")) ? params.get("pick_method").toString()
-				: "PICK";
 
 		if (orders.isEmpty()) {
 			throw new ElidomValidationException("웨이브에 포함할 주문을 선택해 주세요");
@@ -187,18 +187,17 @@ public class OmsWaveService extends AbstractQueryService {
 		}
 
 		// 주문 리스트로 웨이브 생성
-		return this.createWave(orderList, pickType, pickMethod);
+		return this.createWave(orderList, pickType);
 	}
 
 	/**
 	 * 선택된 주문으로 웨이브 생성
 	 *
-	 * @param list
-	 * @param pickType
-	 * @param pickMethod
+	 * @param list     출고 주문 리스트
+	 * @param pickType 피킹 유형
 	 * @return
 	 */
-	public Map<String, Object> createWave(List<ShipmentOrder> list, String pickType, String pickMethod) {
+	public Map<String, Object> createWave(List<ShipmentOrder> list, String pickType) {
 		Long domainId = Domain.currentDomainId();
 
 		if (ValueUtil.isEmpty(list)) {
@@ -226,7 +225,7 @@ public class OmsWaveService extends AbstractQueryService {
 		}
 
 		if (validOrders.isEmpty()) {
-			throw new ElidomValidationException("웨이브에 포함할 수 있는 주문이 없습니다 (ALLOCATED 상태의 주문만 가능)");
+			throw new ElidomValidationException("웨이브에 포함할 수 있는 주문이 없습니다. (ALLOCATED 상태의 주문만 가능)");
 		}
 
 		// 계획 수량 집계
@@ -245,12 +244,17 @@ public class OmsWaveService extends AbstractQueryService {
 		int planItemCnt = skuCnt != null ? skuCnt : 0;
 
 		// 대표 택배사 (첫 번째 주문 기준)
-		String carrierCd = validOrders.get(0).getCarrierCd();
+		ShipmentOrder firstOrder = validOrders.get(0);
+		String waveNo = firstOrder.getWaveNo();
+		String dlvType = firstOrder.getDlvType();
+		String carrierCd = firstOrder.getCarrierCd();
 
 		// ShipmentWave 생성
 		ShipmentWave wave = new ShipmentWave();
 		wave.setDomainId(domainId);
+		wave.setWaveNo(waveNo);
 		wave.setPickType(pickType);
+		wave.setDlvType(dlvType);
 		wave.setCarrierCd(carrierCd);
 		wave.setPlanOrder(planOrderCnt);
 		wave.setPlanItem(planItemCnt);
@@ -276,6 +280,57 @@ public class OmsWaveService extends AbstractQueryService {
 		result.put("total_qty", planTotalQty);
 		result.put("skipped_count", list.size() - validOrders.size());
 		result.put("errors", errors);
+		return result;
+	}
+
+	/**
+	 * WaveNo로 단순 그루핑 웨이브 생성 - 이런 단순 그루핑 웨이브는 웨이브 확정 시 웨이브 소속 주문에 대한 Validation을
+	 * 처리해야 함
+	 * 
+	 * @param wave
+	 * @return
+	 */
+	public Map<String, Object> createWaveForGrouping(ShipmentWave wave) {
+		if (ValueUtil.isEmpty(wave.getWaveNo())) {
+			throw new ElidomValidationException("웨이브번호(waveNo)가 누락되었습니다.");
+		}
+
+		if (ValueUtil.isEmpty(wave.getDomainId())) {
+			wave.setDomainId(Domain.currentDomainId());
+		}
+
+		Map<String, Object> queryParams = ValueUtil.newMap("domainId,waveNo", wave.getDomainId(), wave.getWaveNo());
+		String orderCountSql = "SELECT count(*) FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo";
+		int orderCount = this.queryManager.selectBySql(orderCountSql, queryParams, Integer.class);
+
+		if (orderCount == 0) {
+			throw new ElidomValidationException("웨이브에 포함할 수 있는 주문이 없습니다.");
+		}
+
+		// 계획 수량 집계
+		String planTotalSql = "SELECT sum(total_order) as plan_total_order FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo";
+		double planTotalQty = this.queryManager.selectBySql(planTotalSql, queryParams, Double.class);
+
+		// SKU 종류 집계
+		String skuCountSql = "SELECT COUNT(DISTINCT sku_cd) as sku_cnt FROM shipment_order_items WHERE domain_id = :domainId AND shipment_order_id IN (SELECT id FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo)";
+		Integer skuCnt = this.queryManager.selectBySql(skuCountSql, queryParams, Integer.class);
+		int planItemCnt = skuCnt != null ? skuCnt : 0;
+
+		// ShipmentWave 생성
+		wave.setPlanOrder(orderCount);
+		wave.setPlanItem(planItemCnt);
+		wave.setPlanTotal(planTotalQty);
+		wave.setResultOrder(0);
+		wave.setResultItem(0);
+		wave.setResultTotal(0.0);
+		wave.setStatus(ShipmentWave.STATUS_CREATED);
+		this.queryManager.insert(wave);
+
+		Map<String, Object> result = ValueUtil.newMap("wave_no", wave.getWaveNo());
+		result.put("wave_seq", wave.getWaveSeq());
+		result.put("order_count", orderCount);
+		result.put("sku_count", planItemCnt);
+		result.put("total_qty", planTotalQty);
 		return result;
 	}
 

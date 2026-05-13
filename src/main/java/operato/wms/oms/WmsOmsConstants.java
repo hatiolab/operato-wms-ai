@@ -8,6 +8,11 @@ package operato.wms.oms;
 public class WmsOmsConstants {
 
 	// === 주문 임포트 ===
+	/** 커스텀 서비스 - 출하 주문 유효성 체크 */
+	public static final String TRX_OMS_PRE_CHECK_IMPORT_SHIPMENT = "diy-oms-pre-check-shipment-orders";
+	/** 커스텀 서비스 - 출하 주문 유효성 체크 후 처리 */
+	public static final String TRX_OMS_POST_CHECK_IMPORT_SHIPMENT = "diy-oms-post-check-shipment-orders";
+
 	/** 커스텀 서비스 - 출하 주문 임포트 전 처리 */
 	public static final String TRX_OMS_PRE_IMPORT_SHIPMENT = "diy-oms-pre-import-shipment-orders";
 	/** 커스텀 서비스 - 출하 주문 임포트 후 처리 */

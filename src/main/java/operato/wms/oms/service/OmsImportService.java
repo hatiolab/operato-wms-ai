@@ -121,6 +121,7 @@ public class OmsImportService extends AbstractQueryService {
 			resultRow.put("com_cd", row.getComCd());
 			resultRow.put("dlv_type", row.getDlvType());
 			resultRow.put("carrier_service_type", row.getCarrierServiceType());
+			resultRow.put("carrier_cd", row.getCarrierCd());
 			resultRow.put("priority_cd", row.getPriorityCd());
 			resultRow.put("remarks", row.getRemarks());
 
@@ -203,6 +204,7 @@ public class OmsImportService extends AbstractQueryService {
 			order.setBizType(firstRow.getBizType());
 			order.setShipType(firstRow.getShipType());
 			order.setDlvType(firstRow.getDlvType());
+			order.setCarrierCd(firstRow.getCarrierCd());
 			order.setCarrierServiceType(firstRow.getCarrierServiceType());
 			order.setPriorityCd(ValueUtil.isNotEmpty(firstRow.getPriorityCd()) ? firstRow.getPriorityCd() : "NORMAL");
 			order.setRemarks(firstRow.getRemarks());

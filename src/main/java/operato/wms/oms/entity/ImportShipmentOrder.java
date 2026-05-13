@@ -97,6 +97,12 @@ public class ImportShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStamp
 	private String dlvType;
 
 	/**
+	 * 운송사 코드
+	 */
+	@Column(name = "carrier_cd", length = 30)
+	private String carrierCd;
+
+	/**
 	 * 운송사 서비스 타입
 	 */
 	@Column(name = "carrier_service_type", length = 20)
@@ -360,6 +366,14 @@ public class ImportShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStamp
 
 	public void setDlvType(String dlvType) {
 		this.dlvType = dlvType;
+	}
+
+	public String getCarrierCd() {
+		return carrierCd;
+	}
+
+	public void setCarrierCd(String carrierCd) {
+		this.carrierCd = carrierCd;
 	}
 
 	public String getCarrierServiceType() {
