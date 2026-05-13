@@ -110,6 +110,7 @@ public class OmsImportService extends AbstractQueryService {
 			Map<String, Object> resultRow = ValueUtil.newMap("row_no", i + 1);
 			resultRow.put("biz_type", ValueUtil.isNotEmpty(row.getBizType()) ? row.getBizType() : bizType);
 			resultRow.put("ref_order_no", row.getRefOrderNo());
+			resultRow.put("wave_no", row.getWaveNo());
 			resultRow.put("sku_cd", row.getSkuCd());
 			resultRow.put("sku_nm", row.getSkuNm());
 			resultRow.put("order_qty", row.getOrderQty());
@@ -119,6 +120,7 @@ public class OmsImportService extends AbstractQueryService {
 			resultRow.put("wh_cd", row.getWhCd());
 			resultRow.put("com_cd", row.getComCd());
 			resultRow.put("dlv_type", row.getDlvType());
+			resultRow.put("carrier_service_type", row.getCarrierServiceType());
 			resultRow.put("priority_cd", row.getPriorityCd());
 			resultRow.put("remarks", row.getRemarks());
 
@@ -191,6 +193,7 @@ public class OmsImportService extends AbstractQueryService {
 			ShipmentOrder order = new ShipmentOrder();
 			order.setDomainId(domainId);
 			order.setRefOrderNo(firstRow.getRefOrderNo());
+			order.setWaveNo(firstRow.getWaveNo());
 			order.setOrderDate(ValueUtil.isNotEmpty(firstRow.getOrderDate()) ? firstRow.getOrderDate() : today);
 			order.setShipByDate(firstRow.getShipByDate());
 			order.setComCd(firstRow.getComCd());
@@ -200,6 +203,7 @@ public class OmsImportService extends AbstractQueryService {
 			order.setBizType(firstRow.getBizType());
 			order.setShipType(firstRow.getShipType());
 			order.setDlvType(firstRow.getDlvType());
+			order.setCarrierServiceType(firstRow.getCarrierServiceType());
 			order.setPriorityCd(ValueUtil.isNotEmpty(firstRow.getPriorityCd()) ? firstRow.getPriorityCd() : "NORMAL");
 			order.setRemarks(firstRow.getRemarks());
 			order.setAttr01(firstRow.getAttr01());

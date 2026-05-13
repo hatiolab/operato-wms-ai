@@ -390,9 +390,9 @@ class OmsHome extends localize(i18next)(PageView) {
                   <h2>오늘의 주문 현황</h2>
                   <div class="header-actions">
                     <button class="btn btn-outline" @click="${() => this._fetchDashboardData()}">🔍 새로고침</button>
+                    <button class="btn btn-outline" @click="${() => this._navigateTo('shipment-order-import')}">📥 주문 임포트</button>
                     <button class="btn btn-outline" @click="${() => this._navigateTo('shipment-orders')}">📋 주문 목록</button>
                     <button class="btn btn-outline" @click="${() => this._openWaveNewPopup()}">🌊 웨이브 생성</button>
-                    <button class="btn btn-outline" @click="${() => this._navigateTo('shipment-order-import')}">📥 주문 임포트</button>
                     <button class="btn btn-outline" @click="${() => this._navigateTo('replenish-orders')}">🔁 보충 현황</button>
                     <button class="btn btn-outline" @click="${() => this._navigateTo('inventories')}">📦 재고 조회</button>
                   </div>

@@ -37,6 +37,12 @@ public class ImportShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStamp
 	private String refOrderNo;
 
 	/**
+	 * 웨이브 번호
+	 */
+	@Column(name = "wave_no", length = 50)
+	private String waveNo;
+
+	/**
 	 * 주문일자 (YYYY-MM-DD)
 	 */
 	@Column(name = "order_date", length = 10)
@@ -89,6 +95,12 @@ public class ImportShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStamp
 	 */
 	@Column(name = "dlv_type", length = 20)
 	private String dlvType;
+
+	/**
+	 * 운송사 서비스 타입
+	 */
+	@Column(name = "carrier_service_type", length = 20)
+	private String carrierServiceType;
 
 	/**
 	 * 우선순위 코드 (URGENT/HIGH/NORMAL/LOW)
@@ -270,6 +282,14 @@ public class ImportShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStamp
 		this.refOrderNo = refOrderNo;
 	}
 
+	public String getWaveNo() {
+		return waveNo;
+	}
+
+	public void setWaveNo(String waveNo) {
+		this.waveNo = waveNo;
+	}
+
 	public String getOrderDate() {
 		return orderDate;
 	}
@@ -340,6 +360,14 @@ public class ImportShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStamp
 
 	public void setDlvType(String dlvType) {
 		this.dlvType = dlvType;
+	}
+
+	public String getCarrierServiceType() {
+		return carrierServiceType;
+	}
+
+	public void setCarrierServiceType(String carrierServiceType) {
+		this.carrierServiceType = carrierServiceType;
 	}
 
 	public String getPriorityCd() {

@@ -539,6 +539,7 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
               <th class="center">상태</th>
               <th>오류 내용</th>
               <th>원 주문번호</th>
+              <th>출고준비번호</th>
               <th>상품코드</th>
               <th>상품명</th>
               <th class="right">수량</th>
@@ -569,6 +570,7 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
                   <td class="center"><span class="status-icon">${row.valid ? '✅' : '❌'}</span></td>
                   <td class="error-text">${row.error_messages ? row.error_messages.join(', ') : ''}</td>
                   <td>${row.ref_order_no || ''}</td>
+                  <td>${row.wave_no || ''}</td>
                   <td>${row.sku_cd || ''}</td>
                   <td>${row.sku_nm || ''}</td>
                   <td class="right">${row.order_qty || 0}</td>
