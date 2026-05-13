@@ -19,7 +19,7 @@
 
 ## 1. 현황 요약
 
-> 최종 업데이트: 2026-05-13 | Week 2~3 작업 75% 완료 (41 / 55)
+> 최종 업데이트: 2026-05-13 | Week 2~3 작업 70% 완료 (43 / 61)
 
 ### 모듈별 완성도
 
@@ -36,15 +36,18 @@
 ### 핵심 미구현 목록 (요약)
 
 ```
-[잔여 7건 + 커스터마이징 7건]
+[잔여 8건]
 - W23-SF-7: 재고 실사 PDA 화면 (pda-stock-count.js)
 - W23-WA-3: 웨이브 확정 팝업 연동 (피킹 유형·배송 유형·택배사·검수여부·작업자 수)
 - W23-RW-1~2: 반품 전체 플로우 테스트
 - W23-FR-1: 백엔드 에러 메시지 클라이언트 전달 구조 수정
 - W23-FR-2: 기본 화면 조회 버튼 추가
 - W23-ETC-1: 재고 바코드 키 프로세스 전체 검증 (피킹·재고 트랜잭션)
-[커스터마이징]
-- W23-CUST-LK-1~7: 로지온 코리아 커스터마이징 (주소 정제, 대한통운 연동 등)
+- W23-ETC-2: 라벨 프린터 연동
+[커스터마이징 5건]
+- W23-CUST-LK-3~7: 로지온 코리아 커스터마이징 (B2C/B2B 프로세스, 검수·포장, 웨이브별 주문 화면)
+[택배사 연동 5건]
+- W23-CT-LT-1~5: 대한통운 연동 (주소 정제, 송장 채번/취소/출력, 집하 요청)
 ```
 
 ---
@@ -147,150 +150,163 @@
 
 현재 `frontend/pages/stock/` 디렉토리가 비어 있음. 최소 아래 화면은 오픈 전 필요.
 
-| 작업번호 | 화면명 | 파일명 | 내용 | 예정일 | 진행율 | 완료 | 비고 |
-|---------|--------|--------|------|--------|--------|------|------|
-| W23-SF-1 | 재고 현황 | `stock-inventory-list.js` | 로케이션별·SKU별 재고 조회 (필터: 화주사, 창고, 존) | 2026-04-25 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
-| W23-SF-2 | 수불 현황 | `inventory-transaction-list.js` | 기간별 입출고 이력 (inventory_hists 기반) | 2026-04-26 | 100% | ☑ | 백엔드 API + 프론트엔드 완료 |
-| W23-SF-3 | 재고 실사 목록 | `stock-stocktake-list.js` | 실사 지시 생성/조회/확정 | 2026-04-27 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
-| W23-SF-4 | 재고 이동 (PDA) | `pda-stock-move.js` | PDA 재고 이동 (바코드 스캔 → 목적지 로케이션 스캔 → 이동 확정) | 2026-04-28 | 100% | ☑ | PDA 화면으로 구현 완료 |
-| W23-SF-5 | 재고 조회 (PDA) | `pda-stock-inquiry.js` | PDA 바코드 스캔으로 재고 상세 정보 조회 (재고 바코드로 조회, 상품 코드, 상품 바코드로 조회, 로케이션 코드로 조회), 재고 추가 기능 | 2026-04-30 | 100% | ☑ | PDA 화면 구현 완료. W23-SF-6(재고 조정) 통합 |
-| W23-SF-6 | 재고 분할 / 병합 (PDA) | `pda-stock-inquiry.js` | PDA 바코드 스캔으로 동일 SKU 재고 분할 / 병합 | 2026-05-02 | 100% | ☑ | W23-SF-5(재고 조정) 통합 |
-| W23-SF-7 | 재고 실사 (PDA) | `pda-stock-count.js` | PDA 바코드 스캔으로 재고 실사 | 2026-05-02 | 0% | ☐ | |
-| W23-SF-8 | PDA 입고, 검수/포장, 실사 등 화면 | `pda-inbound-receiving.js`, `pda-fulfillment-picking.js`, `pda-fulfillment-packing.js`, `fulfillment-picking-pc`, `fulfillment-packing-pc` | 상품 바코드 스캔 시도 상품을 찾을 수 있도록 (서버에 요청) | 2026-04-29 | 100% | ☑ | |
-| W23-SF-9 | PDA 입고 화면 | `pda-inbound-receiving.js` | 상품 코드 스캔 하지 않으면 확정 버튼 처리할 수 없도록 수정 | 2026-04-29 | 100% | ☑ | |
-| W23-SF-10 | PDA 적치 화면 | `pda-stock-putaway.js` | 적치 전략에 따라 로케이션 추천 | 2026-04-29 | 100% | ☑ | |
-| W23-SF-11 | PDA 적치 화면 | `pda-inbound-putaway.js` | 입고 정보 상태 관리를 입고 & 적치 하나로 통합 - 화면에서 대기, 완료, 합계 수량과 입고 리스트를 표시 | 2026-04-29 | 100% | ☑ | list 모드 중단에 입고별 WAITING/STORED 건수 카드 리스트 추가. 카드 클릭 시 입고번호 스캔과 동일 동작. 백엔드 `GET /putaway/receiving-list` 신규 |
-| W23-SF-12 | PDA 출고 피킹 화면 | `pda-fulfillment-picking.js`,  | 상품 바코드 스캔이 아닌 재고 바코드 스캔으로 피킹하도록 수정 | 2026-04-29 | 100% | ☑ | |
+| # | 작업번호 | 화면명 | 파일명 | 내용 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|--------|------|--------|--------|------|------|
+| 1 | W23-SF-1 | 재고 현황 | `stock-inventory-list.js` | 로케이션별·SKU별 재고 조회 (필터: 화주사, 창고, 존) | 2026-04-25 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
+| 2 | W23-SF-2 | 수불 현황 | `inventory-transaction-list.js` | 기간별 입출고 이력 (inventory_hists 기반) | 2026-04-26 | 100% | ☑ | 백엔드 API + 프론트엔드 완료 |
+| 3 | W23-SF-3 | 재고 실사 목록 | `stock-stocktake-list.js` | 실사 지시 생성/조회/확정 | 2026-04-27 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
+| 4 | W23-SF-4 | 재고 이동 (PDA) | `pda-stock-move.js` | PDA 재고 이동 (바코드 스캔 → 목적지 로케이션 스캔 → 이동 확정) | 2026-04-28 | 100% | ☑ | PDA 화면으로 구현 완료 |
+| 5 | W23-SF-5 | 재고 조회 (PDA) | `pda-stock-inquiry.js` | PDA 바코드 스캔으로 재고 상세 정보 조회 (재고 바코드로 조회, 상품 코드, 상품 바코드로 조회, 로케이션 코드로 조회), 재고 추가 기능 | 2026-04-30 | 100% | ☑ | PDA 화면 구현 완료. W23-SF-6(재고 조정) 통합 |
+| 6 | W23-SF-6 | 재고 병합 (PDA) | `pda-stock-inquiry.js` | PDA 바코드 스캔으로 동일 SKU 재고 병합, 소비기한이 다르면 병합 불가능 | 2026-05-02 | 100% | ☑ | W23-SF-5(재고 조정) 통합 |
+| 7 | W23-SF-7 | 재고 실사 (PDA) | `pda-stock-count.js` | PDA 바코드 스캔으로 재고 실사 | 2026-05-02 | 0% | ☐ | |
+| 8 | W23-SF-8 | PDA 입고, 검수/포장, 실사 등 화면 | `pda-inbound-receiving.js`, `pda-fulfillment-picking.js`, `pda-fulfillment-packing.js`, `fulfillment-picking-pc`, `fulfillment-packing-pc` | 상품 바코드 스캔 시도 상품을 찾을 수 있도록 (서버에 요청) | 2026-04-29 | 100% | ☑ | |
+| 9 | W23-SF-9 | PDA 입고 화면 | `pda-inbound-receiving.js` | 상품 코드 스캔 하지 않으면 확정 버튼 처리할 수 없도록 수정 | 2026-04-29 | 100% | ☑ | |
+| 10 | W23-SF-10 | PDA 적치 화면 | `pda-stock-putaway.js` | 적치 전략에 따라 로케이션 추천 | 2026-04-29 | 100% | ☑ | |
+| 11 | W23-SF-11 | PDA 적치 화면 | `pda-inbound-putaway.js` | 입고 정보 상태 관리를 입고 & 적치 하나로 통합 - 화면에서 대기, 완료, 합계 수량과 입고 리스트를 표시 | 2026-04-29 | 100% | ☑ | list 모드 중단에 입고별 WAITING/STORED 건수 카드 리스트 추가. 카드 클릭 시 입고번호 스캔과 동일 동작. 백엔드 `GET /putaway/receiving-list` 신규 |
+| 12 | W23-SF-12 | PDA 출고 피킹 화면 | `pda-fulfillment-picking.js`,  | 상품 바코드 스캔이 아닌 재고 바코드 스캔으로 피킹하도록 수정 | 2026-04-29 | 100% | ☑ | |
 
 
 ### 3-2. [OMS] 웨이브 자동 할당 완성
 
-| 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
-|---------|------|------|------|--------|--------|------|------|
-| W23-WA-1 | 자동 웨이브 그루핑 룰 | 배송유형·거래처·화주사 조건으로 주문 자동 그루핑 | `OmsWaveService` | 2026-04-25 | 100% | ☑ | `createAutoWaves()`에 `wh_cd`/`com_cd` 필터 추가, `buildGroupKey()`에 `com_cd`/`dlv_type`/`ship_by_date` 케이스 추가 |
-| W23-WA-2 | 자동 웨이브 생성 스케줄러 | 특정 시각 자동 웨이브 생성 스케줄러 (Quartz) | `OmsWaveJob` (신규) | 2026-04-28 | 100% | ☑ | `OmsWaveJob extends AbstractJob` 신규 (handler_type=static), `WmsOmsConfigConstants`에 설정 상수 6개 추가. 트리거는 otarepo-core Quartz 프레임워크가 담당 — jobs 테이블에 handler=`operato.wms.oms.job.OmsWaveJob` 등록으로 활성화 |
-| W23-WA-3 | 웨이브 확정 팝업 연동 | 피킹 유형, 배송 유형, 택배사 코드, 검수 여부, 작업자 수 처리 | `FulfillmentTransactionController` | 2026-04-29 | 0% | ☐ | |
+| # | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|------|------|------|--------|------|------|
+| 1 | W23-WA-1 | 자동 웨이브 그루핑 룰 | 배송유형·거래처·화주사 조건으로 주문 자동 그루핑 | `OmsWaveService` | 2026-04-25 | 100% | ☑ | `createAutoWaves()`에 `wh_cd`/`com_cd` 필터 추가, `buildGroupKey()`에 `com_cd`/`dlv_type`/`ship_by_date` 케이스 추가 |
+| 2 | W23-WA-2 | 자동 웨이브 생성 스케줄러 | 특정 시각 자동 웨이브 생성 스케줄러 (Quartz) | `OmsWaveJob` (신규) | 2026-04-28 | 100% | ☑ | `OmsWaveJob extends AbstractJob` 신규 (handler_type=static), `WmsOmsConfigConstants`에 설정 상수 6개 추가. 트리거는 otarepo-core Quartz 프레임워크가 담당 — jobs 테이블에 handler=`operato.wms.oms.job.OmsWaveJob` 등록으로 활성화 |
+| 3 | W23-WA-3 | 웨이브 확정 팝업 연동 | 피킹 유형, 배송 유형, 택배사 코드, 검수 여부, 작업자 수 처리 | `FulfillmentTransactionController` | 2026-04-29 | 0% | ☐ | |
 
 ### 3-3. [OMS] 보충 지시 완성
 
-| 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
-|---------|------|------|------|--------|--------|------|------|
-| W23-RE-1 | 보충 지시 생성 | 피킹존 재고 부족 감지 → `ReplenishOrder` 자동 생성 | `OmsReplenishOrderService` | 2026-04-28 | 100% | ☑ | 재고 할당 시 BACK_ORDER 발생 → 자동 생성. 수동 생성 API(create_from_order/orders) 추가. start/complete/cancel 엔드포인트를 OmsReplenishOrderService에서 ReplenishOrderController로 노출 |
-| W23-RE-2 | 보충 작업 처리 | PDA 보충 작업 → 재고 이동 트랜잭션 연결 | `InvTransactionController` | 2026-04-29 | 100% | ☑ | `OmsReplenishOrderService.completeReplenishItem()` 신규 (result_qty 기록 + 전체 완료 시 헤더 자동 COMPLETED). PDA 화면 `pda-oms-replenish.js` 신규: 보충번호 스캔 → 바코드 스캔 → move_inventory → complete 연속 처리 |
+| # | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|------|------|--------|--------|------|------|
+| 1 | W23-RE-1 | 보충 지시 생성 | 피킹존 재고 부족 감지 → `ReplenishOrder` 자동 생성 | `OmsReplenishOrderService` | 2026-04-28 | 100% | ☑ | 재고 할당 시 BACK_ORDER 발생 → 자동 생성. 수동 생성 API(create_from_order/orders) 추가. start/complete/cancel 엔드포인트를 OmsReplenishOrderService에서 ReplenishOrderController로 노출 |
+| 2 | W23-RE-2 | 보충 작업 처리 | PDA 보충 작업 → 재고 이동 트랜잭션 연결 | `InvTransactionController` | 2026-04-29 | 100% | ☑ | `OmsReplenishOrderService.completeReplenishItem()` 신규 (result_qty 기록 + 전체 완료 시 헤더 자동 COMPLETED). PDA 화면 `pda-oms-replenish.js` 신규: 보충번호 스캔 → 바코드 스캔 → move_inventory → complete 연속 처리 |
 
 ### 3-4. [BASE] 사용자-화주사 매핑
 
-| 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
-|---------|------|------|------|--------|--------|------|------|
-| W23-UA-1 | 사용자-화주사 매핑 API | 사용자별 접근 가능 화주사 코드 목록 조회 API | `WmsBaseService`, `UserCompanyController` | 2026-04-29 | 100% | ☑ | |
-| W23-UA-2 | 화주사 선택 컴포넌트 | 로그인 사용자 권한 내 화주사 선택 드롭다운 공통 컴포넌트 | `MenuMetaService` (REF_TYPE_URL 구현) | 2026-04-30 | 100% | ☑ | |
+| # | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|------|------|------|--------|--------|------|------|
+| 1 | W23-UA-1 | 사용자-화주사 매핑 API | 사용자별 접근 가능 화주사 코드 목록 조회 API | `WmsBaseService`, `UserCompanyController` | 2026-04-29 | 100% | ☑ | |
+| 2 | W23-UA-2 | 화주사 선택 컴포넌트 | 로그인 사용자 권한 내 화주사 선택 드롭다운 공통 컴포넌트 | `MenuMetaService` (REF_TYPE_URL 구현) | 2026-04-30 | 100% | ☑ | |
 
 ### 3-5. [INBOUND] 입고 검수 반려 기능
 
-| 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
-|---------|------|------|------|--------|--------|------|------|
-| W23-IR-1 | 검수 반려 API | 입고 항목 반려 처리 → `REJECTED` 상태, 반려 사유 기록 | `InboundTransactionController` | 2026-04-30 | 100% | ☑ | `STATUS_REJECTED` 상수 추가, `rejectReceivingOrderLine()` 서비스 메서드, `POST receiving_orders/line/{id}/reject` + `POST receiving_orders/line/reject` 엔드포인트 추가, 자동 마감 체크 SQL에 REJECTED 제외 처리 |
-| W23-IR-2 | 반려 재고 처리 | 반려 항목 불량 로케이션 이동 또는 반품 처리 플로우 | `InboundTransactionService` | 2026-05-01 | 100% | ☑ | `processRejectedReceivingItem()` 신규 — DEFECT 로케이션 조회 후 불량(BAD) 재고 생성, `closeReceivingOrder()`에서 REJECTED 아이템 skip 처리, `createInventoriesByReceivingOrder()`에서 STATUS_END만 재고 생성(REJECTED 자동 제외) |
+| # | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|------|------|------|--------|--------|------|------|
+| 1 | W23-IR-1 | 검수 반려 API | 입고 항목 반려 처리 → `REJECTED` 상태, 반려 사유 기록 | `InboundTransactionController` | 2026-04-30 | 100% | ☑ | `STATUS_REJECTED` 상수 추가, `rejectReceivingOrderLine()` 서비스 메서드, `POST receiving_orders/line/{id}/reject` + `POST receiving_orders/line/reject` 엔드포인트 추가, 자동 마감 체크 SQL에 REJECTED 제외 처리 |
+| 2 | W23-IR-2 | 반려 재고 처리 | 반려 항목 불량 로케이션 이동 또는 반품 처리 플로우 | `InboundTransactionService` | 2026-05-01 | 100% | ☑ | `processRejectedReceivingItem()` 신규 — DEFECT 로케이션 조회 후 불량(BAD) 재고 생성, `closeReceivingOrder()`에서 REJECTED 아이템 skip 처리, `createInventoriesByReceivingOrder()`에서 STATUS_END만 재고 생성(REJECTED 자동 제외) |
 
 ### 3-6. [STOCK] 부족 재고 알림
 
-| 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
-|---------|------|------|------|--------|--------|------|------|
-| W23-SA-1 | 부족 재고 계산 | `SKU.safetyStock` 기준 부족 재고 SKU 목록 계산 | `InventoryDashboardService.java:95` | 2026-05-01 | 100% | ☑ | `getShortageSkus()` 신규 메서드 추가 → `getDashboardStatusCounts()`에 `shortage_sku` 집계, `getDashboardAlerts()`에 부족 재고 알림 추가, `GET /shortage-skus` 엔드포인트 추가 |
-| W23-SA-2 | 부족 재고 알림 노출 | 재고 대시보드에 부족 재고 경고 배지 표시 | `InventoryDashboardService.java:385` | 2026-05-01 | 100% | ☑ | 4번째 상태 카드를 "부족 재고 SKU" 배지 카드로 교체(`shortage_sku`), 알림 아이템에 건수 배지 CSS+HTML 추가 |
+| # | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|------|------|------|--------|--------|------|------|
+| 1 | W23-SA-1 | 부족 재고 계산 | `SKU.safetyStock` 기준 부족 재고 SKU 목록 계산 | `InventoryDashboardService.java:95` | 2026-05-01 | 100% | ☑ | `getShortageSkus()` 신규 메서드 추가 → `getDashboardStatusCounts()`에 `shortage_sku` 집계, `getDashboardAlerts()`에 부족 재고 알림 추가, `GET /shortage-skus` 엔드포인트 추가 |
+| 2 | W23-SA-2 | 부족 재고 알림 노출 | 재고 대시보드에 부족 재고 경고 배지 표시 | `InventoryDashboardService.java:385` | 2026-05-01 | 100% | ☑ | 4번째 상태 카드를 "부족 재고 SKU" 배지 카드로 교체(`shortage_sku`), 알림 아이템에 건수 배지 CSS+HTML 추가 |
 
 ### 3-7. [OMS] 추가 취소 백 프로세스
 
 > **설계 원칙**: 취소는 영구 종료가 아닌 **리셋** — 작업자 교대·실수 등의 사유로 처음부터 재작업 가능하게 복귀. 재고 할당(stock_allocations/reserved_qty)은 유지하여 재할당 없이 즉시 재작업 가능.
 
-| 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
-|---------|------|------|------|--------|--------|------|------|
-| W23-CB-1 | 피킹 취소 | PickingTask 리셋 (IN_PROGRESS → CREATED), PickingTaskItem WAIT 복귀·실적 수량 초기화, ShipmentOrder 상태 유지(PICKING) | `FulfillmentPickingService.cancelPickingTask()` | 2026-04-21 | 100% | ☑ | `cancelPickingTask()` 리셋 방식으로 재구현: PickingTask→CREATED, worker_id·started_at·실적 수량 null/0 초기화, PickingTaskItem→WAIT·pick_qty/short_qty 0 초기화, stock_allocations 유지 |
-| W23-CB-2 | 포장 취소 | PackingOrder 리셋 (CREATED/IN_PROGRESS/COMPLETED → CREATED), 박스 삭제, PackingOrderItem WAIT 복귀·수량 초기화, ShipmentOrder 상태 유지(PACKING) | `FulfillmentPackingService.cancelPackingOrder()` | 2026-05-02 | 100% | ☑ | `cancelPackingOrder()` 리셋 방식으로 재구현: PackingOrder→CREATED, packing_boxes 삭제, PackingOrderItem→WAIT·insp_qty/pack_qty/packing_box_id 초기화, LABEL_PRINTED 이후는 리셋 불가(송장 취소 필요), stock_allocations 유지 |
-| W23-CB-3 | 출하 취소 | 출하 확정 취소 → 포장 완료 상태 복귀 (SHIPPED → COMPLETED), ShipmentOrder PACKING 복귀, shipped_qty 롤백 | `FulfillmentShippingService.cancelShipping()` | 2026-05-03 | 100% | ☑ | `cancelShipping()` 재구현: PackingOrder→COMPLETED·PackingBox→CLOSED 복귀, ShipmentOrder→PACKING, ShipmentOrderItem.shipped_qty 0 롤백, stock_allocations 유지(재출하 확정 즉시 가능) |
+| # | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|------|------|------|--------|--------|------|------|
+| 1 | W23-CB-1 | 피킹 취소 | PickingTask 리셋 (IN_PROGRESS → CREATED), PickingTaskItem WAIT 복귀·실적 수량 초기화, ShipmentOrder 상태 유지(PICKING) | `FulfillmentPickingService.cancelPickingTask()` | 2026-04-21 | 100% | ☑ | `cancelPickingTask()` 리셋 방식으로 재구현: PickingTask→CREATED, worker_id·started_at·실적 수량 null/0 초기화, PickingTaskItem→WAIT·pick_qty/short_qty 0 초기화, stock_allocations 유지 |
+| 2 | W23-CB-2 | 포장 취소 | PackingOrder 리셋 (CREATED/IN_PROGRESS/COMPLETED → CREATED), 박스 삭제, PackingOrderItem WAIT 복귀·수량 초기화, ShipmentOrder 상태 유지(PACKING) | `FulfillmentPackingService.cancelPackingOrder()` | 2026-05-02 | 100% | ☑ | `cancelPackingOrder()` 리셋 방식으로 재구현: PackingOrder→CREATED, packing_boxes 삭제, PackingOrderItem→WAIT·insp_qty/pack_qty/packing_box_id 초기화, LABEL_PRINTED 이후는 리셋 불가(송장 취소 필요), stock_allocations 유지 |
+| 3 | W23-CB-3 | 출하 취소 | 출하 확정 취소 → 포장 완료 상태 복귀 (SHIPPED → COMPLETED), ShipmentOrder PACKING 복귀, shipped_qty 롤백 | `FulfillmentShippingService.cancelShipping()` | 2026-05-03 | 100% | ☑ | `cancelShipping()` 재구현: PackingOrder→COMPLETED·PackingBox→CLOSED 복귀, ShipmentOrder→PACKING, ShipmentOrderItem.shipped_qty 0 롤백, stock_allocations 유지(재출하 확정 즉시 가능) |
 
 ### 3-8. [VAS] 유통가공 완성 및 테스트
 
-| 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
-|---------|------|------|------|--------|--------|------|------|
-| W23-VA-1 | 세트 상품 조립 재고 처리 | VAS 완료 시 구성품 재고 차감 → 세트 SKU 재고 생성 end-to-end 테스트 | `VasTransactionService` | 2026-05-03 | 100% | ☑ | |
-| W23-VA-2 | 세트 해체 재고 처리 | 세트 SKU 재고 차감 → 구성품 재고 생성 | `VasTransactionService` | 2026-05-04 | 100% | ☑ | |
-| W23-VA-3 | 피킹 시 세트 상품 처리 | 세트 상품 피킹 시 구성품 재고 차감 vs 세트 재고 차감 정책 결정 및 구현 | `FulfillmentPickingService` | 2026-05-05 | 100% | ☑ | |
+| # | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|------|------|------|--------|--------|------|------|
+| 1 | W23-VA-1 | 세트 상품 조립 재고 처리 | VAS 완료 시 구성품 재고 차감 → 세트 SKU 재고 생성 end-to-end 테스트 | `VasTransactionService` | 2026-05-03 | 100% | ☑ | |
+| 2 | W23-VA-2 | 세트 해체 재고 처리 | 세트 SKU 재고 차감 → 구성품 재고 생성 | `VasTransactionService` | 2026-05-04 | 100% | ☑ | |
+| 3 | W23-VA-3 | 피킹 시 세트 상품 처리 | 세트 상품 피킹 시 구성품 재고 차감 vs 세트 재고 차감 정책 결정 및 구현 | `FulfillmentPickingService` | 2026-05-05 | 100% | ☑ | |
 
 ### 3-9. [RWA] 반품 전체 플로우 테스트
 
-| 작업번호 | 항목 | 내용 | 예정일 | 진행율 | 완료 | 비고 |
-|---------|------|------|--------|--------|------|------|
-| W23-RW-1 | 반품 접수 → 검수 → 처분 end-to-end 테스트 | 정상 재입고 / 불량 처리 / 폐기 전 경로 검증 | 2026-05-05 | 0% | ☐ | |
-| W23-RW-2 | 반품 재고 트랜잭션 연결 | 검수 완료 후 재입고 처리 시 `InventoryTransactionService.in()` 연결 | 2026-05-06 | 0% | ☐ | |
+| # | 작업번호 | 항목 | 내용 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|------|------|--------|--------|------|------|
+| 1 | W23-RW-1 | 반품 접수 → 검수 → 처분 end-to-end 테스트 | 정상 재입고 / 불량 처리 / 폐기 전 경로 검증 | 2026-05-05 | 0% | ☐ | |
+| 2 | W23-RW-2 | 반품 재고 트랜잭션 연결 | 검수 완료 후 재입고 처리 시 `InventoryTransactionService.in()` 연결 | 2026-05-06 | 0% | ☐ | |
 
 ### 3-10. [BASE] 신규 필드 화면 반영
 
 이번 세션에서 Entity에 추가한 필드들이 프론트 화면에 미반영 상태.
 
-| 작업번호 | 엔티티 | 추가 필드 | 작업 | 예정일 | 진행율 | 완료 | 비고 |
-|---------|--------|-----------|------|--------|--------|------|------|
-| W23-BF-0 | StoragePolicy | 보관 정책 마스터 엔티티 생성, entity_meta 등록, 15개 운영 필드 추가 | `StoragePolicy.java`, `entity_columns`, `common_codes` | 2026-04-20 | 100% | ☑ | putaway_strategy/release_strategy/wave 정책 등 포함 |
-| W23-BF-1 | SKU | lotFlag, serialFlag, hazmatFlag, safetyStock, reorderPoint | 상품 등록/수정 화면 필드 추가 | 2026-05-05 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
-| W23-BF-2 | Location | comCd, skuCd, sortNo, maxWeight, maxQty | 로케이션 관리 화면 필드 추가 | 2026-05-06 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
-| W23-BF-3 | Customer | deliveryZipCd, deliveryAddr, defaultCarrierCd, leadTimeDays | 거래처 관리 화면 필드 추가 | 2026-05-06 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
-| W23-BF-4 | CourierContract | status, contractNm, contractStartDate/EndDate, 요금 필드 | 택배 계약 관리 화면 필드 추가 | 2026-05-07 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
-| W23-BF-5 | Warehouse | 담당자, 시설 규모, 온도, 운영 시간 필드 | 창고 관리 화면 필드 추가 | 2026-05-07 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
+| # | 작업번호 | 엔티티 | 추가 필드 | 작업 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|--------|-----------|------|--------|--------|------|------|
+| 1 | W23-BF-0 | StoragePolicy | 보관 정책 마스터 엔티티 생성, entity_meta 등록, 15개 운영 필드 추가 | `StoragePolicy.java`, `entity_columns`, `common_codes` | 2026-04-20 | 100% | ☑ | putaway_strategy/release_strategy/wave 정책 등 포함 |
+| 2 | W23-BF-1 | SKU | lotFlag, serialFlag, hazmatFlag, safetyStock, reorderPoint | 상품 등록/수정 화면 필드 추가 | 2026-05-05 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
+| 3 | W23-BF-2 | Location | comCd, skuCd, sortNo, maxWeight, maxQty | 로케이션 관리 화면 필드 추가 | 2026-05-06 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
+| 4 | W23-BF-3 | Customer | deliveryZipCd, deliveryAddr, defaultCarrierCd, leadTimeDays | 거래처 관리 화면 필드 추가 | 2026-05-06 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
+| 5 | W23-BF-4 | CourierContract | status, contractNm, contractStartDate/EndDate, 요금 필드 | 택배 계약 관리 화면 필드 추가 | 2026-05-07 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
+| 6 | W23-BF-5 | Warehouse | 담당자, 시설 규모, 온도, 운영 시간 필드 | 창고 관리 화면 필드 추가 | 2026-05-07 | 100% | ☑ | 메뉴 메타(entity_columns)로 처리 완료 |
 
 ### 3-11. [인프라] DB 마이그레이션 파일 작성
 
 현재 `frontend/packages/operato-wes/server/migrations/` 디렉토리가 비어 있음.
 
-| 작업번호 | 항목 | 내용 | 예정일 | 진행율 | 완료 | 비고 |
-|---------|------|------|--------|--------|------|------|
-| W23-DB-1 | 기존 테이블 ALTER 마이그레이션 | SKU, Location, Customer, Warehouse, BoxType, CourierContract 신규 컬럼 DDL | 2026-05-07 | 100% | ☑ | |
-| W23-DB-2 | 마이그레이션 실행 검증 | 로컬 → 스테이징 순으로 실행 후 무결성 확인 | 2026-05-08 | 100% | ☑ | |
+| # | 작업번호 | 항목 | 내용 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|------|------|--------|--------|------|------|
+| 1 | W23-DB-1 | 기존 테이블 ALTER 마이그레이션 | SKU, Location, Customer, Warehouse, BoxType, CourierContract 신규 컬럼 DDL | 2026-05-07 | 100% | ☑ | |
+| 2 | W23-DB-2 | 마이그레이션 실행 검증 | 로컬 → 스테이징 순으로 실행 후 무결성 확인 | 2026-05-08 | 100% | ☑ | |
 
 ### 3-12. [필드 로직] 로케이션·창고·SKU 운영 규칙 구현
 
 엔티티에 컬럼은 있으나 우선순위가 낮아 Week 2~3으로 미룬 필드 로직들.
 
-| 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
-|---------|------|------|------|--------|--------|------|------|
-| W23-FL-1 | Location sortNo 피킹 동선 정렬 | 피킹 태스크 생성 시 `Location.sortNo` 순으로 정렬하여 이동 동선 최적화 | `FulfillmentPickingService` | 2026-05-02 | 100% | ☑ | |
-| W23-FL-2 | SKU hazmatFlag 위험물 로케이션 제한 | `hazmatFlag=true`인 SKU는 hazmat 허용 로케이션에만 적치 가능하도록 검증 | `StockTransactionService`, `InboundTransactionService` | 2026-05-03 | 100% | ☑ | |
-| W23-FL-3 | SKU reorderPoint 재주문점 알림 | 가용 재고가 `reorderPoint` 이하로 떨어지면 재고 대시보드 경고 또는 보충 지시 자동 생성 | `InventoryDashboardService` | 2026-05-05 | 100% | ☑ | |
-| W23-FL-4 | Warehouse 온도 조건 매칭 검증 | 적치 시 `SKU.tempType`과 `Warehouse.tempMin/tempMax` 호환성 검증 | `InboundTransactionService` | 2026-05-06 | 100% | ☑ | |
-| W23-FL-5 | Warehouse 수용 용량 초과 경고 | 입고 시 `Warehouse.maxPalletCnt` 기준 용량 초과 여부 사전 경고 | `InboundTransactionService` | 2026-05-07 | 100% | ☑ | |
+| # | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|------|------|------|--------|--------|------|------|
+| 1 | W23-FL-1 | Location sortNo 피킹 동선 정렬 | 피킹 태스크 생성 시 `Location.sortNo` 순으로 정렬하여 이동 동선 최적화 | `FulfillmentPickingService` | 2026-05-02 | 100% | ☑ | |
+| 2 | W23-FL-2 | SKU hazmatFlag 위험물 로케이션 제한 | `hazmatFlag=true`인 SKU는 hazmat 허용 로케이션에만 적치 가능하도록 검증 | `StockTransactionService`, `InboundTransactionService` | 2026-05-03 | 100% | ☑ | |
+| 3 | W23-FL-3 | SKU reorderPoint 재주문점 알림 | 가용 재고가 `reorderPoint` 이하로 떨어지면 재고 대시보드 경고 또는 보충 지시 자동 생성 | `InventoryDashboardService` | 2026-05-05 | 100% | ☑ | |
+| 4 | W23-FL-4 | Warehouse 온도 조건 매칭 검증 | 적치 시 `SKU.tempType`과 `Warehouse.tempMin/tempMax` 호환성 검증 | `InboundTransactionService` | 2026-05-06 | 100% | ☑ | |
+| 5 | W23-FL-5 | Warehouse 수용 용량 초과 경고 | 입고 시 `Warehouse.maxPalletCnt` 기준 용량 초과 여부 사전 경고 | `InboundTransactionService` | 2026-05-07 | 100% | ☑ | |
 
 ### 3-13. [프레임워크] 프레임워크 기능 개선
 
-| 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
-|---------|------|------|------|--------|--------|------|------|
-| W23-FR-1 | 백엔드 서비스 호출 구조 수정 | 서비스 호출 - 에러 발생시 클라이언트에서 에러 메시지를 받을 수 없음 | ExceptionHandler 구조 파악 및 수정 | 2026-04-29 | 0% | ☐ | |
-| W23-FR-2 | 기본 화면에 조회 버튼 추가 | 기본적으로 조회 버튼이 없음 | frontend metapage에서 처리 | 2026-04-29 | 0% | ☐ | |
-| W23-FR-3 | 상품 코드, 바코드, 재고 바코드 모두 조회 가능한 컴포넌트 | 상품 코드, 상품 바코드, 재고 바코드로 조회하여 여러 상품이 나오는 경우 하나를 선택할 수 있는 팝업까지 제공하는 SKU 바코드 검색 컴포넌트. | `sku-barcode-input.js` | 2026-04-29 | 100% | ☑ | |
+| # | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|------|------|------|--------|--------|------|------|
+| 1 | W23-FR-1 | 백엔드 서비스 호출 구조 수정 | 서비스 호출 - 에러 발생시 클라이언트에서 에러 메시지를 받을 수 없음 | ExceptionHandler 구조 파악 및 수정 | 2026-04-29 | 0% | ☐ | |
+| 2 | W23-FR-2 | 기본 화면에 조회 버튼 추가 | 기본적으로 조회 버튼이 없음 | frontend metapage에서 처리 | 2026-04-29 | 0% | ☐ | |
+| 3 | W23-FR-3 | 상품 코드, 바코드, 재고 바코드 모두 조회 가능한 컴포넌트 | 상품 코드, 상품 바코드, 재고 바코드로 조회하여 여러 상품이 나오는 경우 하나를 선택할 수 있는 팝업까지 제공하는 SKU 바코드 검색 컴포넌트. | `sku-barcode-input.js` | 2026-04-29 | 100% | ☑ | |
 
 ### 3-14. [기타] 기타
 
-| 작업번호 | 항목 | 내용 | 예정일 | 진행율 | 완료 | 비고 |
-|---------|------|------|------|--------|--------|------|------|
-| W23-ETC-1 | 재고 바코드 키 (바코드 + 로케이션) | 재고 바코드 키에 맞게 모든 프로세스 (특히 피킹, 재고 트랜잭션) 제대로 처리되는지 확인 | 2026-05-02 | 0% | ☐ | |
+| # | 작업번호 | 항목 | 내용 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|------|------|--------|--------|------|------|
+| 1 | W23-ETC-1 | 재고 바코드 키 (바코드 + 로케이션) | 재고 바코드 키에 맞게 모든 프로세스 (특히 피킹, 재고 트랜잭션) 제대로 처리되는지 확인 | 2026-05-02 | 0% | ☐ | |
+| 2 | W23-ETC-2 | 라벨 프린터 연동 | 라벨 프린터 연동 처리 | 2026-05-31 | 0% | ☐ | |
 
 ### 3-15. [커스터마이징] 로지온 코리아
 
-| W23-CUST-LK-1 | 주문 임포트 시 웨이브 번호 (준비 번호) 추가 | 웨이브 번호 (준비 번호)가 있으면 해당 웨이브를 자동 생성 | 2026-05-08 | 0% | ☐ | |
-| W23-CUST-LK-2 | 주문 임포트 시 웨이브 유형을 사용자가 입력한대로 적용 | 웨이브 별 주문 리스트 조회 화면을 별도 추가하여 웨이브 유형별로 조회 가능하도록 구현 | 2026-05-08 | 0% | ☐ | |
-| W23-CUST-LK-3 | 수취인 주소 정보 검증 | 주소 정제 - 대한통운 주소정제 API | 2026-05-11 | 0% | ☐ | |
-| W23-CUST-LK-4 | 대한통운 연동 - 송장 채번 | 대한통운 송장 채번 기능 | 2026-05-11 | 0% | ☐ | |
-| W23-CUST-LK-5 | 대한통운 연동 - 송장 취소 | 대한통운 송장 취소 기능 | 2026-05-11 | 0% | ☐ | |
-| W23-CUST-LK-6 | 대한통운 연동 - 송장 출력 | 대한통운 송장 출력 기능 | 2026-05-11 | 0% | ☐ | |
-| W23-CUST-LK-7 | 대한통운 연동 - 집하 요청 | 대한통운 집하 요청 기능 | 2026-05-11 | 0% | ☐ | |
+| # | 작업번호 | 항목 | 내용 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|------|------|--------|--------|------|------|
+| 1 | W23-CUST-LK-1 | 주문 임포트 시 웨이브 번호 (준비 번호) 추가 | 웨이브 번호 (출고준비 번호)가 있으면 주문 정보에 추가, 출고준비 번호가 있으면 웨이브 자동 생성 | 2026-05-13 | 100% | ☑ | |
+| 2 | W23-CUST-LK-2 | B2B, B2C 주문 화면 분리 | B2B, B2C 주문 화면 분리 | 2026-05-13 | 100% | ☑ | |
+| 3 | W23-CUST-LK-3 | B2C 주문 프로세스 커스터마이징 | 주문 임포트 : 기본값 처리 (커스텀 서비스) 구현, 주문 확인 : 주소 정제, 할당 : 송장 채번, 할당 | 2026-05-13 | 30% | ☐ | |
+| 4 | W23-CUST-LK-4 | B2B 주문 프로세스 커스터마이징 | 주문 할당 : 주문 확인 자동 처리, 웨이브 없는 피킹 지원, 패킹 스테이션에서 라벨 출력 연동 | 2026-05-13 | 0% | ☐ | |
+| 5 | W23-CUST-LK-5 | B2C 검수, 포장 프로세스 커스터마이징 | 옵션으로 송장 출력 연동 | 2026-05-17 | 0% | ☐ | |
+| 6 | W23-CUST-LK-6 | B2B 피킹 프로세스 커스터마이징 | 옵션으로 라벨 출력 연동 | 2026-05-17 | 0% | ☐ | |
+| 7 | W23-CUST-LK-7 | B2C 웨이브 별 주문 화면 추가 | B2C 웨이브 별 주문 화면 추가 | 2026-05-20 | 0% | ☐ | |
+
+### 3-16. [택배사 연동] 대한통운
+
+| # | 작업번호 | 항목 | 내용 | 예정일 | 진행율 | 완료 | 비고 |
+|---|--------|------|------|--------|--------|------|------|
+| 1 | W23-CT-LT-1 | 수취인 주소 정보 검증 | 주소 정제 - 대한통운 주소정제 API | 2026-05-31 | 0% | ☐ | |
+| 2 | W23-CT-LT-2 | 대한통운 연동 - 송장 채번 | 대한통운 송장 채번 기능 | 2026-05-31 | 0% | ☐ | |
+| 3 | W23-CT-LT-3 | 대한통운 연동 - 송장 취소 | 대한통운 송장 취소 기능 | 2026-05-31 | 0% | ☐ | |
+| 4 | W23-CT-LT-4 | 대한통운 연동 - 송장 출력 | 대한통운 송장 출력 기능 | 2026-05-31 | 0% | ☐ | |
+| 5 | W23-CT-LT-5 | 대한통운 연동 - 집하 요청 | 대한통운 집하 요청 기능 | 2026-05-31 | 0% | ☐ | |
 
 ### Week 2~3 진행 현황
 
 | 항목 | 수치 |
 |------|------|
-| 전체 작업 수 | 55개 |
-| 완료 (☑) | 41개 (W23-SF-1~6·8~12, W23-UA-1~2, W23-SA-1~2, W23-CB-1~3, W23-BF-0~5, W23-DB-1~2, W23-RE-1~2, W23-FL-1~5, W23-IR-1~2, W23-WA-1~2, W23-VA-1~3, W23-FR-3) |
+| 전체 작업 수 | 61개 |
+| 완료 (☑) | 43개 (W23-SF-1~6·8~12, W23-UA-1~2, W23-SA-1~2, W23-CB-1~3, W23-BF-0~5, W23-DB-1~2, W23-RE-1~2, W23-FL-1~5, W23-IR-1~2, W23-WA-1~2, W23-VA-1~3, W23-FR-3, W23-CUST-LK-1~2) |
 | 진행 중 | 0개 |
-| 미완료 (☐) | 14개 (W23-SF-7, W23-WA-3, W23-RW-1~2, W23-FR-1~2, W23-ETC-1, W23-CUST-LK-1~7) |
-| 전체 진행율 | 75% (완료 41 / 전체 55) |
+| 미완료 (☐) | 18개 (W23-SF-7, W23-WA-3, W23-RW-1~2, W23-FR-1~2, W23-ETC-1~2, W23-CUST-LK-3~7, W23-CT-LT-1~5) |
+| 전체 진행율 | 70% (완료 43 / 전체 61) |
 
 ---
 
