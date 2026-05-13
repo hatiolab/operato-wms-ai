@@ -776,34 +776,6 @@ public class OmsTransactionController extends AbstractRestService {
 	 */
 
 	/**
-	 * 웨이브 구성
-	 *
-	 * POST /rest/oms_trx/waves/{id}/configure
-	 *
-	 * @param id 웨이브 ID
-	 * @return { success, orderCount }
-	 */
-	@RequestMapping(value = "waves/{id}/configure", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description = "Configure wave")
-	public Map<String, Object> configureWave(@PathVariable("id") String id) {
-		Long domainId = Domain.currentDomainId();
-
-		// 1. 커스텀 서비스 - 전 처리
-		Map<String, Object> params = ValueUtil.newMap("id", id);
-		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CREATE_WAVE, params);
-
-		// 2. 본 로직 실행
-		Map<String, Object> result = this.waveService.configureWave(id);
-
-		// 3. 커스텀 서비스 - 후 처리
-		params.put("result", result);
-		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CREATE_WAVE, params);
-
-		// 4. 결과 리턴
-		return result;
-	}
-
-	/**
 	 * 웨이브 확정 (릴리스)
 	 *
 	 * POST /rest/oms_trx/waves/{id}/release

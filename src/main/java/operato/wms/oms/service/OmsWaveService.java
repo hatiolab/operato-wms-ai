@@ -353,17 +353,6 @@ public class OmsWaveService extends AbstractQueryService {
 	}
 
 	/**
-	 * 웨이브 구성 : 웨이브 소속 주문들의 상태를 체크 - 할당 상태가 아니면 에러 발생
-	 * 
-	 * @param id
-	 * @return
-	 */
-	public Map<String, Object> configureWave(String id) {
-		// TODO
-		return null;
-	}
-
-	/**
 	 * 웨이브 확정/릴리스 (CREATED → RELEASED)
 	 *
 	 * 웨이브 상태를 RELEASED로 변경하고, 포함된 주문을 RELEASED 상태로 전환한다.
