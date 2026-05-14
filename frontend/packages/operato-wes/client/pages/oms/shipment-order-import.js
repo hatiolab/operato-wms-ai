@@ -602,7 +602,7 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
       ${result.error > 0
         ? html`
             <div class="exclude-option">
-              <input type="checkbox" id="excludeErrors" ?checked="${this.excludeErrors}" @change="${e => (this.excludeErrors = e.target.checked)}" />
+              <input type="checkbox" id="excludeErrors" checked disabled />
               <label for="excludeErrors">오류 행 제외하고 등록 (${result.valid}건만 처리)</label>
             </div>
           `
@@ -686,7 +686,7 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
       ${result.error > 0
         ? html`
             <div class="exclude-option">
-              <input type="checkbox" id="excludeErrors" ?checked="${this.excludeErrors}" @change="${e => (this.excludeErrors = e.target.checked)}" />
+              <input type="checkbox" id="excludeErrors" checked disabled />
               <label for="excludeErrors">오류 행 제외하고 등록 (${result.valid}건만 처리)</label>
             </div>
           `

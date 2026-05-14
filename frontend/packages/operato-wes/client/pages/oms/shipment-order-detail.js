@@ -796,7 +796,6 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
             <th class="text-right">할당수량</th>
             <th class="text-right">부족수량</th>
             <th class="text-right">출하수량</th>
-            <th>상태</th>
           </tr>
         </thead>
         <tbody>
@@ -809,7 +808,6 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
               <td class="text-right">${item.alloc_qty ?? 0}</td>
               <td class="text-right ${(item.short_qty || 0) > 0 ? 'qty-short' : ''}">${item.short_qty ?? 0}</td>
               <td class="text-right">${item.shipped_qty ?? 0}</td>
-              <td><span class="item-status ${item.status}">${this._statusLabel(item.status)}</span></td>
             </tr>
           `)}
         </tbody>
@@ -1221,13 +1219,15 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
     return labels[type] || type || '-'
   }
 
-  /** 배송유형 코드를 한글 라벨로 변환 */
+  /** 배송유형 코드를 한글 라벨로 변환 (SHIPMENT_ORDER_DLV_TYPE) */
   _dlvTypeLabel(type) {
     const labels = {
-      STANDARD: '일반 배송',
-      EXPRESS: '특급 배송',
-      SAME_DAY: '당일 배송',
-      DAWN: '새벽 배송'
+      PARCEL: '택배',
+      FREIGHT: '화물',
+      CHARTER: '용차',
+      QUICK: '퀵서비스',
+      PICKUP: '직접 인수',
+      DIRECT: '직접 배송'
     }
     return labels[type] || type || '-'
   }
