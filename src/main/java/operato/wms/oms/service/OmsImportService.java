@@ -7,8 +7,10 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
+import operato.wms.base.entity.Company;
 import operato.wms.base.entity.Customer;
 import operato.wms.base.entity.SKU;
+import operato.wms.base.entity.Warehouse;
 import operato.wms.oms.entity.ImportShipmentOrder;
 import operato.wms.oms.entity.ShipmentDelivery;
 import operato.wms.oms.entity.ShipmentOrder;
@@ -58,8 +60,10 @@ public class OmsImportService extends AbstractQueryService {
 			if (ValueUtil.isEmpty(row.getSkuCd())) {
 				errors.add("상품코드(sku_cd)가 누락되었습니다");
 			}
-			if (row.getOrderQty() == null || row.getOrderQty() <= 0) {
-				errors.add("주문 수량은 양수여야 합니다");
+			if (row.getOrderQty() == null) {
+				errors.add("주문 수량(order_qty)이 누락되었거나 숫자가 아닙니다");
+			} else if (row.getOrderQty() <= 0) {
+				errors.add("주문 수량은 0보다 커야 합니다 (입력값: " + row.getOrderQty() + ")");
 			}
 
 			// 2. SKU 존재 여부 검증
@@ -75,7 +79,29 @@ public class OmsImportService extends AbstractQueryService {
 				}
 			}
 
-			// 3. 날짜 형식 검증
+			// 3. 창고 존재 여부 검증 (값이 있을 때만)
+			if (ValueUtil.isNotEmpty(row.getWhCd())) {
+				Query whQuery = new Query();
+				whQuery.addFilter(new Filter("domainId", domainId));
+				whQuery.addFilter(new Filter("whCd", row.getWhCd()));
+				Warehouse warehouse = this.queryManager.selectByCondition(Warehouse.class, whQuery);
+				if (warehouse == null) {
+					errors.add("창고 [" + row.getWhCd() + "]가 존재하지 않습니다");
+				}
+			}
+
+			// 4. 화주사 존재 여부 검증 (값이 있을 때만)
+			if (ValueUtil.isNotEmpty(row.getComCd())) {
+				Query comQuery = new Query();
+				comQuery.addFilter(new Filter("domainId", domainId));
+				comQuery.addFilter(new Filter("comCd", row.getComCd()));
+				Company company = this.queryManager.selectByCondition(Company.class, comQuery);
+				if (company == null) {
+					errors.add("화주사 [" + row.getComCd() + "]가 존재하지 않습니다");
+				}
+			}
+
+			// 6. 날짜 형식 검증
 			if (ValueUtil.isNotEmpty(row.getOrderDate()) && !row.getOrderDate().matches("\\d{4}-\\d{2}-\\d{2}")) {
 				errors.add("주문일 날짜 형식이 올바르지 않습니다 (YYYY-MM-DD)");
 			}
@@ -83,7 +109,7 @@ public class OmsImportService extends AbstractQueryService {
 				errors.add("출하기한 날짜 형식이 올바르지 않습니다 (YYYY-MM-DD)");
 			}
 
-			// 4. 참조번호 중복 검증 (기존 데이터)
+			// 7. 참조번호 중복 검증 (기존 데이터)
 			if (ValueUtil.isNotEmpty(row.getRefOrderNo())) {
 				String sqlDup = "SELECT COUNT(*) FROM shipment_orders WHERE domain_id = :domainId AND ref_order_no = :refOrderNo";
 				Map<String, Object> dupParams = ValueUtil.newMap("domainId,refOrderNo", domainId, row.getRefOrderNo());
@@ -93,8 +119,8 @@ public class OmsImportService extends AbstractQueryService {
 				}
 			}
 
-			// 5. B2B인 경우 거래처 존재 여부 검증
-			if (!isB2C) {
+			// 8. B2B인 경우 거래처 존재 여부 검증 (값이 있을 때만)
+			if (!isB2C && ValueUtil.isNotEmpty(row.getCustCd())) {
 				Query custQuery = new Query();
 				custQuery.addFilter(new Filter("domainId", domainId));
 				custQuery.addFilter(new Filter("custCd", row.getCustCd()));

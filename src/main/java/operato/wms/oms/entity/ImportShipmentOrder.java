@@ -1,5 +1,8 @@
 package operato.wms.oms.entity;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+
+import operato.wms.oms.util.LenientDoubleDeserializer;
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
 import xyz.elidom.dbist.annotation.PrimaryKey;
@@ -134,13 +137,17 @@ public class ImportShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStamp
 
 	/**
 	 * 주문 수량
+	 * 엑셀에서 숫자가 아닌 값이 들어올 경우 null로 처리 (검증 단계에서 오류 표시)
 	 */
+	@JsonDeserialize(using = LenientDoubleDeserializer.class)
 	@Column(name = "order_qty")
 	private Double orderQty;
 
 	/**
 	 * 단가
+	 * 엑셀에서 숫자가 아닌 값이 들어올 경우 null로 처리
 	 */
+	@JsonDeserialize(using = LenientDoubleDeserializer.class)
 	@Column(name = "unit_price")
 	private Double unitPrice;
 
