@@ -822,11 +822,19 @@ class ShipmentOrderImport extends localize(i18next)(PageView) {
     reader.readAsArrayBuffer(file)
   }
 
-  /** Excel 파싱 완료 콜백 */
+  /** Excel 파싱 완료 콜백 - 빈 행 제거 후 미리보기 데이터 세팅 */
   _onExcelParsed(records) {
     const importData = records.header ? records.data : records
     if (importData && importData.length > 0) {
-      this.parsedData = importData
+      // 빈 행 제거: 모든 컬럼 값이 비어있는 행 제외
+      const filtered = importData.filter(row =>
+        Object.values(row).some(val => val !== null && val !== undefined && String(val).trim() !== '')
+      )
+      if (filtered.length === 0) {
+        UiUtil.showToast('warning', '파일에서 유효한 데이터를 찾을 수 없습니다.')
+        return
+      }
+      this.parsedData = filtered
       this.requestUpdate()
     } else {
       UiUtil.showToast('warning', '파일에서 데이터를 읽을 수 없습니다.')
