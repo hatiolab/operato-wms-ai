@@ -311,6 +311,12 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 			}
 		}
 
+		// 처리된 주문이 하나도 없으면 예외 처리
+		if (successCount == 0 && !errors.isEmpty()) {
+			String errorMsg = String.join("\n", errors);
+			throw new ElidomRuntimeException(errorMsg);
+		}
+
 		// 결과 리턴
 		return ValueUtil.newMap("success_count,allocated_count,back_order_count,errors", successCount, allocatedCount,
 				backOrderCount, errors);
