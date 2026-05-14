@@ -462,7 +462,8 @@ class ReceivingOrderImportPopup extends LitElement {
    */
   static get REQUIRED_FIELDS() {
     return [
-      { keys: ['rcv_no', 'rcvNo'], label: '입고번호' },
+      // 입고번호(rcv_no)가 없어도 입고요청번호(rcv_req_no)가 있으면 백엔드에서 동일값으로 자동 세팅
+      { keys: ['rcv_no', 'rcvNo', 'rcv_req_no', 'rcvReqNo'], label: '입고번호/입고요청번호' },
       { keys: ['rcv_req_date', 'rcvReqDate'], label: '입고요청일' },
       { keys: ['rcv_type', 'rcvType'], label: '입고유형' },
       { keys: ['sku_cd', 'skuCd'], label: 'SKU 코드' },
@@ -551,6 +552,7 @@ class ReceivingOrderImportPopup extends LitElement {
                   <tr>
                     <th class="center">행</th>
                     <th>입고번호</th>
+                    <th>입고요청번호</th>
                     <th>입고요청일</th>
                     <th>입고유형</th>
                     <th>창고</th>
@@ -574,7 +576,8 @@ class ReceivingOrderImportPopup extends LitElement {
                       return html`
                         <tr class="${hasError ? 'row-error' : ''}">
                           <td class="center">${idx + 1}</td>
-                          <td class="${this._isFieldMissing(row, ['rcv_no', 'rcvNo']) ? 'cell-error' : ''}">${row.rcv_no || row.rcvNo || ''}</td>
+                          <td class="${this._isFieldMissing(row, ['rcv_no', 'rcvNo', 'rcv_req_no', 'rcvReqNo']) ? 'cell-error' : ''}">${row.rcv_no || row.rcvNo || ''}</td>
+                          <td class="${this._isFieldMissing(row, ['rcv_no', 'rcvNo', 'rcv_req_no', 'rcvReqNo']) ? 'cell-error' : ''}">${row.rcv_req_no || row.rcvReqNo || ''}</td>
                           <td class="${this._isFieldMissing(row, ['rcv_req_date', 'rcvReqDate']) ? 'cell-error' : ''}">${row.rcv_req_date || row.rcvReqDate || ''}</td>
                           <td class="${this._isFieldMissing(row, ['rcv_type', 'rcvType']) ? 'cell-error' : ''}">${row.rcv_type || row.rcvType || ''}</td>
                           <td>${row.wh_cd || row.whCd || ''}</td>
