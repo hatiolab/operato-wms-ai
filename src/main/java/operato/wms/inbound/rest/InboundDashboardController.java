@@ -112,14 +112,15 @@ public class InboundDashboardController {
     }
 
     /**
-     * 적치 작업 PDA - 대기/완료 건수 요약 조회
+     * 적치 현황 요약 조회
      *
      * GET /rest/inbound_dashboard/putaway-summary
      *
-     * - waiting_count: inventories 중 status = 'WAITING' 건수
-     * - stored_count:  오늘 receiving_items 완료(END) 처리 중 inventories가 STORED 상태인 건수
+     * - waiting_count: 현재 적치 대기 중인 전체 재고 건수
+     * - stored_count: 오늘 적치 완료한 재고 건수
+     * - stored_qty: 오늘 적치 완료한 재고 수량 합계
      *
-     * @return Map { waiting_count: N, stored_count: N }
+     * @return Map { waiting_count: N, stored_count: N, stored_qty: N }
      */
     @GetMapping("/putaway-summary")
     @ApiDesc(description = "Get Putaway Summary Counts")

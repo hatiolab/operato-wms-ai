@@ -151,14 +151,14 @@ class InboundHome extends localize(i18next)(PageView) {
           max-height: 250px;
         }
 
-        /* 검수 현황 카드 */
-        .inspection-cards {
+        /* 적치 현황 카드 */
+        .putaway-cards {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
           gap: var(--spacing-medium, 16px);
         }
 
-        .inspection-card {
+        .putaway-card {
           background: var(--md-sys-color-surface);
           border-radius: 12px;
           padding: var(--spacing-medium, 16px);
@@ -167,26 +167,26 @@ class InboundHome extends localize(i18next)(PageView) {
           transition: all 0.2s ease;
         }
 
-        .inspection-card:hover {
+        .putaway-card:hover {
           box-shadow: var(--box-shadow-normal, 0 4px 8px rgba(0, 0, 0, 0.15));
           transform: translateY(-2px);
         }
 
-        .inspection-card .label {
+        .putaway-card .label {
           font-size: 14px;
           color: var(--md-sys-color-on-surface-variant);
           margin-bottom: 8px;
         }
 
-        .inspection-card .count {
+        .putaway-card .count {
           font-size: 28px;
           font-weight: 700;
           color: var(--md-sys-color-on-surface);
         }
 
-        .inspection-card.wait { border-left: 4px solid #2196F3; }
-        .inspection-card.pass { border-left: 4px solid #4CAF50; }
-        .inspection-card.fail { border-left: 4px solid #F44336; }
+        .putaway-card.wait { border-left: 4px solid #2196F3; }
+        .putaway-card.done { border-left: 4px solid #4CAF50; }
+        .putaway-card.qty { border-left: 4px solid #FF9800; }
 
         /* 알림 영역 */
         .alerts-section {
@@ -252,7 +252,7 @@ class InboundHome extends localize(i18next)(PageView) {
       loading: Boolean,
       statusCounts: Object,
       typeStats: Object,
-      inspectionStats: Object,
+      putawayStats: Object,
       alerts: Array
     }
   }
@@ -267,15 +267,11 @@ class InboundHome extends localize(i18next)(PageView) {
       START: 0,
       END: 0
     }
-    this.typeStats = {
-      NORMAL: 0,
-      RETURN: 0,
-      ETC: 0
-    }
-    this.inspectionStats = {
-      WAIT: 0,
-      PASS: 0,
-      FAIL: 0
+    this.typeStats = {}
+    this.putawayStats = {
+      waiting_count: 0,
+      stored_count: 0,
+      stored_qty: 0
     }
     this.alerts = []
   }
@@ -337,21 +333,21 @@ class InboundHome extends localize(i18next)(PageView) {
                 </div>
               </section>
 
-              <!-- 검수 현황 -->
+              <!-- 적치 현황 -->
               <section>
-                <h3 class="section-title">🔍 검수 현황</h3>
-                <div class="inspection-cards">
-                  <div class="inspection-card wait">
-                    <div class="label">검수 대기</div>
-                    <div class="count">${this.inspectionStats.WAIT || 0}</div>
+                <h3 class="section-title">📦 적치 현황</h3>
+                <div class="putaway-cards">
+                  <div class="putaway-card wait">
+                    <div class="label">적치 대기</div>
+                    <div class="count">${this.putawayStats.waiting_count || 0}</div>
                   </div>
-                  <div class="inspection-card pass">
-                    <div class="label">검수 완료</div>
-                    <div class="count">${this.inspectionStats.PASS || 0}</div>
+                  <div class="putaway-card done">
+                    <div class="label">적치 완료</div>
+                    <div class="count">${this.putawayStats.stored_count || 0}</div>
                   </div>
-                  <div class="inspection-card fail">
-                    <div class="label">불량</div>
-                    <div class="count">${this.inspectionStats.FAIL || 0}</div>
+                  <div class="putaway-card qty">
+                    <div class="label">완료 재고 수량</div>
+                    <div class="count">${this._formatQuantity(this.putawayStats.stored_qty)}</div>
                   </div>
                 </div>
               </section>
@@ -384,7 +380,7 @@ class InboundHome extends localize(i18next)(PageView) {
     }
   }
 
-  /** 대시보드 데이터 일괄 조회 (상태별 건수, 유형별 통계, 검수 통계, 알림) */
+  /** 대시보드 데이터 일괄 조회 (상태별 건수, 유형별 통계, 적치 현황, 알림) */
   async _fetchDashboardData() {
     try {
       this.loading = true
@@ -397,9 +393,9 @@ class InboundHome extends localize(i18next)(PageView) {
       const typeResponse = await this._fetchTypeStats()
       this.typeStats = typeResponse
 
-      // 검수 통계 조회
-      const inspectionResponse = await this._fetchInspectionStats()
-      this.inspectionStats = inspectionResponse
+      // 적치 현황 조회
+      const putawayResponse = await this._fetchPutawayStats()
+      this.putawayStats = putawayResponse
 
       // 알림 데이터 생성
       this.alerts = await this._fetchAlerts()
@@ -425,26 +421,31 @@ class InboundHome extends localize(i18next)(PageView) {
     }
   }
 
-  /** 입고 유형별 통계 조회 (일반/반품/기타) */
+  /** 입고 유형별 통계 조회 */
   async _fetchTypeStats() {
     try {
       const data = await ServiceUtil.restGet('inbound_dashboard/type-stats')
-      return data || { NORMAL: 0, RETURN: 0, ETC: 0 }
+      return data || {}
     } catch (error) {
       console.error('유형별 통계 조회 실패:', error)
-      return { NORMAL: 0, RETURN: 0, ETC: 0 }
+      return {}
     }
   }
 
-  /** 검수 현황 통계 조회 (대기/완료/불량) */
-  async _fetchInspectionStats() {
+  /** 적치 현황 통계 조회 */
+  async _fetchPutawayStats() {
     try {
-      const data = await ServiceUtil.restGet('inbound_dashboard/inspection-stats')
-      return data || { WAIT: 0, PASS: 0, FAIL: 0 }
+      const data = await ServiceUtil.restGet('inbound_dashboard/putaway-summary')
+      return data || { waiting_count: 0, stored_count: 0, stored_qty: 0 }
     } catch (error) {
-      console.error('검수 통계 조회 실패:', error)
-      return { WAIT: 0, PASS: 0, FAIL: 0 }
+      console.error('적치 현황 조회 실패:', error)
+      return { waiting_count: 0, stored_count: 0, stored_qty: 0 }
     }
+  }
+
+  /** 수량 표시용 숫자 포맷 */
+  _formatQuantity(value) {
+    return Number(value || 0).toLocaleString()
   }
 
   /** 대시보드 알림 데이터 조회 (지연, 검수 대기 등) */
@@ -468,20 +469,21 @@ class InboundHome extends localize(i18next)(PageView) {
       this._chart.destroy()
     }
 
+    const typeEntries = Object.entries(this.typeStats || {})
+    const labels = typeEntries.map(([label]) => label)
+    const counts = typeEntries.map(([, count]) => Number(count || 0))
+    const colors = ['#2196F3', '#4CAF50', '#FF9800', '#9C27B0', '#607D8B', '#795548']
+
     const ctx = canvas.getContext('2d')
     this._chart = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: ['일반 입고', '반품 입고', '기타 입고'],
+        labels,
         datasets: [
           {
             label: '입고 건수',
-            data: [
-              this.typeStats.NORMAL || 0,
-              this.typeStats.RETURN || 0,
-              this.typeStats.ETC || 0
-            ],
-            backgroundColor: ['#2196F3', '#F44336', '#9E9E9E'],
+            data: counts,
+            backgroundColor: labels.map((_, index) => colors[index % colors.length]),
             borderRadius: 8
           }
         ]

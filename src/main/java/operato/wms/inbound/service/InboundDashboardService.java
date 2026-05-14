@@ -82,11 +82,37 @@ public class InboundDashboardService extends AbstractQueryService {
      * @param whCd      창고 코드 (optional)
      * @param startDate 시작일 (optional, 기본값: 오늘)
      * @param endDate   종료일 (optional, 기본값: 오늘)
-     * @return 유형별 건수 Map { rcvType: count }
+     * @return 유형별 건수 Map { rcvTypeName: count }
      */
     public Map<String, Object> getDashboardTypeStats(String comCd, String whCd, String startDate, String endDate) {
         String start = ValueUtil.isNotEmpty(startDate) ? startDate : DateUtil.todayStr();
         String end = ValueUtil.isNotEmpty(endDate) ? endDate : DateUtil.todayStr();
+        Long domainId = Domain.currentDomainId();
+
+        String codeSql = "SELECT ccd.name AS rcv_type, ccd.description AS type_name " +
+                "FROM common_codes cc " +
+                "INNER JOIN common_code_details ccd " +
+                "  ON ccd.domain_id = cc.domain_id " +
+                " AND ccd.parent_id = cc.id " +
+                "WHERE cc.domain_id = :domainId " +
+                "AND cc.name = 'RECEIVING_TYPE' " +
+                "ORDER BY COALESCE(ccd.rank, 999999), ccd.name";
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> types = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
+                codeSql, ValueUtil.newMap("domainId", domainId), Map.class, 0, 0);
+
+        Map<String, String> typeNames = new java.util.LinkedHashMap<>();
+        Map<String, Object> typeStats = new java.util.LinkedHashMap<>();
+        for (Map<String, Object> type : types) {
+            String rcvType = (String) type.get("rcv_type");
+            String typeName = (String) type.get("type_name");
+            if (ValueUtil.isNotEmpty(rcvType)) {
+                String label = ValueUtil.isNotEmpty(typeName) ? typeName : rcvType;
+                typeNames.put(rcvType, label);
+                typeStats.put(label, 0);
+            }
+        }
 
         String sql = "SELECT rcv_type, COUNT(*) as count " +
                 "FROM receivings " +
@@ -96,7 +122,7 @@ public class InboundDashboardService extends AbstractQueryService {
                 "AND status != :cancelStatus ";
 
         Map<String, Object> params = ValueUtil.newMap("domainId,startDate,endDate,cancelStatus",
-                Domain.currentDomainId(), start, end, WmsInboundConstants.STATUS_CANCEL);
+                domainId, start, end, WmsInboundConstants.STATUS_CANCEL);
 
         if (ValueUtil.isNotEmpty(comCd)) {
             sql += "AND com_cd = :comCd ";
@@ -113,19 +139,14 @@ public class InboundDashboardService extends AbstractQueryService {
         List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
                 sql, params, Map.class, 0, 0);
 
-        // 결과를 Map으로 변환 (모든 유형 초기화)
-        Map<String, Object> typeStats = new java.util.HashMap<>();
-        typeStats.put("NORMAL", 0);
-        typeStats.put("RETURN", 0);
-        typeStats.put("ETC", 0);
-
         // 조회 결과를 Map에 반영
         for (Map<String, Object> row : results) {
             String rcvType = (String) row.get("rcv_type");
             Object countObj = row.get("count");
             Integer count = countObj instanceof Long ? ((Long) countObj).intValue() : (Integer) countObj;
             if (rcvType != null) {
-                typeStats.put(rcvType, count);
+                String label = typeNames.getOrDefault(rcvType, rcvType);
+                typeStats.put(label, count);
             }
         }
 
@@ -279,51 +300,66 @@ public class InboundDashboardService extends AbstractQueryService {
     }
 
     /**
-     * 적치 작업 PDA 화면 - 대기/완료 건수 요약 조회
+     * 적치 현황 요약 조회
      *
-     * - 대기: inventories 테이블에서 status = 'WAITING' 인 건수
-     * - 완료: receiving_items 테이블에서 updated_at >= 오늘 AND status = 'END' 이고,
-     *         해당 rcv_no + sku_cd가 inventories 테이블에서 status = 'STORED' 인 건수
+     * - 적치 대기: 현재 WAITING 상태로 남아있는 전체 재고 건수
+     * - 적치 완료: 오늘 적치 작업으로 실제 보관 로케이션에 이동된 재고 건수
+     * - 완료 재고 수량: 오늘 적치 완료된 재고 수량 합계
      *
-     * @return Map { waiting_count: N, stored_count: N }
+     * @return Map { waiting_count: N, stored_count: N, stored_qty: N }
      */
     public Map<String, Object> getPutawaySummary() {
         Long domainId = Domain.currentDomainId();
         String today = DateUtil.todayStr();
 
-        // 대기 건수: inventories status = 'WAITING'
         String waitingSql =
                 "SELECT COUNT(*) " +
-                "FROM inventories " +
-                "WHERE domain_id = :domainId " +
-                "AND status = 'WAITING'";
+                "FROM inventories i " +
+                "WHERE i.domain_id = :domainId " +
+                "AND i.status = 'WAITING' " +
+                "AND i.rcv_no IS NOT NULL " +
+                "AND (i.del_flag IS NULL OR i.del_flag = false)";
 
         Integer waitingCount = this.queryManager.selectBySql(
                 waitingSql, ValueUtil.newMap("domainId", domainId), Integer.class);
 
-        // 완료 건수: receiving_items 오늘 END 처리 + receivings 조인으로 rcv_no 획득 + inventories STORED 매칭
-        // receiving_items 에는 rcv_no 컬럼이 없으므로 receivings 테이블을 경유
-        String storedSql =
+        String putawaySubQuery =
+                "SELECT ih.barcode, MAX(ih.inv_qty) AS inv_qty " +
+                "FROM inventory_hists ih " +
+                "WHERE ih.domain_id = :domainId " +
+                "AND ih.rcv_no IS NOT NULL " +
+                "AND ih.last_tran_cd = 'MOVE' " +
+                "AND ih.status = 'STORED' " +
+                "AND CAST(ih.created_at AS DATE) = CAST(:today AS DATE) " +
+                "AND EXISTS ( " +
+                "  SELECT 1 " +
+                "  FROM inventory_hists prev " +
+                "  WHERE prev.domain_id = ih.domain_id " +
+                "  AND prev.barcode = ih.barcode " +
+                "  AND prev.hist_seq = ih.hist_seq - 1 " +
+                "  AND prev.last_tran_cd = 'IN' " +
+                "  AND prev.status = 'STORED' " +
+                ") " +
+                "GROUP BY ih.barcode";
+
+        String storedCountSql =
                 "SELECT COUNT(*) " +
-                "FROM receiving_items ri " +
-                "INNER JOIN receivings r " +
-                "  ON r.id = ri.receiving_id " +
-                "  AND r.domain_id = ri.domain_id " +
-                "INNER JOIN inventories inv " +
-                "  ON inv.domain_id = ri.domain_id " +
-                "  AND inv.rcv_no = r.rcv_no " +
-                "  AND inv.sku_cd = ri.sku_cd " +
-                "  AND inv.status = 'STORED' " +
-                "WHERE ri.domain_id = :domainId " +
-                "AND ri.status = 'END' " +
-                "AND CAST(ri.updated_at AS DATE) = CAST(:today AS DATE)";
+                "FROM (" + putawaySubQuery + ") putaway";
 
         Integer storedCount = this.queryManager.selectBySql(
-                storedSql, ValueUtil.newMap("domainId,today", domainId, today), Integer.class);
+                storedCountSql, ValueUtil.newMap("domainId,today", domainId, today), Integer.class);
+
+        String storedQtySql =
+                "SELECT COALESCE(SUM(putaway.inv_qty), 0) " +
+                "FROM (" + putawaySubQuery + ") putaway";
+
+        Double storedQty = this.queryManager.selectBySql(
+                storedQtySql, ValueUtil.newMap("domainId,today", domainId, today), Double.class);
 
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("waiting_count", waitingCount != null ? waitingCount : 0);
         result.put("stored_count", storedCount != null ? storedCount : 0);
+        result.put("stored_qty", storedQty != null ? storedQty : 0);
         return result;
     }
 }
