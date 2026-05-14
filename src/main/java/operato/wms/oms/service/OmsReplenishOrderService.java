@@ -153,15 +153,18 @@ public class OmsReplenishOrderService extends AbstractQueryService {
 			if (needQty <= 0)
 				continue;
 
-			// STORE (보관)존에서 동일 창고/SKU 가용 재고 탐색
+			// 소스 재고 탐색: STORE(보관) 우선, 없으면 PICKABLE(피킹)의 HOLD 재고도 포함
+			// PICKABLE 로케이션에 재고가 있지만 HOLD 상태인 경우에도 보충지시 생성 대상
 			String stockSql = """
 					SELECT i.loc_cd, i.sku_nm, (i.inv_qty - COALESCE(i.reserved_qty, 0)) AS avail_qty
 					FROM inventories i
 					INNER JOIN locations l ON l.domain_id = i.domain_id AND l.loc_cd = i.loc_cd
 					WHERE i.domain_id = :domainId AND i.com_cd = :comCd AND i.wh_cd = :whCd
-					  AND i.sku_cd = :skuCd AND l.loc_type = 'STORE'
+					  AND i.sku_cd = :skuCd AND l.loc_type IN ('STORE', 'PICKABLE')
 					  AND (i.inv_qty - COALESCE(i.reserved_qty, 0)) > 0
-					ORDER BY (i.inv_qty - COALESCE(i.reserved_qty, 0)) DESC
+					ORDER BY
+					    CASE l.loc_type WHEN 'STORE' THEN 1 WHEN 'PICKABLE' THEN 2 ELSE 3 END,
+					    (i.inv_qty - COALESCE(i.reserved_qty, 0)) DESC
 					LIMIT 1
 					""";
 			Map<String, Object> stockParams = ValueUtil.newMap("domainId,comCd,whCd,skuCd",
