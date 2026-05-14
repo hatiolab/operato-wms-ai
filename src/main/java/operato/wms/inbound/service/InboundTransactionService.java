@@ -418,8 +418,8 @@ public class InboundTransactionService extends AbstractQueryService {
             throw new ElidomRuntimeException("입고 순번 [" + item.getRcvSeq() + "]은 작업 중인 상태가 아닙니다.");
         }
 
-        if (item.getRcvQty() == null || item.getRcvQty() == 0) {
-            throw new ElidomRuntimeException("입고 순번 [" + item.getRcvSeq() + "]은 입고 수량이 0 입니다.");
+        if (item.getRcvQty() == null || item.getRcvQty() <= 0) {
+            throw new ElidomRuntimeException("입고 순번 [" + item.getRcvSeq() + "]은 입고 수량이 0보다 커야 합니다.");
         }
 
         if (item.getRcvQty() > item.getRcvExpQty()) {
