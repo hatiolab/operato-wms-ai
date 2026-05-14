@@ -361,8 +361,8 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 			this.queryManager.executeBySql(updAllocSql, updAllocParams);
 		}
 
-		// ShipmentOrderItem alloc_qty 초기화
-		String updItemsSql = "UPDATE shipment_order_items SET alloc_qty = 0, short_qty = order_qty, updated_at = now() WHERE domain_id = :domainId AND shipment_order_id = :orderId";
+		// ShipmentOrderItem alloc_qty, short_qty 초기화 (할당해제 → CONFIRMED 복원, 부족수량도 0으로)
+		String updItemsSql = "UPDATE shipment_order_items SET alloc_qty = 0, short_qty = 0, updated_at = now() WHERE domain_id = :domainId AND shipment_order_id = :orderId";
 		Map<String, Object> updItemsParams = ValueUtil.newMap("domainId,orderId", domainId, id);
 		this.queryManager.executeBySql(updItemsSql, updItemsParams);
 
