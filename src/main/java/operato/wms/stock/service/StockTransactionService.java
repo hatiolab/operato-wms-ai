@@ -295,12 +295,17 @@ public class StockTransactionService extends AbstractQueryService {
         }
         this.queryManager.update(mainInv, "lastTranCd", "invQty", "remarks", "updatedAt");
 
-        // 2. 병합되는 재고 수량 0 처리
+        // 2. 병합되는 재고 수량 0 처리하여 재고 이력에 남김
         mergeInv.setLastTranCd(Inventory.TRANSACTION_MERGED);
         mergeInv.setInvQty(0.0);
         mergeInv.setRemarks(
                 "Merged to barcode : " + mainInv.getBarcode() + ", location : " + mainInv.getLocCd() + "," + remark);
         this.queryManager.update(mergeInv, "lastTranCd", "invQty", "status", "remarks", "updatedAt", "delFlag");
+
+        // 3. 병합되는 재고 물리적 삭제
+        this.queryManager.delete(mergeInv);
+
+        // 4. 병합 재고 리턴
         return mainInv;
     }
 
