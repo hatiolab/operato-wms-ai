@@ -1502,32 +1502,29 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     try {
       const location = await ServiceUtil.restPost('inventory_trx/validate_location_for_move', {
         to_loc_cd: locCd
-      })
-
-      if (location && location.id) {
+      }, null, null, (res) => {
         this._moveToLocCd = locCd
-        this._moveToLocation = location
+        this._moveToLocation = res
         this._showFeedback(`${locCd} 로케이션 확인`, 'success')
-
-      } else {
-        this.clearForValidateMoveFailed()
-      }
-
+      }, (error) => {
+        this.clearForValidateMoveFailed(error)
+      })
     } catch (error) {
-      this.clearForValidateMoveFailed()
+      this.clearForValidateMoveFailed(error)
     }
   }
 
   /**
-   * To 로케이션 입력값 초기화
+   * 로케이션 유효성 에러 처리
+   * @param {*} err 
    */
-  clearForValidateMoveFailed() {
+  clearForValidateMoveFailed(err) {
     this._moveToLocCd = ''
     this._moveToLocation = null
     const oxLocInput = this.shadowRoot?.querySelector('#moveToLocInput')
     const innerInput = oxLocInput?.shadowRoot?.querySelector('input')
     if (innerInput) innerInput.value = ''
-    this._updateErrorFeedback(error.message || '유효하지 않은 로케이션입니다')
+    this._updateErrorFeedback(err && err.msg || '유효하지 않은 로케이션입니다')
   }
 
   /**
