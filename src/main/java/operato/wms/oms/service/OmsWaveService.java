@@ -395,6 +395,7 @@ public class OmsWaveService extends AbstractQueryService {
 		this.queryManager.update(wave, "status", "releasedAt", "updatedAt");
 
 		// 포함된 주문 상태 변경 (ALLOCATED / WAVED → RELEASED)
+		queryParams.put("status", ShipmentOrder.STATUS_RELEASED);
 		sql = "UPDATE shipment_orders SET status = :status, released_at = :now, updated_at = now() WHERE domain_id = :domainId AND wave_no = :waveNo AND (status = :currentStatus OR status = :currentStatus2)";
 		this.queryManager.executeBySql(sql, queryParams);
 
