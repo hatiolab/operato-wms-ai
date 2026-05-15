@@ -420,9 +420,9 @@ export async function checkResponse(res, responseJson) {
         typeof errData == 'string'
           ? errData
           : errData.code && errData.msg
-          ? `${errData.code} - ${errData.msg}`
-          : OperatoTerms.t1('text.unexpected_server_error')
-      await showCustomAlert('title.error', errMsg, 'error', 'button.confirm')
+            ? `${errData.code} - ${errData.msg}`
+            : OperatoTerms.t1('text.unexpected_server_error')
+      showCustomAlert('title.error', errMsg, 'error', 'button.confirm')
       return errData
     } catch (err) {
       console.log(err)

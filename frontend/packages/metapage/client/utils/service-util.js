@@ -52,7 +52,7 @@ export class ServiceUtil {
    * @param {String} codeName 공통 코드 명
    * @returns {Array} 설정값 클리어를 위해 빈 값이 추가된 코드 리스트
    */
-   static async getCodeSelectorDataNotEmpty(codeName) {
+  static async getCodeSelectorDataNotEmpty(codeName) {
     let codeInfo = await ServiceUtil.codeItems(codeName)
     let codeItems = codeInfo.items
     let codeSelectors = codeItems.map(c => {
@@ -351,7 +351,7 @@ export class ServiceUtil {
    * @return {Object}
    */
   static async callRest(method, url, params, confirmTitleKey, confirmMsgKey, successCallback, failureCallback) {
-    if(!url){
+    if (!url) {
       UiUtil.showToast('error', TermsUtil.tText('url_error'))
       return null
     }
@@ -379,7 +379,7 @@ export class ServiceUtil {
         if (successCallback) successCallback(responseData)
         return responseData
       } else {
-        if (failureCallback) failureCallback()
+        if (failureCallback) failureCallback(res)
       }
     }
 
@@ -393,7 +393,7 @@ export class ServiceUtil {
    * @returns {Array} 그리스트에서 변경, 추가된 데이터 리스트
    */
   static patchesForUpdateMultiple(grist) {
-    
+
     let cudRecords = grist.dirtyRecords
     let gristTree = grist.config.tree
 
@@ -413,17 +413,17 @@ export class ServiceUtil {
         '__selected__',
         '__children__'
       ]
-      
+
       let patchDataList = cudRecords.map(record => {
         let patchData = record.id ? { id: record.id } : {}
 
-        if(gristTree){
-          let childrenProperty = gristTree.childrenProperty? gristTree.childrenProperty: 'children'
+        if (gristTree) {
+          let childrenProperty = gristTree.childrenProperty ? gristTree.childrenProperty : 'children'
 
           patchData[childrenProperty] = record.__children__
-          
+
           // add children parent_id def value = 'root'
-          if(record.parent && !record.parent.id){
+          if (record.parent && !record.parent.id) {
             record.parent_id = 'root'
           }
         }
@@ -752,7 +752,7 @@ export class ServiceUtil {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     });
 
-    let dwonloadFileName = fileName? fileName : Date.now() + '.xlsx'
+    let dwonloadFileName = fileName ? fileName : Date.now() + '.xlsx'
     // download
     const element = document.createElement('a')
     element.setAttribute('download', dwonloadFileName)
@@ -761,6 +761,6 @@ export class ServiceUtil {
     element.setAttribute('target', '_blank')
     element.click()
     URL.revokeObjectURL(href)
-    
+
   }
 }
