@@ -169,6 +169,29 @@ public class InvTransactionController extends AbstractRestService {
     }
 
     /**
+     * 보충 작업 도착 로케이션 유효성 사전 검증 (PDA 보충 화면 전용)
+     *
+     * 일반 이동 검증보다 엄격한 보충 전용 규칙을 적용한다.
+     * - 창고 일치 / 로케이션 유형(STORE 불가) / 출고·입고 제한 / 고정 SKU / 혼적 불가 / 출발지 출고 제한
+     *
+     * POST /rest/inventory_trx/validate_location_for_replenish
+     * Body: { "to_loc_cd": "...", "from_loc_cd": "...", "sku_cd": "...", "wh_cd": "..." }
+     *
+     * @param input to_loc_cd, from_loc_cd, sku_cd, wh_cd 를 포함하는 요청 바디
+     * @return 유효한 Location 엔티티
+     */
+    @PostMapping(value = "/validate_location_for_replenish", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Validate To-Location for Replenish (PDA)")
+    public Location validateLocationForReplenish(@RequestBody Map<String, String> input) {
+        Long domainId = Domain.currentDomainId();
+        String toLocCd = input.get("to_loc_cd");
+        String fromLocCd = input.get("from_loc_cd");
+        String skuCd = input.get("sku_cd");
+        String whCd = input.get("wh_cd");
+        return this.invTrxSvc.validateLocationForReplenish(domainId, toLocCd, fromLocCd, skuCd, whCd);
+    }
+
+    /**
      * 재고 병합 대상 유효성 사전 검증
      *
      * PDA 재고 병합 화면에서 병합 바코드·로케이션 스캔 후 호출한다.

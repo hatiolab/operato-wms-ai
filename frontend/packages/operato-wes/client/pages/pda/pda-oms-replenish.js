@@ -992,12 +992,21 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
    * 도착 로케이션 스캔 핸들러 (to_loc_cd가 null인 아이템용)
    * @param {string} locCd
    */
+  /**
+   * 도착 로케이션 스캔 핸들러 - 보충 전용 검증 적용
+   * (존재 여부 / 창고 / 로케이션 유형 / 출고·입고 제한 / 고정 SKU / 혼적 불가 / 출발지 출고 제한)
+   * @param {string} locCd
+   */
   async _onScanToLoc(locCd) {
     if (!locCd || this.processing) return
+    const currentItem = this.replenishItems[this.currentItemIdx]
     this.processing = true
     try {
-      const location = await ServiceUtil.restPost('inventory_trx/validate_location_for_move', {
-        to_loc_cd: locCd
+      const location = await ServiceUtil.restPost('inventory_trx/validate_location_for_replenish', {
+        to_loc_cd: locCd,
+        from_loc_cd: currentItem?.from_loc_cd,
+        sku_cd: currentItem?.sku_cd,
+        wh_cd: this.replenishOrder?.wh_cd
       })
       if (location && location.id) {
         this.scannedToLocCd = location.loc_cd
@@ -1034,6 +1043,7 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
     try {
       const inv = await ServiceUtil.restPost('inventory_trx/validate_barcode_for_move', {
         barcode,
+        from_loc_cd: currentItem.from_loc_cd,
         to_loc_cd: toLocCd
       })
 

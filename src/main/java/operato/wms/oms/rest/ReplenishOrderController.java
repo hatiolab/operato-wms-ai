@@ -27,6 +27,7 @@ import operato.wms.oms.entity.ReplenishOrderItem;
 import operato.wms.oms.entity.ShipmentOrder;
 import operato.wms.oms.service.OmsReplenishOrderService;
 
+import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
@@ -179,6 +180,18 @@ public class ReplenishOrderController extends AbstractRestService {
 			throw new ElidomValidationException("주문 정보가 없습니다.");
 		}
 
+		// BACK_ORDER 상태 검증 — BACK_ORDER 외 상태 주문은 보충지시 생성 불가
+		List<String> invalidOrders = new ArrayList<>();
+		for (ShipmentOrder order : shipmentOrders) {
+			if (!ShipmentOrder.STATUS_BACK_ORDER.equals(order.getStatus())) {
+				invalidOrders.add(order.getShipmentNo() != null ? order.getShipmentNo() : order.getId());
+			}
+		}
+		if (!invalidOrders.isEmpty()) {
+			throw new ElidomRuntimeException(
+					"재고부족(BACK_ORDER) 상태인 주문만 보충지시를 생성할 수 있습니다: " + String.join(", ", invalidOrders));
+		}
+
 		int totalCreated = 0;
 		int totalItems = 0;
 		List<String> replenishNos = new ArrayList<>();
@@ -193,8 +206,14 @@ public class ReplenishOrderController extends AbstractRestService {
 				totalItems += (int) result.getOrDefault("item_count", 0);
 				replenishNos.add(ValueUtil.toString(result.get("replenish_no")));
 			} else {
-				noStockOrders.add(order.getId());
+				noStockOrders.add(order.getShipmentNo() != null ? order.getShipmentNo() : order.getId());
 			}
+		}
+
+		// 전체 실패 시 오류 표시 (보관재고 없음)
+		if (totalCreated == 0) {
+			throw new ElidomRuntimeException(
+					"보충지시를 생성할 수 없습니다. 보관(STORE/PICKABLE) 재고가 없습니다: " + String.join(", ", noStockOrders));
 		}
 
 		return ValueUtil.newMap("total_created,total_items,replenish_nos,no_stock_orders",
