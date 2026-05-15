@@ -606,6 +606,7 @@ class ShipmentOrderDetail extends localize(i18next)(LitElement) {
       ` : ''}
       ${s === 'BACK_ORDER' ? html`
         <button class="action-btn primary" ?disabled="${this.actionLoading}" @click="${this._allocateOrder}">재할당</button>
+        <button class="action-btn secondary" ?disabled="${this.actionLoading}" @click="${this._deallocateOrder}">할당해제</button>
         <button class="action-btn danger" ?disabled="${this.actionLoading}" @click="${this._cancelOrder}">취소</button>
       ` : ''}
       ${s === 'WAVED' ? html`

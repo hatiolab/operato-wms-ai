@@ -337,8 +337,9 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 			throw new ElidomValidationException("주문을 찾을 수 없습니다: " + id);
 		}
 
-		if (!ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus())) {
-			throw new ElidomValidationException("주문 상태가 [" + order.getStatus() + "]이므로 할당을 해제할 수 없습니다");
+		if (!ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus())
+				&& !ShipmentOrder.STATUS_BACK_ORDER.equals(order.getStatus())) {
+			throw new ElidomValidationException("주문 상태가 [" + order.getStatus() + "]이므로 할당을 해제할 수 없습니다 (ALLOCATED 또는 BACK_ORDER 상태만 가능)");
 		}
 
 		// 할당 레코드 조회
