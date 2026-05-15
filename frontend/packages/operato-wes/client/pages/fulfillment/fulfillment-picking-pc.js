@@ -1242,11 +1242,14 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
 
       if (task.status === 'CREATED') {
         await ServiceUtil.restPost(`ful_trx/picking_tasks/${task.id}/start`)
+        // 서버 상태 변경 후 로컬 목록의 task 상태도 IN_PROGRESS로 갱신하여 카드 재렌더링 트리거
+        task.status = 'IN_PROGRESS'
+        this.pickingTasks = this.pickingTasks.map(t => t.id === task.id ? { ...t, status: 'IN_PROGRESS' } : t)
       }
 
       await this._loadPickingItems(task.id)
 
-      this.pickingTask = task
+      this.pickingTask = { ...task }
       this.rightPanelMode = 'work'
       this.startTime = Date.now()
       this.loading = false
@@ -1314,23 +1317,18 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
       }
     }
 
-    // 3. 바코드 매칭 성공 - 수량 증가
+    // 3. 바코드 매칭 성공 - 재고 단위 바코드이므로 1회 스캔으로 지시 수량 전체 충족
     this.barcodeMatched = true
     const orderQty = item.order_qty || 0
-    const currentQty = this.pickQty || 0
 
-    if (currentQty < orderQty) {
-      this.pickQty = currentQty + 1
+    if (orderQty > 0) {
+      this.pickQty = orderQty
       this.lastScannedItem = { success: true, message: `✓ 바코드 확인 완료 (${this.pickQty}/${orderQty})` }
       this._showFeedback(`✓ ${item.sku_nm || item.sku_cd} (${this.pickQty}/${orderQty})`, 'success')
-
-      // 지시 수량과 일치하면 자동으로 피킹 확인
-      if (this.pickQty === orderQty) {
-        setTimeout(() => this._confirmPick(), 300)
-      }
+      setTimeout(() => this._confirmPick(), 300)
     } else {
-      this.lastScannedItem = { success: false, message: '✗ 지시 수량을 초과할 수 없습니다' }
-      this._showFeedback('✗ 지시 수량을 초과할 수 없습니다', 'warning')
+      this.lastScannedItem = { success: false, message: '✗ 지시 수량 정보가 없습니다' }
+      this._showFeedback('✗ 지시 수량 정보가 없습니다', 'warning')
     }
 
     e.target.value = ''
