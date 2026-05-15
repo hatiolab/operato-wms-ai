@@ -181,6 +181,12 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String carrierServiceType;
 
 	/**
+	 * 송장 번호
+	 */
+	@Column(name = "invoice_no", length = 20)
+	private String invoiceNo;
+
+	/**
 	 * 이동 대상 창고 코드
 	 */
 	@Column(name = "to_wh_cd", length = 30)
@@ -441,6 +447,14 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setCarrierServiceType(String carrierServiceType) {
 		this.carrierServiceType = carrierServiceType;
+	}
+
+	public String getInvoiceNo() {
+		return invoiceNo;
+	}
+
+	public void setInvoiceNo(String invoiceNo) {
+		this.invoiceNo = invoiceNo;
 	}
 
 	public String getToWhCd() {

@@ -13,7 +13,7 @@ SELECT
     so.shipment_no, so.ref_order_no,
     so.order_date, so.ship_by_date, so.cutoff_time, so.priority_cd,
     so.wave_no, so.wh_cd, so.com_cd, so.cust_cd, so.cust_nm,
-    so.biz_type, so.ship_type, so.dlv_type,
+    so.biz_type, so.ship_type, so.dlv_type, so.invoice_no,
     so.status,
     so.total_item, so.total_order, so.total_alloc, so.total_shipped,
     so.confirmed_at, so.allocated_at, so.released_at, so.shipped_at,
@@ -137,6 +137,12 @@ public class ShipmentOrderStatus extends xyz.elidom.orm.entity.basic.DomainTimeS
 	 */
 	@Column(name = "dlv_type", length = 20)
 	private String dlvType;
+
+	/**
+	 * 송장 코드
+	 */
+	@Column(name = "invoice_no", length = 20)
+	private String invoiceNo;
 
 	/**
 	 * 주문 상태
@@ -426,6 +432,14 @@ public class ShipmentOrderStatus extends xyz.elidom.orm.entity.basic.DomainTimeS
 
 	public void setDlvType(String dlvType) {
 		this.dlvType = dlvType;
+	}
+
+	public String getInvoiceNo() {
+		return invoiceNo;
+	}
+
+	public void setInvoiceNo(String invoiceNo) {
+		this.invoiceNo = invoiceNo;
 	}
 
 	public String getStatus() {
