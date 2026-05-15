@@ -1088,7 +1088,7 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
   /** 포장번호 바코드 스캔으로 빠른 선택 */
   _onScanPackingOrder(barcode) {
     if (!barcode) return
-    const order = this.packingOrders.find(o => o.pack_order_no === barcode)
+    const order = this.packingOrders.find(o => o.pack_order_no === barcode || (o.invoice_no && o.invoice_no === barcode))
     if (order) {
       this._selectOrder(order)
     } else {
@@ -1194,6 +1194,7 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
   /** 전체 검수 완료 → packing 모드 전환 */
   _onInspectionComplete() {
     this.mode = 'packing'
+    this.trackingNo = this.selectedOrder?.invoice_no || ''
     setTimeout(() => {
       if (this._trackingInput) this._trackingInput.focus()
     }, 200)

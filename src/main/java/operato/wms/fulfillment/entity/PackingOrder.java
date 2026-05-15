@@ -214,6 +214,12 @@ public class PackingOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String shippedAt;
 
 	/**
+	 * 송장번호 (출고주문의 invoiceNo 복사)
+	 */
+	@Column(name = "invoice_no", length = 20)
+	private String invoiceNo;
+
+	/**
 	 * 비고
 	 */
 	@Column(name = "remarks", length = 1000)
@@ -459,6 +465,14 @@ public class PackingOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setShippedAt(String shippedAt) {
 		this.shippedAt = shippedAt;
+	}
+
+	public String getInvoiceNo() {
+		return invoiceNo;
+	}
+
+	public void setInvoiceNo(String invoiceNo) {
+		this.invoiceNo = invoiceNo;
 	}
 
 	public String getRemarks() {

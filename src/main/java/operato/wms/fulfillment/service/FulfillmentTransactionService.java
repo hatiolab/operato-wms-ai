@@ -351,6 +351,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		packOrder.setCarrierCd(carrierCd);
 		packOrder.setCarrierServiceType(order != null ? order.getCarrierServiceType() : null);
 		packOrder.setDockCd(dockCd);
+		packOrder.setInvoiceNo(order != null ? order.getInvoiceNo() : null);
 		packOrder.setTotalBox(0);
 		packOrder.setStatus(PackingOrder.STATUS_CREATED);
 		this.queryManager.insert(packOrder);
@@ -465,6 +466,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			packOrder.setCarrierCd(batchCarrierCd);
 			packOrder.setCarrierServiceType(order.getCarrierServiceType());
 			packOrder.setDockCd(batchDockCd);
+			packOrder.setInvoiceNo(order.getInvoiceNo());
 			packOrder.setTotalBox(0);
 			packOrder.setStatus(PackingOrder.STATUS_CREATED);
 			this.queryManager.insert(packOrder);

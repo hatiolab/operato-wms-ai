@@ -316,7 +316,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 		StringBuilder sql = new StringBuilder();
 		sql.append("SELECT po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.carrier_cd,");
 		sql.append(" po.status, po.created_at, po.started_at, po.completed_at,");
-		sql.append(" po.total_box, po.total_wt,");
+		sql.append(" po.total_box, po.total_wt, po.invoice_no,");
 		sql.append(
 				" (SELECT SUM(poi.order_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,");
 		sql.append(
@@ -353,7 +353,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 		StringBuilder sql = new StringBuilder();
 		sql.append("SELECT po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.carrier_cd,");
 		sql.append(" po.status, po.created_at, po.started_at, po.completed_at,");
-		sql.append(" po.total_box, po.total_wt,");
+		sql.append(" po.total_box, po.total_wt, po.invoice_no,");
 		sql.append(
 				" (SELECT SUM(poi.order_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,");
 		sql.append(

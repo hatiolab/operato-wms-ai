@@ -1407,7 +1407,8 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
   /** 포장번호 바코드 스캔 - 일치하는 포장 주문 자동 선택 */
   async _onScanPackingOrder(barcode) {
     if (!barcode || !barcode.trim()) return
-    const order = this.packingOrders.find(o => o.pack_order_no === barcode.trim())
+    const trimmed = barcode.trim()
+    const order = this.packingOrders.find(o => o.pack_order_no === trimmed || (o.invoice_no && o.invoice_no === trimmed))
     if (order) {
       await this._onSelectOrder(order)
     } else {
@@ -1532,6 +1533,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
   /** 검수 완료 처리 - 포장 정보 입력 화면으로 전환 */
   _onInspectionComplete() {
     this.rightPanelMode = 'packing'
+    this.trackingNo = this.selectedOrder?.invoice_no || ''
     this._recommendBoxType()
 
     // 운송장 입력에 포커스
