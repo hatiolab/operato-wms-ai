@@ -296,6 +296,8 @@ export class SkuBarcodeInput extends LitElement {
    */
   async _onScan(barcode) {
     if (!barcode || !barcode.trim()) return
+    // ox-input-barcode에서 Enter 키 입력 시 change 이벤트가 2회 발생하는 이슈 방어
+    if (this._processing) return
 
     this._feedback = null
     this._processing = true
