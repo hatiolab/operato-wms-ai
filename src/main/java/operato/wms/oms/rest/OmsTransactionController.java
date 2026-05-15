@@ -198,7 +198,7 @@ public class OmsTransactionController extends AbstractRestService {
 		Map<String, Object> result = this.waveService.createAutoWaves(params);
 
 		// 3. 커스텀 서비스 - 후 처리
-		params.put("wave", result);
+		params.put("wave", result.get("wave"));
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CREATE_WAVE, params);
 
 		// 4. 결과 리턴
@@ -227,7 +227,7 @@ public class OmsTransactionController extends AbstractRestService {
 		Map<String, Object> result = this.waveService.createWave(list, null);
 
 		// 3. 커스텀 서비스 - 후 처리
-		params.put("wave", result);
+		params.put("wave", result.get("wave"));
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CREATE_WAVE, params);
 
 		// 4. 결과 리턴
@@ -255,7 +255,7 @@ public class OmsTransactionController extends AbstractRestService {
 		Map<String, Object> result = this.waveService.createManualWave(params);
 
 		// 3. 커스텀 서비스 - 후 처리
-		params.put("wave", result);
+		params.put("wave", result.get("wave"));
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CREATE_WAVE, params);
 
 		// 4. 결과 리턴
@@ -796,7 +796,7 @@ public class OmsTransactionController extends AbstractRestService {
 		Map<String, Object> result = this.waveService.releaseWave(id);
 
 		// 3. 커스텀 서비스 - 후 처리
-		params.put("result", result);
+		params.put("wave", result.get("wave"));
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_RELEASE_WAVE, params);
 
 		// 4. 결과 리턴

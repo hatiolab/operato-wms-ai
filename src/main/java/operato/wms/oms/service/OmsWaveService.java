@@ -267,13 +267,12 @@ public class OmsWaveService extends AbstractQueryService {
 
 		// 주문에 wave_no 업데이트 및 상태 변경
 		for (ShipmentOrder ord : validOrders) {
-			String updateSql = "UPDATE shipment_orders SET wave_no = :waveNo, status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-			Map<String, Object> updateParams = ValueUtil.newMap("waveNo,status,domainId,id", wave.getWaveNo(),
-					ShipmentOrder.STATUS_WAVED, domainId, ord.getId());
-			this.queryManager.executeBySql(updateSql, updateParams);
+			ord.setWaveNo(wave.getWaveNo());
+			ord.setStatus(ShipmentOrder.STATUS_WAVED);
+			this.queryManager.update(ord, "waveNo", "status", "updatedAt");
 		}
 
-		Map<String, Object> result = ValueUtil.newMap("wave_no", wave.getWaveNo());
+		Map<String, Object> result = ValueUtil.newMap("wave,wave_no", wave, wave.getWaveNo());
 		result.put("wave_seq", wave.getWaveSeq());
 		result.put("order_count", planOrderCnt);
 		result.put("sku_count", planItemCnt);
@@ -391,10 +390,9 @@ public class OmsWaveService extends AbstractQueryService {
 		}
 
 		// 웨이브 상태 변경
-		sql = "UPDATE shipment_waves SET status = :status, released_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-		queryParams.put("id", id);
-		queryParams.put("status", ShipmentWave.STATUS_RELEASED);
-		this.queryManager.executeBySql(sql, queryParams);
+		wave.setStatus(ShipmentWave.STATUS_RELEASED);
+		wave.setReleasedAt(now);
+		this.queryManager.update(wave, "status", "releasedAt", "updatedAt");
 
 		// 포함된 주문 상태 변경 (ALLOCATED / WAVED → RELEASED)
 		sql = "UPDATE shipment_orders SET status = :status, released_at = :now, updated_at = now() WHERE domain_id = :domainId AND wave_no = :waveNo AND (status = :currentStatus OR status = :currentStatus2)";
@@ -416,7 +414,8 @@ public class OmsWaveService extends AbstractQueryService {
 		this.eventPublisher.publishEvent(event);
 
 		// 결과 리턴
-		return ValueUtil.newMap("success,order_count", true, changedOrderCount != null ? changedOrderCount : 0);
+		return ValueUtil.newMap("success,order_count,wave", true, changedOrderCount != null ? changedOrderCount : 0,
+				wave);
 	}
 
 	/**
