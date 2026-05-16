@@ -583,27 +583,27 @@ export class PdaStockMove extends connect(store)(PageView) {
 
     this.processing = true
     try {
-      const location = await ServiceUtil.restPost('inventory_trx/validate_location_for_move', {
+      await ServiceUtil.restPost('inventory_trx/validate_location_for_move', {
         to_loc_cd: locCd
-      })
-
-      if (location && location.id) {
+      }, null, null, (location) => {
         this.toLocCd = location.loc_cd
         this.toLocation = location
         const locInfo = location.loc_type ? ` (${location.loc_type})` : ''
         this._showFeedback(`목적지: ${location.loc_cd}${locInfo} — From 로케이션을 스캔하세요`, 'success')
         if (this._toLocationInput) this._toLocationInput.value = ''
         setTimeout(() => this._focusFromLocationInput(), 150)
-      } else {
-        this._showFeedback('유효하지 않은 로케이션입니다', 'error')
+
+      }, (err) => {
+        this._showFeedback(err?.msg || '유효하지 않은 로케이션입니다', 'error')
         navigator.vibrate?.(200)
         if (this._toLocationInput) this._toLocationInput.value = ''
-      }
+      })
 
     } catch (error) {
       this._showFeedback(error.message || '유효하지 않은 로케이션입니다', 'error')
       navigator.vibrate?.(200)
       if (this._toLocationInput) this._toLocationInput.value = ''
+
     } finally {
       this.processing = false
     }
@@ -619,27 +619,27 @@ export class PdaStockMove extends connect(store)(PageView) {
 
     this.processing = true
     try {
-      const location = await ServiceUtil.restPost('inventory_trx/validate_location_for_move', {
+      await ServiceUtil.restPost('inventory_trx/validate_location_for_move', {
         from_loc_cd: locCd
-      })
-
-      if (location && location.id) {
+      }, null, null, (location) => {
         this.fromLocCd = location.loc_cd
         this.fromLocation = location
         const locInfo = location.loc_type ? ` (${location.loc_type})` : ''
         this._showFeedback(`From: ${location.loc_cd}${locInfo} — 바코드를 스캔하세요`, 'success')
         if (this._fromLocationInput) this._fromLocationInput.value = ''
         setTimeout(() => this._focusBarcodeInput(), 150)
-      } else {
-        this._showFeedback('유효하지 않은 로케이션입니다', 'error')
+
+      }, (err) => {
+        this._showFeedback(err?.msg || '유효하지 않은 로케이션입니다', 'error')
         navigator.vibrate?.(200)
         if (this._fromLocationInput) this._fromLocationInput.value = ''
-      }
+      })
 
     } catch (error) {
       this._showFeedback(error.message || '유효하지 않은 로케이션입니다', 'error')
       navigator.vibrate?.(200)
       if (this._fromLocationInput) this._fromLocationInput.value = ''
+
     } finally {
       this.processing = false
     }
@@ -665,13 +665,11 @@ export class PdaStockMove extends connect(store)(PageView) {
 
     this.processing = true
     try {
-      const inv = await ServiceUtil.restPost('inventory_trx/validate_barcode_for_move', {
+      await ServiceUtil.restPost('inventory_trx/validate_barcode_for_move', {
         barcode,
         from_loc_cd: this.fromLocCd,
         to_loc_cd: this.toLocCd
-      })
-
-      if (inv && inv.id) {
+      }, null, null, (inv) => {
         this.scannedItems = [...this.scannedItems, inv]
         this._showFeedback(`추가됨: ${inv.sku_cd} (${this.fromLocCd} → ${this.toLocCd})`, 'success')
         // 성공: From 로케이션 + 바코드 모두 초기화, From 포커스
@@ -680,13 +678,14 @@ export class PdaStockMove extends connect(store)(PageView) {
         if (this._fromLocationInput) this._fromLocationInput.value = ''
         if (this._barcodeInput) this._barcodeInput.value = ''
         setTimeout(() => this._focusFromLocationInput(), 100)
-      } else {
+
+      }, (err) => {
         this._showFeedback('이동 불가한 재고입니다', 'error')
         navigator.vibrate?.(200)
         // 실패: 바코드만 초기화, 바코드 포커스 유지
         if (this._barcodeInput) this._barcodeInput.value = ''
         setTimeout(() => this._focusBarcodeInput(), 100)
-      }
+      })
 
     } catch (error) {
       this._showFeedback(error.message || '이동 불가한 재고입니다', 'error')
@@ -694,6 +693,7 @@ export class PdaStockMove extends connect(store)(PageView) {
       // 실패: 바코드만 초기화, 바코드 포커스 유지
       if (this._barcodeInput) this._barcodeInput.value = ''
       setTimeout(() => this._focusBarcodeInput(), 100)
+
     } finally {
       this.processing = false
     }
@@ -744,17 +744,16 @@ export class PdaStockMove extends connect(store)(PageView) {
     try {
       for (const inv of this.scannedItems) {
         try {
-          const result = await ServiceUtil.restPost(`inventory_trx/${inv.id}/move_inventory`, {
+          await ServiceUtil.restPost(`inventory_trx/${inv.id}/move_inventory`, {
             from_loc_cd: inv.loc_cd,
             to_loc_cd: this.toLocCd,
             reason: this.reason || ''
+          }, null, null, (result) => {
+            success++
+          }, (err) => {
+            failed++
           })
 
-          if (result && result.id) {
-            success++
-          } else {
-            failed++
-          }
         } catch {
           failed++
         }

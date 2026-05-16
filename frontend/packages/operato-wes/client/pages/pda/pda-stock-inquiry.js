@@ -1430,7 +1430,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
     this.processing = true
     try {
-      const result = await ServiceUtil.restPost('inventory_trx/create_inventory', {
+      await ServiceUtil.restPost('inventory_trx/create_inventory', {
         wh_cd,
         com_cd,
         sku_cd,
@@ -1439,17 +1439,15 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         lot_no: this.addForm.lot_no || null,
         expired_date: this.addForm.expired_date || null,
         remarks: this.addForm.remarks || null
-      })
-
-      if (result && result.id) {
+      }, null, null, (res) => {
         document.dispatchEvent(new CustomEvent('notify', {
           detail: { level: 'info', message: `재고 추가 완료: ${sku_cd} → ${loc_cd}` }
         }))
         this._goList()
 
-      } else {
-        this._updateErrorFeedback('재고 추가에 실패했습니다')
-      }
+      }, (err) => {
+        this._updateErrorFeedback(err?.msg || '재고 추가에 실패했습니다')
+      })
 
     } catch (error) {
       this._updateErrorFeedback(error.message || '재고 추가에 실패했습니다')
@@ -1499,32 +1497,33 @@ export class PdaStockInquiry extends connect(store)(PageView) {
    */
   async _onMoveToLocCdChange(locCd) {
     if (!locCd) return
+
     try {
-      const location = await ServiceUtil.restPost('inventory_trx/validate_location_for_move', {
+      await ServiceUtil.restPost('inventory_trx/validate_location_for_move', {
         to_loc_cd: locCd
       }, null, null, (res) => {
         this._moveToLocCd = locCd
         this._moveToLocation = res
         this._showFeedback(`${locCd} 로케이션 확인`, 'success')
-      }, (error) => {
-        this.clearForValidateMoveFailed(error)
+      }, (err) => {
+        this.clearForValidateMoveFailed(err?.msg || '유효하지 않은 로케이션입니다')
       })
     } catch (error) {
-      this.clearForValidateMoveFailed(error)
+      this.clearForValidateMoveFailed(error?.message || '유효하지 않은 로케이션입니다')
     }
   }
 
   /**
    * 로케이션 유효성 에러 처리
-   * @param {*} err 
+   * @param {*} errorMessage 
    */
-  clearForValidateMoveFailed(err) {
+  clearForValidateMoveFailed(errorMessage) {
     this._moveToLocCd = ''
     this._moveToLocation = null
     const oxLocInput = this.shadowRoot?.querySelector('#moveToLocInput')
     const innerInput = oxLocInput?.shadowRoot?.querySelector('input')
     if (innerInput) innerInput.value = ''
-    this._updateErrorFeedback(err && err.msg || '유효하지 않은 로케이션입니다')
+    this._updateErrorFeedback(errorMessage)
   }
 
   /**
@@ -1561,22 +1560,21 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
     this.processing = true
     try {
-      const result = await ServiceUtil.restPost(`inventory_trx/${inv.id}/move_inventory`, {
+      await ServiceUtil.restPost(`inventory_trx/${inv.id}/move_inventory`, {
         to_loc_cd: this._moveToLocCd,
         to_qty: qty,
         reason: this._moveReason.trim()
-      })
-
-      if (result && result.id) {
+      }, null, null, (res) => {
         document.dispatchEvent(new CustomEvent('notify', {
           detail: { level: 'info', message: `재고 이동 완료: ${inv.barcode} → ${this._moveToLocCd} (${qty})` }
         }))
-      } else {
-        this._updateErrorFeedback('재고 이동에 실패했습니다')
-      }
+        this._goList()
+      }, (err) => {
+        this._updateErrorFeedback(err?.msg || '재고 이동에 실패했습니다')
+      })
 
     } catch (error) {
-      this._updateErrorFeedback(error.message || '재고 이동에 실패했습니다')
+      this._updateErrorFeedback(error?.message || '재고 이동에 실패했습니다')
 
     } finally {
       this.processing = false
@@ -1642,31 +1640,29 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   async _validateMergeInventory() {
     const inv = this.selectedInventory
     try {
-      const found = await ServiceUtil.restPost('inventory_trx/validate_inventory_for_merge', {
+      await ServiceUtil.restPost('inventory_trx/validate_inventory_for_merge', {
         merge_barcode: this._mergeBarcode,
         merge_loc_cd: this._mergeMergeLocCd,
         base_inventory_id: inv?.id
-      })
-
-      if (found && found.id) {
-        this._mergeInventory = found
+      }, null, null, (res) => {
+        this._mergeInventory = res
         this._showFeedback(
-          `${found.sku_cd || ''} · ${found.loc_cd || ''} · ${found.inv_qty ?? 0}개 확인`,
+          `${res.sku_cd || ''} · ${res.loc_cd || ''} · ${res.inv_qty ?? 0}개 확인`,
           'success'
         )
-      } else {
-        this.clearForValidateMergeFailed()
-      }
+      }, (err) => {
+        this.clearForValidateMergeFailed(err?.msg || '병합 처리를 할 수 있는 재고가 아닙니다')
+      })
 
     } catch (error) {
-      this.clearForValidateMergeFailed()
+      this.clearForValidateMergeFailed(error?.message || '병합 처리를 할 수 있는 재고가 아닙니다')
     }
   }
 
   /**
    * 병합 대상 재고 검증 실패 시 입력값 초기화
    */
-  clearForValidateMergeFailed() {
+  clearForValidateMergeFailed(errMsg) {
     this._mergeInventory = null
     this._mergeBarcode = ''
     this._mergeMergeLocCd = ''
@@ -1679,7 +1675,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     const innerLoc = locOx?.shadowRoot?.querySelector('input')
     if (innerLoc) innerLoc.value = ''
 
-    this._updateErrorFeedback('병합 처리를 할 수 있는 재고가 아닙니다.')
+    this._updateErrorFeedback(errMsg)
   }
 
   /**
@@ -1707,14 +1703,13 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
     const inv = this.selectedInventory
     this.processing = true
+
     try {
-      const result = await ServiceUtil.restPost(`inventory_trx/${inv.id}/merge_inventory`, {
+      await ServiceUtil.restPost(`inventory_trx/${inv.id}/merge_inventory`, {
         merge_barcode: this._mergeBarcode,
         merge_loc_cd: this._mergeMergeLocCd,
         reason: this._mergeReason.trim()
-      })
-
-      if (result && result.id) {
+      }, null, null, (res) => {
         document.dispatchEvent(new CustomEvent('notify', {
           detail: {
             level: 'info',
@@ -1722,9 +1717,9 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           }
         }))
 
-      } else {
-        this._updateErrorFeedback('재고 병합에 실패했습니다')
-      }
+      }, (err) => {
+        this._updateErrorFeedback(err?.msg || '재고 병합에 실패했습니다')
+      })
 
     } catch (error) {
       this._updateErrorFeedback(error.message || '재고 병합에 실패했습니다')
@@ -1757,24 +1752,20 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     this.processing = true
     try {
       const inv = this.selectedInventory
-      const result = await ServiceUtil.restPost(`inventory_trx/${inv.id}/adjust_inventory`, {
+      await ServiceUtil.restPost(`inventory_trx/${inv.id}/adjust_inventory`, {
         to_qty: qty,
         reason: this._adjReason.trim()
-      })
-
-      if (result && result.id) {
+      }, null, null, (result) => {
         document.dispatchEvent(new CustomEvent('notify', {
           detail: { level: 'info', message: `재고 조정 완료: ${inv.barcode} (${qty > 0 ? '+' : ''}${qty})` }
         }))
 
-        // 조정 후 상세 화면으로 복귀하며 재고 정보 갱신
         this.selectedInventory = result || inv
         this.lastFeedback = null
         this.mode = 'detail'
-
-      } else {
-        this._updateErrorFeedback('재고 조정에 실패했습니다')
-      }
+      }, (err) => {
+        this._updateErrorFeedback(err?.msg || '재고 조정에 실패했습니다')
+      })
 
     } catch (error) {
       this._updateErrorFeedback(error.message || '재고 조정에 실패했습니다')
