@@ -102,7 +102,8 @@ public class OmsTransactionController extends AbstractRestService {
 				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2C_OUT, list);
 		try {
 			this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CHECK_IMPORT_SHIPMENT, params);
-		} catch (Throwable ignored) {}
+		} catch (Throwable ignored) {
+		}
 
 		// 2. 본 로직 실행
 		Map<String, Object> result = this.importService.validateImportData(list,
@@ -112,7 +113,8 @@ public class OmsTransactionController extends AbstractRestService {
 		params.put("result", result);
 		try {
 			this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CHECK_IMPORT_SHIPMENT, params);
-		} catch (Throwable ignored) {}
+		} catch (Throwable ignored) {
+		}
 
 		// 4. 결과 리턴
 		return result;
@@ -136,7 +138,8 @@ public class OmsTransactionController extends AbstractRestService {
 				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT, list);
 		try {
 			this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CHECK_IMPORT_SHIPMENT, params);
-		} catch (Throwable ignored) {}
+		} catch (Throwable ignored) {
+		}
 
 		// 2. 본 로직 실행
 		Map<String, Object> result = this.importService.validateImportData(list,
@@ -146,7 +149,8 @@ public class OmsTransactionController extends AbstractRestService {
 		params.put("result", result);
 		try {
 			this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CHECK_IMPORT_SHIPMENT, params);
-		} catch (Throwable ignored) {}
+		} catch (Throwable ignored) {
+		}
 
 		// 4. 결과 리턴
 		return result;
@@ -169,7 +173,8 @@ public class OmsTransactionController extends AbstractRestService {
 		Map<String, Object> params = ValueUtil.newMap("list", list);
 		try {
 			this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_IMPORT_SHIPMENT, params);
-		} catch (Throwable ignored) {}
+		} catch (Throwable ignored) {
+		}
 
 		// 2. 본 로직 실행
 		Map<String, Object> result = this.importService.importShipmentOrders(list);
@@ -178,7 +183,8 @@ public class OmsTransactionController extends AbstractRestService {
 		params.put("shipmentOrders", result);
 		try {
 			this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_IMPORT_SHIPMENT, params);
-		} catch (Throwable ignored) {}
+		} catch (Throwable ignored) {
+		}
 
 		// 4. 결과 리턴
 		return result;
@@ -318,7 +324,7 @@ public class OmsTransactionController extends AbstractRestService {
 		Map<String, Object> result = this.orderService.confirmShipmentOrders(ids);
 
 		// 3. 커스텀 서비스 - 후 처리
-		customParams.put("result", result);
+		customParams.put("confirmed_ids", result.get("confirmed_ids"));
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CONFIRM_SHIPMENT, customParams);
 
 		// 4. 결과 리턴

@@ -150,6 +150,36 @@ public class ShipmentDelivery extends xyz.elidom.orm.entity.basic.ElidomStampHoo
 	private String deliveryMemo;
 
 	/**
+	 * 분류 코드
+	 */
+	@Column (name = "dlv_region_cd", length = 10)
+	private String dlvRegionCd;
+
+	/**
+	 * 분류 서브코드
+	 */
+	@Column (name = "dlv_region_sub_cd", length = 10)
+	private String dlvRegionSubCd;
+
+	/**
+	 * 배달 점소
+	 */
+	@Column (name = "dlv_store_nm", length = 10)
+	private String dlvStoreNm;
+
+	/**
+	 * 배송사원 코드
+	 */
+	@Column (name = "dlv_emp_cd", length = 10)
+	private String dlvEmpCd;
+
+	/**
+	 * 배송사원 명
+	 */
+	@Column (name = "dlv_emp_nm", length = 15)
+	private String dlvEmpNm;
+
+	/**
 	 * 배송 정보 세트 (JSON)
 	 */
 	@Column (name = "delivery_info_set", length = 2000)
@@ -357,6 +387,46 @@ public class ShipmentDelivery extends xyz.elidom.orm.entity.basic.ElidomStampHoo
 
 	public void setDeliveryMemo(String deliveryMemo) {
 		this.deliveryMemo = deliveryMemo;
+	}
+
+	public String getDlvRegionCd() {
+		return dlvRegionCd;
+	}
+
+	public void setDlvRegionCd(String dlvRegionCd) {
+		this.dlvRegionCd = dlvRegionCd;
+	}
+
+	public String getDlvRegionSubCd() {
+		return dlvRegionSubCd;
+	}
+
+	public void setDlvRegionSubCd(String dlvRegionSubCd) {
+		this.dlvRegionSubCd = dlvRegionSubCd;
+	}
+
+	public String getDlvStoreNm() {
+		return dlvStoreNm;
+	}
+
+	public void setDlvStoreNm(String dlvStoreNm) {
+		this.dlvStoreNm = dlvStoreNm;
+	}
+
+	public String getDlvEmpCd() {
+		return dlvEmpCd;
+	}
+
+	public void setDlvEmpCd(String dlvEmpCd) {
+		this.dlvEmpCd = dlvEmpCd;
+	}
+
+	public String getDlvEmpNm() {
+		return dlvEmpNm;
+	}
+
+	public void setDlvEmpNm(String dlvEmpNm) {
+		this.dlvEmpNm = dlvEmpNm;
 	}
 
 	public String getDeliveryInfoSet() {

@@ -106,9 +106,10 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 	public Map<String, Object> confirmShipmentOrders(List<String> ids) {
 		Long domainId = Domain.currentDomainId();
 		String now = DateUtil.currentTimeStr();
+		List<String> confirmedIds = new ArrayList<String>();
+		List<String> errors = new ArrayList<String>();
 		int successCount = 0;
 		int failCount = 0;
-		List<String> errors = new ArrayList<>();
 
 		for (String id : ids) {
 			ShipmentOrder order = this.findOrder(domainId, id);
@@ -124,10 +125,11 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 				continue;
 			}
 
-			String sql = "UPDATE shipment_orders SET status = :status, confirmed_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-			Map<String, Object> params = ValueUtil.newMap("status,now,domainId,id",
-					ShipmentOrder.STATUS_CONFIRMED, now, domainId, id);
-			this.queryManager.executeBySql(sql, params);
+			order.setStatus(ShipmentOrder.STATUS_CONFIRMED);
+			order.setConfirmedAt(now);
+			this.queryManager.update(order, "status", "confirmedAt", "updatedAt");
+			confirmedIds.add(id);
+
 			successCount++;
 		}
 
@@ -138,7 +140,8 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 		}
 
 		// 결과 리턴
-		return ValueUtil.newMap("success_count,fail_count,errors", successCount, failCount, errors);
+		return ValueUtil.newMap("success_count,fail_count,errors,confirmed_ids", successCount, failCount, errors,
+				confirmedIds);
 	}
 
 	/**
@@ -162,7 +165,8 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 			}
 
 			if (!ShipmentOrder.STATUS_CONFIRMED.equals(order.getStatus())) {
-				errors.add("주문 [" + order.getShipmentNo() + "] 상태가 [" + order.getStatus() + "]이므로 확정 취소할 수 없습니다 (CONFIRMED 상태만 가능)");
+				errors.add("주문 [" + order.getShipmentNo() + "] 상태가 [" + order.getStatus()
+						+ "]이므로 확정 취소할 수 없습니다 (CONFIRMED 상태만 가능)");
 				failCount++;
 				continue;
 			}
@@ -305,7 +309,8 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 			successCount++;
 			if (hasShort) {
 				backOrderCount++;
-				this.omsReplenishOrderService.createReplenishForOrder(domainId, orderId, order.getComCd(), order.getWhCd());
+				this.omsReplenishOrderService.createReplenishForOrder(domainId, orderId, order.getComCd(),
+						order.getWhCd());
 			} else {
 				allocatedCount++;
 			}
@@ -339,7 +344,8 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 
 		if (!ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus())
 				&& !ShipmentOrder.STATUS_BACK_ORDER.equals(order.getStatus())) {
-			throw new ElidomValidationException("주문 상태가 [" + order.getStatus() + "]이므로 할당을 해제할 수 없습니다 (ALLOCATED 또는 BACK_ORDER 상태만 가능)");
+			throw new ElidomValidationException(
+					"주문 상태가 [" + order.getStatus() + "]이므로 할당을 해제할 수 없습니다 (ALLOCATED 또는 BACK_ORDER 상태만 가능)");
 		}
 
 		// 할당 레코드 조회
@@ -382,9 +388,9 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 	 *
 	 * 피킹 처리 이후(PICKING/PACKING/SHIPPED/CLOSED) 상태는 취소 불가.
 	 * 상태별 추가 처리:
-	 *   - ALLOCATED/BACK_ORDER: stock_allocations 해제
-	 *   - CONFIRMED: confirmed_at 초기화
-	 *   - WAVED/RELEASED: wave_no 초기화 (웨이브 정합성 유지)
+	 * - ALLOCATED/BACK_ORDER: stock_allocations 해제
+	 * - CONFIRMED: confirmed_at 초기화
+	 * - WAVED/RELEASED: wave_no 초기화 (웨이브 정합성 유지)
 	 *
 	 * @param ids 주문 ID 리스트
 	 * @return { success_count, fail_count, errors }
@@ -426,7 +432,8 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 						StockAllocation.class, 0, 0);
 
 				for (StockAllocation alloc : allocations) {
-					this.stockTransactionService.deallocateInventory(domainId, alloc.getInventoryId(), alloc.getAllocQty());
+					this.stockTransactionService.deallocateInventory(domainId, alloc.getInventoryId(),
+							alloc.getAllocQty());
 
 					String updAllocSql = "UPDATE stock_allocations SET status = :status, released_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :allocId";
 					Map<String, Object> updAllocParams = ValueUtil.newMap("status,now,domainId,allocId",
@@ -540,7 +547,8 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 
 		for (StockAllocation alloc : allocations) {
 			double allocQty = alloc.getAllocQty() != null ? alloc.getAllocQty() : 0;
-			if (allocQty <= 0 || alloc.getInventoryId() == null) continue;
+			if (allocQty <= 0 || alloc.getInventoryId() == null)
+				continue;
 
 			// inv_qty 복원(증가) + reserved_qty 재설정
 			String updInvSql = "UPDATE inventories"
@@ -548,7 +556,8 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 					+ "     reserved_qty = COALESCE(reserved_qty, 0) + :qty,"
 					+ "     updated_at = now()"
 					+ " WHERE domain_id = :domainId AND id = :invId";
-			Map<String, Object> updInvParams = ValueUtil.newMap("qty,domainId,invId", allocQty, domainId, alloc.getInventoryId());
+			Map<String, Object> updInvParams = ValueUtil.newMap("qty,domainId,invId", allocQty, domainId,
+					alloc.getInventoryId());
 			this.queryManager.executeBySql(updInvSql, updInvParams);
 
 			// stock_allocations RELEASED → HARD 복귀 (재마감 가능)
