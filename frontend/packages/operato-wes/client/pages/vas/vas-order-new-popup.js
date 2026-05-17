@@ -437,6 +437,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
       companies: Array,
       warehouses: Array,
       locations: Array,
+      putawayLocations: Array,
       formData: Object,
       selectedBom: Object,
       loadingBomItems: Boolean,
@@ -455,6 +456,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     this.companies = []
     this.warehouses = []
     this.locations = []
+    this.putawayLocations = []
     this.formData = {
       comCd: '',
       whCd: '',
@@ -463,6 +465,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
       planQty: '',
       priority: 'NORMAL',
       workLocCd: '',
+      putawayLocCd: '',
       remarks: ''
     }
     this.selectedBom = null
@@ -477,6 +480,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     this._fetchCompanies()
     this._fetchWarehouses()
     this._fetchLocations()
+    this._fetchPutawayLocations()
   }
 
   /** 화면 렌더링 - 스텝 인디케이터, 폼 내용, 하단 버튼 구성 */
@@ -628,13 +632,27 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
         </div>
 
         <div class="form-group">
-          <label>작업장 로케이션</label>
+          <label>작업장 로케이션<span class="required">*</span></label>
           <select @change="${e => this._updateField('workLocCd', e.target.value)}">
             <option value="">-- 작업장 선택 --</option>
             ${this.locations.map(
               loc => html`
                 <option value="${loc.loc_cd}" ?selected="${this.formData.workLocCd === loc.loc_cd}">
                   ${loc.loc_cd}${loc.loc_type ? ` (${loc.loc_type})` : ''}
+                </option>
+              `
+            )}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>적치 로케이션</label>
+          <select @change="${e => this._updateField('putawayLocCd', e.target.value)}">
+            <option value="">-- 작업장과 동일 --</option>
+            ${this.putawayLocations.map(
+              loc => html`
+                <option value="${loc.loc_cd}" ?selected="${this.formData.putawayLocCd === loc.loc_cd}">
+                  ${loc.loc_cd}${loc.loc_nm ? ` - ${loc.loc_nm}` : ''}
                 </option>
               `
             )}
@@ -872,7 +890,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     }
   }
 
-  /** 로케이션 목록 조회 */
+  /** 로케이션 목록 조회 (작업장 전용 - VAS 유형) */
   async _fetchLocations() {
     try {
       const filters = [{ name: 'loc_type', value: 'VAS' }]
@@ -881,6 +899,17 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     } catch (err) {
       console.error('로케이션 목록 조회 실패:', err)
       this.locations = []
+    }
+  }
+
+  /** 적치 로케이션 목록 조회 (전체 로케이션) */
+  async _fetchPutawayLocations() {
+    try {
+      const data = await ServiceUtil.searchByPagination('locations', [], null, 1, 500)
+      this.putawayLocations = data?.items || []
+    } catch (err) {
+      console.error('적치 로케이션 목록 조회 실패:', err)
+      this.putawayLocations = []
     }
   }
 
@@ -1060,6 +1089,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
         plan_qty: parseFloat(this.formData.planQty),
         priority: this.formData.priority,
         work_loc_cd: this.formData.workLocCd || null,
+        putaway_loc_cd: this.formData.putawayLocCd || null,
         vas_type: this.vasTypeMode || 'SET_ASSEMBLY',
         remarks: this.formData.remarks || null
       }
@@ -1091,7 +1121,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
    * 유틸리티
    * ============================================================ */
 
-  /** 1단계 필수 입력값 검증 (화주사, 창고, BOM, 요청일, 계획수량) */
+  /** 1단계 필수 입력값 검증 (화주사, 창고, BOM, 요청일, 계획수량, 작업장) */
   _validateStep1() {
     const errors = []
     if (!this.formData.comCd) errors.push('화주사를 입력해주세요.')
@@ -1101,6 +1131,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     if (!this.formData.planQty || parseFloat(this.formData.planQty) <= 0) {
       errors.push('계획 수량을 1 이상 입력해주세요.')
     }
+    if (!this.formData.workLocCd) errors.push('작업장 로케이션을 선택해주세요.')
     return errors
   }
 

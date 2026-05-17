@@ -105,6 +105,12 @@ public class VasOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String workLocCd;
 
 	/**
+	 * 적치 로케이션 코드 (완성품/산출품을 적치할 로케이션, 미설정 시 work_loc_cd 사용)
+	 */
+	@Column(name = "putaway_loc_cd", length = 20)
+	private String putawayLocCd;
+
+	/**
 	 * 계획 세트 수량
 	 */
 	@Column(name = "plan_qty", nullable = false)
@@ -304,6 +310,14 @@ public class VasOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setWorkLocCd(String workLocCd) {
 		this.workLocCd = workLocCd;
+	}
+
+	public String getPutawayLocCd() {
+		return putawayLocCd;
+	}
+
+	public void setPutawayLocCd(String putawayLocCd) {
+		this.putawayLocCd = putawayLocCd;
 	}
 
 	public Double getPlanQty() {

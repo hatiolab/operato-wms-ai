@@ -808,6 +808,7 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
       orderItems: Array,
       bomItems: Array,
       scanValue: String,
+      putawayLoc: String,
       feedbackMsg: String,
       feedbackType: String,
       voiceEnabled: Boolean
@@ -826,6 +827,7 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
     this.orderItems = []
     this.bomItems = []
     this.scanValue = ''
+    this.putawayLoc = ''
     this.feedbackMsg = ''
     this.feedbackType = ''
     this.voiceEnabled = voiceService.enabled
@@ -964,6 +966,10 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
         <div class="detail-row">
           <span>상태</span>
           <span class="value">${this._statusLabel(order.status)}</span>
+        </div>
+        <div class="detail-row">
+          <span>적치 로케이션</span>
+          <span class="value" style="color: var(--md-sys-color-primary, #1976D2);">${this.putawayLoc || '-'}</span>
         </div>
       </div>
     `
@@ -1216,6 +1222,8 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
   async _selectOrder(order) {
     this.selectedOrder = order
     this.screen = 'work'
+    // 적치 로케이션 기본값: putaway_loc_cd → work_loc_cd 순으로 적용
+    this.putawayLoc = order.putaway_loc_cd || order.work_loc_cd || ''
     await Promise.all([
       this._fetchOrderItems(order.id),
       this._fetchBomItems(order.vas_bom_id)
@@ -1234,6 +1242,7 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
     this.selectedOrder = null
     this.orderItems = []
     this.bomItems = []
+    this.putawayLoc = ''
     this._fetchOrders()
   }
 
@@ -1384,7 +1393,7 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
     try {
       await ServiceUtil.restPost(
         `vas_trx/vas_orders/${this.selectedOrder.id}/complete_disassembly`,
-        outputs
+        { outputs, destLocCd: this.putawayLoc || null }
       )
       this._showFeedback('해체 작업이 완료되었습니다', 'success')
       voiceService.success('작업 완료')

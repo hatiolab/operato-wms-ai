@@ -271,11 +271,14 @@ public class VasTransactionController {
 	 */
 	@PostMapping(value = "/vas_orders/{id}/complete_disassembly", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Complete Disassembly VAS Work with per-row inventory creation")
+	@SuppressWarnings("unchecked")
 	public VasOrder completeDisassembly(
 			@PathVariable("id") String id,
-			@RequestBody List<Map<String, Object>> outputs) {
+			@RequestBody Map<String, Object> body) {
 
-		return this.vasService.completeDisassembly(id, outputs);
+		List<Map<String, Object>> outputs = (List<Map<String, Object>>) body.get("outputs");
+		String destLocCd = (String) body.get("destLocCd");
+		return this.vasService.completeDisassembly(id, outputs, destLocCd);
 	}
 
 	/**

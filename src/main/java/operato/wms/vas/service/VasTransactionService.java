@@ -1397,7 +1397,7 @@ public class VasTransactionService extends AbstractQueryService {
 		StringBuilder sql = new StringBuilder(
 				"SELECT vo.id, vo.vas_no, vo.vas_type, vo.status, " +
 				"vo.plan_qty, vo.completed_qty, vo.com_cd, vo.wh_cd, " +
-				"vo.worker_id, vo.priority, vo.work_loc_cd, " +
+				"vo.worker_id, vo.priority, vo.work_loc_cd, vo.putaway_loc_cd, " +
 				"vo.started_at, vo.approved_at, vo.vas_req_date, " +
 				"vo.vas_bom_id, vo.remarks, " +
 				"COALESCE(mi.total_items, 0) as total_items, " +
@@ -1463,7 +1463,7 @@ public class VasTransactionService extends AbstractQueryService {
 
 		String sql = "SELECT vo.id, vo.vas_no, vo.vas_type, vo.status, " +
 				"vo.plan_qty, vo.completed_qty, vo.com_cd, vo.wh_cd, " +
-				"vo.worker_id, vo.priority, vo.work_loc_cd, " +
+				"vo.worker_id, vo.priority, vo.work_loc_cd, vo.putaway_loc_cd, " +
 				"vo.started_at, vo.approved_at, vo.vas_req_date, " +
 				"vo.vas_bom_id, vo.remarks, " +
 				"COALESCE(mi.total_items, 0) as total_items, " +
@@ -1889,7 +1889,7 @@ public class VasTransactionService extends AbstractQueryService {
 	 * @return 완료된 작업 지시
 	 */
 	@Transactional
-	public VasOrder completeDisassembly(String vasOrderId, List<Map<String, Object>> outputs) {
+	public VasOrder completeDisassembly(String vasOrderId, List<Map<String, Object>> outputs, String destLocCd) {
 		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
 		if (vasOrder == null) {
 			throw new ElidomValidationException("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
@@ -1913,6 +1913,11 @@ public class VasTransactionService extends AbstractQueryService {
 			throw new ElidomValidationException("작업장 로케이션(work_loc_cd)이 설정되지 않았습니다.");
 		}
 
+		// 산출품 적치 로케이션: destLocCd(프론트 전달) → putaway_loc_cd → work_loc_cd 순으로 적용
+		String finalLocCd = ValueUtil.isNotEmpty(destLocCd) ? destLocCd
+				: ValueUtil.isNotEmpty(vasOrder.getPutawayLocCd()) ? vasOrder.getPutawayLocCd()
+				: workLocCd;
+
 		// 할당 원재고(세트 상품) 소비
 		this.consumeVasAllocatedInventoriesIfNeeded(vasOrder);
 
@@ -1927,7 +1932,7 @@ public class VasTransactionService extends AbstractQueryService {
 			newInv.setDomainId(vasOrder.getDomainId());
 			newInv.setComCd(vasOrder.getComCd());
 			newInv.setWhCd(vasOrder.getWhCd());
-			newInv.setLocCd(workLocCd);
+			newInv.setLocCd(finalLocCd);
 			newInv.setSkuCd(skuCd);
 			newInv.setInvQty(qty);
 			newInv.setExpiredDate(expiryDate);
@@ -1943,7 +1948,7 @@ public class VasTransactionService extends AbstractQueryService {
 			result.setSetSkuCd(skuCd);
 			result.setSetSkuNm(skuNm);
 			result.setResultQty(qty);
-			result.setDestLocCd(workLocCd);
+			result.setDestLocCd(finalLocCd);
 			result.setRemarks(ValueUtil.isEmpty(expiryDate) ? null : "유통기한: " + expiryDate);
 			this.queryManager.insert(result);
 		}
