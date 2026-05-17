@@ -184,7 +184,7 @@ class InboundHome extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface);
         }
 
-        .putaway-card.wait { border-left: 4px solid #2196F3; }
+        .putaway-card.wait { border-left: 4px solid #2196F3; cursor: pointer; }
         .putaway-card.done { border-left: 4px solid #4CAF50; }
         .putaway-card.qty { border-left: 4px solid #FF9800; }
 
@@ -337,7 +337,7 @@ class InboundHome extends localize(i18next)(PageView) {
               <section>
                 <h3 class="section-title">📦 적치 현황</h3>
                 <div class="putaway-cards">
-                  <div class="putaway-card wait">
+                  <div class="putaway-card wait" @click="${() => this._navigateTo('pda-inbound-putaway')}">
                     <div class="label">적치 대기</div>
                     <div class="count">${this.putawayStats.waiting_count || 0}</div>
                   </div>
