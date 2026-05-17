@@ -125,8 +125,21 @@ public class VasTransactionController {
 		Double allocQty = ValueUtil.toDouble(params.get("allocQty"));
 		String srcLocCd = (String) params.get("srcLocCd");
 		String lotNo = (String) params.get("lotNo");
+		String minExpireDate = (String) params.get("minExpireDate");
 
-		return this.vasService.allocateMaterial(itemId, allocQty, srcLocCd, lotNo);
+		return this.vasService.allocateMaterial(itemId, allocQty, srcLocCd, lotNo, minExpireDate);
+	}
+
+	/**
+	 * 개별 재고 할당 취소
+	 *
+	 * @param allocId stock_allocation ID
+	 * @return 업데이트된 작업 지시 상세
+	 */
+	@PostMapping(value = "/stock_allocations/{allocId}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Cancel Single Stock Allocation for VAS Order Item")
+	public VasOrderItem cancelSingleAllocation(@PathVariable("allocId") String allocId) {
+		return this.vasService.cancelSingleAllocation(allocId);
 	}
 
 	/**
@@ -165,8 +178,9 @@ public class VasTransactionController {
 			Double allocQty = ValueUtil.toDouble(item.get("allocQty"));
 			String srcLocCd = (String) item.get("srcLocCd");
 			String lotNo = (String) item.get("lotNo");
+			String minExpireDate = (String) item.get("minExpireDate");
 
-			this.vasService.allocateMaterial(itemId, allocQty, srcLocCd, lotNo);
+			this.vasService.allocateMaterial(itemId, allocQty, srcLocCd, lotNo, minExpireDate);
 		}
 
 		return this.vasService.listVasOrderItems(id);

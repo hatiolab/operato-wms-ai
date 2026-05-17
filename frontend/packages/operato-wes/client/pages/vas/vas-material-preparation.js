@@ -353,17 +353,17 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
           table-layout: fixed;
         }
 
-        /* 순번 4% | SKU 10% | 자재명 20% | 필요/할당/피킹 6%×3 | 로케이션 10% | LOT 0%(숨김) | 상태 8% | 액션 30% */
+        /* 순번 4% | SKU 9% | 자재명 13% | 필요/할당/피킹 6%×3 | 로케이션 9% | LOT 0%(숨김) | 상태 7% | 액션 40% */
         .items-table colgroup col:nth-child(1)  { width: 4%; }
-        .items-table colgroup col:nth-child(2)  { width: 10%; }
-        .items-table colgroup col:nth-child(3)  { width: 20%; }
+        .items-table colgroup col:nth-child(2)  { width: 9%; }
+        .items-table colgroup col:nth-child(3)  { width: 13%; }
         .items-table colgroup col:nth-child(4)  { width: 6%; }
         .items-table colgroup col:nth-child(5)  { width: 6%; }
         .items-table colgroup col:nth-child(6)  { width: 6%; }
-        .items-table colgroup col:nth-child(7)  { width: 10%; }
+        .items-table colgroup col:nth-child(7)  { width: 9%; }
         .items-table colgroup col:nth-child(8)  { width: 0; }
-        .items-table colgroup col:nth-child(9)  { width: 8%; }
-        .items-table colgroup col:nth-child(10) { width: 30%; }
+        .items-table colgroup col:nth-child(9)  { width: 7%; }
+        .items-table colgroup col:nth-child(10) { width: 40%; }
 
         .items-table thead {
           background: var(--md-sys-color-surface-variant, #f0f0f0);
@@ -380,6 +380,9 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
           font-weight: 600;
           color: var(--md-sys-color-on-surface, #333);
           font-size: 12px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .items-table td {
@@ -460,6 +463,31 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
           cursor: not-allowed;
         }
 
+        /* 최소유통기한 날짜 선택 */
+        .item-min-expire-input {
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 4px;
+          padding: 3px 6px;
+          font-size: 11px;
+          color: var(--md-sys-color-on-surface, #333);
+          background: var(--md-sys-color-surface, #fff);
+          cursor: pointer;
+          margin-right: 6px;
+          vertical-align: middle;
+        }
+
+        .item-min-expire-input:focus {
+          outline: none;
+          border-color: var(--md-sys-color-primary, #1976D2);
+        }
+
+        .item-min-expire-label {
+          font-size: 10px;
+          color: var(--md-sys-color-on-surface-variant, #888);
+          margin-right: 2px;
+          vertical-align: middle;
+        }
+
         /* 할당 토글 버튼 */
         .alloc-toggle-btn {
           padding: 3px 8px;
@@ -500,11 +528,12 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
           table-layout: fixed;
         }
 
-        .alloc-sub-table colgroup col:nth-child(1) { width: 30%; }
-        .alloc-sub-table colgroup col:nth-child(2) { width: 20%; }
-        .alloc-sub-table colgroup col:nth-child(3) { width: 15%; }
+        .alloc-sub-table colgroup col:nth-child(1) { width: 28%; }
+        .alloc-sub-table colgroup col:nth-child(2) { width: 18%; }
+        .alloc-sub-table colgroup col:nth-child(3) { width: 12%; }
         .alloc-sub-table colgroup col:nth-child(4) { width: 0; }
-        .alloc-sub-table colgroup col:nth-child(5) { width: 35%; }
+        .alloc-sub-table colgroup col:nth-child(5) { width: 30%; }
+        .alloc-sub-table colgroup col:nth-child(6) { width: 12%; }
 
         .alloc-sub-table th {
           background: #E8EAF6;
@@ -537,6 +566,23 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
           padding: 8px 16px;
           font-size: 12px;
           color: #999;
+        }
+
+        /* 할당 취소 버튼 */
+        .alloc-cancel-btn {
+          padding: 2px 8px;
+          border: 1px solid #FFCDD2;
+          border-radius: 4px;
+          background: #fff;
+          color: #C62828;
+          font-size: 11px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .alloc-cancel-btn:hover {
+          background: #FFEBEE;
+          border-color: #C62828;
         }
 
         /* 토글 아이콘 */
@@ -615,7 +661,8 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
       statusFilter: String,
       allocationsMap: Object,
       expandedItemIds: Object,
-      targetDate: String
+      targetDate: String,
+      itemMinExpireDateMap: Object
     }
   }
 
@@ -630,6 +677,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
     this.allocationsMap = {}
     this.expandedItemIds = {}
     this.targetDate = this._todayStr()
+    this.itemMinExpireDateMap = {}
   }
 
   /** 오늘 날짜를 YYYY-MM-DD 형식으로 반환 (로컬 시간 기준 — UTC 사용 시 한국 오전에 전날 날짜가 뜨는 문제 방지) */
@@ -840,6 +888,15 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
                   </span>
                 </td>
                 <td>
+                  <span class="item-min-expire-label">최소유통기한</span>
+                  <input
+                    type="date"
+                    class="item-min-expire-input"
+                    .value="${this.itemMinExpireDateMap[item.id] || ''}"
+                    ?disabled="${item.status !== 'PLANNED' && item.status !== 'ALLOCATED'}"
+                    title="선택한 날짜 이후 유통기한인 재고만 할당됩니다"
+                    @change="${e => this._onItemMinExpireDateChange(item.id, e.target.value)}"
+                  />
                   <button
                     class="item-action-btn allocate"
                     ?disabled="${item.status !== 'PLANNED' && item.status !== 'ALLOCATED'}"
@@ -860,7 +917,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
               </tr>
               ${this.expandedItemIds[item.id] ? html`
                 <tr class="alloc-sub-row">
-                  <td colspan="10">${this._renderAllocSubTable(item)}</td>
+                  <td colspan="10">${this._renderAllocSubTable(order, item)}</td>
                 </tr>
               ` : ''}
             `)}
@@ -1051,6 +1108,41 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
     await this._fetchItems(orderId)
   }
 
+  /** 개별 바코드 할당 취소 — reserved_qty 차감 + stock_allocation 삭제 + item 상태 복구 */
+  async _cancelAllocation(order, item, alloc) {
+    const confirmed = await UiUtil.showAlertPopup(
+      'title.confirm',
+      `바코드 [${alloc.barcode}] 할당을 취소하시겠습니까? (${alloc.alloc_qty}EA)`,
+      'question',
+      'confirm',
+      'cancel'
+    )
+    if (!confirmed) return
+
+    try {
+      await ServiceUtil.restPost(`vas_trx/stock_allocations/${alloc.id}/cancel`, {})
+      UiUtil.showToast('success', `${alloc.barcode} 할당 취소 완료`)
+
+      // 아이템 수량/상태 갱신
+      await this._refreshItem(order.id, item.id)
+
+      // 할당 취소 후 alloc_qty 확인 → 0이면 서브테이블 닫기
+      const items = this.itemsMap[order.id] || []
+      const refreshed = items.find(i => i.id === item.id)
+      if (refreshed && (!refreshed.alloc_qty || refreshed.alloc_qty <= 0)) {
+        this.expandedItemIds = { ...this.expandedItemIds, [item.id]: false }
+        const updated = { ...this.allocationsMap }
+        delete updated[item.id]
+        this.allocationsMap = updated
+      } else {
+        // 일부 취소 → 남은 할당 목록 재조회
+        await this._fetchItemAllocations(item.id)
+      }
+    } catch (err) {
+      UiUtil.showToast('error', err.message || '할당 취소 실패')
+    }
+  }
+
   async _fetchItemAllocations(itemId) {
     try {
       const allocs = await ServiceUtil.restGet(`vas_trx/vas_order_items/${itemId}/allocations`)
@@ -1065,6 +1157,11 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
    * 자재 할당
    * ============================================================ */
 
+  /** 아이템별 최소유통기한 날짜 변경 핸들러 */
+  _onItemMinExpireDateChange(itemId, dateValue) {
+    this.itemMinExpireDateMap = { ...this.itemMinExpireDateMap, [itemId]: dateValue }
+  }
+
   /** 개별 자재 할당 — 재고 바코드 자동 탐색으로 req_qty 기준 할당 (수동 입력 불필요) */
   async _allocateItem(order, item) {
     if (!item.req_qty || item.req_qty === 0) {
@@ -1072,13 +1169,16 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
       return
     }
 
+    const minExpireDate = this.itemMinExpireDateMap[item.id] || ''
+
     try {
       await ServiceUtil.restPost(`vas_trx/vas_orders/${order.id}/allocate_all`, [
         {
           itemId: item.id,
           allocQty: item.req_qty,
           srcLocCd: '',
-          lotNo: item.lot_no || ''
+          lotNo: item.lot_no || '',
+          minExpireDate: minExpireDate || null
         }
       ])
 
@@ -1109,7 +1209,8 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
           itemId: i.id,
           allocQty: i.req_qty,
           srcLocCd: '',
-          lotNo: i.lot_no || ''
+          lotNo: i.lot_no || '',
+          minExpireDate: this.itemMinExpireDateMap[i.id] || null
         }))
 
       if (allocItems.length === 0) {
@@ -1208,7 +1309,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
     }
   }
 
-  _renderAllocSubTable(item) {
+  _renderAllocSubTable(order, item) {
     if (!(item.id in this.allocationsMap)) {
       return html`<div class="alloc-loading">로딩 중...</div>`
     }
@@ -1222,7 +1323,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
       <div class="alloc-sub-table-wrap">
         <table class="alloc-sub-table">
           <colgroup>
-            <col /><col /><col /><col /><col />
+            <col /><col /><col /><col /><col /><col />
           </colgroup>
           <thead>
             <tr>
@@ -1231,6 +1332,7 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
               <th class="center">할당수량</th>
               <th class="center" style="width:0;padding:0;overflow:hidden;border:none"></th>
               <th>유통기한</th>
+              <th class="center">취소</th>
             </tr>
           </thead>
           <tbody>
@@ -1241,6 +1343,13 @@ class VasMaterialPreparation extends localize(i18next)(PageView) {
                 <td class="center">${a.alloc_qty || 0}</td>
                 <td class="center" style="width:0;padding:0;overflow:hidden;border:none"></td>
                 <td>${a.expired_date || '-'}</td>
+                <td class="center">
+                  <button
+                    class="alloc-cancel-btn"
+                    title="이 바코드의 할당을 취소합니다"
+                    @click="${() => this._cancelAllocation(order, item, a)}"
+                  >✕</button>
+                </td>
               </tr>
             `)}
           </tbody>

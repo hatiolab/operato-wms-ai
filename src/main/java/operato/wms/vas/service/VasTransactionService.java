@@ -276,6 +276,12 @@ public class VasTransactionService extends AbstractQueryService {
 	@Transactional
 	public VasOrderItem allocateMaterial(String vasOrderItemId, Double allocQty,
 			String srcLocCd, String lotNo) {
+		return this.allocateMaterial(vasOrderItemId, allocQty, srcLocCd, lotNo, null);
+	}
+
+	@Transactional
+	public VasOrderItem allocateMaterial(String vasOrderItemId, Double allocQty,
+			String srcLocCd, String lotNo, String minExpireDate) {
 		// 1. 작업 지시 상세 조회
 		VasOrderItem item = this.queryManager.select(VasOrderItem.class, vasOrderItemId);
 		if (item == null) {
@@ -306,6 +312,11 @@ public class VasTransactionService extends AbstractQueryService {
 			throw new ElidomValidationException("작업 지시를 찾을 수 없습니다.");
 		}
 
+		// 최소유통기한 필터 조건 (설정 시 해당 날짜 이후 재고만 조회, 유통기한 없는 재고는 포함)
+		String minExpireFilter = ValueUtil.isNotEmpty(minExpireDate)
+				? " AND (expired_date IS NULL OR expired_date = '' OR expired_date >= :minExpireDate)"
+				: "";
+
 		List<Inventory> candidates;
 		if (ValueUtil.isNotEmpty(srcLocCd)) {
 			// 특정 로케이션 지정 시 해당 로케이션의 재고만 조회 (loc_type 무관)
@@ -314,6 +325,7 @@ public class VasTransactionService extends AbstractQueryService {
 					"AND loc_cd = :locCd AND status = :status " +
 					"AND (del_flag IS NULL OR del_flag = false) " +
 					"AND (inv_qty - COALESCE(reserved_qty, 0)) > 0 " +
+					minExpireFilter +
 					"ORDER BY CASE WHEN expired_date IS NULL THEN 1 ELSE 0 END, expired_date ASC, created_at ASC";
 			Map<String, Object> locParams = ValueUtil.newMap("domainId,comCd,skuCd,locCd,status",
 					item.getDomainId(), order.getComCd(), item.getSkuCd(), srcLocCd,
@@ -322,6 +334,9 @@ public class VasTransactionService extends AbstractQueryService {
 				locSql = locSql.replace("AND loc_cd = :locCd",
 						"AND wh_cd = :whCd AND loc_cd = :locCd");
 				locParams.put("whCd", order.getWhCd());
+			}
+			if (ValueUtil.isNotEmpty(minExpireDate)) {
+				locParams.put("minExpireDate", minExpireDate);
 			}
 			candidates = this.queryManager.selectListBySql(locSql, locParams, Inventory.class, 0, 0);
 		} else {
@@ -332,6 +347,7 @@ public class VasTransactionService extends AbstractQueryService {
 					"AND status = :status " +
 					"AND (del_flag IS NULL OR del_flag = false) " +
 					"AND (inv_qty - COALESCE(reserved_qty, 0)) > 0 " +
+					minExpireFilter +
 					"ORDER BY CASE WHEN expired_date IS NULL THEN 1 ELSE 0 END, expired_date ASC, created_at ASC";
 			Map<String, Object> autoParams = ValueUtil.newMap("domainId,comCd,skuCd,status",
 					item.getDomainId(), order.getComCd(), item.getSkuCd(), Inventory.STATUS_STORED);
@@ -339,6 +355,9 @@ public class VasTransactionService extends AbstractQueryService {
 				autoSql = autoSql.replace("AND status = :status",
 						"AND wh_cd = :whCd AND status = :status");
 				autoParams.put("whCd", order.getWhCd());
+			}
+			if (ValueUtil.isNotEmpty(minExpireDate)) {
+				autoParams.put("minExpireDate", minExpireDate);
 			}
 			candidates = this.queryManager.selectListBySql(autoSql, autoParams, Inventory.class, 0, 0);
 		}
@@ -429,6 +448,61 @@ public class VasTransactionService extends AbstractQueryService {
 			this.stockTrxSvc.deallocateInventory(item.getDomainId(), alloc.getInventoryId(), alloc.getAllocQty());
 			this.queryManager.delete(alloc);
 		}
+	}
+
+	/**
+	 * 개별 재고 할당 취소 — stock_allocation 1건 삭제 후 reserved_qty 및 vas_order_item 상태 복구
+	 *
+	 * @param allocId stock_allocation ID
+	 * @return 업데이트된 vas_order_item
+	 */
+	@Transactional
+	public VasOrderItem cancelSingleAllocation(String allocId) {
+		// 1. 할당 레코드 조회
+		operato.wms.oms.entity.StockAllocation alloc =
+				this.queryManager.select(operato.wms.oms.entity.StockAllocation.class, allocId);
+		if (alloc == null) {
+			throw new ElidomValidationException("할당 내역을 찾을 수 없습니다. ID: " + allocId);
+		}
+
+		// 2. VAS 할당 유형 검증
+		if (!operato.wms.oms.entity.StockAllocation.ALLOC_TYPE_VAS.equals(alloc.getAllocType())) {
+			throw new ElidomValidationException("VAS 할당 내역이 아닙니다.");
+		}
+
+		// 3. 연결된 vas_order_item 조회
+		VasOrderItem item = this.queryManager.select(VasOrderItem.class, alloc.getShipmentOrderItemId());
+		if (item == null) {
+			throw new ElidomValidationException("작업 지시 상세를 찾을 수 없습니다.");
+		}
+
+		// 4. 상태 검증 — ALLOCATED 상태만 취소 가능 (PICKED 이후는 취소 불가)
+		if (!WmsVasConstants.ITEM_STATUS_ALLOCATED.equals(item.getStatus())) {
+			throw new ElidomValidationException(
+					"할당 취소 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
+		}
+
+		// 5. 재고 reserved_qty 차감
+		this.stockTrxSvc.deallocateInventory(alloc.getDomainId(), alloc.getInventoryId(), alloc.getAllocQty());
+
+		// 6. stock_allocation 삭제
+		this.queryManager.delete(alloc);
+
+		// 7. vas_order_item alloc_qty 차감 및 상태 복구
+		double currentAllocQty = item.getAllocQty() == null ? 0 : item.getAllocQty();
+		double newAllocQty = Math.max(currentAllocQty - alloc.getAllocQty(), 0);
+		item.setAllocQty(newAllocQty);
+
+		if (newAllocQty <= 0) {
+			// 모든 할당 취소 → PLANNED 상태로 복구
+			item.setStatus(WmsVasConstants.ITEM_STATUS_PLANNED);
+			item.setSrcLocCd(null);
+			item.setLotNo(null);
+		}
+
+		this.queryManager.update(item, "allocQty", "srcLocCd", "lotNo", "status");
+
+		return item;
 	}
 
 	/**
