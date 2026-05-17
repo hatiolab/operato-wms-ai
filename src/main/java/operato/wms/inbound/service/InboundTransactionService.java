@@ -95,6 +95,17 @@ public class InboundTransactionService extends AbstractQueryService {
             firstOrder.setRcvType(WmsInboundConstants.RECEIVING_TYPE_NORMAL);
         }
 
+        // 입고요청번호 중복 체크
+        Long domainId = Domain.currentDomainId();
+        String rcvReqNo = firstOrder.getRcvReqNo();
+        if (ValueUtil.isNotEmpty(rcvReqNo)) {
+            String dupCheckSql = "SELECT count(id) FROM receivings WHERE domain_id = :domainId AND rcv_req_no = :rcvReqNo";
+            int count = this.queryManager.selectBySql(dupCheckSql, ValueUtil.newMap("domainId,rcvReqNo", domainId, rcvReqNo), Integer.class);
+            if (count > 0) {
+                throw new ElidomRuntimeException("입고요청번호 [" + rcvReqNo + "]는 이미 등록된 입고 주문입니다. 기존 주문을 확인해 주세요.");
+            }
+        }
+
         // 입고 예정 마스터 생성
         Receiving ro = ValueUtil.populate(firstOrder, new Receiving());
         // ro.setCreatedAt(null);
