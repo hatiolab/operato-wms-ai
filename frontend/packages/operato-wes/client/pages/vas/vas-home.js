@@ -3,7 +3,7 @@ import { css, html } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
 import { openPopup } from '@operato/layout'
-import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, UiUtil, TermsUtil, ValueUtil } from '@operato-app/metapage/dist-client'
 import Chart from 'chart.js/auto'
 
 import { vasEventClient } from './vas-event-client'

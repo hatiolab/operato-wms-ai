@@ -234,26 +234,57 @@ public class VasTransactionService extends AbstractQueryService {
 					"취소 가능한 상태가 아닙니다. 현재 상태: " + vasOrder.getStatus());
 		}
 
-		// 3. 취소 처리
+		// 3. 할당 상태 검증
+		this.validateNoAllocatedMaterialBeforeCancel(vasOrder);
+
+		// 4. 취소 처리
 		vasOrder.setStatus(WmsVasConstants.STATUS_CANCELLED);
 		vasOrder.setRemarks(cancelReason);
 
 		this.queryManager.update(vasOrder, "status", "remarks");
 
-		// 4. 상세 항목 상태 업데이트
+		// 5. 상세 항목 상태 업데이트
 		String sql = "UPDATE vas_order_items SET status = :status " +
 				"WHERE vas_order_id = :vasOrderId AND domain_id = :domainId";
 		this.queryManager.executeBySql(sql, ValueUtil.newMap(
 				"status,vasOrderId,domainId",
 				WmsVasConstants.ITEM_STATUS_COMPLETED, vasOrderId, vasOrder.getDomainId()));
 
-		// SSE 이벤트 발행
+		// 6. SSE 이벤트 발행
 		vasSseService.publish(vasOrder.getDomainId(), new VasEventData(
 				"ORDER_CANCELLED", vasOrder.getVasNo(), vasOrder.getId().toString(),
 				null, vasOrder.getStatus(), vasOrder.getVasType(),
 				vasOrder.getVasNo() + " 취소"));
 
 		return vasOrder;
+	}
+
+	/**
+	 * 작업 지시 취소 전 자재 할당이 남아있는지 검증
+	 *
+	 * @param vasOrder 작업 지시
+	 */
+	private void validateNoAllocatedMaterialBeforeCancel(VasOrder vasOrder) {
+		String itemSql = "SELECT COUNT(*) FROM vas_order_items " +
+				"WHERE domain_id = :domainId AND vas_order_id = :vasOrderId " +
+				"AND COALESCE(alloc_qty, 0) > 0";
+		Integer allocatedItemCount = this.queryManager.selectBySql(itemSql,
+				ValueUtil.newMap("domainId,vasOrderId", vasOrder.getDomainId(), vasOrder.getId()),
+				Integer.class);
+
+		String allocationSql = "SELECT COUNT(*) FROM stock_allocations " +
+				"WHERE domain_id = :domainId AND shipment_order_id = :vasOrderId " +
+				"AND alloc_type = :allocType AND status = :status";
+		Integer hardAllocationCount = this.queryManager.selectBySql(allocationSql,
+				ValueUtil.newMap("domainId,vasOrderId,allocType,status",
+						vasOrder.getDomainId(), vasOrder.getId(),
+						StockAllocation.ALLOC_TYPE_VAS, StockAllocation.STATUS_HARD),
+				Integer.class);
+
+		if ((allocatedItemCount != null && allocatedItemCount > 0) ||
+				(hardAllocationCount != null && hardAllocationCount > 0)) {
+			throw new ElidomValidationException("자재 할당이 존재합니다. 할당 취소 후 주문을 취소해주세요.");
+		}
 	}
 
 	/********************************************************************************************************
