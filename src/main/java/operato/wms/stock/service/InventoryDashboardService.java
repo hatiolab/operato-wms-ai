@@ -195,10 +195,23 @@ public class InventoryDashboardService extends AbstractQueryService {
         String sql = "SELECT " +
                 "  expire_status, " +
                 "  COUNT(DISTINCT sku_cd) as sku_count, " +
-                "  SUM(inv_qty) as qty " +
-                "FROM inventories " +
-                "WHERE domain_id = :domainId " +
-                "AND del_flag = 'N' ";
+                "  COALESCE(SUM(inv_qty), 0) as qty " +
+                "FROM ( " +
+                "  SELECT " +
+                "    sku_cd, " +
+                "    inv_qty, " +
+                "    CASE " +
+                "      WHEN NULLIF(expired_date, '') IS NULL THEN '" + Inventory.EXPIRE_STATUS_NORMAL + "' " +
+                "      WHEN NULLIF(expired_date, '') !~ '^\\d{4}-\\d{2}-\\d{2}$' THEN '" + Inventory.EXPIRE_STATUS_NORMAL + "' " +
+                "      WHEN NULLIF(expired_date, '')::date < CURRENT_DATE THEN '" + Inventory.EXPIRE_STATUS_EXPIRED + "' " +
+                "      WHEN NULLIF(expired_date, '')::date <= CURRENT_DATE + INTERVAL '30 days' THEN '" +
+                Inventory.EXPIRE_STATUS_IMMINENT + "' " +
+                "      ELSE '" + Inventory.EXPIRE_STATUS_NORMAL + "' " +
+                "    END as expire_status " +
+                "  FROM inventories " +
+                "  WHERE domain_id = :domainId " +
+                "  AND (del_flag is null OR del_flag = false) " +
+                "  AND COALESCE(inv_qty, 0) > 0 ";
 
         if (ValueUtil.isNotEmpty(comCd)) {
             sql += "AND com_cd = :comCd ";
@@ -207,6 +220,7 @@ public class InventoryDashboardService extends AbstractQueryService {
             sql += "AND wh_cd = :whCd ";
         }
 
+        sql += ") inventory_expire_stats ";
         sql += "GROUP BY expire_status";
 
         Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
