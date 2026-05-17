@@ -1716,6 +1716,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
             message: `재고 병합 완료: ${this._mergeBarcode}(${this._mergeMergeLocCd}) → ${inv.barcode}`
           }
         }))
+        this._goList()
 
       }, (err) => {
         this._updateErrorFeedback(err?.msg || '재고 병합에 실패했습니다')
