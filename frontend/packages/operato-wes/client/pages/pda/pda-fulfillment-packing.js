@@ -1061,25 +1061,31 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
       }
 
       if (order.status === 'CREATED') {
-        await ServiceUtil.restPost(`ful_trx/packing_orders/${order.id}/start`, {})
-        order.status = 'IN_PROGRESS'
+        await ServiceUtil.restPost(`ful_trx/packing_orders/${order.id}/start`, {}, null, null, async (res) => {
+          order.status = 'IN_PROGRESS'
+          this.selectedOrder = order
+          this.startedAt = Date.now()
+          this.lastScannedItem = null
+          this.currentTabKey = 'waiting'
+          this.trackingNo = ''
+
+          await this._loadPackingItems(order.id)
+          this._recommendBoxType()
+          this.mode = 'inspection'
+
+          setTimeout(() => this._focusBarcodeInput(), 200)
+
+        }, (err) => {
+          document.dispatchEvent(new CustomEvent('notify', {
+            detail: { level: 'error', message: err?.msg || '포장 작업을 시작할 수 없습니다' }
+          }))
+        })
       }
-
-      this.selectedOrder = order
-      this.startedAt = Date.now()
-      this.lastScannedItem = null
-      this.currentTabKey = 'waiting'
-      this.trackingNo = ''
-
-      await this._loadPackingItems(order.id)
-      this._recommendBoxType()
-      this.mode = 'inspection'
-
-      setTimeout(() => this._focusBarcodeInput(), 200)
     } catch (error) {
       document.dispatchEvent(new CustomEvent('notify', {
         detail: { level: 'error', message: error.message || '포장 작업을 시작할 수 없습니다' }
       }))
+
     } finally {
       this.processing = false
     }
@@ -1166,26 +1172,33 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
         packQty: confirmQty,
         lotNo: item.lot_no || '',
         expiredDate: item.expired_date || ''
+      }, null, null, (res) => {
+        this.packingItems = this.packingItems.map((it, idx) =>
+          idx === itemIndex ? { ...it, status: 'PACKED' } : it
+        )
+        this.completedCount = this.packingItems.filter(i => i.status === 'PACKED' || i.status === 'INSPECTED').length
+
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: { level: 'info', message: `검수 완료 (${this.completedCount}/${this.totalCount})` }
+        }))
+
+        if (this.completedCount >= this.totalCount) {
+          this._onInspectionComplete()
+        } else {
+          this._moveToNextItem()
+        }
+
+      }, (err) => {
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: { level: 'error', message: err?.msg || '검수 처리 중 오류' }
+        }))
       })
 
-      this.packingItems = this.packingItems.map((it, idx) =>
-        idx === itemIndex ? { ...it, status: 'PACKED' } : it
-      )
-      this.completedCount = this.packingItems.filter(i => i.status === 'PACKED' || i.status === 'INSPECTED').length
-
-      document.dispatchEvent(new CustomEvent('notify', {
-        detail: { level: 'info', message: `검수 완료 (${this.completedCount}/${this.totalCount})` }
-      }))
-
-      if (this.completedCount >= this.totalCount) {
-        this._onInspectionComplete()
-      } else {
-        this._moveToNextItem()
-      }
     } catch (error) {
       document.dispatchEvent(new CustomEvent('notify', {
         detail: { level: 'error', message: error.message || '검수 처리 중 오류' }
       }))
+
     } finally {
       this.processing = false
     }
@@ -1216,17 +1229,24 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
         boxCount: this.boxCount,
         boxWeight: this.boxWeight,
         trackingNo: this.trackingNo.trim()
+      }, null, null, (res) => {
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: { level: 'info', message: '출고 확정 완료' }
+        }))
+
+        this.mode = 'complete'
+
+      }, (err) => {
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: { level: 'error', message: err?.msg || '출고 확정 실패' }
+        }))
       })
 
-      document.dispatchEvent(new CustomEvent('notify', {
-        detail: { level: 'info', message: '출고 확정 완료' }
-      }))
-
-      this.mode = 'complete'
     } catch (error) {
       document.dispatchEvent(new CustomEvent('notify', {
         detail: { level: 'error', message: error.message || '출고 확정 실패' }
       }))
+
     } finally {
       this.processing = false
     }
