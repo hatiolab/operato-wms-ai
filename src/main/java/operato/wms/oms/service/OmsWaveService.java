@@ -131,10 +131,9 @@ public class OmsWaveService extends AbstractQueryService {
 
 				// 주문에 wave_no 업데이트 및 상태 변경
 				for (ShipmentOrder ord : chunk) {
-					String updateSql = "UPDATE shipment_orders SET wave_no = :waveNo, status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-					Map<String, Object> updateParams = ValueUtil.newMap("waveNo,status,domainId,id", wave.getWaveNo(),
-							ShipmentOrder.STATUS_WAVED, domainId, ord.getId());
-					this.queryManager.executeBySql(updateSql, updateParams);
+					ord.setWaveNo(wave.getWaveNo());
+					ord.setStatus(ShipmentOrder.STATUS_WAVED);
+					this.queryManager.update(ord, "waveNo", "status", "updatedAt");
 				}
 
 				// 결과 수집
