@@ -188,39 +188,52 @@ public class InboundTransactionService extends AbstractQueryService {
     }
 
     /**
-     * 입고 예정 정보 요청 취소 처리 (상태 : REQUEST -> INWORK, INWORK -> 삭제)
-     * 
+     * 입고 예정 정보 요청 취소 처리 (상태 : REQUEST -> INWORK)
+     *
      * @param receiving
      * @return
      */
     public Receiving cancelRequestReceivingOrder(Receiving receiving) {
-        // 1. 상태 체크
-        if (ValueUtil.isNotEqual(receiving.getStatus(), WmsInboundConstants.STATUS_INWORK)
-                && ValueUtil.isNotEqual(receiving.getStatus(), WmsInboundConstants.STATUS_REQUEST)) {
+        // 1. 상태 체크 (입고요청 상태만 허용)
+        if (ValueUtil.isNotEqual(receiving.getStatus(), WmsInboundConstants.STATUS_REQUEST)) {
+            throw ThrowUtil.newInvalidStatus("terms.menu.receiving-plan", receiving.getRcvReqNo(),
+                    WmsInboundConstants.STATUS_REQUEST);
+        }
+
+        // 2. 입고 예정 상태 변경
+        receiving.setStatus(WmsInboundConstants.STATUS_INWORK);
+        this.queryManager.update(receiving, "status", "updatedAt");
+
+        // 3. 입고 상세 상태 변경
+        String sql = this.inQueryStore.getUpdateReceivingOrderItems();
+        this.queryManager.executeBySql(sql, ValueUtil.newMap("domainId,receivingId,status", receiving.getDomainId(),
+                receiving.getId(), WmsInboundConstants.STATUS_INWORK));
+
+        // 4. 입고 예정 리턴
+        return receiving;
+    }
+
+    /**
+     * 입고 주문 취소 처리 (상태 : INWORK -> CANCEL)
+     *
+     * @param receiving
+     * @return
+     */
+    public Receiving cancelReceivingOrder(Receiving receiving) {
+        // 1. 상태 체크 (작성중 상태만 허용)
+        if (ValueUtil.isNotEqual(receiving.getStatus(), WmsInboundConstants.STATUS_INWORK)) {
             throw ThrowUtil.newInvalidStatus("terms.menu.receiving-plan", receiving.getRcvReqNo(),
                     WmsInboundConstants.STATUS_INWORK);
         }
 
-        // 2. 작성 중인 경우 삭제
-        if (ValueUtil.isEqual(receiving.getStatus(), WmsInboundConstants.STATUS_INWORK)) {
-            // 2.1 입고 예정 상세 삭제
-            ReceivingItem riCond = new ReceivingItem(receiving.getDomainId(), receiving.getId());
-            this.queryManager.deleteList(ReceivingItem.class, riCond);
+        // 2. 입고 예정 상태 변경
+        receiving.setStatus(WmsInboundConstants.STATUS_CANCEL);
+        this.queryManager.update(receiving, "status", "updatedAt");
 
-            // 2.2 입고 예정 삭제
-            this.queryManager.delete(receiving);
-
-            // 3. 요청 상태인 경우 작성 중으로
-        } else {
-            // 3.1 입고 예정 상태 변경
-            receiving.setStatus(WmsInboundConstants.STATUS_INWORK);
-            this.queryManager.update(receiving, "status", "updatedAt");
-
-            // 3.2 입고 상세 상태 변경
-            String sql = this.inQueryStore.getUpdateReceivingOrderItems();
-            this.queryManager.executeBySql(sql, ValueUtil.newMap("domainId,receivingId,status", receiving.getDomainId(),
-                    receiving.getId(), WmsInboundConstants.STATUS_INWORK));
-        }
+        // 3. 입고 상세 상태 변경
+        String sql = this.inQueryStore.getUpdateReceivingOrderItems();
+        this.queryManager.executeBySql(sql, ValueUtil.newMap("domainId,receivingId,status", receiving.getDomainId(),
+                receiving.getId(), WmsInboundConstants.STATUS_CANCEL));
 
         // 4. 입고 예정 리턴
         return receiving;

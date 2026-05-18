@@ -246,8 +246,8 @@ public class InboundTransactionController extends AbstractRestService {
     }
 
     /**
-     * 입고 예정 정보 요청 취소 처리 (상태 : REQUEST -> INWORK, INWORK -> 삭제)
-     * 
+     * 입고 예정 정보 요청 취소 처리 (상태 : REQUEST -> INWORK)
+     *
      * @param id
      * @return
      */
@@ -324,8 +324,27 @@ public class InboundTransactionController extends AbstractRestService {
     }
 
     /**
+     * 입고 주문 취소 처리 (상태 : INWORK -> CANCEL)
+     *
+     * @param id
+     * @return
+     */
+    @RequestMapping(value = "receiving_orders/{id}/cancel_order", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Cancel Receiving Order")
+    public Receiving cancelReceivingOrder(@PathVariable("id") String id) {
+        // 1. 조회
+        Receiving receiving = this.queryManager.select(Receiving.class, id);
+
+        // 2. 입고 주문 취소 처리
+        this.inbTrxService.cancelReceivingOrder(receiving);
+
+        // 3. 리턴
+        return receiving;
+    }
+
+    /**
      * 입고 예정 작업 시작 처리 (상태 : READY -> START)
-     * 
+     *
      * @param id
      * @return
      */
