@@ -1203,25 +1203,31 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
       await ServiceUtil.restPut(`inventory_trx/put_away/${item.id}`, {
         barcode: item.barcode,
         loc_cd: this.locCd
+      }, null, null, async (res) => {
+        // 서버에서 최신 항목 목록 재조 회 
+        await this._loadWorkItems(this.currentRcvNo)
+
+        const completedCount = this.doneItems.length
+        const totalCount = this.workItems.length + completedCount
+        this._showFeedback(`적치 완료 (${completedCount} / ${totalCount})`, 'success')
+
+        if (completedCount >= totalCount) {
+          await this._onAllItemsCompleted()
+        } else {
+          this._resetScanStep()
+          this._moveToNextItem()
+          setTimeout(() => this._focusBarcodeInput(), 200)
+        }
+
+      }, (err) => {
+        this._showFeedback(err?.msg || '적치 처리에 실패했습니다', 'error')
+        navigator.vibrate?.(200)
       })
 
-      // 서버에서 최신 항목 목록 재조회
-      await this._loadWorkItems(this.currentRcvNo)
-
-      const completedCount = this.doneItems.length
-      const totalCount = this.workItems.length + completedCount
-      this._showFeedback(`적치 완료 (${completedCount} / ${totalCount})`, 'success')
-
-      if (completedCount >= totalCount) {
-        await this._onAllItemsCompleted()
-      } else {
-        this._resetScanStep()
-        this._moveToNextItem()
-        setTimeout(() => this._focusBarcodeInput(), 200)
-      }
     } catch (error) {
       this._showFeedback(error.message || '적치 처리에 실패했습니다', 'error')
       navigator.vibrate?.(200)
+
     } finally {
       this.processing = false
     }
