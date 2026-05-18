@@ -498,10 +498,16 @@ class ReceivingOrderImportPopup extends LitElement {
     return this._getFieldValue(row, ['rcv_exp_qty', 'rcvExpQty', 'total_exp_qty', 'totalExpQty']) === null
   }
 
+  /** 예정수량이 0 이하인지 여부 */
+  _isQtyInvalid(row) {
+    const val = this._getFieldValue(row, ['rcv_exp_qty', 'rcvExpQty'])
+    return val !== null && Number(val) <= 0
+  }
+
   /** Step 1: 파일 업로드 + 미리보기 렌더링 */
   _renderStep1() {
     const invalidRows = this.parsedData
-      ? this.parsedData.filter(row => this._getMissingFields(row).length > 0)
+      ? this.parsedData.filter(row => this._getMissingFields(row).length > 0 || this._isQtyInvalid(row))
       : []
 
     return html`
@@ -537,9 +543,9 @@ class ReceivingOrderImportPopup extends LitElement {
                   <div class="validation-warning">
                     <span>⚠️</span>
                     <div>
-                      <strong>${invalidRows.length}건</strong>의 데이터에 필수 항목이 누락되어 있습니다. 임포트 전 확인해 주세요.
+                      <strong>${invalidRows.length}건</strong>의 데이터에 문제가 있습니다. 임포트 전 확인해 주세요.
                       <div class="warning-detail">
-                        필수 항목: ${ReceivingOrderImportPopup.REQUIRED_FIELDS.map(f => f.label).join(', ')}
+                        필수 항목: ${ReceivingOrderImportPopup.REQUIRED_FIELDS.map(f => f.label).join(', ')} / 수량은 0보다 커야 합니다.
                       </div>
                     </div>
                   </div>
@@ -572,7 +578,7 @@ class ReceivingOrderImportPopup extends LitElement {
                   ${this.parsedData.map(
                     (row, idx) => {
                       const missing = this._getMissingFields(row)
-                      const hasError = missing.length > 0
+                      const hasError = missing.length > 0 || this._isQtyInvalid(row)
                       return html`
                         <tr class="${hasError ? 'row-error' : ''}">
                           <td class="center">${idx + 1}</td>
@@ -586,8 +592,8 @@ class ReceivingOrderImportPopup extends LitElement {
                           <td class="${this._isFieldMissing(row, ['sku_cd', 'skuCd']) ? 'cell-error' : ''}">${row.sku_cd || row.skuCd || ''}</td>
                           <td>${row.sku_nm || row.skuNm || ''}</td>
                           <td>${row.rcv_exp_date || row.rcvExpDate || ''}</td>
-                          <td class="right ${this._isQtyMissing(row) ? 'cell-error' : ''}">${row.rcv_exp_qty ?? row.rcvExpQty ?? ''}</td>
-                          <td class="right ${this._isQtyMissing(row) ? 'cell-error' : ''}">${row.total_exp_qty ?? row.totalExpQty ?? ''}</td>
+                          <td class="right ${this._isQtyMissing(row) || this._isQtyInvalid(row) ? 'cell-error' : ''}">${row.rcv_exp_qty ?? row.rcvExpQty ?? ''}</td>
+                          <td class="right">${row.total_exp_qty ?? row.totalExpQty ?? ''}</td>
                           <td>${row.lot_no || row.lotNo || ''}</td>
                           <td>${row.expired_date || row.expiredDate || ''}</td>
                           <td>${row.remarks || ''}</td>

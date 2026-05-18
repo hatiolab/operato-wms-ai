@@ -117,6 +117,12 @@ public class InboundTransactionService extends AbstractQueryService {
         int rcvExpSeq = 1;
 
         for (ImportReceivingOrder order : list) {
+            if (ValueUtil.isEmpty(order.getSkuCd())) continue;
+
+            if (order.getRcvExpQty() != null && order.getRcvExpQty() <= 0) {
+                throw new ElidomRuntimeException("SKU [" + order.getSkuCd() + "]의 예정수량은 0보다 커야 합니다.");
+            }
+
             ReceivingItem ri = ValueUtil.populate(order, new ReceivingItem());
             ri.setReceivingId(ro.getId());
 
