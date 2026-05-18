@@ -1012,25 +1012,31 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
 
     try {
       if (task.status === 'CREATED') {
-        await ServiceUtil.restPost(`ful_trx/picking_tasks/${task.id}/start`)
-        task.status = 'IN_PROGRESS'
+        await ServiceUtil.restPost(`ful_trx/picking_tasks/${task.id}/start`, {}, null, null, async (res) => {
+          task.status = 'IN_PROGRESS'
+          this.currentTask = task
+          this.startedAt = Date.now()
+          this.lastFeedback = null
+          this.currentTabKey = 'todo'
+          this.pickQty = 0
+
+          await this._loadTaskItems(task.id)
+          this._setInitialPickQty()
+          this.mode = 'work'
+
+          setTimeout(() => this._focusBarcodeInput(), 200)
+        }, (err) => {
+          document.dispatchEvent(new CustomEvent('notify', {
+            detail: { level: 'error', message: err?.msg || '피킹 지시를 시작할 수 없습니다' }
+          }))
+        })
       }
 
-      this.currentTask = task
-      this.startedAt = Date.now()
-      this.lastFeedback = null
-      this.currentTabKey = 'todo'
-      this.pickQty = 0
-
-      await this._loadTaskItems(task.id)
-      this._setInitialPickQty()
-      this.mode = 'work'
-
-      setTimeout(() => this._focusBarcodeInput(), 200)
     } catch (error) {
       document.dispatchEvent(new CustomEvent('notify', {
         detail: { level: 'error', message: error.message || '피킹 지시를 시작할 수 없습니다' }
       }))
+
     } finally {
       this.processing = false
     }
@@ -1123,25 +1129,27 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
     try {
       await ServiceUtil.restPost(
         `ful_trx/picking_tasks/${this.currentTask.id}/items/${item.id}/pick`,
-        { pick_qty: qty, from_loc_cd: item.from_loc_cd, barcode: item.barcode }
+        { pick_qty: qty, from_loc_cd: item.from_loc_cd, barcode: item.barcode }, null, null, (res) => {
+          this.taskItems = this.taskItems.map((it, idx) =>
+            idx === this.currentItemIndex ? { ...it, status: 'PICKED', pick_qty: qty } : it
+          )
+          this.completedCount = this.taskItems.filter(i => i.status === 'PICKED' || i.status === 'SHORT').length
+          this._showFeedback(`피킹 완료 (${this.completedCount}/${this.totalCount})`, 'success')
+
+          if (this.completedCount >= this.totalCount) {
+            this._onAllItemsCompleted()
+          } else {
+            this._moveToNextItem()
+            this._setInitialPickQty()
+            setTimeout(() => this._focusBarcodeInput(), 200)
+          }
+        }, (err) => {
+          this._showFeedback(err?.msg || '피킹 확인 실패', 'error')
+        }
       )
-
-      this.taskItems = this.taskItems.map((it, idx) =>
-        idx === this.currentItemIndex ? { ...it, status: 'PICKED', pick_qty: qty } : it
-      )
-      this.completedCount = this.taskItems.filter(i => i.status === 'PICKED' || i.status === 'SHORT').length
-
-      this._showFeedback(`피킹 완료 (${this.completedCount}/${this.totalCount})`, 'success')
-
-      if (this.completedCount >= this.totalCount) {
-        this._onAllItemsCompleted()
-      } else {
-        this._moveToNextItem()
-        this._setInitialPickQty()
-        setTimeout(() => this._focusBarcodeInput(), 200)
-      }
     } catch (error) {
       this._showFeedback(error.message || '피킹 확인 실패', 'error')
+
     } finally {
       this.processing = false
     }
@@ -1163,27 +1171,31 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
     try {
       await ServiceUtil.restPost(
         `ful_trx/picking_tasks/${this.currentTask.id}/items/${item.id}/short`,
-        { short_qty: item.order_qty, pick_qty: 0 }
+        { short_qty: item.order_qty, pick_qty: 0 }, null, null, (res) => {
+          this.taskItems = this.taskItems.map((it, idx) =>
+            idx === this.currentItemIndex
+              ? { ...it, status: 'SHORT', short_qty: item.order_qty, pick_qty: 0 }
+              : it
+          )
+          this.completedCount = this.taskItems.filter(i => i.status === 'PICKED' || i.status === 'SHORT').length
+          this._showFeedback(`부족 처리 (${this.completedCount}/${this.totalCount})`, 'warning')
+
+          if (this.completedCount >= this.totalCount) {
+            this._onAllItemsCompleted()
+          } else {
+            this._moveToNextItem()
+            this._setInitialPickQty()
+            setTimeout(() => this._focusBarcodeInput(), 200)
+          }
+
+        }, (err) => {
+          this._showFeedback(err?.msg || '부족 처리 실패', 'error')
+        }
       )
 
-      this.taskItems = this.taskItems.map((it, idx) =>
-        idx === this.currentItemIndex
-          ? { ...it, status: 'SHORT', short_qty: item.order_qty, pick_qty: 0 }
-          : it
-      )
-      this.completedCount = this.taskItems.filter(i => i.status === 'PICKED' || i.status === 'SHORT').length
-
-      this._showFeedback(`부족 처리 (${this.completedCount}/${this.totalCount})`, 'warning')
-
-      if (this.completedCount >= this.totalCount) {
-        this._onAllItemsCompleted()
-      } else {
-        this._moveToNextItem()
-        this._setInitialPickQty()
-        setTimeout(() => this._focusBarcodeInput(), 200)
-      }
     } catch (error) {
       this._showFeedback(error.message || '부족 처리 실패', 'error')
+
     } finally {
       this.processing = false
     }
@@ -1205,17 +1217,23 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
 
     this.processing = true
     try {
-      await ServiceUtil.restPost(`ful_trx/picking_tasks/${this.currentTask.id}/complete`)
+      await ServiceUtil.restPost(`ful_trx/picking_tasks/${this.currentTask.id}/complete`, {}, null, null, (res) => {
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: { level: 'info', message: '피킹 완료' }
+        }))
+        this.mode = 'complete'
 
-      document.dispatchEvent(new CustomEvent('notify', {
-        detail: { level: 'info', message: '피킹 완료' }
-      }))
+      }, (err) => {
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: { level: 'error', message: err?.msg || '피킹 완료 처리에 실패했습니다' }
+        }))
+      })
 
-      this.mode = 'complete'
     } catch (error) {
       document.dispatchEvent(new CustomEvent('notify', {
         detail: { level: 'error', message: error.message || '피킹 완료 처리에 실패했습니다' }
       }))
+
     } finally {
       this.processing = false
     }
