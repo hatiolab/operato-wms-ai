@@ -129,6 +129,7 @@ class InboundHome extends localize(i18next)(PageView) {
 
         /* 상태별 색상 */
         .status-card.inwork { border-left: 4px solid #9E9E9E; }
+        .status-card.request { border-left: 4px solid #9C27B0; }
         .status-card.ready { border-left: 4px solid #2196F3; }
         .status-card.start { border-left: 4px solid #FF9800; }
         .status-card.end { border-left: 4px solid #4CAF50; }
@@ -263,6 +264,7 @@ class InboundHome extends localize(i18next)(PageView) {
     this.loading = true
     this.statusCounts = {
       INWORK: 0,
+      REQUEST: 0,
       READY: 0,
       START: 0,
       END: 0
@@ -306,6 +308,11 @@ class InboundHome extends localize(i18next)(PageView) {
                     <div class="label">작성중</div>
                     <div class="count">${this.statusCounts.INWORK || 0}</div>
                     <div class="subtitle">입고 준비</div>
+                  </div>
+                  <div class="status-card request" @click="${() => this._navigateTo('receivings', { status: 'REQUEST', rcv_req_date: ValueUtil.todayFormatted() })}">
+                    <div class="label">요청</div>
+                    <div class="count">${this.statusCounts.REQUEST || 0}</div>
+                    <div class="subtitle">입고 요청</div>
                   </div>
                   <div class="status-card ready" @click="${() => this._navigateTo('receivings', { status: 'READY', rcv_req_date: ValueUtil.todayFormatted() })}">
                     <div class="label">대기</div>
@@ -414,10 +421,10 @@ class InboundHome extends localize(i18next)(PageView) {
   async _fetchStatusCounts() {
     try {
       const data = await ServiceUtil.restGet('inbound_dashboard/status-counts')
-      return data || { INWORK: 0, READY: 0, START: 0, END: 0 }
+      return data || { INWORK: 0, REQUEST: 0, READY: 0, START: 0, END: 0 }
     } catch (error) {
       console.error('상태별 건수 조회 실패:', error)
-      return { INWORK: 0, READY: 0, START: 0, END: 0 }
+      return { INWORK: 0, REQUEST: 0, READY: 0, START: 0, END: 0 }
     }
   }
 
