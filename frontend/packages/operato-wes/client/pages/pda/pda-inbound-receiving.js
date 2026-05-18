@@ -1039,25 +1039,32 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
     try {
       if (r.status === 'READY') {
-        await ServiceUtil.restPost(`inbound_trx/receiving_orders/${r.id}/start`)
-        r.status = 'START'
+        await ServiceUtil.restPost(`inbound_trx/receiving_orders/${r.id}/start`, {}, null, null, (res) => {
+          r.status = 'START'
+          this.currentReceiving = r
+          this.startedAt = Date.now()
+          this.lastFeedback = null
+          this.currentTabKey = 'todo'
+          this.rcvQty = 0
+
+          this._loadReceivingItems(r.id)
+          this._setInitialRcvQty()
+          this.mode = 'work'
+
+          setTimeout(() => this._focusBarcodeInput(), 200)
+
+        }, (err) => {
+          document.dispatchEvent(new CustomEvent('notify', {
+            detail: { level: 'error', message: err?.msg || '입고 작업을 시작할 수 없습니다' }
+          }))
+        })
       }
 
-      this.currentReceiving = r
-      this.startedAt = Date.now()
-      this.lastFeedback = null
-      this.currentTabKey = 'todo'
-      this.rcvQty = 0
-
-      await this._loadReceivingItems(r.id)
-      this._setInitialRcvQty()
-      this.mode = 'work'
-
-      setTimeout(() => this._focusBarcodeInput(), 200)
     } catch (error) {
       document.dispatchEvent(new CustomEvent('notify', {
         detail: { level: 'error', message: error.message || '입고 작업을 시작할 수 없습니다' }
       }))
+
     } finally {
       this.processing = false
     }
@@ -1127,25 +1134,27 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
     this.processing = true
     try {
-      const body = {
-        ...item,
-        rcv_qty: qty
-      }
-      await ServiceUtil.restPost(`inbound_trx/receiving_orders/line/${item.id}/finish`, body)
+      await ServiceUtil.restPost(`inbound_trx/receiving_orders/line/${item.id}/finish`, {
+        ...item, rcv_qty: qty
+      }, null, null, async (res) => {
+        // 서버에서 최신 항목 목록 재조회 (미완료/완료 탭 갱신)
+        await this._loadReceivingItems(this.currentReceiving.id)
+        // 메시지 표시
+        this._showFeedback(`입고 완료 (${this.completedCount}/${this.totalCount})`, 'success')
 
-      // 서버에서 최신 항목 목록 재조회 (미완료/완료 탭 갱신)
-      await this._loadReceivingItems(this.currentReceiving.id)
+        if (this.completedCount >= this.totalCount) {
+          await this._onAllItemsCompleted()
+        } else {
+          this._setInitialRcvQty()
+          setTimeout(() => this._focusBarcodeInput(), 200)
+        }
+      }, (err) => {
+        this._showFeedback(err?.msg || '입고 확인 실패', 'error')
+      })
 
-      this._showFeedback(`입고 완료 (${this.completedCount}/${this.totalCount})`, 'success')
-
-      if (this.completedCount >= this.totalCount) {
-        await this._onAllItemsCompleted()
-      } else {
-        this._setInitialRcvQty()
-        setTimeout(() => this._focusBarcodeInput(), 200)
-      }
     } catch (error) {
       this._showFeedback(error.message || '입고 확인 실패', 'error')
+
     } finally {
       this.processing = false
     }
@@ -1167,17 +1176,23 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
     this.processing = true
     try {
-      await ServiceUtil.restPost(`inbound_trx/receiving_orders/${this.currentReceiving.id}/close`)
+      await ServiceUtil.restPost(`inbound_trx/receiving_orders/${this.currentReceiving.id}/close`, {}, null, null, (res) => {
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: { level: 'info', message: '입고 마감 완료' }
+        }))
+        this.mode = 'complete'
 
-      document.dispatchEvent(new CustomEvent('notify', {
-        detail: { level: 'info', message: '입고 마감 완료' }
-      }))
+      }, (err) => {
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: { level: 'error', message: err?.msg || '입고 마감 처리에 실패했습니다' }
+        }))
+      })
 
-      this.mode = 'complete'
     } catch (error) {
       document.dispatchEvent(new CustomEvent('notify', {
         detail: { level: 'error', message: error.message || '입고 마감 처리에 실패했습니다' }
       }))
+
     } finally {
       this.processing = false
     }
