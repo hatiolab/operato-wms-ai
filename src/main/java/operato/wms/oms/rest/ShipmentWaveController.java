@@ -2,6 +2,10 @@ package operato.wms.oms.rest;
 
 import java.util.List;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +24,9 @@ import operato.wms.oms.entity.ShipmentWave;
 
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
+import xyz.elidom.print.rest.PrintoutController;
 import xyz.elidom.sys.system.service.AbstractRestService;
+import xyz.elidom.util.ValueUtil;
 import xyz.elidom.dbist.dml.Page;
 
 @RestController
@@ -29,6 +35,9 @@ import xyz.elidom.dbist.dml.Page;
 @RequestMapping("/rest/shipment_waves")
 @ServiceDesc(description = "ShipmentWave Service API")
 public class ShipmentWaveController extends AbstractRestService {
+
+	@Autowired
+	private PrintoutController printoutCtrl;
 
 	@Override
 	protected Class<?> entityClass() {
@@ -81,5 +90,33 @@ public class ShipmentWaveController extends AbstractRestService {
 	@ApiDesc(description = "Create, Update or Delete multiple at one time")
 	public Boolean multipleUpdate(@RequestBody List<ShipmentWave> list) {
 		return this.cudMultipleData(this.entityClass(), list);
+	}
+
+	/**
+	 * 웨이브 ID로 피킹지시서 PDF 다운로드
+	 *
+	 * @param req
+	 * @param res
+	 * @param id       웨이브 ID
+	 * @param template 템플릿명 (미지정시 PICKING_ORDER_SHEET 사용)
+	 */
+	@GetMapping(value = "/{id}/download_picking_sheet", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Download Picking Order Sheet by Wave ID")
+	public void downloadPickingSheet(
+			HttpServletRequest req,
+			HttpServletResponse res,
+			@PathVariable("id") String id,
+			@RequestParam(name = "template", required = false) String template) {
+
+		// 1. 웨이브 조회
+		ShipmentWave wave = this.queryManager.select(ShipmentWave.class, id);
+
+		// 2. 템플릿명 기본값
+		if (ValueUtil.isEmpty(template)) {
+			template = "PICKING_TASK_SHEET2";
+		}
+
+		// 3. PDF 다운로드
+		this.printoutCtrl.showPdfByPrintTemplateName(req, res, template, ValueUtil.newMap("wave", wave));
 	}
 }

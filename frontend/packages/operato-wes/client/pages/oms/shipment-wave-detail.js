@@ -1,6 +1,8 @@
 import { css, html, LitElement } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
+import { openPopup } from '@operato/layout'
 import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
+import { operatoGet } from '@operato-app/operatofill'
 
 /**
  * 웨이브 상세 팝업
@@ -667,6 +669,9 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
         </button>
       ` : ''}
       ${s === 'RELEASED' ? html`
+        <button class="action-btn secondary" @click="${this._downloadPickingSheet}">
+          ${i18next.t('button.download_picking_sheet', { defaultValue: '피킹지시서 출력' })}
+        </button>
         <button class="action-btn danger" ?disabled="${this.actionLoading}" @click="${this._cancelWaveRelease}">
           ${i18next.t('button.cancel_wave_release', { defaultValue: '확정 취소' })}
         </button>
@@ -1002,6 +1007,30 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
       document.dispatchEvent(new CustomEvent('notify', { detail: { level: 'error', message: error.message || i18next.t('message.cancel_wave_release_failed', { defaultValue: '웨이브 확정 취소에 실패했습니다' }) } }))
     } finally {
       this.actionLoading = false
+    }
+  }
+
+  /** 피킹지시서 PDF 팝업 */
+  async _downloadPickingSheet() {
+    try {
+      const res = await operatoGet(`shipment_waves/${this.waveId}/download_picking_sheet`, {}, false)
+      const arrayBuffer = await res.arrayBuffer()
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' })
+      const blobUrl = URL.createObjectURL(blob)
+
+      openPopup(
+        html`<object data="${blobUrl}" type="application/pdf" style="width:100%;height:100%;border:none;"></object>`,
+        {
+          backdrop: true,
+          size: 'large',
+          title: i18next.t('title.picking_sheet', { defaultValue: '피킹지시서' })
+        }
+      )
+    } catch (error) {
+      console.error('피킹지시서 로드 실패:', error)
+      document.dispatchEvent(new CustomEvent('notify', {
+        detail: { level: 'error', message: i18next.t('message.picking_sheet_load_failed', { defaultValue: '피킹지시서 로드에 실패했습니다' }) }
+      }))
     }
   }
 
