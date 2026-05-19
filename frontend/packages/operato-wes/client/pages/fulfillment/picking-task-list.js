@@ -395,9 +395,11 @@ class PickingTaskList extends localize(i18next)(PageView) {
             <button class="btn btn-outline" @click="${this._search}">
               🔍 ${i18next.t('button.search', { defaultValue: '조회' })}
             </button>
+            <!-- 일괄 취소 버튼 (임시 숨김)
             <button class="btn btn-danger" @click="${this._batchCancel}">
               🚫 ${i18next.t('button.batch_cancel', { defaultValue: '일괄 취소' })}
             </button>
+            -->
             <button class="btn btn-outline" @click="${this._resetSearch}">
               🔄 ${i18next.t('button.reset', { defaultValue: '초기화' })}
             </button>
