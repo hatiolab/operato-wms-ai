@@ -416,7 +416,7 @@ class OmsHome extends localize(i18next)(PageView) {
                   </div>
                   <div class="status-card released" @click="${() => this._navigateTo('shipment-orders', { status: 'RELEASED', order_date: ValueUtil.todayFormatted() })}">
                     <div class="label">인계 (RELEASED)</div>
-                    <div class="count">${this.statusCounts.RELEASED + this.statusCounts.PICKING + this.statusCounts.PACKING + this.statusCounts.SHIPPED + this.statusCounts.CLOSED || 0}</div>
+                    <div class="count">${(this.statusCounts.RELEASED || 0) + (this.statusCounts.PICKING || 0) + (this.statusCounts.PACKING || 0) + (this.statusCounts.SHIPPED || 0) + (this.statusCounts.CLOSED || 0)}</div>
                   </div>
                   <div class="status-card back-order" @click="${() => this._navigateTo('shipment-orders', { status: 'BACK_ORDER' })}">
                     <div class="label">부족 (BACK_ORDER)</div>

@@ -353,7 +353,7 @@ public class OmsTransactionController extends AbstractRestService {
 		Map<String, Object> result = this.orderService.confirmShipmentOrders(ids);
 
 		// 3. 커스텀 서비스 - 후 처리
-		params.put("result", result);
+		params.put("confirmed_ids", result.get("confirmed_ids"));
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CONFIRM_SHIPMENT, params);
 
 		return result;

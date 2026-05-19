@@ -669,9 +669,6 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
         </button>
       ` : ''}
       ${s === 'RELEASED' ? html`
-        <button class="action-btn secondary" @click="${this._downloadPickingSheet}">
-          ${i18next.t('button.download_picking_sheet', { defaultValue: '피킹지시서 출력' })}
-        </button>
         <button class="action-btn danger" ?disabled="${this.actionLoading}" @click="${this._cancelWaveRelease}">
           ${i18next.t('button.cancel_wave_release', { defaultValue: '확정 취소' })}
         </button>
