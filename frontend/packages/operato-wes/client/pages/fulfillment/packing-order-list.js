@@ -534,18 +534,26 @@ class PackingOrderList extends localize(i18next)(PageView) {
 
         <!-- 액션 버튼 -->
         <section class="action-bar">
+          <!-- 라벨 출력 (임시 숨김)
           <button class="btn btn-info" @click="${this._printLabelBatch}">
             🖨️ ${i18next.t('button.print_label', { defaultValue: '라벨 출력' })}
           </button>
+          -->
+          <!-- 매니페스트 (임시 숨김)
           <button class="btn btn-warning" @click="${this._manifestBatch}">
             📄 ${i18next.t('button.manifest', { defaultValue: '매니페스트' })}
           </button>
+          -->
+          <!-- 일괄 출하 확정 (임시 숨김)
           <button class="btn btn-success" @click="${this._confirmShippingBatch}">
             ✅ ${i18next.t('button.confirm_shipping', { defaultValue: '일괄 출하 확정' })}
           </button>
+          -->
+          <!-- 일괄 취소 (임시 숨김)
           <button class="btn btn-danger" @click="${this._cancelBatch}">
             🚫 ${i18next.t('button.cancel_batch', { defaultValue: '일괄 취소' })}
           </button>
+          -->
         </section>
 
         <!-- 데이터 테이블 -->
