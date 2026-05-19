@@ -697,6 +697,40 @@ class ReceivingOrderImportPopup extends LitElement {
     reader.readAsArrayBuffer(file)
   }
 
+  /**
+   * 날짜 값을 YYYY-MM-DD 문자열로 변환한다.
+   * - Date 객체: getFullYear/Month/Date로 로컬 날짜 추출
+   * - Date.toString() 문자열 ("Tue May 19 2026 09:00:00 GMT+0900..."): 요일 약어로 시작하는 경우만 변환
+   * - YYYY-MM-DD 형식 문자열: 그대로 반환
+   * - "1", "GRAIN_ON" 등 기타 값: 그대로 반환
+   */
+  _formatDateValue(val) {
+    if (!val) return val
+    if (val instanceof Date) {
+      const y = val.getFullYear()
+      const m = String(val.getMonth() + 1).padStart(2, '0')
+      const d = String(val.getDate()).padStart(2, '0')
+      return `${y}-${m}-${d}`
+    }
+    if (typeof val === 'string') {
+      // 이미 YYYY-MM-DD 형식이면 그대로
+      if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val
+      // Date.toString() 형식만 변환 (요일 약어로 시작: "Mon Tue Wed Thu Fri Sat Sun")
+      // 예: "Tue May 19 2026 09:00:00 GMT+0900 (한국 표준시)"
+      // "1", "GRAIN_ON" 같은 일반 값은 이 조건에 해당하지 않아 안전
+      if (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s/.test(val)) {
+        const parsed = new Date(val)
+        if (!isNaN(parsed.getTime())) {
+          const y = parsed.getFullYear()
+          const m = String(parsed.getMonth() + 1).padStart(2, '0')
+          const d = String(parsed.getDate()).padStart(2, '0')
+          return `${y}-${m}-${d}`
+        }
+      }
+    }
+    return val
+  }
+
   /** Excel 파싱 완료 콜백 - 미리보기 데이터 세팅 (빈 행 제거 포함) */
   _onExcelParsed(records) {
     const importData = records.header ? records.data : records
@@ -712,7 +746,15 @@ class ReceivingOrderImportPopup extends LitElement {
         UiUtil.showToast('warning', '파일에서 유효한 데이터를 찾을 수 없습니다.')
         return
       }
-      this.parsedData = filtered
+      // 모든 필드를 순회해서 Date 객체이면 YYYY-MM-DD 문자열로 변환
+      // (엑셀 날짜 셀을 import-base가 Date 객체로 파싱하는 경우 대응)
+      this.parsedData = filtered.map(row => {
+        const normalized = {}
+        Object.keys(row).forEach(key => {
+          normalized[key] = this._formatDateValue(row[key])
+        })
+        return normalized
+      })
       this.requestUpdate()
     } else {
       UiUtil.showToast('warning', '파일에서 데이터를 읽을 수 없습니다.')
