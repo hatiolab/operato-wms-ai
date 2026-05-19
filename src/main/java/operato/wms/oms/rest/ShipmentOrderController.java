@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import operato.wms.oms.WmsOmsConfigConstants;
+import operato.wms.oms.WmsOmsConstants;
 import operato.wms.oms.entity.ImportShipmentOrder;
 import operato.wms.oms.entity.ShipmentDelivery;
 import operato.wms.oms.entity.ShipmentOrder;
@@ -26,8 +28,10 @@ import operato.wms.oms.entity.ShipmentOrderItem;
 import operato.wms.oms.service.OmsImportService;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
+import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.system.service.AbstractRestService;
 import xyz.elidom.util.ValueUtil;
+import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.dbist.dml.Filter;
 import xyz.elidom.dbist.dml.Order;
 import xyz.elidom.dbist.dml.Page;
@@ -40,7 +44,14 @@ import xyz.elidom.exception.server.ElidomRuntimeException;
 @RequestMapping("/rest/shipment_orders")
 @ServiceDesc(description = "ShipmentOrder Service API")
 public class ShipmentOrderController extends AbstractRestService {
-
+	/**
+	 * 커스텀 서비스
+	 */
+	@Autowired
+	private ICustomService customSvc;
+	/**
+	 * 임포트 서비스
+	 */
 	@Autowired
 	private OmsImportService importService;
 
@@ -218,5 +229,39 @@ public class ShipmentOrderController extends AbstractRestService {
 		// 3. 검증 통과 시 임포트 실행
 		Map<String, Object> importResult = this.importService.importShipmentOrders(list);
 		return importResult;
+	}
+
+	/**
+	 * B2C 출하 주문 엑셀 임포트 (Validation) - 커스텀 서비스에서 100% 구현
+	 *
+	 * POST /rest/shipment_orders/import_validate/b2c/by_custom
+	 *
+	 * @param list 엑셀에서 파싱된 임포트 데이터
+	 * @return 임포트 결과 { total_rows, order_count, item_count, delivery_count }
+	 */
+	@RequestMapping(value = "import_validate/b2c/by_custom", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Validate For Import B2C shipment orders from Excel by custom service (validate)")
+	public List<ImportShipmentOrder> importB2cExcelByCustomService(@RequestBody List<ImportShipmentOrder> list) {
+		Map<String, Object> params = ValueUtil.newMap("biz_type,list",
+				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2C_OUT, list);
+		this.customSvc.doCustomService(Domain.currentDomainId(), "diy-validate-b2c-shipment-order", params);
+		return list;
+	}
+
+	/**
+	 * B2B 출하 주문 엑셀 임포트 (Validation) - 커스텀 서비스에서 100% 구현
+	 *
+	 * POST /rest/shipment_orders/import_validate/b2b/by_custom
+	 *
+	 * @param list 엑셀에서 파싱된 임포트 데이터
+	 * @return 임포트 결과 { total_rows, order_count, item_count, delivery_count }
+	 */
+	@RequestMapping(value = "import_validate/b2b/by_custom", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Validate For Import B2B shipment orders from Excel by custom service (validate)")
+	public List<ImportShipmentOrder> importB2bExcelByCustomService(@RequestBody List<ImportShipmentOrder> list) {
+		Map<String, Object> params = ValueUtil.newMap("biz_type,list",
+				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT, list);
+		this.customSvc.doCustomService(Domain.currentDomainId(), "diy-validate-b2b-shipment-order", params);
+		return list;
 	}
 }
