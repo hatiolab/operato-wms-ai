@@ -245,36 +245,46 @@ public class FulfillmentPickingService extends AbstractQueryService {
 	}
 
 	/**
-	 * 피킹 지시 목록 조회
+	 * 피킹 지시 목록 조회 (대기 + 작업중)
 	 *
-	 * CREATED, IN_PROGRESS 상태의 피킹 지시 목록을 반환한다.
-	 * 우선순위 순으로 정렬된다.
+	 * - 대기(CREATED): order_date = 오늘인 것만
+	 * - 작업중(IN_PROGRESS): 날짜 무관하게 전체
 	 *
 	 * @return 피킹 지시 목록
 	 */
 	public List<Map> searchTodoPickingTasks() {
 		Long domainId = Domain.currentDomainId();
 
-		String sql = "SELECT pt.id, pt.pick_task_no, pt.wave_no, pt.shipment_no, pt.order_date,"
+		String cols = "pt.id, pt.pick_task_no, pt.wave_no, pt.shipment_no, pt.order_date,"
 				+ " pt.pick_type, pt.pick_method, pt.zone_cd, pt.priority_cd, pt.worker_id,"
 				+ " pt.plan_order, pt.plan_item, pt.plan_total,"
 				+ " pt.result_order, pt.result_item, pt.result_total, pt.short_total,"
 				+ " pt.status, pt.created_at, pt.started_at, pt.completed_at,"
 				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id) AS total_items,"
-				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id AND pti.status = 'PICKED') AS picked_items"
-				+ " FROM picking_tasks pt"
-				+ " WHERE pt.domain_id = :domainId AND pt.status IN (:s1, :s2)"
-				+ " ORDER BY CASE pt.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, pt.created_at";
-		Map<String, Object> params = ValueUtil.newMap("domainId,s1,s2",
-				domainId, PickingTask.STATUS_CREATED, PickingTask.STATUS_IN_PROGRESS);
+				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id AND pti.status = 'PICKED') AS picked_items";
+		// UNION ALL 결과에는 테이블 별칭 사용 불가 — 컬럼명만 사용
+		String orderBy = " ORDER BY CASE priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, created_at";
+
+		// 대기: 오늘 날짜 order_date만 / 작업중: 날짜 무관 전체
+		// order_date는 varchar 타입이므로 TO_CHAR로 문자열 캐스팅
+		// PostgreSQL UNION ALL에서 ORDER BY에 CASE 표현식 불가 → 서브쿼리로 감싸서 외부 ORDER BY 적용
+		String sql = "SELECT * FROM ("
+				+ " SELECT " + cols + " FROM picking_tasks pt"
+				+ " WHERE pt.domain_id = :domainId AND pt.status = 'CREATED' AND pt.order_date = TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD')"
+				+ " UNION ALL"
+				+ " SELECT " + cols + " FROM picking_tasks pt"
+				+ " WHERE pt.domain_id = :domainId AND pt.status = 'IN_PROGRESS'"
+				+ ") combined"
+				+ orderBy;
+
+		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
 		return this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
 	}
 
 	/**
-	 * 피킹 지시 목록 조회
+	 * 피킹 지시 완료 목록 조회
 	 *
-	 * COMPLETED 상태의 피킹 지시 목록을 반환한다.
-	 * 우선순위 순으로 정렬된다.
+	 * completed_at = 오늘인 COMPLETED 상태 피킹 지시 목록을 반환한다.
 	 *
 	 * @return 피킹 지시 목록
 	 */
@@ -289,7 +299,7 @@ public class FulfillmentPickingService extends AbstractQueryService {
 				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id) AS total_items,"
 				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id AND pti.status = 'PICKED') AS picked_items"
 				+ " FROM picking_tasks pt"
-				+ " WHERE pt.domain_id = :domainId AND pt.status = :status"
+				+ " WHERE pt.domain_id = :domainId AND pt.status = :status AND pt.completed_at::date = CURRENT_DATE"
 				+ " ORDER BY CASE pt.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, pt.created_at";
 		Map<String, Object> params = ValueUtil.newMap("domainId,status",
 				domainId, PickingTask.STATUS_COMPLETED);

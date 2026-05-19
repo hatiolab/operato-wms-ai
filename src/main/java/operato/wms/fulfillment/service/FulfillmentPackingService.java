@@ -313,31 +313,24 @@ public class FulfillmentPackingService extends AbstractQueryService {
 	public List<Map> searchTodoPackingOrders(String orderDate) {
 		Long domainId = Domain.currentDomainId();
 
-		StringBuilder sql = new StringBuilder();
-		sql.append("SELECT po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.carrier_cd,");
-		sql.append(" po.status, po.created_at, po.started_at, po.completed_at,");
-		sql.append(" po.total_box, po.total_wt, po.invoice_no,");
-		sql.append(
-				" (SELECT SUM(poi.order_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,");
-		sql.append(
-				" (SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,");
-		sql.append(
-				" (SELECT SUM(poi.pack_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty");
-		sql.append(" FROM packing_orders po");
-		sql.append(" WHERE po.domain_id = :domainId AND po.status in ('CREATED', 'IN_PROGRESS')");
+		String cols = "po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.carrier_cd,"
+				+ " po.status, po.created_at, po.started_at, po.completed_at,"
+				+ " po.total_box, po.total_wt, po.invoice_no,"
+				+ " (SELECT SUM(poi.order_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,"
+				+ " (SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,"
+				+ " (SELECT SUM(poi.pack_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty";
+
+		// 대기: 오늘 날짜 order_date만 / 작업중: 날짜 무관 전체
+		// order_date는 varchar 타입이므로 TO_CHAR로 문자열 캐스팅
+		String sql = "SELECT " + cols + " FROM packing_orders po"
+				+ " WHERE po.domain_id = :domainId AND po.status = 'CREATED' AND po.order_date = TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD')"
+				+ " UNION ALL"
+				+ " SELECT " + cols + " FROM packing_orders po"
+				+ " WHERE po.domain_id = :domainId AND po.status = 'IN_PROGRESS'"
+				+ " ORDER BY created_at";
 
 		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
-
-		if (orderDate != null && !orderDate.isEmpty()) {
-			sql.append(" AND po.order_date = :orderDate");
-			params.put("orderDate", orderDate);
-		}
-
-		// sql.append(
-		// " ORDER BY CASE po.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN
-		// 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, po.created_at");
-
-		return this.queryManager.selectListBySql(sql.toString(), params, Map.class, 0, 0);
+		return this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
 	}
 
 	/**
@@ -350,31 +343,21 @@ public class FulfillmentPackingService extends AbstractQueryService {
 	public List<Map> searchDonePackingOrders(String orderDate) {
 		Long domainId = Domain.currentDomainId();
 
-		StringBuilder sql = new StringBuilder();
-		sql.append("SELECT po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.carrier_cd,");
-		sql.append(" po.status, po.created_at, po.started_at, po.completed_at,");
-		sql.append(" po.total_box, po.total_wt, po.invoice_no,");
-		sql.append(
-				" (SELECT SUM(poi.order_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,");
-		sql.append(
-				" (SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,");
-		sql.append(
-				" (SELECT SUM(poi.pack_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty");
-		sql.append(" FROM packing_orders po");
-		sql.append(" WHERE po.domain_id = :domainId AND po.status not in ('CREATED', 'IN_PROGRESS', 'CANCELLED')");
+		// 완료: completed_at = 오늘인 것만 (상태는 CREATED/IN_PROGRESS/CANCELLED 제외 전부)
+		String sql = "SELECT po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.carrier_cd,"
+				+ " po.status, po.created_at, po.started_at, po.completed_at,"
+				+ " po.total_box, po.total_wt, po.invoice_no,"
+				+ " (SELECT SUM(poi.order_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,"
+				+ " (SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,"
+				+ " (SELECT SUM(poi.pack_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty"
+				+ " FROM packing_orders po"
+				+ " WHERE po.domain_id = :domainId"
+				+ " AND po.status NOT IN ('CREATED', 'IN_PROGRESS', 'CANCELLED')"
+				+ " AND po.completed_at::date = CURRENT_DATE"
+				+ " ORDER BY po.completed_at DESC";
 
 		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
-
-		if (orderDate != null && !orderDate.isEmpty()) {
-			sql.append(" AND po.order_date = :orderDate");
-			params.put("orderDate", orderDate);
-		}
-
-		// sql.append(
-		// " ORDER BY CASE po.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN
-		// 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, po.created_at");
-
-		return this.queryManager.selectListBySql(sql.toString(), params, Map.class, 0, 0);
+		return this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
 	}
 
 	/**
