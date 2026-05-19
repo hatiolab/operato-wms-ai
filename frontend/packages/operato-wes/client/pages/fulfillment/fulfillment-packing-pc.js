@@ -1304,7 +1304,8 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     try {
       this.loading = this.packingOrders.length === 0
 
-      const today = new Date().toISOString().substring(0, 10)
+      const _d = new Date()
+      const today = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`
       const [waitingOrders, completedOrders] = await Promise.all([
         ServiceUtil.restGet(`ful_trx/packing_orders/todo?order_date=${today}`).catch(() => []),
         ServiceUtil.restGet(`ful_trx/packing_orders/done?order_date=${today}`).catch(() => []),
