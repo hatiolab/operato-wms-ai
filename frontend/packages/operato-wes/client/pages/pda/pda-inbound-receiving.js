@@ -1058,6 +1058,16 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
             detail: { level: 'error', message: err?.msg || '입고 작업을 시작할 수 없습니다' }
           }))
         })
+      } else if (r.status === 'START') {
+        this.currentReceiving = r
+        this.startedAt = Date.now()
+        this.lastFeedback = null
+        this.currentTabKey = 'todo'
+        this.rcvQty = 0
+        await this._loadReceivingItems(r.id)
+        this._setInitialRcvQty()
+        this.mode = 'work'
+        setTimeout(() => this._focusBarcodeInput(), 200)
       }
 
     } catch (error) {

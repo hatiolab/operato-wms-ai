@@ -224,7 +224,10 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
           color: #1976d2;
         }
 
-        .order-card .status-badge.completed {
+        .order-card .status-badge.completed,
+        .order-card .status-badge.label_printed,
+        .order-card .status-badge.manifested,
+        .order-card .status-badge.shipped {
           background: #e8f5e9;
           color: #4CAF50;
         }
@@ -920,6 +923,7 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
         <div class="form-group">
           <label>${TermsUtil.tLabel('invoice_no') || '운송장번호'}</label>
           <ox-input-barcode id="trackingInput"
+            .value=${this.trackingNo}
             placeholder="운송장번호 스캔 또는 입력"
             @change=${e => (this.trackingNo = e.target.value)}>
           </ox-input-barcode>
@@ -1080,6 +1084,18 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
             detail: { level: 'error', message: err?.msg || '포장 작업을 시작할 수 없습니다' }
           }))
         })
+      } else if (order.status === 'IN_PROGRESS') {
+        this.selectedOrder = order
+        this.startedAt = Date.now()
+        this.lastScannedItem = null
+        this.currentTabKey = 'waiting'
+        this.trackingNo = order.invoice_no || ''
+
+        await this._loadPackingItems(order.id)
+        this._recommendBoxType()
+        this.mode = 'inspection'
+
+        setTimeout(() => this._focusBarcodeInput(), 200)
       }
     } catch (error) {
       document.dispatchEvent(new CustomEvent('notify', {

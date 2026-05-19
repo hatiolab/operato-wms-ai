@@ -1030,6 +1030,18 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
             detail: { level: 'error', message: err?.msg || '피킹 지시를 시작할 수 없습니다' }
           }))
         })
+      } else if (task.status === 'IN_PROGRESS') {
+        this.currentTask = task
+        this.startedAt = Date.now()
+        this.lastFeedback = null
+        this.currentTabKey = 'todo'
+        this.pickQty = 0
+
+        await this._loadTaskItems(task.id)
+        this._setInitialPickQty()
+        this.mode = 'work'
+
+        setTimeout(() => this._focusBarcodeInput(), 200)
       }
 
     } catch (error) {
