@@ -199,6 +199,11 @@ public class StockTransactionService extends AbstractQueryService {
         // 재고 조회 & 기본 체크 포인트 체크
         this.checkInventoryForTrx(inventory, Inventory.TRANSACTION_MOVE);
 
+        // 재고 할당 여부 체크
+        if (inventory.getReservedQty() != null && inventory.getReservedQty() > 0) {
+            throw ThrowUtil.newValidationErrorWithNoLog("출고 예약된 재고입니다. 출고 예약 해제 후 이동 처리해주세요.");
+        }
+
         // 로케이션 조회 & 기본 체크 포인트 체크
         Location toLoc = this.findAndCheckLocation(inventory.getDomainId(), toLocCd, Inventory.TRANSACTION_MOVE);
 
@@ -579,14 +584,15 @@ public class StockTransactionService extends AbstractQueryService {
     /**
      * 보충 작업 도착 로케이션 유효성 사전 검증 (PDA 보충 화면 전용)
      *
-     * @param domainId   도메인 ID
-     * @param toLocCd    도착 로케이션 코드
-     * @param fromLocCd  출발 로케이션 코드 (보충 아이템의 from_loc_cd)
-     * @param skuCd      보충 대상 SKU 코드
-     * @param whCd       보충 지시 창고 코드
+     * @param domainId  도메인 ID
+     * @param toLocCd   도착 로케이션 코드
+     * @param fromLocCd 출발 로케이션 코드 (보충 아이템의 from_loc_cd)
+     * @param skuCd     보충 대상 SKU 코드
+     * @param whCd      보충 지시 창고 코드
      * @return 유효한 Location 엔티티
      */
-    public Location validateLocationForReplenish(Long domainId, String toLocCd, String fromLocCd, String skuCd, String whCd) {
+    public Location validateLocationForReplenish(Long domainId, String toLocCd, String fromLocCd, String skuCd,
+            String whCd) {
         // 1. 도착 로케이션 조회 (존재·삭제 체크, 없으면 예외)
         ValueUtil.checkEmptyData(toLocCd, "label.to_loc_cd");
         Location toLoc = this.wmsBaseSvc.findLocation(toLocCd, false, true);
@@ -594,32 +600,32 @@ public class StockTransactionService extends AbstractQueryService {
         // 2. 창고 불일치 체크
         if (ValueUtil.isNotEmpty(whCd) && !whCd.equals(toLoc.getWhCd())) {
             throw ThrowUtil.newValidationErrorWithNoLog(
-                "도착 로케이션의 창고[" + toLoc.getWhCd() + "]가 보충 지시 창고[" + whCd + "]와 다릅니다.");
+                    "도착 로케이션의 창고[" + toLoc.getWhCd() + "]가 보충 지시 창고[" + whCd + "]와 다릅니다.");
         }
 
         // 3. 로케이션 유형이 STORE(보관)이면 불가
         if ("STORE".equals(toLoc.getLocType())) {
             throw ThrowUtil.newValidationErrorWithNoLog(
-                "보관(STORE) 로케이션[" + toLocCd + "]으로는 보충 이동이 불가합니다. 피킹(PICKABLE) 로케이션을 지정하세요.");
+                    "보관(STORE) 로케이션[" + toLocCd + "]으로는 보충 이동이 불가합니다. 피킹(PICKABLE) 로케이션을 지정하세요.");
         }
 
         // 4. 출고 제한 로케이션 체크 (이후 피킹 불가)
         if ("OUT".equals(toLoc.getRestrictType())) {
             throw ThrowUtil.newValidationErrorWithNoLog(
-                "출고 제한 로케이션[" + toLocCd + "]으로 보충 시 이후 피킹이 불가합니다.");
+                    "출고 제한 로케이션[" + toLocCd + "]으로 보충 시 이후 피킹이 불가합니다.");
         }
 
         // 5. 입고 제한 로케이션 체크
         if ("IN".equals(toLoc.getRestrictType())) {
             throw ThrowUtil.newValidationErrorWithNoLog(
-                "입고 제한이 걸린 로케이션[" + toLocCd + "]으로는 이동이 불가합니다.");
+                    "입고 제한이 걸린 로케이션[" + toLocCd + "]으로는 이동이 불가합니다.");
         }
 
         // 6. 고정 SKU 불일치 체크
         if (ValueUtil.isNotEmpty(toLoc.getSkuCd()) && ValueUtil.isNotEmpty(skuCd)
                 && !toLoc.getSkuCd().equals(skuCd)) {
             throw ThrowUtil.newValidationErrorWithNoLog(
-                "고정 SKU 로케이션[" + toLocCd + "]의 지정 SKU[" + toLoc.getSkuCd() + "]와 보충 SKU[" + skuCd + "]가 다릅니다.");
+                    "고정 SKU 로케이션[" + toLocCd + "]의 지정 SKU[" + toLoc.getSkuCd() + "]와 보충 SKU[" + skuCd + "]가 다릅니다.");
         }
 
         // 7. 혼적 불가 로케이션에 이미 다른 SKU 재고 존재 체크
@@ -629,7 +635,7 @@ public class StockTransactionService extends AbstractQueryService {
                     ValueUtil.newMap("domainId,locCd,skuCd", domainId, toLocCd, skuCd), Long.class);
             if (cnt != null && cnt > 0) {
                 throw ThrowUtil.newValidationErrorWithNoLog(
-                    "혼적 불가 로케이션[" + toLocCd + "]에 이미 다른 SKU 재고가 존재합니다.");
+                        "혼적 불가 로케이션[" + toLocCd + "]에 이미 다른 SKU 재고가 존재합니다.");
             }
         }
 
@@ -638,7 +644,7 @@ public class StockTransactionService extends AbstractQueryService {
             Location fromLoc = this.wmsBaseSvc.findLocation(fromLocCd, false, true);
             if ("OUT".equals(fromLoc.getRestrictType())) {
                 throw ThrowUtil.newValidationErrorWithNoLog(
-                    "출발 로케이션[" + fromLocCd + "]이 출고 제한 상태라 보충 이동이 불가합니다. 보충 지시를 확인하세요.");
+                        "출발 로케이션[" + fromLocCd + "]이 출고 제한 상태라 보충 이동이 불가합니다. 보충 지시를 확인하세요.");
             }
         }
 
