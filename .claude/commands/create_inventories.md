@@ -265,15 +265,24 @@ def to_date_str(val):
     if isinstance(val, (date, datetime)):
         return val.strftime('%Y-%m-%d')
     s = str(val).strip()
-    # 숫자형 (엑셀 시리얼 번호)
-    if s.isdigit():
-        from datetime import timedelta
-        excel_epoch = date(1899, 12, 30)
-        return (excel_epoch + timedelta(days=int(s))).strftime('%Y-%m-%d')
+    # yyyyMMdd 형식 (8자리 숫자 문자열) — 엑셀 시리얼 번호보다 먼저 처리
+    if s.isdigit() and len(s) == 8:
+        try:
+            return datetime.strptime(s, '%Y%m%d').strftime('%Y-%m-%d')
+        except:
+            pass
     # 슬래시/점 구분자 처리
     for fmt in ('%Y-%m-%d', '%Y/%m/%d', '%Y.%m.%d', '%m/%d/%Y'):
         try:
             return datetime.strptime(s, fmt).strftime('%Y-%m-%d')
+        except:
+            pass
+    # 엑셀 시리얼 번호 (5자리 이하 숫자)
+    if s.isdigit():
+        try:
+            from datetime import timedelta
+            excel_epoch = date(1899, 12, 30)
+            return (excel_epoch + timedelta(days=int(s))).strftime('%Y-%m-%d')
         except:
             pass
     return None
