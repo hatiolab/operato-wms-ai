@@ -1,5 +1,7 @@
 package operato.wms.base.entity;
 
+import java.util.Map;
+
 import org.apache.commons.lang.StringUtils;
 
 import operato.wms.vas.WmsVasConstants;
@@ -9,8 +11,11 @@ import xyz.elidom.dbist.annotation.Index;
 import xyz.elidom.dbist.annotation.PrimaryKey;
 import xyz.elidom.dbist.annotation.Table;
 import xyz.elidom.dev.entity.RangedSeq;
+import xyz.elidom.exception.server.ElidomRuntimeException;
+import xyz.elidom.orm.IQueryManager;
 import xyz.elidom.sys.SysConstants;
 import xyz.elidom.sys.entity.Domain;
+import xyz.elidom.util.BeanUtil;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -297,6 +302,9 @@ public class VasBom extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	public void beforeCreate() {
 		super.beforeCreate();
 
+		// validation check
+		this.validateCreation();
+
 		// 상태 초기화
 		if (this.status == null) {
 			this.status = WmsVasConstants.BOM_STATUS_ACTIVE;
@@ -320,5 +328,34 @@ public class VasBom extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		if (this.totalComponentQty == null) {
 			this.totalComponentQty = 0.0;
 		}
+	}
+
+	/**
+	 * 생성 전에 validation check
+	 */
+	private void validateCreation() {
+		IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
+
+		// 세트 상품이 상품에 존재하는지 체크
+		String sql = "SELECT id FROM sku WHERE com_cd = :comCd AND sku_cd = :setSkuCd AND domain_id = :domainId and (del_flag is null or del_flag = false)";
+		Map<String, Object> param = ValueUtil.newMap("domainId,comCd,setSkuCd", this.domainId, this.comCd,
+				this.setSkuCd);
+		Integer cnt = queryMgr.selectSizeBySql(sql, param);
+
+		if (ValueUtil.toInteger(cnt) == 0) {
+			throw new ElidomRuntimeException("등록하신 세트 상품이 상품 마스터에 존재하지 않습니다.");
+		}
+
+		// 이미 등록된 세트 상품인지 체크
+		sql = "SELECT id FROM vas_boms WHERE com_cd = :comCd AND set_sku_cd = :setSkuCd AND domain_id = :domainId";
+		cnt = queryMgr.selectSizeBySql(sql, param);
+
+		if (ValueUtil.toInteger(cnt) > 0) {
+			throw new ElidomRuntimeException("이미 등록된 세트 상품입니다.");
+		}
+
+		// 세트 상품명 자동 조회
+		sql = "select sku_nm from sku where domain_id = :domainId and com_cd = :comCd and sku_cd = :setSkuCd";
+		this.setSkuNm = queryMgr.selectBySql(sql, param, String.class);
 	}
 }

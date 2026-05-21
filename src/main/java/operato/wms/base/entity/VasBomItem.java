@@ -158,12 +158,46 @@ public class VasBomItem extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 					Integer.class);
 			this.bomSeq = (maxSeq != null ? maxSeq : 0) + 1;
 		}
+
+		this.updateSkuNm();
+	}
+
+	@Override
+	public void beforeUpdate() {
+		super.beforeUpdate();
+		this.updateSkuNm();
 	}
 
 	@Override
 	public void afterCreate() {
 		super.afterCreate();
 		this.updateParentBomCounts();
+	}
+
+	@Override
+	public void afterUpdate() {
+		super.afterUpdate();
+		this.updateParentBomCounts();
+	}
+
+	@Override
+	public void afterDelete() {
+		super.afterDelete();
+		this.updateParentBomCounts();
+	}
+
+	/**
+	 * SKU명 자동 조회
+	 */
+	private void updateSkuNm() {
+		if (this.skuCd != null && this.vasBomId != null) {
+			IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
+			String sql = "select sku_nm from sku where domain_id = :domainId and com_cd = (select com_cd from vas_boms where domain_id = :domainId and id = :vasBomId) and sku_cd = :skuCd";
+			String skuNm = queryMgr.selectBySql(sql,
+					ValueUtil.newMap("domainId,vasBomId,skuCd", this.domainId, this.vasBomId, this.skuCd),
+					String.class);
+			this.skuNm = skuNm;
+		}
 	}
 
 	/**
