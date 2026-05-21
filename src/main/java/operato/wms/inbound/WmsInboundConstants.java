@@ -41,6 +41,11 @@ public class WmsInboundConstants {
 	 * 상태 : 반려 (검수 반려)
 	 */
 	public static final String STATUS_REJECTED = "REJECTED";
+
+	/**
+	 * 상태 : 검수 승인 (화주사 검수 후 승인)
+	 */
+	public static final String STATUS_APPROVED = "APPROVED";
 	
 	/**
 	 * 검수 결과 : 정상 (합) 

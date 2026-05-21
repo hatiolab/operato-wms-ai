@@ -577,8 +577,43 @@ public class InboundTransactionService extends AbstractQueryService {
     }
 
     /**
+     * 입고 주문 검수 승인 처리 (상태 : END -> APPROVED)
+     * 화주사가 입고 완료된 주문을 검수 후 승인하는 처리
+     *
+     * @param receiving
+     * @return
+     */
+    public Receiving approveReceivingOrder(Receiving receiving) {
+        // 1. 상태 체크 (입고 완료(END) 상태에서만 승인 가능)
+        if (ValueUtil.isNotEqual(receiving.getStatus(), WmsInboundConstants.STATUS_END)) {
+            throw ThrowUtil.newInvalidStatus("terms.menu.receiving-plan", receiving.getRcvReqNo(),
+                    WmsInboundConstants.STATUS_END);
+        }
+
+        // 2. 입고 주문 상태 변경 (END -> APPROVED)
+        receiving.setStatus(WmsInboundConstants.STATUS_APPROVED);
+        this.queryManager.update(receiving, "status", "updatedAt");
+
+        // 3. 상세 품목 상태도 동일하게 변경
+        List<ReceivingItem> receivingItems = this.queryManager.selectList(ReceivingItem.class,
+                ValueUtil.newMap("domainId,receivingId", receiving.getDomainId(), receiving.getId()));
+
+        for (ReceivingItem item : receivingItems) {
+            // 반려된 아이템은 상태 유지
+            if (ValueUtil.isEqual(item.getStatus(), WmsInboundConstants.STATUS_REJECTED)) {
+                continue;
+            }
+            item.setStatus(WmsInboundConstants.STATUS_APPROVED);
+        }
+        this.queryManager.updateBatch(receivingItems, "status", "updatedAt");
+
+        // 4. 입고 정보 리턴
+        return receiving;
+    }
+
+    /**
      * 입고 예정 정보 상품 입고 완료 취소 리스트 처리 (상태 : END -> START)
-     * 
+     *
      * @param receiving
      * @param list
      * @param printerId

@@ -157,6 +157,14 @@ public class InboundTransactionController extends AbstractRestService {
      */
     public static final String TRX_INB_POST_REJECT_LINE_RECEIPT = "diy-inb-post-reject-line-receiving";
     /**
+     * 커스텀 서비스 - 입고 주문 검수 승인 전 처리
+     */
+    public static final String TRX_INB_PRE_APPROVE_RECEIPT = "diy-inb-pre-approve-receiving";
+    /**
+     * 커스텀 서비스 - 입고 주문 검수 승인 후 처리
+     */
+    public static final String TRX_INB_POST_APPROVE_RECEIPT = "diy-inb-post-approve-receiving";
+    /**
      * 화주사 - 창고별 설정 조회 서비스
      */
     @Autowired
@@ -579,8 +587,35 @@ public class InboundTransactionController extends AbstractRestService {
     }
 
     /**
+     * 입고 주문 검수 승인 처리 (상태 : END -> APPROVED)
+     * 화주사가 입고 완료된 주문을 검수 후 승인
+     *
+     * @param id
+     * @return
+     */
+    @RequestMapping(value = "receiving_orders/{id}/approve", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Approve Receiving Order")
+    public Receiving approveReceivingOrder(@PathVariable("id") String id) {
+        // 1. 조회
+        Receiving receiving = this.queryManager.select(Receiving.class, id);
+
+        // 2. 전 처리 커스텀 서비스 호출
+        Map<String, Object> custSvcParams = ValueUtil.newMap("receivingOrder", receiving);
+        this.customSvc.doCustomService(receiving.getDomainId(), TRX_INB_PRE_APPROVE_RECEIPT, custSvcParams);
+
+        // 3. 검수 승인 처리 (END -> APPROVED)
+        this.inbTrxService.approveReceivingOrder(receiving);
+
+        // 4. 후 처리 커스텀 서비스 호출
+        this.customSvc.doCustomService(receiving.getDomainId(), TRX_INB_POST_APPROVE_RECEIPT, custSvcParams);
+
+        // 5. 리턴
+        return receiving;
+    }
+
+    /**
      * 입고 예정 정보 상품 입고 완료 리스트 취소 처리 (상태 : END -> START)
-     * 
+     *
      * @param id
      * @return
      */
