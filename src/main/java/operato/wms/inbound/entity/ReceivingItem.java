@@ -207,7 +207,7 @@ public class ReceivingItem extends xyz.elidom.orm.entity.basic.ElidomStampHook {
     /**
      * 바코드 - 입고 완료 시 발행되는 재고 바코드. 재고(Inventory) 추적 키
      */
-    @Column(name = "barcode", length = 40)
+    @Column(name = "barcode", length = 50)
     private String barcode;
 
     /**

@@ -10,7 +10,8 @@ import xyz.elidom.dbist.annotation.Table;
  *
  * 엑셀 파일 업로드를 통한 입고 예정 일괄 등록에 사용하는 플랫 모델.
  * Receiving(헤더) + ReceivingItem(아이템) 정보를 한 행에 담아 임포트한 후
- * {@link operato.wms.inbound.service.InboundTransactionService#importReleaseOrders} 에서
+ * {@link operato.wms.inbound.service.InboundTransactionService#importReleaseOrders}
+ * 에서
  * Receiving / ReceivingItem으로 분리·저장한다. DB 테이블 없이 뷰 전용으로 사용된다.
  *
  * @author shortstop
@@ -226,7 +227,7 @@ public class ImportReceivingOrder extends xyz.elidom.orm.entity.basic.ElidomStam
     /**
      * 바코드 - 입고 완료 시 발행되는 재고 바코드. 재고(Inventory) 추적 키
      */
-    @Column(name = "barcode", length = 40)
+    @Column(name = "barcode", length = 50)
     private String barcode;
 
     /**
@@ -348,24 +349,24 @@ public class ImportReceivingOrder extends xyz.elidom.orm.entity.basic.ElidomStam
     public void setDriverTel(String driverTel) {
         this.driverTel = driverTel;
     }
-    
+
     public Integer getTotalBox() {
-		return totalBox;
-	}
+        return totalBox;
+    }
 
-	public void setTotalBox(Integer totalBox) {
-		this.totalBox = totalBox;
-	}
+    public void setTotalBox(Integer totalBox) {
+        this.totalBox = totalBox;
+    }
 
-	public Double getBoxWt() {
-		return boxWt;
-	}
+    public Double getBoxWt() {
+        return boxWt;
+    }
 
-	public void setBoxWt(Double boxWt) {
-		this.boxWt = boxWt;
-	}
+    public void setBoxWt(Double boxWt) {
+        this.boxWt = boxWt;
+    }
 
-	public String getRemarks() {
+    public String getRemarks() {
         return remarks;
     }
 

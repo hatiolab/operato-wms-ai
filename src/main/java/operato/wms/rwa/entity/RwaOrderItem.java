@@ -155,7 +155,7 @@ public class RwaOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	/**
 	 * 바코드
 	 */
-	@Column(name = "barcode", length = 40)
+	@Column(name = "barcode", length = 50)
 	private String barcode;
 
 	/**

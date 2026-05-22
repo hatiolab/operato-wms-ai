@@ -308,7 +308,7 @@ public class ReceivingOrderStatus extends xyz.elidom.orm.entity.basic.DomainTime
 	/**
 	 * 바코드 - 입고 완료 시 발행되는 재고 바코드. 재고(Inventory) 추적 키
 	 */
-	@Column(name = "barcode", length = 40)
+	@Column(name = "barcode", length = 50)
 	private String barcode;
 
 	/**
@@ -341,7 +341,7 @@ public class ReceivingOrderStatus extends xyz.elidom.orm.entity.basic.DomainTime
 	 */
 	@Column(name = "item_remarks", length = 1000)
 	private String itemRemarks;
-  
+
 	public String getId() {
 		return id;
 	}
@@ -423,14 +423,14 @@ public class ReceivingOrderStatus extends xyz.elidom.orm.entity.basic.DomainTime
 	}
 
 	public String getMgrId() {
-        return mgrId;
-    }
+		return mgrId;
+	}
 
-    public void setMgrId(String mgrId) {
-        this.mgrId = mgrId;
-    }
+	public void setMgrId(String mgrId) {
+		this.mgrId = mgrId;
+	}
 
-    public Boolean getInspFlag() {
+	public Boolean getInspFlag() {
 		return inspFlag;
 	}
 
@@ -447,22 +447,22 @@ public class ReceivingOrderStatus extends xyz.elidom.orm.entity.basic.DomainTime
 	}
 
 	public Integer getTotalBox() {
-        return totalBox;
-    }
+		return totalBox;
+	}
 
-    public void setTotalBox(Integer totalBox) {
-        this.totalBox = totalBox;
-    }
+	public void setTotalBox(Integer totalBox) {
+		this.totalBox = totalBox;
+	}
 
-    public Double getBoxWt() {
-        return boxWt;
-    }
+	public Double getBoxWt() {
+		return boxWt;
+	}
 
-    public void setBoxWt(Double boxWt) {
-        this.boxWt = boxWt;
-    }
+	public void setBoxWt(Double boxWt) {
+		this.boxWt = boxWt;
+	}
 
-    public String getCarNo() {
+	public String getCarNo() {
 		return carNo;
 	}
 
@@ -519,14 +519,14 @@ public class ReceivingOrderStatus extends xyz.elidom.orm.entity.basic.DomainTime
 	}
 
 	public String getSkuNm() {
-        return skuNm;
-    }
+		return skuNm;
+	}
 
-    public void setSkuNm(String skuNm) {
-        this.skuNm = skuNm;
-    }
+	public void setSkuNm(String skuNm) {
+		this.skuNm = skuNm;
+	}
 
-    public String getErpPartNo() {
+	public String getErpPartNo() {
 		return erpPartNo;
 	}
 
@@ -711,26 +711,26 @@ public class ReceivingOrderStatus extends xyz.elidom.orm.entity.basic.DomainTime
 	}
 
 	public String getPoNo() {
-        return poNo;
-    }
+		return poNo;
+	}
 
-    public void setPoNo(String poNo) {
-        this.poNo = poNo;
-    }
+	public void setPoNo(String poNo) {
+		this.poNo = poNo;
+	}
 
-    public String getItemStatus() {
-        return itemStatus;
-    }
+	public String getItemStatus() {
+		return itemStatus;
+	}
 
-    public void setItemStatus(String itemStatus) {
-        this.itemStatus = itemStatus;
-    }
+	public void setItemStatus(String itemStatus) {
+		this.itemStatus = itemStatus;
+	}
 
-    public String getItemRemarks() {
-        return itemRemarks;
-    }
+	public String getItemRemarks() {
+		return itemRemarks;
+	}
 
-    public void setItemRemarks(String itemRemarks) {
-        this.itemRemarks = itemRemarks;
-    }
+	public void setItemRemarks(String itemRemarks) {
+		this.itemRemarks = itemRemarks;
+	}
 }

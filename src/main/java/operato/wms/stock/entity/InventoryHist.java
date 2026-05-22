@@ -36,7 +36,7 @@ public class InventoryHist extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 	@Column(name = "id", nullable = false, length = 40)
 	private String id;
 
-	@Column(name = "barcode", nullable = false, length = 40)
+	@Column(name = "barcode", nullable = false, length = 50)
 	private String barcode;
 
 	@Column(name = "hist_seq", nullable = false)
