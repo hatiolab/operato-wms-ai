@@ -1,5 +1,6 @@
 package operato.wms.stock.entity;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import xyz.elidom.dbist.annotation.Column;
@@ -81,6 +82,18 @@ public class InventoryHist extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 	@Column(name = "rcv_seq")
 	private Integer rcvSeq;
 
+	/**
+	 * 입고 확정 일시 (형식: YYYY-MM-DD HH:mm:ss)
+	 */
+	@Column(name = "received_at", length = 20)
+	private String receivedAt;
+
+	/**
+	 * 재고 종료 일시 - 재고 소진 또는 폐기로 종료 처리된 일시 (형식: YYYY-MM-DD HH:mm:ss)
+	 */
+	@Column(name = "closed_at", length = 20)
+	private String closedAt;
+
 	@Column(name = "rls_ord_no", length = 30)
 	private String rlsOrdNo;
 
@@ -113,6 +126,18 @@ public class InventoryHist extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 
 	@Column(name = "cbm")
 	private Double cbm;
+
+	/**
+	 * 단가 - 재고 입고 시 단위 가격
+	 */
+	@Column(name = "unit_price")
+	private BigDecimal unitPrice;
+
+	/**
+	 * 통화 코드 (ISO 4217, 예: KRW, USD, EUR)
+	 */
+	@Column(name = "currency_cd", length = 3)
+	private String currencyCd;
 
 	@Column(name = "pallet_qty")
 	private Integer palletQty;
@@ -334,6 +359,22 @@ public class InventoryHist extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 		this.cbm = cbm;
 	}
 
+	public BigDecimal getUnitPrice() {
+		return unitPrice;
+	}
+
+	public void setUnitPrice(BigDecimal unitPrice) {
+		this.unitPrice = unitPrice;
+	}
+
+	public String getCurrencyCd() {
+		return currencyCd;
+	}
+
+	public void setCurrencyCd(String currencyCd) {
+		this.currencyCd = currencyCd;
+	}
+
 	public Integer getPalletQty() {
 		return palletQty;
 	}
@@ -436,6 +477,22 @@ public class InventoryHist extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 
 	public void setRcvSeq(Integer rcvSeq) {
 		this.rcvSeq = rcvSeq;
+	}
+
+	public String getReceivedAt() {
+		return receivedAt;
+	}
+
+	public void setReceivedAt(String receivedAt) {
+		this.receivedAt = receivedAt;
+	}
+
+	public String getClosedAt() {
+		return closedAt;
+	}
+
+	public void setClosedAt(String closedAt) {
+		this.closedAt = closedAt;
 	}
 
 	public String getRlsOrdNo() {

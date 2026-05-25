@@ -1,5 +1,7 @@
 package operato.wms.stock.entity;
 
+import java.math.BigDecimal;
+
 import operato.wms.base.entity.SKU;
 import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.dbist.annotation.Column;
@@ -23,7 +25,7 @@ import xyz.elidom.util.ValueUtil;
 		@Index(name = "ix_inventories_4", columnList = "domain_id,wh_cd,invoice_no,lot_no,expired_date"),
 		@Index(name = "ix_inventories_5", columnList = "domain_id,wh_cd,last_tran_cd"),
 		@Index(name = "ix_inventories_6", columnList = "domain_id,wh_cd,rcv_no"),
-		@Index(name = "ix_inventories_7", columnList = "domain_id,wh_cd,rls_ord_no"),
+		@Index(name = "ix_inventories_7", columnList = "domain_id,wh_cd,updated_at"),
 		@Index(name = "ix_inventories_8", columnList = "domain_id,wh_cd,expire_status"),
 		@Index(name = "ix_inventories_9", columnList = "domain_id,wh_cd,status"),
 		@Index(name = "ix_inventories_10", columnList = "domain_id,wh_cd,del_flag")
@@ -47,15 +49,18 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	 */
 	public static final String STATUS_STORED = "STORED";
 	/**
-	 * 재고 상태 - RESERVED (피킹 예약)
+	 * 재고 상태 - RESERVED (피킹 예약) -> 제거 필요. 피킹 예약을 한다고 해서 재고 상태가 예약 상태로 변경되면 안되고 보관 중
+	 * 상태로 되어 있다가 피킹 완료된 이후에 수량 차감 혹은 모든 수량이 차감되면 삭제되어야 함.
 	 */
 	public static final String STATUS_RESERVED = "RESERVED";
 	/**
-	 * 재고 상태 - PICKING (피킹 중)
+	 * 재고 상태 - PICKING (피킹 중) -> 제거 필요. 피킹 중인 상태에도 재고 상태가 보관 중으로 되어 있어야 하고, 피킹 완료된
+	 * 이후에 수량 차감
+	 * 혹은 모든 수량이 차감되면 삭제되어야 함.
 	 */
 	public static final String STATUS_PICK = "PICKING";
 	/**
-	 * 재고 상태 - LOCKED (잠김)
+	 * 재고 상태 - LOCKED (잠김) -> 제거 필요, 상태에서 LOCKED를 제거하고 locked_flag를 추가로 만들어서 처리 필요
 	 */
 	public static final String STATUS_LOCK = "LOCKED";
 	/**
@@ -77,7 +82,8 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	public static final String EXPIRE_STATUS_EXPIRED = "EXPIRED";
 
 	/**
-	 * 재고 트렌젝션 - IN-INSP (입고 검수)
+	 * 재고 트렌젝션 - IN-INSP (입고 검수) -> 제거 필요. 입고 검수는 트랜잭션으로 처리하지 말고 입고 검수 완료 후 적치 시점에
+	 * 입고로 트랜잭션 처리 필요
 	 */
 	public static final String TRANSACTION_IN_INSP = "IN-INSP";
 	/**
@@ -168,7 +174,7 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	/**
 	 * 재고 바코드 - 재고 단위를 식별하는 고유 바코드. 입고 시 자동 생성
 	 */
-	@Column(name = "barcode", nullable = false, length = 30)
+	@Column(name = "barcode", nullable = false, length = 50)
 	private String barcode;
 
 	/**
@@ -250,6 +256,18 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private Integer rcvSeq;
 
 	/**
+	 * 입고 확정 일시 (형식: YYYY-MM-DD HH:mm:ss)
+	 */
+	@Column(name = "received_at", length = 20)
+	private String receivedAt;
+
+	/**
+	 * 재고 종료 일시 - 재고 소진 또는 폐기로 종료 처리된 일시 (형식: YYYY-MM-DD HH:mm:ss)
+	 */
+	@Column(name = "closed_at", length = 20)
+	private String closedAt;
+
+	/**
 	 * 출고 주문 번호 - 예약/피킹 중인 출고 주문 번호
 	 */
 	@Column(name = "rls_ord_no", length = 30)
@@ -314,6 +332,18 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	 */
 	@Column(name = "cbm")
 	private Double cbm;
+
+	/**
+	 * 단가 - 재고 입고 시 단위 가격
+	 */
+	@Column(name = "unit_price")
+	private BigDecimal unitPrice;
+
+	/**
+	 * 통화 코드 (ISO 4217, 예: KRW, USD, EUR)
+	 */
+	@Column(name = "currency_cd", length = 3)
+	private String currencyCd;
 
 	/**
 	 * 팔레트 수량
@@ -563,6 +593,22 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.cbm = cbm;
 	}
 
+	public BigDecimal getUnitPrice() {
+		return unitPrice;
+	}
+
+	public void setUnitPrice(BigDecimal unitPrice) {
+		this.unitPrice = unitPrice;
+	}
+
+	public String getCurrencyCd() {
+		return currencyCd;
+	}
+
+	public void setCurrencyCd(String currencyCd) {
+		this.currencyCd = currencyCd;
+	}
+
 	public Integer getPalletQty() {
 		return palletQty;
 	}
@@ -667,6 +713,22 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		this.rcvSeq = rcvSeq;
 	}
 
+	public String getReceivedAt() {
+		return receivedAt;
+	}
+
+	public void setReceivedAt(String receivedAt) {
+		this.receivedAt = receivedAt;
+	}
+
+	public String getClosedAt() {
+		return closedAt;
+	}
+
+	public void setClosedAt(String closedAt) {
+		this.closedAt = closedAt;
+	}
+
 	public String getRlsOrdNo() {
 		return rlsOrdNo;
 	}
@@ -729,6 +791,7 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 			// 재고 소진시 상태 : 비어있음
 			this.status = Inventory.STATUS_EMPTY;
 			this.delFlag = true;
+			this.closedAt = DateUtil.currentTimeStr();
 		} else {
 			// 상태 초기화 : 보관 중
 			this.status = (this.status == null) ? Inventory.STATUS_STORED : this.status;
@@ -778,6 +841,11 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		if (this.invQty <= 0) {
 			this.status = Inventory.STATUS_EMPTY;
 			this.delFlag = true;
+			this.closedAt = DateUtil.currentTimeStr();
+		}
+
+		if (ValueUtil.isEqualIgnoreCase(Inventory.TRANSACTION_IN, this.lastTranCd)) {
+			this.receivedAt = DateUtil.currentTimeStr();
 		}
 	}
 
