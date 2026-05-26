@@ -12,11 +12,11 @@ Java 18이 없으면 사용자에게 알리고 중단.
 
 ### 2. 빌드 실행
 
-다음 명령을 실행한다:
+프론트엔드는 별도 Docker로 배포하므로 `SKIP_FRONTEND=true`를 항상 적용한다:
 
 ```bash
 cd /Users/shortstop/Git/operato-wms-ai
-JAVA_HOME=$(/usr/libexec/java_home -v 18) ./gradlew build
+JAVA_HOME=$(/usr/libexec/java_home -v 18) SKIP_FRONTEND=true ./gradlew build -x test
 ```
 
 ### 3. 빌드 옵션
@@ -25,13 +25,12 @@ JAVA_HOME=$(/usr/libexec/java_home -v 18) ./gradlew build
 
 | 상황 | 명령 |
 |------|------|
-| 기본 빌드 (테스트 포함) | `./gradlew build` |
-| 테스트 제외 (빠른 빌드) | `./gradlew build -x test` |
-| 클린 후 빌드 | `./gradlew clean build` |
-| 클린 후 빌드 (테스트 제외) | `./gradlew clean build -x test` |
-| Docker용 빌드 | `./gradlew build -x test --no-daemon --console=plain` |
+| 기본 빌드 (기본) | `SKIP_FRONTEND=true ./gradlew build -x test` |
+| 테스트 포함 | `SKIP_FRONTEND=true ./gradlew build` |
+| 클린 후 빌드 | `SKIP_FRONTEND=true ./gradlew clean build -x test` |
+| Docker용 빌드 | `SKIP_FRONTEND=true ./gradlew build -x test --no-daemon --console=plain` |
 
-사용자가 옵션을 명시하지 않으면 **기본 빌드**(`./gradlew build`)를 실행.
+사용자가 옵션을 명시하지 않으면 **기본 빌드**(`SKIP_FRONTEND=true ./gradlew build -x test`)를 실행.
 
 ### 4. 결과 해석
 
