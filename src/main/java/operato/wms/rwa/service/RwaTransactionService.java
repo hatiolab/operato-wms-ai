@@ -1,6 +1,7 @@
 package operato.wms.rwa.service;
 
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -8,6 +9,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.apache.commons.lang.StringUtils;
+
+import operato.wms.base.entity.Location;
 import operato.wms.base.entity.SKU;
 import operato.wms.base.service.RuntimeConfigService;
 import operato.wms.base.service.WmsBaseService;
@@ -19,10 +23,14 @@ import operato.wms.rwa.entity.RwaOrder;
 import operato.wms.rwa.entity.RwaOrderItem;
 import operato.wms.stock.entity.Inventory;
 import xyz.anythings.sys.service.AbstractQueryService;
+import xyz.anythings.sys.service.ICustomService;
+import xyz.elidom.dev.entity.RangedSeq;
 import xyz.elidom.dbist.dml.Query;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
+import xyz.elidom.sys.entity.User;
 import xyz.elidom.sys.util.ThrowUtil;
+import xyz.elidom.util.BeanUtil;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -30,12 +38,13 @@ import xyz.elidom.util.ValueUtil;
  * RWA(Return Warehouse Authorization) 모듈 트랜잭션 처리 서비스
  *
  * 반품 프로세스:
- * 1. 반품 요청 (REQUEST) → createRwaOrder()
- * 2. 반품 승인 (APPROVED) → approveRwaOrder()
- * 3. 반품 입고 (RECEIVING) → receiveRwaItem()
- * 4. 반품 검수 (INSPECTING/INSPECTED) → inspectRwaItem()
- * 5. 반품 처분 (DISPOSED) → disposeRwaItem()
- * 6. 완료 (COMPLETED) → completeRwaOrder()
+ * 1. 반품 요청 등록 (REQUEST) → createRwaOrder()       — rwa_req_no 자동 채번
+ * 2. 반품 승인 (APPROVED)     → approveRwaOrder()      — rwa_no 자동 채번
+ * 3. 반품 거부 (REJECTED)     → rejectRwaOrder()       — 승인 전 단계에서만 가능
+ * 4. 반품 취소 (CANCELLED)    → cancelRwaOrder()       — 완료 전 어느 단계든 가능
+ * 5. 반품 입고 (RECEIVING/RECEIVED) → receiveRwaItem() — 아이템별 입고, 전체 완료 시 RECEIVED
+ * 6. 반품 검수 (INSPECTING/INSPECTED) → inspectRwaItem()
+ * 7. 반품 처분 (DISPOSING)    → disposeRwaItem()       — 전체 처분 완료 시 자동으로 COMPLETED
  *
  * @author HatioLab
  */
@@ -53,6 +62,7 @@ public class RwaTransactionService extends AbstractQueryService {
 	 */
 	@Autowired
 	protected WmsBaseService wmsBaseSvc;
+
 
 	/********************************************************************************************************
 	 * 1. 반품 지시 생성 및 승인
@@ -162,14 +172,21 @@ public class RwaTransactionService extends AbstractQueryService {
 					"승인 가능한 상태가 아닙니다. 현재 상태: " + rwaOrder.getStatus());
 		}
 
-		// 3. 승인 처리
+		// 3. 반품 번호 채번 (rwa_no) — 승인 시점에 부여
+		if (ValueUtil.isEmpty(rwaOrder.getRwaNo())) {
+			String rwaNo = (String) BeanUtil.get(ICustomService.class).doCustomService(
+					rwaOrder.getDomainId(), "diy-generate-rwa-no", new HashMap<String, Object>());
+			rwaOrder.setRwaNo(rwaNo);
+		}
+
+		// 4. 승인 처리
 		rwaOrder.setStatus(WmsRwaConstants.STATUS_APPROVED);
 		rwaOrder.setApprovedBy(approvedBy);
 		rwaOrder.setApprovedAt(new Date());
 
-		this.queryManager.update(rwaOrder, "status", "approvedBy", "approvedAt");
+		this.queryManager.update(rwaOrder, "status", "approvedBy", "approvedAt", "rwaNo");
 
-		// 4. 상세 항목 상태 업데이트
+		// 5. 상세 항목 상태 업데이트
 		String sql = "UPDATE rwa_order_items SET status = :status WHERE rwa_order_id = :rwaOrderId AND domain_id = :domainId";
 		this.queryManager.executeBySql(sql, ValueUtil.newMap(
 				"status,rwaOrderId,domainId",
@@ -209,6 +226,43 @@ public class RwaTransactionService extends AbstractQueryService {
 		return rwaOrder;
 	}
 
+	/**
+	 * 반품 지시 취소
+	 *
+	 * 완료(COMPLETED) 전 어느 단계에서든 취소 가능.
+	 * 단, REJECTED/CANCELLED 상태는 재취소 불가.
+	 *
+	 * @param rwaOrderId   반품 지시 ID
+	 * @param cancelReason 취소 사유
+	 * @return 취소된 반품 지시
+	 */
+	@Transactional
+	public RwaOrder cancelRwaOrder(String rwaOrderId, String cancelReason) {
+		// 1. 반품 지시 조회
+		RwaOrder rwaOrder = this.queryManager.select(RwaOrder.class, rwaOrderId);
+		if (rwaOrder == null) {
+			throw ThrowUtil.newValidationErrorWithNoLog("반품 지시를 찾을 수 없습니다. ID: " + rwaOrderId);
+		}
+
+		// 2. 상태 검증 — COMPLETED, REJECTED, CANCELLED 는 취소 불가
+		String currentStatus = rwaOrder.getStatus();
+		if (WmsRwaConstants.STATUS_COMPLETED.equals(currentStatus)
+				|| WmsRwaConstants.STATUS_REJECTED.equals(currentStatus)
+				|| WmsRwaConstants.STATUS_CANCELLED.equals(currentStatus)) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+					"취소할 수 없는 상태입니다. 현재 상태: " + currentStatus);
+		}
+
+		// 3. 취소 처리
+		rwaOrder.setStatus(WmsRwaConstants.STATUS_CANCELLED);
+		if (ValueUtil.isNotEmpty(cancelReason)) {
+			rwaOrder.setRemarks(cancelReason);
+		}
+		this.queryManager.update(rwaOrder, "status", "remarks");
+
+		return rwaOrder;
+	}
+
 	/********************************************************************************************************
 	 * 2. 반품 입고
 	 ********************************************************************************************************/
@@ -231,15 +285,15 @@ public class RwaTransactionService extends AbstractQueryService {
 
 		// 2. 상태 검증
 		if (!WmsRwaConstants.STATUS_APPROVED.equals(item.getStatus()) &&
-				!WmsRwaConstants.STATUS_RECEIVING.equals(item.getStatus())) {
+				!WmsRwaConstants.STATUS_RECEIVED.equals(item.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
 					"입고 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
 		}
 
-		// 3. 입고 처리
+		// 3. 입고 처리 — 아이템 단위 입고 완료
 		item.setRwaQty(rwaQty);
 		item.setLocCd(locCd);
-		item.setStatus(WmsRwaConstants.STATUS_RECEIVING);
+		item.setStatus(WmsRwaConstants.STATUS_RECEIVED);
 
 		this.queryManager.update(item, "rwaQty", "locCd", "status");
 
@@ -268,9 +322,10 @@ public class RwaTransactionService extends AbstractQueryService {
 			throw ThrowUtil.newValidationErrorWithNoLog("반품 상세를 찾을 수 없습니다. ID: " + rwaOrderItemId);
 		}
 
-		// 2. 상태 검증
-		if (!WmsRwaConstants.STATUS_RECEIVING.equals(item.getStatus()) &&
-				!WmsRwaConstants.STATUS_INSPECTING.equals(item.getStatus())) {
+		// 2. 상태 검증 (재검수를 위해 INSPECTED도 허용)
+		if (!WmsRwaConstants.STATUS_RECEIVED.equals(item.getStatus()) &&
+				!WmsRwaConstants.STATUS_INSPECTING.equals(item.getStatus()) &&
+				!WmsRwaConstants.STATUS_INSPECTED.equals(item.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
 					"검수 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
 		}
@@ -278,6 +333,13 @@ public class RwaTransactionService extends AbstractQueryService {
 		// 3. 검수 기록 생성
 		inspection.setRwaOrderItemId(rwaOrderItemId);
 		inspection.setDomainId(item.getDomainId());
+
+		// 검수자 자동 설정 (프론트에서 미전달 시 현재 로그인 사용자로 설정)
+		if (ValueUtil.isEmpty(inspection.getInspBy())) {
+			String userId = User.currentUser() != null ? User.currentUser().getId() : "system";
+			inspection.setInspBy(userId);
+		}
+
 		this.queryManager.insert(inspection);
 
 		// 4. Entity의 afterCreate()에서 자동으로 rwa_order_items 업데이트 수행
@@ -308,14 +370,215 @@ public class RwaTransactionService extends AbstractQueryService {
 					"검수가 완료되지 않았습니다. 검수 수량: " + item.getInspectedQty() + " / 입고 수량: " + item.getRwaQty());
 		}
 
+		// 재검수 여부: status가 아닌 RETURN-GOOD 재고 실존 여부로 판단
+		// (RwaInspection.afterCreate()가 inspectedQty >= rwaQty 시 status를 INSPECTED로 선제 변경하므로
+		//  status 기반 판단은 첫 검수도 재검수로 오판하는 버그 발생)
+		boolean isReInspect = false;
+		if (ValueUtil.isNotEmpty(item.getBarcode())) {
+			String checkSql = "SELECT COUNT(*) FROM inventories " +
+					"WHERE domain_id = :domainId AND barcode = :barcode AND last_tran_cd = 'RWA_GOOD'";
+			Integer goodCount = this.queryManager.selectBySql(checkSql,
+					ValueUtil.newMap("domainId,barcode", item.getDomainId(), item.getBarcode()), Integer.class);
+			isReInspect = goodCount != null && goodCount > 0;
+		}
+
 		// 3. 상태 업데이트
 		item.setStatus(WmsRwaConstants.STATUS_INSPECTED);
 		this.queryManager.update(item, "status");
 
-		// 4. 헤더 상태 업데이트
+		// 4. 검수 분류 재고 처리 (RETURN-GOOD / RETURN-DEF)
+		RwaOrder order = this.queryManager.select(RwaOrder.class, item.getRwaOrderId());
+		if (order != null) {
+			if (isReInspect) {
+				this.updateInspectionInventories(item, order);
+			} else {
+				this.assignBatchBarcodes(item, order);
+			}
+		}
+
+		// 5. 헤더 상태 업데이트
 		this.updateRwaOrderStatus(item.getRwaOrderId());
 
 		return item;
+	}
+
+	/**
+	 * 검수 완료 시 재고를 RETURN-GOOD / RETURN-DEF 로케이션으로 분류 등록
+	 *
+	 * 흐름:
+	 * 1. 입고(receive) 단계에서 생성된 RETURN 위치 임시 재고 삭제
+	 * 2. 양품 수량 > 0 → loc_type=RETURN-GOOD 로케이션에 재고 생성
+	 * 3. 불량 수량 > 0 → loc_type=RETURN-DEF  로케이션에 재고 생성
+	 *
+	 * @param item  반품 상세
+	 * @param order 반품 지시
+	 */
+	private void assignBatchBarcodes(RwaOrderItem item, RwaOrder order) {
+		double goodQty = item.getGoodQty() != null ? item.getGoodQty() : 0;
+		double defectQty = item.getDefectQty() != null ? item.getDefectQty() : 0;
+
+		if (goodQty <= 0 && defectQty <= 0) {
+			return;
+		}
+
+		// 1. 입고 단계 RETURN 임시 재고 삭제
+		if (ValueUtil.isNotEmpty(item.getBarcode())) {
+			String delSql = "DELETE FROM inventories WHERE domain_id = :domainId AND barcode = :barcode";
+			this.queryManager.executeBySql(delSql,
+					ValueUtil.newMap("domainId,barcode", order.getDomainId(), item.getBarcode()));
+		}
+
+		// 2. RETURN-GOOD / RETURN-DEF 로케이션 조회
+		String goodLocCd = findLocCdByType(order.getDomainId(), order.getWhCd(), "RETURN-GOOD");
+		String defectLocCd = findLocCdByType(order.getDomainId(), order.getWhCd(), "RETURN-DEF");
+
+		if (ValueUtil.isEmpty(goodLocCd))   goodLocCd   = "RETURN-GOOD";
+		if (ValueUtil.isEmpty(defectLocCd)) defectLocCd = "RETURN-DEF";
+
+		String goodBarcode = null;
+		String defectBarcode = null;
+
+		// 3. 양품 재고 생성 (barcode=null → beforeCreate()에서 입고 형식으로 자동 채번)
+		if (goodQty > 0) {
+			Inventory inv = buildReturnInventory(item, order, null, goodQty,
+					goodLocCd, Inventory.STATUS_STORED, "RWA_GOOD");
+			inv.setRemarks("RWA 반품 양품 - " + order.getRwaNo());
+			this.queryManager.insert(inv);
+			goodBarcode = inv.getBarcode(); // beforeCreate()에서 채번된 바코드
+		}
+
+		// 4. 불량 재고 생성 (barcode=null → beforeCreate()에서 입고 형식으로 자동 채번)
+		if (defectQty > 0) {
+			Inventory inv = buildReturnInventory(item, order, null, defectQty,
+					defectLocCd, Inventory.STATUS_BAD, "RWA_DEFECT");
+			inv.setRemarks("RWA 반품 불량 - " + order.getRwaNo());
+			this.queryManager.insert(inv);
+			defectBarcode = inv.getBarcode(); // beforeCreate()에서 채번된 바코드
+		}
+
+		// 5. 대표 바코드 저장 (양품 우선)
+		if (ValueUtil.isNotEmpty(goodBarcode)) {
+			item.setBarcode(goodBarcode);
+		} else if (ValueUtil.isNotEmpty(defectBarcode)) {
+			item.setBarcode(defectBarcode);
+		}
+		this.queryManager.update(item, "barcode");
+	}
+
+	/**
+	 * 재검수 시 기존 RETURN-GOOD / RETURN-DEF 재고 수량 업데이트
+	 *
+	 * @param item  반품 상세
+	 * @param order 반품 지시
+	 */
+	private void updateInspectionInventories(RwaOrderItem item, RwaOrder order) {
+		double goodQty = item.getGoodQty() != null ? item.getGoodQty() : 0;
+		double defectQty = item.getDefectQty() != null ? item.getDefectQty() : 0;
+
+		// 기존 RETURN-GOOD 재고 수량 업데이트 (item.barcode = 양품 바코드)
+		if (ValueUtil.isNotEmpty(item.getBarcode())) {
+			String updGood = "UPDATE inventories SET inv_qty = :qty, updated_at = now() " +
+					"WHERE domain_id = :domainId AND barcode = :barcode AND last_tran_cd = 'RWA_GOOD'";
+			int updated = this.queryManager.executeBySql(updGood,
+					ValueUtil.newMap("qty,domainId,barcode", goodQty, order.getDomainId(), item.getBarcode()));
+
+			// 기존 양품 재고가 없고 수량이 생긴 경우 새로 생성
+			if (updated == 0 && goodQty > 0) {
+				String goodLocCd = findLocCdByType(order.getDomainId(), order.getWhCd(), "RETURN-GOOD");
+				if (ValueUtil.isEmpty(goodLocCd)) goodLocCd = "RETURN-GOOD";
+				Inventory inv = buildReturnInventory(item, order, item.getBarcode(), goodQty,
+						goodLocCd, Inventory.STATUS_STORED, "RWA_GOOD");
+				inv.setRemarks("RWA 반품 양품 - " + order.getRwaNo());
+				this.queryManager.insert(inv);
+			}
+		}
+
+		// 기존 RETURN-DEF 재고 수량 업데이트 (remarks로 조회)
+		String updDef = "UPDATE inventories SET inv_qty = :qty, updated_at = now() " +
+				"WHERE domain_id = :domainId AND wh_cd = :whCd AND sku_cd = :skuCd " +
+				"AND last_tran_cd = 'RWA_DEFECT' AND remarks = :remarks";
+		String defRemarks = "RWA 반품 불량 - " + order.getRwaNo();
+		int updatedDef = this.queryManager.executeBySql(updDef,
+				ValueUtil.newMap("qty,domainId,whCd,skuCd,remarks",
+						defectQty, order.getDomainId(), order.getWhCd(), item.getSkuCd(), defRemarks));
+
+		// 기존 불량 재고가 없고 수량이 생긴 경우 새로 생성 (barcode=null → 입고 형식 자동 채번)
+		if (updatedDef == 0 && defectQty > 0) {
+			String defectLocCd = findLocCdByType(order.getDomainId(), order.getWhCd(), "RETURN-DEF");
+			if (ValueUtil.isEmpty(defectLocCd)) defectLocCd = "RETURN-DEF";
+			Inventory inv = buildReturnInventory(item, order, null, defectQty,
+					defectLocCd, Inventory.STATUS_BAD, "RWA_DEFECT");
+			inv.setRemarks(defRemarks);
+			this.queryManager.insert(inv);
+		}
+	}
+
+	/**
+	 * loc_type으로 로케이션 코드 조회 (loc_cd 오름차순 첫 번째)
+	 *
+	 * @param domainId 도메인 ID
+	 * @param whCd     창고 코드
+	 * @param locType  로케이션 유형 (예: RETURN-GOOD, RETURN-DEF)
+	 * @return 로케이션 코드, 없으면 null
+	 */
+	private String findLocCdByType(Long domainId, String whCd, String locType) {
+		xyz.elidom.dbist.dml.Query q = new xyz.elidom.dbist.dml.Query();
+		q.addFilter("domainId", domainId);
+		q.addFilter("whCd", whCd);
+		q.addFilter("locType", locType);
+		q.addOrder("locCd", true);
+		q.setPageSize(1);
+		List<Location> locs = this.queryManager.selectList(Location.class, q);
+		return (locs != null && !locs.isEmpty()) ? locs.get(0).getLocCd() : null;
+	}
+
+	/**
+	 * RWA 반품 배치 바코드 채번
+	 * 형식: RWAB{G/D}{domainId}-{yyMMdd}-{seq:05d}
+	 *
+	 * @param domainId 도메인 ID
+	 * @param type     "G"(양품) 또는 "D"(불량)
+	 * @return 채번된 바코드 문자열
+	 */
+	private String generateRwaBatchBarcode(Long domainId, String type) {
+		String dateStr = DateUtil.todayStr("yyMMdd");
+		String seqKey = "RWA_BATCH_BCD_" + type;
+		Integer seq = xyz.elidom.dev.entity.RangedSeq.increaseSequence(
+				domainId, seqKey, seqKey, "DATE", dateStr, null, null);
+		String serialNo = org.apache.commons.lang.StringUtils.leftPad(String.valueOf(seq), 5, "0");
+		return "RWAB" + type + domainId + "-" + dateStr + "-" + serialNo;
+	}
+
+	/**
+	 * 반품 재고 Inventory 객체 생성 (공통 필드 세팅)
+	 *
+	 * @param item      반품 상세
+	 * @param order     반품 지시
+	 * @param barcode   배치 바코드
+	 * @param qty       수량
+	 * @param locCd     로케이션
+	 * @param status    재고 상태
+	 * @param tranCd    트랜잭션 코드
+	 * @return Inventory 객체
+	 */
+	private Inventory buildReturnInventory(RwaOrderItem item, RwaOrder order,
+			String barcode, double qty, String locCd, String status, String tranCd) {
+		Inventory inv = new Inventory();
+		inv.setDomainId(order.getDomainId());
+		inv.setWhCd(order.getWhCd());
+		inv.setComCd(order.getComCd());
+		inv.setSkuCd(item.getSkuCd());
+		inv.setSkuNm(item.getSkuNm());
+		inv.setLocCd(locCd);
+		inv.setBarcode(barcode);
+		inv.setInvQty(qty);
+		inv.setStatus(status);
+		inv.setLastTranCd(tranCd);
+		inv.setLotNo(item.getLotNo());
+		inv.setExpiredDate(item.getExpiredDate());
+		inv.setProdDate(item.getPrdDate()); // RwaOrderItem.prdDate → Inventory.prodDate
+		inv.setRcvNo(order.getRwaNo());    // 입고번호에 반품번호 기록
+		return inv;
 	}
 
 	/********************************************************************************************************
@@ -349,6 +612,7 @@ public class RwaTransactionService extends AbstractQueryService {
 		// 4. 처분 기록 생성
 		disposition.setRwaOrderItemId(rwaOrderItemId);
 		disposition.setDomainId(item.getDomainId());
+		disposition.setDisposedBy(User.currentUser() != null ? User.currentUser().getId() : "system");
 		this.queryManager.insert(disposition);
 
 		// 5. Entity의 afterCreate()에서 자동으로 rwa_order_items 업데이트 수행
@@ -376,44 +640,158 @@ public class RwaTransactionService extends AbstractQueryService {
 	}
 
 	/********************************************************************************************************
-	 * 5. 반품 완료 및 마감
+	 * 4-2. 반품 처분 일괄 완료 (양품/불량 분리 처분)
 	 ********************************************************************************************************/
 
 	/**
-	 * 반품 지시 완료 처리
+	 * 반품 처분 일괄 완료 처리 (양품/불량 분리 처분 + 재고 일괄 처리 + 주문 완료)
+	 *
+	 * "반품 완료" 버튼 클릭 시 호출.
+	 * - 각 아이템의 양품(GOOD) / 불량(DEFECT) 처분을 별도 RwaDisposition 레코드로 생성
+	 * - qty_type = GOOD / DEFECT 로 구분
+	 * - RESTOCK 처분 시 즉시 재고 생성
+	 * - 모든 처리 후 주문 상태를 COMPLETED로 전환
 	 *
 	 * @param rwaOrderId 반품 지시 ID
+	 * @param decisions  처분 결정 목록 (각 항목: item_id, good_disposition, defect_disposition)
 	 * @return 완료된 반품 지시
 	 */
 	@Transactional
-	public RwaOrder completeRwaOrder(String rwaOrderId) {
-		// 1. 반품 지시 조회
-		RwaOrder rwaOrder = this.queryManager.select(RwaOrder.class, rwaOrderId);
-		if (rwaOrder == null) {
+	public RwaOrder finalizeOrderWithDispositions(String rwaOrderId, List<Map<String, Object>> decisions) {
+		RwaOrder order = this.queryManager.select(RwaOrder.class, rwaOrderId);
+		if (order == null) {
 			throw ThrowUtil.newValidationErrorWithNoLog("반품 지시를 찾을 수 없습니다. ID: " + rwaOrderId);
 		}
 
-		// 2. 모든 상세 항목이 처분 완료 상태인지 확인
-		String sql = "SELECT COUNT(*) FROM rwa_order_items WHERE rwa_order_id = :rwaOrderId " +
-				"AND domain_id = :domainId AND status != :status";
-		int incompleteCount = this.queryManager.selectBySql(sql,
-				ValueUtil.newMap("rwaOrderId,domainId,status",
-						rwaOrderId, rwaOrder.getDomainId(), WmsRwaConstants.STATUS_DISPOSED),
-				Integer.class);
+		String disposedBy = User.currentUser() != null ? User.currentUser().getId() : "system";
+		Date now = new Date();
 
-		if (incompleteCount > 0) {
-			throw ThrowUtil.newValidationErrorWithNoLog(
-					"모든 상세 항목이 처분 완료되지 않았습니다. 미완료 항목: " + incompleteCount);
+		for (Map<String, Object> decision : decisions) {
+			String itemId = (String) decision.get("item_id");
+			RwaOrderItem item = this.queryManager.select(RwaOrderItem.class, itemId);
+			if (item == null) continue;
+
+			@SuppressWarnings("unchecked")
+			Map<String, Object> goodDisp = (Map<String, Object>) decision.get("good_disposition");
+			@SuppressWarnings("unchecked")
+			Map<String, Object> defectDisp = (Map<String, Object>) decision.get("defect_disposition");
+
+			// 양품 처분
+			if (goodDisp != null && item.getGoodQty() != null && item.getGoodQty() > 0) {
+				RwaDisposition disp = buildDisposition(item, order, goodDisp, "GOOD",
+						item.getGoodQty(), disposedBy, now);
+				this.queryManager.insert(disp); // afterCreate()는 qty_type=GOOD이므로 item 자동업데이트 생략
+
+				if (Boolean.TRUE.equals(disp.getStockImpactFlag())) {
+					String txnId = this.processStockForDisposition(disp, item, order);
+					if (ValueUtil.isNotEmpty(txnId)) {
+						disp.setStockTxnId(txnId);
+						this.queryManager.update(disp, "stockTxnId");
+					}
+				}
+
+				// RESTOCK 유통기한 item 반영
+				if (WmsRwaConstants.DISPOSITION_TYPE_RESTOCK.equals(disp.getDispositionType())
+						&& ValueUtil.isNotEmpty(disp.getRestockExpiredDate())) {
+					item.setExpiredDate(disp.getRestockExpiredDate());
+				}
+			}
+
+			// 불량 처분
+			if (defectDisp != null && item.getDefectQty() != null && item.getDefectQty() > 0) {
+				RwaDisposition disp = buildDisposition(item, order, defectDisp, "DEFECT",
+						item.getDefectQty(), disposedBy, now);
+				this.queryManager.insert(disp);
+				// 불량 처분은 보통 SCRAP/REPAIR 등이므로 재고 처리 없음 (stockImpactFlag=false)
+			}
+
+			// item 상태 DISPOSED, disposition_type(양품 우선)
+			String primaryType = goodDisp != null ? (String) goodDisp.get("disposition_type")
+					: (defectDisp != null ? (String) defectDisp.get("disposition_type") : null);
+			item.setStatus(WmsRwaConstants.STATUS_DISPOSED);
+			if (ValueUtil.isNotEmpty(primaryType)) {
+				item.setDispositionType(primaryType);
+			}
+			this.queryManager.update(item, "status", "dispositionType", "expiredDate");
 		}
 
-		// 3. 재고 처리 (auto stock flag=false → 완료 시점에 일괄 처리)
+		// 주문 완료 처리
+		order.setStatus(WmsRwaConstants.STATUS_COMPLETED);
+		order.setRwaEndDate(DateUtil.todayStr());
+		this.queryManager.update(order, "status", "rwaEndDate");
+
+		String sql = "UPDATE rwa_order_items SET status = :status WHERE rwa_order_id = :rwaOrderId AND domain_id = :domainId";
+		this.queryManager.executeBySql(sql, ValueUtil.newMap(
+				"status,rwaOrderId,domainId",
+				WmsRwaConstants.STATUS_COMPLETED, rwaOrderId, order.getDomainId()));
+
+		return order;
+	}
+
+	/**
+	 * 처분 결정 Map → RwaDisposition 빌더
+	 */
+	@SuppressWarnings("unchecked")
+	private RwaDisposition buildDisposition(RwaOrderItem item, RwaOrder order,
+			Map<String, Object> dispMap, String qtyType, double qty, String disposedBy, Date now) {
+		RwaDisposition disp = new RwaDisposition();
+		disp.setDomainId(item.getDomainId());
+		disp.setRwaOrderItemId(item.getId());
+		disp.setQtyType(qtyType);
+		disp.setDispositionType((String) dispMap.get("disposition_type"));
+		disp.setDispositionQty(qty);
+		disp.setDisposedBy(disposedBy);
+		disp.setDisposedAt(now);
+
+		// 처분 유형별 필드 설정
+		switch (ValueUtil.toString(disp.getDispositionType())) {
+			case WmsRwaConstants.DISPOSITION_TYPE_RESTOCK:
+				disp.setRestockLocCd((String) dispMap.get("restock_loc_cd"));
+				disp.setRestockExpiredDate((String) dispMap.get("restock_expired_date"));
+				disp.setStockImpactFlag(true);
+				disp.setRestockAt(now);
+				break;
+			case WmsRwaConstants.DISPOSITION_TYPE_SCRAP:
+				disp.setScrapMethod((String) dispMap.get("scrap_method"));
+				disp.setStockImpactFlag(false);
+				disp.setScrapAt(now);
+				break;
+			case WmsRwaConstants.DISPOSITION_TYPE_REPAIR:
+				disp.setRepairStatus(WmsRwaConstants.REPAIR_STATUS_REQUESTED);
+				disp.setStockImpactFlag(false);
+				break;
+			case WmsRwaConstants.DISPOSITION_TYPE_RETURN_VENDOR:
+				disp.setStockImpactFlag(false);
+				disp.setReturnShippedAt(now);
+				break;
+			default:
+				disp.setStockImpactFlag(false);
+		}
+		return disp;
+	}
+
+	/********************************************************************************************************
+	 * 5. 반품 완료 (내부 자동 처리)
+	 ********************************************************************************************************/
+
+	/**
+	 * 반품 지시 자동 완료 처리
+	 *
+	 * 모든 아이템의 처분이 완료되면 updateRwaOrderStatus()에서 자동 호출.
+	 * 재고 처리 후 마스터 상태를 COMPLETED로, 전체 아이템도 COMPLETED로 전환.
+	 *
+	 * @param rwaOrder 반품 지시
+	 */
+	@Transactional
+	private void autoCompleteRwaOrder(RwaOrder rwaOrder) {
+		// 1. 재고 처리 (auto stock flag=false 인 경우 여기서 일괄 처리)
 		String autoFlag = this.runtimeConfSvc.getRuntimeConfigValue(
 				rwaOrder.getComCd(), rwaOrder.getWhCd(),
 				WmsRwaConfigConstants.RWA_DISPOSITION_AUTO_STOCK_FLAG);
 		boolean autoAtDisposition = ValueUtil.toBoolean(autoFlag, false);
 
 		if (!autoAtDisposition) {
-			List<RwaOrderItem> items = this.listRwaOrderItems(rwaOrderId);
+			List<RwaOrderItem> items = this.listRwaOrderItems(rwaOrder.getId());
 			for (RwaOrderItem item : items) {
 				RwaDisposition dispCond = new RwaDisposition();
 				dispCond.setDomainId(rwaOrder.getDomainId());
@@ -431,39 +809,16 @@ public class RwaTransactionService extends AbstractQueryService {
 			}
 		}
 
-		// 4. 완료 처리
+		// 2. 마스터 완료 처리
 		rwaOrder.setStatus(WmsRwaConstants.STATUS_COMPLETED);
 		rwaOrder.setRwaEndDate(DateUtil.todayStr());
 		this.queryManager.update(rwaOrder, "status", "rwaEndDate");
 
-		return rwaOrder;
-	}
-
-	/**
-	 * 반품 지시 마감 처리
-	 *
-	 * @param rwaOrderId 반품 지시 ID
-	 * @return 마감된 반품 지시
-	 */
-	@Transactional
-	public RwaOrder closeRwaOrder(String rwaOrderId) {
-		// 1. 반품 지시 조회
-		RwaOrder rwaOrder = this.queryManager.select(RwaOrder.class, rwaOrderId);
-		if (rwaOrder == null) {
-			throw ThrowUtil.newValidationErrorWithNoLog("반품 지시를 찾을 수 없습니다. ID: " + rwaOrderId);
-		}
-
-		// 2. 상태 검증
-		if (!WmsRwaConstants.STATUS_COMPLETED.equals(rwaOrder.getStatus())) {
-			throw ThrowUtil.newValidationErrorWithNoLog(
-					"마감 가능한 상태가 아닙니다. 현재 상태: " + rwaOrder.getStatus());
-		}
-
-		// 3. 마감 처리
-		rwaOrder.setStatus(WmsRwaConstants.STATUS_CLOSED);
-		this.queryManager.update(rwaOrder, "status");
-
-		return rwaOrder;
+		// 3. 전체 아이템도 COMPLETED로 전환
+		String sql = "UPDATE rwa_order_items SET status = :status WHERE rwa_order_id = :rwaOrderId AND domain_id = :domainId";
+		this.queryManager.executeBySql(sql, ValueUtil.newMap(
+				"status,rwaOrderId,domainId",
+				WmsRwaConstants.STATUS_COMPLETED, rwaOrder.getId(), rwaOrder.getDomainId()));
 	}
 
 	/**
@@ -494,14 +849,25 @@ public class RwaTransactionService extends AbstractQueryService {
 			inv.setLocCd(disposition.getRestockLocCd());
 			inv.setInvQty(disposition.getDispositionQty());
 			inv.setStatus(Inventory.STATUS_STORED);
-			inv.setLastTranCd(Inventory.TRANSACTION_RWA_RESTOCK);
+			inv.setLastTranCd(Inventory.TRANSACTION_IN);
+			inv.setRcvNo(order.getRwaNo());
 			inv.setLotNo(item.getLotNo());
-			inv.setExpiredDate(item.getExpiredDate());
+			// 소비기한: 처분 시 입력된 값 우선, 없으면 기존 아이템 소비기한 사용
+			String expiredDate = ValueUtil.isNotEmpty(disposition.getRestockExpiredDate())
+					? disposition.getRestockExpiredDate()
+					: item.getExpiredDate();
+			inv.setExpiredDate(expiredDate);
 			inv.setProdDate(item.getPrdDate());
 			inv.setRcvNo(order.getOrderNo());
 			inv.setRcvSeq(item.getRwaSeq());
 			inv.setRemarks("RWA 반품 재입고 - " + order.getRwaNo());
+			// beforeCreate()에서 입고 프로세스와 동일한 방식으로 바코드 자동 채번 (diy-generate-inv-barcode)
 			this.queryManager.insert(inv);
+
+			// rwa_order_items.barcode를 채번된 바코드로 업데이트
+			item.setBarcode(inv.getBarcode());
+			this.queryManager.update(item, "barcode");
+
 			return inv.getId();
 		}
 
@@ -667,39 +1033,64 @@ public class RwaTransactionService extends AbstractQueryService {
 		}
 
 		// 3. 상태 판정
-		String newStatus = rwaOrder.getStatus();
+		// 디테일 아이템 상태 진행 순서: APPROVED → RECEIVED → INSPECTED → DISPOSED → COMPLETED
+		// 마스터 상태 자동 전환 규칙:
+		//   일부 RECEIVED 이상 → RECEIVING
+		//   전체 RECEIVED 이상 → RECEIVED
+		//   일부 INSPECTED 이상 → INSPECTING
+		//   전체 INSPECTED 이상 → INSPECTED
+		//   일부 DISPOSED 이상 → DISPOSING
+		//   전체 DISPOSED 이상 → autoCompleteRwaOrder() (→ COMPLETED)
 
-		boolean allDisposed = true;
+		boolean allReceived = true;
+		boolean anyReceived = false;
 		boolean allInspected = true;
-		boolean anyReceiving = false;
-		boolean anyInspecting = false;
+		boolean anyInspected = false;
+		boolean allDisposed = true;
+		boolean anyDisposed = false;
 
 		for (Map<String, Object> statusCount : statusCounts) {
 			String status = (String) statusCount.get("status");
 
-			if (!WmsRwaConstants.STATUS_DISPOSED.equals(status)) {
-				allDisposed = false;
-			}
-			if (!WmsRwaConstants.STATUS_INSPECTED.equals(status) &&
-					!WmsRwaConstants.STATUS_DISPOSED.equals(status)) {
-				allInspected = false;
-			}
-			if (WmsRwaConstants.STATUS_RECEIVING.equals(status)) {
-				anyReceiving = true;
-			}
-			if (WmsRwaConstants.STATUS_INSPECTING.equals(status)) {
-				anyInspecting = true;
-			}
+			// RECEIVED 이상: RECEIVED, INSPECTED, DISPOSED, COMPLETED
+			boolean isReceivedOrAbove = WmsRwaConstants.STATUS_RECEIVED.equals(status)
+					|| WmsRwaConstants.STATUS_INSPECTED.equals(status)
+					|| WmsRwaConstants.STATUS_DISPOSED.equals(status)
+					|| WmsRwaConstants.STATUS_COMPLETED.equals(status);
+			if (!isReceivedOrAbove) allReceived = false;
+			if (isReceivedOrAbove) anyReceived = true;
+
+			// INSPECTED 이상: INSPECTED, DISPOSED, COMPLETED
+			boolean isInspectedOrAbove = WmsRwaConstants.STATUS_INSPECTED.equals(status)
+					|| WmsRwaConstants.STATUS_DISPOSED.equals(status)
+					|| WmsRwaConstants.STATUS_COMPLETED.equals(status);
+			if (!isInspectedOrAbove) allInspected = false;
+			if (isInspectedOrAbove) anyInspected = true;
+
+			// DISPOSED 이상: DISPOSED, COMPLETED
+			boolean isDisposedOrAbove = WmsRwaConstants.STATUS_DISPOSED.equals(status)
+					|| WmsRwaConstants.STATUS_COMPLETED.equals(status);
+			if (!isDisposedOrAbove) allDisposed = false;
+			if (isDisposedOrAbove) anyDisposed = true;
 		}
 
-		// 4. 상태 결정
+		// 4. 상태 결정 및 업데이트
 		if (allDisposed) {
-			newStatus = WmsRwaConstants.STATUS_DISPOSED;
+			// 전체 처분 완료 → 자동 완료 처리 (status=COMPLETED, 완료일 기록, 아이템 일괄 COMPLETED)
+			autoCompleteRwaOrder(rwaOrder);
+			return;
+		}
+
+		String newStatus = rwaOrder.getStatus();
+		if (anyDisposed) {
+			newStatus = WmsRwaConstants.STATUS_DISPOSING;
 		} else if (allInspected) {
 			newStatus = WmsRwaConstants.STATUS_INSPECTED;
-		} else if (anyInspecting) {
+		} else if (anyInspected) {
 			newStatus = WmsRwaConstants.STATUS_INSPECTING;
-		} else if (anyReceiving) {
+		} else if (allReceived) {
+			newStatus = WmsRwaConstants.STATUS_RECEIVED;
+		} else if (anyReceived) {
 			newStatus = WmsRwaConstants.STATUS_RECEIVING;
 		}
 
@@ -747,15 +1138,17 @@ public class RwaTransactionService extends AbstractQueryService {
 		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
 				sql, params, Map.class, 0, 0);
 
-		// 결과를 Map으로 변환
+		// 결과를 Map으로 변환 (신규 상태값 기준)
 		Map<String, Object> statusCounts = ValueUtil.newMap("REQUEST", 0);
 		statusCounts.put("APPROVED", 0);
 		statusCounts.put("RECEIVING", 0);
+		statusCounts.put("RECEIVED", 0);
 		statusCounts.put("INSPECTING", 0);
 		statusCounts.put("INSPECTED", 0);
-		statusCounts.put("DISPOSED", 0);
+		statusCounts.put("DISPOSING", 0);
 		statusCounts.put("COMPLETED", 0);
-		statusCounts.put("CLOSED", 0);
+		statusCounts.put("REJECTED", 0);
+		statusCounts.put("CANCELLED", 0);
 
 		for (Map<String, Object> row : results) {
 			String status = (String) row.get("status");
@@ -884,4 +1277,5 @@ public class RwaTransactionService extends AbstractQueryService {
 
 		return alerts;
 	}
+
 }

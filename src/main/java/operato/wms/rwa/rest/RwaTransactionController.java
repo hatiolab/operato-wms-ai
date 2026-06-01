@@ -31,13 +31,16 @@ import xyz.elidom.util.ValueUtil;
  * RWA(Return Warehouse Authorization) 트랜잭션 처리 REST API Controller
  *
  * 반품 프로세스:
- * 1. POST /rwa_orders - 반품 지시 생성
- * 2. POST /rwa_orders/{id}/approve - 반품 승인
- * 3. POST /rwa_orders/{id}/items/{itemId}/receive - 반품 입고
- * 4. POST /rwa_orders/{id}/items/{itemId}/inspect - 반품 검수
- * 5. POST /rwa_orders/{id}/items/{itemId}/dispose - 반품 처분
- * 6. POST /rwa_orders/{id}/complete - 반품 완료
- * 7. POST /rwa_orders/{id}/close - 반품 마감
+ * 1. POST /rwa_orders - 반품 지시 생성 (→ REQUEST, rwa_req_no 자동 채번)
+ * 2. POST /rwa_orders/{id}/approve - 반품 승인 (→ APPROVED, rwa_no 자동 채번)
+ * 3. POST /rwa_orders/{id}/reject - 반품 거부 (→ REJECTED, 승인 전 단계에서만)
+ * 4. POST /rwa_orders/{id}/cancel - 반품 취소 (→ CANCELLED, 완료 전 어느 단계에서든)
+ * 5. POST /rwa_orders/{id}/items/{itemId}/receive - 반품 입고 (→ 아이템 RECEIVED, 마스터 RECEIVING/RECEIVED 자동 전환)
+ * 6. POST /rwa_orders/{id}/items/{itemId}/inspect - 검수 데이터 저장
+ * 7. POST /rwa_orders/{id}/items/{itemId}/complete_inspection - 검수 완료 (→ 아이템 INSPECTED, 바코드 배치 채번)
+ * 8. POST /rwa_orders/{id}/items/{itemId}/dispose - 처분 완료 (→ 아이템 DISPOSED, 마스터 DISPOSING→COMPLETED 자동 전환)
+ *
+ * 완료(COMPLETED) 전환은 모든 아이템이 DISPOSED 상태일 때 자동으로 처리됨.
  *
  * @author HatioLab
  */
@@ -225,36 +228,63 @@ public class RwaTransactionController extends AbstractRestService {
 		return this.rwaService.disposeRwaItem(itemId, disposition);
 	}
 
+	/**
+	 * 반품 처분 일괄 완료 (양품/불량 분리 처분 + 반품 완료)
+	 *
+	 * POST /rest/rwa_trx/rwa_orders/{id}/finalize
+	 *
+	 * "반품 완료" 버튼 클릭 시 호출. 각 아이템의 양품/불량 처분을 한 번에 처리하고 주문을 완료 상태로 전환.
+	 *
+	 * 요청 바디:
+	 * {
+	 *   "decisions": [
+	 *     {
+	 *       "item_id": "...",
+	 *       "good_disposition": { "disposition_type": "RESTOCK", "restock_loc_cd": "A-01", "restock_expired_date": "2026-12-31" },
+	 *       "defect_disposition": { "disposition_type": "SCRAP", "scrap_method": "INCINERATION" }
+	 *     }
+	 *   ]
+	 * }
+	 *
+	 * @param id     반품 지시 ID
+	 * @param params decisions 배열 포함 payload
+	 * @return 완료된 반품 지시
+	 */
+	@PostMapping("/rwa_orders/{id}/finalize")
+	@ApiDesc(description = "Finalize RWA Order with dispositions (good/defect split)")
+	public RwaOrder finalizeOrderWithDispositions(
+			@PathVariable("id") String id,
+			@RequestBody Map<String, Object> params) {
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> decisions = (List<Map<String, Object>>) params.get("decisions");
+		if (decisions == null || decisions.isEmpty()) {
+			throw new xyz.elidom.exception.server.ElidomValidationException("처분 결정 목록이 없습니다.");
+		}
+		return this.rwaService.finalizeOrderWithDispositions(id, decisions);
+	}
+
 	/********************************************************************************************************
 	 * 5. 반품 완료 및 마감
 	 ********************************************************************************************************/
 
 	/**
-	 * 반품 지시 완료 처리
+	 * 반품 지시 취소 처리
 	 *
-	 * POST /rest/rwa_trx/rwa_orders/{id}/complete
+	 * POST /rest/rwa_trx/rwa_orders/{id}/cancel
 	 *
-	 * @param id 반품 지시 ID
-	 * @return 완료된 반품 지시
+	 * 완료(COMPLETED), 거부(REJECTED), 취소(CANCELLED) 상태를 제외한 모든 단계에서 취소 가능.
+	 *
+	 * @param id     반품 지시 ID
+	 * @param params { cancelReason: "취소 사유" }
+	 * @return 취소된 반품 지시
 	 */
-	@PostMapping("/rwa_orders/{id}/complete")
-	@ApiDesc(description = "Complete RWA Order")
-	public RwaOrder completeRwaOrder(@PathVariable("id") String id) {
-		return this.rwaService.completeRwaOrder(id);
-	}
-
-	/**
-	 * 반품 지시 마감 처리
-	 *
-	 * POST /rest/rwa_trx/rwa_orders/{id}/close")
-	 *
-	 * @param id 반품 지시 ID
-	 * @return 마감된 반품 지시
-	 */
-	@PostMapping("/rwa_orders/{id}/close")
-	@ApiDesc(description = "Close RWA Order")
-	public RwaOrder closeRwaOrder(@PathVariable("id") String id) {
-		return this.rwaService.closeRwaOrder(id);
+	@PostMapping("/rwa_orders/{id}/cancel")
+	@ApiDesc(description = "Cancel RWA Order")
+	public RwaOrder cancelRwaOrder(
+			@PathVariable("id") String id,
+			@RequestBody(required = false) Map<String, Object> params) {
+		String cancelReason = params != null ? (String) params.get("cancelReason") : null;
+		return this.rwaService.cancelRwaOrder(id, cancelReason);
 	}
 
 	/********************************************************************************************************

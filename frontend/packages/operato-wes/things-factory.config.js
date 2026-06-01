@@ -40,6 +40,7 @@ export default {
     { tagname: 'rwa-inspection-work', page: 'rwa-inspection-work' },
     { tagname: 'rwa-disposition-list', page: 'rwa-disposition-list' },
     { tagname: 'rwa-disposition-work', page: 'rwa-disposition-work' },
+    { tagname: 'rwa-work', page: 'rwa-work' },
     { tagname: 'rwa-result-dashboard', page: 'rwa-result-dashboard' },
     { tagname: 'rwa-quality-analysis', page: 'rwa-quality-analysis' },
 

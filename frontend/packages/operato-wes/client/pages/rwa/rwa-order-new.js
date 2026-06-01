@@ -418,8 +418,6 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
       custNm: '',
       orderNo: '',
       rwaReqDate: today,
-      returnReason: '',
-      returnReasonDesc: '',
       inspFlag: true,
       qcFlag: false,
       remarks: ''
@@ -434,7 +432,6 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
     super.connectedCallback()
     this._fetchCompanies()
     this._fetchWarehouses()
-    this._fetchCustomers()
   }
 
   get context() {
@@ -523,7 +520,7 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
 
         <div class="form-field">
           <label>화주사 <span class="required">*</span></label>
-          <select @change="${e => this._updateOrder('comCd', e.target.value)}">
+          <select @change="${e => this._onCompanySelect(e.target.value)}">
             <option value="">-- 화주사 선택 --</option>
             ${this.companies.map(
       c => html`
@@ -568,33 +565,7 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
           <input type="text" placeholder="원 주문번호" .value="${this.rwaOrder.orderNo}" @input="${e => this._updateOrder('orderNo', e.target.value)}" />
         </div>
 
-        <div class="form-field">
-          <label>반품 사유</label>
-          <select .value="${this.rwaOrder.returnReason}" @change="${e => this._updateOrder('returnReason', e.target.value)}">
-            <option value="">선택</option>
-            <option value="DEFECT">상품 하자</option>
-            <option value="WRONG_ITEM">오배송</option>
-            <option value="CUSTOMER_CHANGE">고객 변심</option>
-            <option value="DAMAGED">파손</option>
-            <option value="EXPIRED">유통기한</option>
-            <option value="OTHER">기타</option>
-          </select>
-        </div>
-
-        <div class="form-field full-width">
-          <label>상세 사유</label>
-          <textarea placeholder="반품 사유를 상세히 입력하세요" .value="${this.rwaOrder.returnReasonDesc}" @input="${e => this._updateOrder('returnReasonDesc', e.target.value)}"></textarea>
-        </div>
-
-        <div class="form-field checkbox-field">
-          <input type="checkbox" id="inspFlag" .checked="${this.rwaOrder.inspFlag}" @change="${e => this._updateOrder('inspFlag', e.target.checked)}" />
-          <label for="inspFlag">검수 필요</label>
-        </div>
-
-        <div class="form-field checkbox-field">
-          <input type="checkbox" id="qcFlag" .checked="${this.rwaOrder.qcFlag}" @change="${e => this._updateOrder('qcFlag', e.target.checked)}" />
-          <label for="qcFlag">품질검사 필요</label>
-        </div>
+        <!-- 검수 필요 / 품질검사 필요 체크박스: 미사용으로 숨김 처리 (추후 활성화 예정) -->
 
         <div class="form-field full-width">
           <label>비고</label>
@@ -741,15 +712,29 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
     }
   }
 
-  /** 화주사 목록 조회 */
+  /** 화주사 목록 조회 (del_flag=false 인 활성 화주사만 조회, 1개면 자동 선택) */
   async _fetchCompanies() {
     try {
-      const data = await ServiceUtil.searchByPagination('companies', [], null, 1, 100)
+      const data = await ServiceUtil.searchByPagination('companies', [{ name: 'del_flag', value: false }], null, 1, 100)
       this.companies = data?.items || []
+      if (this.companies.length === 1) {
+        const comCd = this.companies[0].com_cd
+        this.rwaOrder = { ...this.rwaOrder, comCd }
+        this._fetchCustomers(comCd)
+      }
     } catch (err) {
       console.error('화주사 목록 조회 실패:', err)
       this.companies = []
     }
+  }
+
+  /**
+   * 화주사 선택 시 comCd 업데이트 + 거래처 목록 재조회
+   */
+  _onCompanySelect(comCd) {
+    this.rwaOrder = { ...this.rwaOrder, comCd, custCd: '', custNm: '' }
+    this.customers = []
+    if (comCd) this._fetchCustomers(comCd)
   }
 
   /** 창고 목록 조회 */
@@ -763,10 +748,14 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
     }
   }
 
-  /** 거래처 목록 조회 */
-  async _fetchCustomers() {
+  /** 거래처 목록 조회 (선택한 화주사의 거래처만 조회) */
+  async _fetchCustomers(comCd) {
+    if (!comCd) {
+      this.customers = []
+      return
+    }
     try {
-      const data = await ServiceUtil.searchByPagination('customers', [], null, 1, 100)
+      const data = await ServiceUtil.searchByPagination('customers', [{ name: 'com_cd', value: comCd }], null, 1, 100)
       this.customers = data?.items || []
     } catch (err) {
       console.error('거래처 목록 조회 실패:', err)
@@ -886,7 +875,7 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
       })
 
       if (result) {
-        UiUtil.showToast('success', `반품 요청이 생성되었습니다 (${result.rwaNo || ''})`)
+        UiUtil.showToast('success', `반품 요청이 생성되었습니다 (${result.rwa_req_no || ''})`)
         this.dispatchEvent(
           new CustomEvent('order-created', {
             composed: true,
@@ -950,11 +939,7 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
    * 팝업 닫기
    */
   _close() {
-    // 팝업 컨테이너 닫기
-    const popup = this.closest('.popup-layer') || this.closest('[popup]')
-    if (popup) {
-      popup.close?.()
-    }
+    UiUtil.closePopupBy(this)
   }
 }
 

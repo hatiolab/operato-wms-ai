@@ -16,10 +16,11 @@ import xyz.elidom.util.ValueUtil;
  * 반품 항목의 최종 처분 결정 및 재고 처리 기록
  * - 처분 유형: RESTOCK, SCRAP, REPAIR, RETURN_VENDOR, DONATION
  * - 재고 영향: RESTOCK(+), SCRAP(없음), REPAIR(보류→+), RETURN_VENDOR(없음), DONATION(-)
- * - rwa_order_item_id는 UNIQUE (1:1 관계)
+ * - qty_type: ALL(기존 1:1), GOOD(양품 처분), DEFECT(불량 처분)
+ * - UNIQUE: (rwa_order_item_id, domain_id, qty_type)
  */
-@Table(name = "rwa_dispositions", idStrategy = GenerationRule.UUID, uniqueFields="rwaOrderItemId,domainId", indexes = {
-	@Index(name = "ix_rwa_dispositions_0", columnList = "rwa_order_item_id,domain_id", unique = true),
+@Table(name = "rwa_dispositions", idStrategy = GenerationRule.UUID, uniqueFields="rwaOrderItemId,domainId,qtyType", indexes = {
+	@Index(name = "ix_rwa_dispositions_0", columnList = "rwa_order_item_id,domain_id,qty_type", unique = true),
 	@Index(name = "ix_rwa_dispositions_1", columnList = "disposition_type,domain_id"),
 	@Index(name = "ix_rwa_dispositions_2", columnList = "disposed_at,domain_id"),
 	@Index(name = "ix_rwa_dispositions_3", columnList = "stock_txn_id,domain_id"),
@@ -37,10 +38,18 @@ public class RwaDisposition extends xyz.elidom.orm.entity.basic.ElidomStampHook 
 	private String id;
 
 	/**
-	 * 반품 상세 ID (FK → rwa_order_items.id, UNIQUE 1:1 관계)
+	 * 반품 상세 ID (FK → rwa_order_items.id)
 	 */
 	@Column(name = "rwa_order_item_id", nullable = false, length = 40)
 	private String rwaOrderItemId;
+
+	/**
+	 * 수량 유형 (ALL: 전체, GOOD: 양품만, DEFECT: 불량만)
+	 * - ALL: 기존 1건 처분 방식 (하위 호환)
+	 * - GOOD + DEFECT: 양품/불량 분리 처분 방식 (/finalize 엔드포인트)
+	 */
+	@Column(name = "qty_type", nullable = false, length = 10)
+	private String qtyType = "ALL";
 
 	/**
 	 * 처분 유형 (RESTOCK/SCRAP/REPAIR/RETURN_VENDOR/DONATION)
@@ -157,6 +166,13 @@ public class RwaDisposition extends xyz.elidom.orm.entity.basic.ElidomStampHook 
 	private java.util.Date disposedAt;
 
 	/**
+	 * 재입고 소비기한 (RESTOCK 처분 시 입력, YYYY-MM-DD)
+	 * 검수 완료 후 재입고 처분 시 재고의 소비기한을 변경/설정할 때 사용
+	 */
+	@Column(name = "restock_expired_date", length = 10)
+	private String restockExpiredDate;
+
+	/**
 	 * 처분 사유
 	 */
 	@Column(name = "disposition_reason", length = 500)
@@ -200,6 +216,14 @@ public class RwaDisposition extends xyz.elidom.orm.entity.basic.ElidomStampHook 
 
 	public void setRwaOrderItemId(String rwaOrderItemId) {
 		this.rwaOrderItemId = rwaOrderItemId;
+	}
+
+	public String getQtyType() {
+		return qtyType;
+	}
+
+	public void setQtyType(String qtyType) {
+		this.qtyType = qtyType;
 	}
 
 	public String getDispositionType() {
@@ -354,6 +378,14 @@ public class RwaDisposition extends xyz.elidom.orm.entity.basic.ElidomStampHook 
 		this.disposedAt = disposedAt;
 	}
 
+	public String getRestockExpiredDate() {
+		return restockExpiredDate;
+	}
+
+	public void setRestockExpiredDate(String restockExpiredDate) {
+		this.restockExpiredDate = restockExpiredDate;
+	}
+
 	public String getDispositionReason() {
 		return dispositionReason;
 	}
@@ -436,7 +468,12 @@ public class RwaDisposition extends xyz.elidom.orm.entity.basic.ElidomStampHook 
 	public void afterCreate() {
 		super.afterCreate();
 
-		// 처분 완료 후 rwa_order_items의 disposition_type, disposed_qty 자동 업데이트
+		// qty_type이 GOOD/DEFECT인 경우 → /finalize 플로우에서 직접 관리하므로 자동 업데이트 생략
+		if ("GOOD".equals(this.qtyType) || "DEFECT".equals(this.qtyType)) {
+			return;
+		}
+
+		// 처분 완료 후 rwa_order_items의 disposition_type, disposed_qty 자동 업데이트 (ALL 또는 기존 플로우)
 		if (ValueUtil.isNotEmpty(this.rwaOrderItemId)) {
 			IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
 			RwaOrderItem item = queryMgr.select(RwaOrderItem.class, this.rwaOrderItemId);
@@ -445,6 +482,12 @@ public class RwaDisposition extends xyz.elidom.orm.entity.basic.ElidomStampHook 
 				item.setDispositionType(this.dispositionType);
 				item.setDisposedQty(this.dispositionQty);
 				item.setStatus(WmsRwaConstants.STATUS_DISPOSED);
+
+				// 정상입고(RESTOCK) 처분 시 유통기한을 rwa_order_items에 반영
+				if (WmsRwaConstants.DISPOSITION_TYPE_RESTOCK.equals(this.dispositionType)
+						&& xyz.elidom.util.ValueUtil.isNotEmpty(this.restockExpiredDate)) {
+					item.setExpiredDate(this.restockExpiredDate);
+				}
 
 				queryMgr.update(item);
 			}

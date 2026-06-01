@@ -33,6 +33,13 @@ public class WmsRwaConfigConstants {
 	public static final String RWA_TEMP_LOCATION = "rwa.temp.location";
 
 	/**
+	 * 반품 불량 보관 로케이션
+	 * - 검수 완료 시 불량품 배치 바코드를 부여하고 이동할 로케이션
+	 * - 기본값: DEFECT (없으면 임시 로케이션과 동일)
+	 */
+	public static final String RWA_DEFECT_LOCATION = "rwa.defect.location";
+
+	/**
 	 * 반품 재입고(RESTOCK) 시 기본 로케이션 전략
 	 * - ORIGINAL: 원래 로케이션으로 복원
 	 * - OPTIMAL: 최적 로케이션 자동 할당

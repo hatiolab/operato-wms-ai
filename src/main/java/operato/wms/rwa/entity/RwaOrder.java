@@ -9,21 +9,23 @@ import xyz.elidom.dbist.annotation.GenerationRule;
 import xyz.elidom.dbist.annotation.Index;
 import xyz.elidom.dbist.annotation.PrimaryKey;
 import xyz.elidom.dbist.annotation.Table;
+import xyz.elidom.dev.entity.RangedSeq;
+import xyz.elidom.sys.SysConstants;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.util.BeanUtil;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
+import org.apache.commons.lang.StringUtils;
 
 /**
  * RWA(Return Warehouse Authorization) 반품 지시 헤더 Entity
  *
  * 반품 지시의 헤더 정보를 관리
- * - 반품 유형: CUSTOMER_RETURN, VENDOR_RETURN, DEFECT_RETURN, STOCK_ADJUST,
- * EXPIRED_RETURN
- * - 상태: REQUEST, APPROVED, RECEIVING, INSPECTING, INSPECTED, DISPOSED,
- * COMPLETED, CLOSED, REJECTED, CANCELLED
+ * - 반품 유형: CUSTOMER_RETURN, VENDOR_RETURN, DEFECT_RETURN, STOCK_ADJUST, EXPIRED_RETURN
+ * - 상태: REQUEST, APPROVED, RECEIVING, RECEIVED, INSPECTING, INSPECTED, DISPOSING, COMPLETED, REJECTED, CANCELLED
+ * - 번호 채번: 생성 시 rwa_req_no (반품요청번호), 승인 시 rwa_no (반품번호)
  */
-@Table(name = "rwa_orders", idStrategy = GenerationRule.UUID, uniqueFields = "rwaNo,domainId", indexes = {
+@Table(name = "rwa_orders", idStrategy = GenerationRule.UUID, uniqueFields = "rwaReqNo,domainId", indexes = {
 		@Index(name = "ix_rwa_orders_0", columnList = "rwa_no,domain_id", unique = true),
 		@Index(name = "ix_rwa_orders_1", columnList = "com_cd,domain_id"),
 		@Index(name = "ix_rwa_orders_2", columnList = "wh_cd,domain_id"),
@@ -46,13 +48,15 @@ public class RwaOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String id;
 
 	/**
-	 * 반품 번호 (UNIQUE, 자동 채번: RWA-YYYYMMDD-XXXXX)
+	 * 반품 번호 (UNIQUE, 승인 시 자동 채번: RWA-YYMMDD-XXXXX)
+	 * - 반품 요청이 승인될 때 창고 처리 번호로 부여
 	 */
-	@Column(name = "rwa_no", nullable = false, length = 30)
+	@Column(name = "rwa_no", length = 30)
 	private String rwaNo;
 
 	/**
-	 * 반품 요청 번호 (외부 시스템 연동용)
+	 * 반품 요청 번호 (UNIQUE, 생성 시 자동 채번: RWRQ-YYMMDD-XXXXX)
+	 * - 반품 주문 등록 시 즉시 부여되는 요청 식별 번호
 	 */
 	@Column(name = "rwa_req_no", length = 30)
 	private String rwaReqNo;
@@ -566,10 +570,12 @@ public class RwaOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 			this.status = WmsRwaConstants.STATUS_REQUEST;
 		}
 
-		// 반품 번호 자동 채번 (RWA-YYYYMMDD-XXXXX)
-		if (ValueUtil.isEmpty(this.rwaNo)) {
-			this.rwaNo = (String) BeanUtil.get(ICustomService.class).doCustomService(Domain.currentDomainId(),
-					"diy-generate-rwa-no", new HashMap<String, Object>());
+		// 반품 요청 번호 자동 채번 (RWRQ-YYMMDD-XXXXX) — 생성 시 부여
+		if (ValueUtil.isEmpty(this.rwaReqNo)) {
+			String dateStr = DateUtil.todayStr("yyMMdd");
+			Integer seq = RangedSeq.increaseSequence(Domain.currentDomainId(), "RWA_REQ_NO", "RWA_REQ_NO", "DATE", dateStr, null, null);
+			String serialNo = StringUtils.leftPad(String.valueOf(seq), 5, "0");
+			this.rwaReqNo = "RWRQ" + Domain.currentDomainId() + SysConstants.DASH + dateStr + SysConstants.DASH + serialNo;
 		}
 
 		// 반품 요청일이 없는 경우 당일 날짜 설정

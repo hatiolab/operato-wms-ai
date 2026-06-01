@@ -371,72 +371,6 @@ class RwaInspectionWork extends localize(i18next)(PageView) {
           flex: 1;
         }
 
-        /* 사진 첨부 */
-        .photo-actions {
-          display: flex;
-          gap: 8px;
-          margin-bottom: 8px;
-        }
-
-        .photo-upload {
-          border: 2px dashed var(--md-sys-color-outline, #ccc);
-          border-radius: 8px;
-          padding: 16px 12px;
-          text-align: center;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .photo-upload.camera,
-        .photo-upload.gallery {
-          flex: 1;
-          font-size: 14px;
-          font-weight: 600;
-        }
-
-        .photo-upload.camera {
-          background: #E3F2FD;
-          border-color: #90CAF9;
-          color: #1565C0;
-        }
-
-        .photo-upload.gallery {
-          background: #F3E5F5;
-          border-color: #CE93D8;
-          color: #6A1B9A;
-        }
-
-        .photo-upload.camera:active,
-        .photo-upload.gallery:active {
-          transform: scale(0.98);
-        }
-
-        .photo-upload input[type="file"] {
-          display: none;
-        }
-
-        .photo-preview {
-          margin-top: 12px;
-        }
-
-        .photo-preview img {
-          max-width: 300px;
-          max-height: 300px;
-          border-radius: 8px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        }
-
-        .photo-remove {
-          margin-top: 8px;
-          padding: 6px 12px;
-          background: #F44336;
-          color: #fff;
-          border: none;
-          border-radius: 4px;
-          font-size: 12px;
-          cursor: pointer;
-        }
-
         /* 하단 액션 버튼 */
         .action-buttons {
           display: flex;
@@ -570,8 +504,6 @@ class RwaInspectionWork extends localize(i18next)(PageView) {
       defectQty: Number,
       defectType: String,
       defectDesc: String,
-      photoFile: Object,
-      photoPreview: String,
       remarks: String,
       feedbackMsg: String,
       feedbackType: String
@@ -591,8 +523,6 @@ class RwaInspectionWork extends localize(i18next)(PageView) {
     this.defectQty = 0
     this.defectType = ''
     this.defectDesc = ''
-    this.photoFile = null
-    this.photoPreview = null
     this.remarks = ''
     this.feedbackMsg = ''
     this.feedbackType = ''
@@ -829,41 +759,6 @@ class RwaInspectionWork extends localize(i18next)(PageView) {
             `
           : ''}
 
-        <!-- 사진 첨부 -->
-        <div class="form-group">
-          <label>사진 첨부 (선택)</label>
-          <div class="photo-actions">
-            <div class="photo-upload camera" @click="${this._openCamera}">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                @change="${this._onPhotoSelect}"
-                id="cameraInput"
-              />
-              <span>📷 카메라 촬영</span>
-            </div>
-            <div class="photo-upload gallery" @click="${this._openGallery}">
-              <input
-                type="file"
-                accept="image/*"
-                @change="${this._onPhotoSelect}"
-                id="galleryInput"
-              />
-              <span>🖼️ 갤러리 선택</span>
-            </div>
-          </div>
-          ${this.photoPreview
-            ? html`
-                <div class="photo-preview">
-                  <img src="${this.photoPreview}" alt="검수 사진" />
-                  <br />
-                  <button class="photo-remove" @click="${this._removePhoto}">사진 삭제</button>
-                </div>
-              `
-            : ''}
-        </div>
-
         <!-- 비고 -->
         <div class="form-group">
           <label>비고</label>
@@ -992,52 +887,7 @@ class RwaInspectionWork extends localize(i18next)(PageView) {
     this.defectQty = 0
     this.defectType = ''
     this.defectDesc = ''
-    this.photoFile = null
-    this.photoPreview = null
     this.remarks = ''
-  }
-
-  _openCamera() {
-    const input = this.shadowRoot.querySelector('#cameraInput')
-    if (input) input.click()
-  }
-
-  _openGallery() {
-    const input = this.shadowRoot.querySelector('#galleryInput')
-    if (input) input.click()
-  }
-
-  _onPhotoSelect(e) {
-    const file = e.target.files[0]
-    if (!file || !file.type.startsWith('image/')) {
-      UiUtil.showToast('error', '이미지 파일만 첨부 가능합니다')
-      return
-    }
-
-    // 5MB 제한
-    if (file.size > 5 * 1024 * 1024) {
-      UiUtil.showToast('error', '파일 크기는 5MB 이하만 가능합니다')
-      return
-    }
-
-    this.photoFile = file
-
-    // 미리보기
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      this.photoPreview = event.target.result
-    }
-    reader.readAsDataURL(file)
-  }
-
-  _removePhoto() {
-    this.photoFile = null
-    this.photoPreview = null
-
-    const cameraInput = this.shadowRoot.querySelector('#cameraInput')
-    if (cameraInput) cameraInput.value = ''
-    const galleryInput = this.shadowRoot.querySelector('#galleryInput')
-    if (galleryInput) galleryInput.value = ''
   }
 
   async _completeInspection() {
@@ -1055,23 +905,17 @@ class RwaInspectionWork extends localize(i18next)(PageView) {
     }
 
     try {
-      // 사진 Base64 변환
-      let photoUrl = null
-      if (this.photoFile) {
-        photoUrl = await this._convertPhotoToBase64(this.photoFile)
-      }
-
       // 검수 API 호출
       await ServiceUtil.restPost(
         `rwa_trx/rwa_orders/${this.selectedOrder.id}/items/${item.id}/inspect`,
         {
-          inspType: 'VISUAL',
-          inspQty: (this.goodQty || 0) + (this.defectQty || 0),
-          goodQty: this.goodQty || 0,
-          defectQty: this.defectQty || 0,
-          defectType: this.defectType || null,
-          defectDesc: this.defectDesc || null,
-          photoUrl: photoUrl,
+          insp_type: 'VISUAL',
+          insp_qty: (this.goodQty || 0) + (this.defectQty || 0),
+          good_qty: this.goodQty || 0,
+          defect_qty: this.defectQty || 0,
+          defect_type: this.defectType || null,
+          defect_desc: this.defectDesc || null,
+          photo_url: null,
           remarks: this.remarks || null
         }
       )
@@ -1088,15 +932,6 @@ class RwaInspectionWork extends localize(i18next)(PageView) {
       console.error('검수 처리 실패:', err)
       UiUtil.showToast('error', err.message || '검수 처리 실패')
     }
-  }
-
-  async _convertPhotoToBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result)
-      reader.onerror = reject
-      reader.readAsDataURL(file)
-    })
   }
 
   _skipItem() {

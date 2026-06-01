@@ -20,42 +20,48 @@ public class WmsRwaConstants {
 	public static final String STATUS_APPROVED = "APPROVED";
 
 	/**
-	 * 상태: 입고 중
+	 * 상태: 입고 중 (일부 아이템 입고 완료)
 	 */
 	public static final String STATUS_RECEIVING = "RECEIVING";
 
 	/**
-	 * 상태: 검수 중
+	 * 상태: 입고 완료 (전체 아이템 입고 완료)
+	 */
+	public static final String STATUS_RECEIVED = "RECEIVED";
+
+	/**
+	 * 상태: 검수 중 (일부 아이템 검수 완료)
 	 */
 	public static final String STATUS_INSPECTING = "INSPECTING";
 
 	/**
-	 * 상태: 검수 완료
+	 * 상태: 검수 완료 (전체 아이템 검수 완료)
 	 */
 	public static final String STATUS_INSPECTED = "INSPECTED";
 
 	/**
-	 * 상태: 처분 완료
+	 * 상태: 처리 중 (일부 아이템 처분 완료)
+	 */
+	public static final String STATUS_DISPOSING = "DISPOSING";
+
+	/**
+	 * 상태: 처분 완료 (아이템 레벨에서만 사용 — 개별 아이템이 처분됨)
+	 * 마스터 상태에서는 사용하지 않음. 모든 아이템이 DISPOSED → 마스터 자동 COMPLETED 전환
 	 */
 	public static final String STATUS_DISPOSED = "DISPOSED";
 
 	/**
-	 * 상태: 완료
+	 * 상태: 완료 (전체 아이템 처분 완료 — 자동 전환)
 	 */
 	public static final String STATUS_COMPLETED = "COMPLETED";
 
 	/**
-	 * 상태: 마감
-	 */
-	public static final String STATUS_CLOSED = "CLOSED";
-
-	/**
-	 * 상태: 거부됨
+	 * 상태: 거부됨 (승인 단계에서만 가능)
 	 */
 	public static final String STATUS_REJECTED = "REJECTED";
 
 	/**
-	 * 상태: 취소됨
+	 * 상태: 취소됨 (완료 전 어느 단계에서든 가능)
 	 */
 	public static final String STATUS_CANCELLED = "CANCELLED";
 

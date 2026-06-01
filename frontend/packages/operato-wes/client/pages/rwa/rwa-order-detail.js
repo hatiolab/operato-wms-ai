@@ -534,20 +534,20 @@ class RwaOrderDetail extends localize(i18next)(LitElement) {
     `
   }
 
+  /** 상태별 액션 버튼 렌더링 */
   _renderActionButtons() {
     const s = this.rwaOrder?.status
+    // 취소 불가 상태: 완료/거부/취소
+    const canCancel = s && !['COMPLETED', 'REJECTED', 'CANCELLED'].includes(s)
     return html`
       ${s === 'REQUEST'
         ? html`
-            <button class="action-btn primary" ?disabled="${this.actionLoading}" @click="${this._approveOrder}">승인</button>
-            <button class="action-btn danger" ?disabled="${this.actionLoading}" @click="${this._rejectOrder}">거부</button>
+            <button class="action-btn primary" ?disabled="${this.actionLoading}" @click="${this._approveOrder}">${TermsUtil.tButton('approve')}</button>
+            <button class="action-btn danger" ?disabled="${this.actionLoading}" @click="${this._rejectOrder}">${TermsUtil.tButton('reject')}</button>
           `
         : ''}
-      ${s === 'INSPECTED' || s === 'DISPOSED'
-        ? html`<button class="action-btn primary" ?disabled="${this.actionLoading}" @click="${this._completeOrder}">완료</button>`
-        : ''}
-      ${s === 'COMPLETED'
-        ? html`<button class="action-btn secondary" ?disabled="${this.actionLoading}" @click="${this._closeOrder}">마감</button>`
+      ${canCancel
+        ? html`<button class="action-btn secondary" ?disabled="${this.actionLoading}" @click="${this._cancelOrder}">${TermsUtil.tButton('cancel')}</button>`
         : ''}
     `
   }
@@ -861,10 +861,8 @@ class RwaOrderDetail extends localize(i18next)(LitElement) {
    * 액션
    * ============================================================ */
 
+  /** 반품 승인 처리 (확인 팝업 없이 즉시 처리) */
   async _approveOrder() {
-    const result = await UiUtil.showAlertPopup('title.confirm', '반품 요청을 승인하시겠습니까?', 'question', 'confirm', 'cancel')
-    if (!result.confirmButton) return
-
     this.actionLoading = true
     try {
       await ServiceUtil.restPost(`rwa_trx/rwa_orders/${this.rwaOrderId}/approve`, { approvedBy: '' })
@@ -906,37 +904,28 @@ class RwaOrderDetail extends localize(i18next)(LitElement) {
     }
   }
 
-  async _completeOrder() {
-    const result = await UiUtil.showAlertPopup('title.confirm', '반품을 완료 처리하시겠습니까?', 'question', 'confirm', 'cancel')
+  /** 반품 취소 처리 (취소 사유 입력 후 처리) */
+  async _cancelOrder() {
+    const result = await OxPrompt.open({
+      title: '취소 사유',
+      text: '취소 사유를 입력해주세요 (선택)',
+      type: 'prompt',
+      confirmButton: { text: '확인' },
+      cancelButton: { text: '닫기' }
+    })
     if (!result.confirmButton) return
 
     this.actionLoading = true
     try {
-      await ServiceUtil.restPost(`rwa_trx/rwa_orders/${this.rwaOrderId}/complete`, {})
-      UiUtil.showToast('success', '반품이 완료 처리되었습니다')
+      await ServiceUtil.restPost(`rwa_trx/rwa_orders/${this.rwaOrderId}/cancel`, {
+        cancelReason: result.text || ''
+      })
+      UiUtil.showToast('success', '반품이 취소되었습니다')
       await this._fetchOrderData()
       this._dispatchOrderUpdated()
     } catch (error) {
-      console.error('반품 완료 실패:', error)
-      UiUtil.showToast('error', error.message || '반품 완료에 실패했습니다')
-    } finally {
-      this.actionLoading = false
-    }
-  }
-
-  async _closeOrder() {
-    const result = await UiUtil.showAlertPopup('title.confirm', '반품을 마감 처리하시겠습니까?', 'question', 'confirm', 'cancel')
-    if (!result.confirmButton) return
-
-    this.actionLoading = true
-    try {
-      await ServiceUtil.restPost(`rwa_trx/rwa_orders/${this.rwaOrderId}/close`, {})
-      UiUtil.showToast('success', '반품이 마감 처리되었습니다')
-      await this._fetchOrderData()
-      this._dispatchOrderUpdated()
-    } catch (error) {
-      console.error('반품 마감 실패:', error)
-      UiUtil.showToast('error', error.message || '반품 마감에 실패했습니다')
+      console.error('반품 취소 실패:', error)
+      UiUtil.showToast('error', error.message || '반품 취소에 실패했습니다')
     } finally {
       this.actionLoading = false
     }
@@ -956,16 +945,18 @@ class RwaOrderDetail extends localize(i18next)(LitElement) {
    * 유틸리티
    * ============================================================ */
 
+  /** 상태 코드를 한국어 라벨로 변환 */
   _statusLabel(status) {
     const labels = {
-      REQUEST: '요청',
+      REQUEST: '반품요청',
       APPROVED: '승인',
       RECEIVING: '입고중',
+      RECEIVED: '입고완료',
       INSPECTING: '검수중',
       INSPECTED: '검수완료',
+      DISPOSING: '처리중',
       DISPOSED: '처분완료',
       COMPLETED: '완료',
-      CLOSED: '마감',
       REJECTED: '거부',
       CANCELLED: '취소'
     }

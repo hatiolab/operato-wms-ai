@@ -601,6 +601,7 @@ class RwaDispositionWork extends localize(i18next)(PageView) {
       goodDispositionType: String,
       goodLocationId: String,
       goodStockStatus: String,
+      goodExpiredDate: String,
       goodScrapMethod: String,
       goodScrapReason: String,
       goodSupplierId: String,
@@ -611,6 +612,7 @@ class RwaDispositionWork extends localize(i18next)(PageView) {
       defectDispositionType: String,
       defectLocationId: String,
       defectStockStatus: String,
+      defectExpiredDate: String,
       defectScrapMethod: String,
       defectScrapReason: String,
       defectSupplierId: String,
@@ -647,6 +649,7 @@ class RwaDispositionWork extends localize(i18next)(PageView) {
     this.goodDispositionType = ''
     this.goodLocationId = ''
     this.goodStockStatus = 'GOOD'
+    this.goodExpiredDate = ''
     this.goodScrapMethod = ''
     this.goodScrapReason = ''
     this.goodSupplierId = ''
@@ -657,6 +660,7 @@ class RwaDispositionWork extends localize(i18next)(PageView) {
     this.defectDispositionType = ''
     this.defectLocationId = ''
     this.defectStockStatus = 'DEFECT'
+    this.defectExpiredDate = ''
     this.defectScrapMethod = ''
     this.defectScrapReason = ''
     this.defectSupplierId = ''
@@ -936,6 +940,16 @@ class RwaDispositionWork extends localize(i18next)(PageView) {
               .value="${this[`${prefix}LocationId`]}"
               @input="${e => {
                 this[`${prefix}LocationId`] = e.target.value
+              }}"
+            />
+          </div>
+          <div class="form-group">
+            <label>소비기한</label>
+            <input
+              type="date"
+              .value="${this[`${prefix}ExpiredDate`]}"
+              @change="${e => {
+                this[`${prefix}ExpiredDate`] = e.target.value
               }}"
             />
           </div>
@@ -1269,8 +1283,9 @@ class RwaDispositionWork extends localize(i18next)(PageView) {
     // 처분 유형별 추가 필드
     switch (dispositionType) {
       case 'RESTOCK':
-        payload.locationId = this[`${prefix}LocationId`]
-        payload.stockStatus = this[`${prefix}StockStatus`]
+        payload.restock_loc_cd = this[`${prefix}LocationId`]
+        payload.stock_status = this[`${prefix}StockStatus`]
+        payload.restock_expired_date = this[`${prefix}ExpiredDate`] || null
         break
 
       case 'SCRAP':
