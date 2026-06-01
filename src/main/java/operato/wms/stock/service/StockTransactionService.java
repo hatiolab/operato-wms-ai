@@ -9,7 +9,6 @@ import operato.wms.base.entity.Location;
 import operato.wms.base.entity.SKU;
 import operato.wms.base.entity.StoragePolicy;
 import operato.wms.inbound.WmsInboundConstants;
-import operato.wms.stock.WmsStockConstants;
 import operato.wms.stock.entity.Inventory;
 import operato.wms.stock.entity.InventoryTran;
 import operato.wms.stock.model.InvTransaction;
@@ -886,10 +885,18 @@ public class StockTransactionService extends BaseStockService {
      * @return UPSERT된 레코드 수
      */
     public int summarizeDailyStock(Long domainId, String summaryDate) {
-        // opening CTE: summaryDate 이전 마지막 트랜잭션의 after_qty 합산 → 기초 재고
-        // daily CTE: summaryDate 당일 tran_type별 수량 집계
-        // INSERT ... ON CONFLICT: UPSERT (멱등 재실행 보장)
-        String sql = "WITH opening AS (" +
+        Map<String, Object> params = ValueUtil.newMap("domainId,summaryDate", domainId, summaryDate);
+
+        // 1. 기존 집계 데이터 삭제 (재실행 멱등 보장)
+        this.queryManager.executeBySql(
+                "DELETE FROM daily_stock_summaries WHERE domain_id = :domainId AND summary_date = :summaryDate",
+                params);
+
+        // 2. opening  CTE: summaryDate 이전 각 바코드의 마지막 after_qty 합산 → 기초 재고
+        //    daily    CTE: summaryDate 당일 tran_type별 수량 집계
+        //    combined CTE: 기초 재고가 있는 상품(트랜잭션 없음 포함) ∪ 당일 트랜잭션 상품
+        String insertSql =
+                "WITH opening AS (" +
                 "  SELECT wh_cd, com_cd, sku_cd, SUM(after_qty) AS opening_qty" +
                 "  FROM (" +
                 "    SELECT DISTINCT ON (inventory_id) wh_cd, com_cd, sku_cd, after_qty" +
@@ -907,10 +914,8 @@ public class StockTransactionService extends BaseStockService {
                 "    SUM(CASE WHEN tran_type = 'OUT_CANCEL' THEN tran_qty ELSE 0 END) AS out_cancel_qty," +
                 "    SUM(CASE WHEN tran_type = 'MOVE_IN' THEN tran_qty ELSE 0 END) AS transfer_in_qty," +
                 "    SUM(CASE WHEN tran_type = 'MOVE_OUT' THEN tran_qty ELSE 0 END) AS transfer_out_qty," +
-                "    SUM(CASE WHEN tran_type IN ('ADJUST','COUNT') AND direction = 'IN' THEN tran_qty ELSE 0 END) AS adjust_plus_qty,"
-                +
-                "    SUM(CASE WHEN tran_type IN ('ADJUST','COUNT') AND direction = 'OUT' THEN tran_qty ELSE 0 END) AS adjust_minus_qty,"
-                +
+                "    SUM(CASE WHEN tran_type IN ('ADJUST','COUNT') AND direction = 'IN' THEN tran_qty ELSE 0 END) AS adjust_plus_qty," +
+                "    SUM(CASE WHEN tran_type IN ('ADJUST','COUNT') AND direction = 'OUT' THEN tran_qty ELSE 0 END) AS adjust_minus_qty," +
                 "    SUM(CASE WHEN tran_type = 'NEW' THEN tran_qty ELSE 0 END) AS add_qty," +
                 "    SUM(CASE WHEN tran_type = 'SCRAP' THEN tran_qty ELSE 0 END) AS loss_qty," +
                 "    SUM(CASE WHEN tran_type = 'VAS_OUT' THEN tran_qty ELSE 0 END) AS vas_out_qty," +
@@ -919,6 +924,11 @@ public class StockTransactionService extends BaseStockService {
                 "  FROM inventory_trans" +
                 "  WHERE domain_id = :domainId AND tran_date = :summaryDate" +
                 "  GROUP BY wh_cd, com_cd, sku_cd" +
+                ")," +
+                "combined AS (" +
+                "  SELECT wh_cd, com_cd, sku_cd FROM opening WHERE opening_qty > 0" +
+                "  UNION" +
+                "  SELECT wh_cd, com_cd, sku_cd FROM daily" +
                 ")" +
                 "INSERT INTO daily_stock_summaries (" +
                 "  id, domain_id, summary_date, wh_cd, com_cd, sku_cd," +
@@ -928,42 +938,27 @@ public class StockTransactionService extends BaseStockService {
                 "  created_at, updated_at" +
                 ") SELECT" +
                 "  gen_random_uuid()::text, :domainId, :summaryDate," +
-                "  d.wh_cd, d.com_cd, d.sku_cd," +
+                "  c.wh_cd, c.com_cd, c.sku_cd," +
                 "  COALESCE(o.opening_qty, 0)," +
-                "  d.in_qty, d.out_qty, d.in_cancel_qty, d.out_cancel_qty," +
-                "  d.transfer_in_qty, d.transfer_out_qty," +
-                "  d.adjust_plus_qty, d.adjust_minus_qty," +
-                "  d.add_qty, d.loss_qty, d.vas_out_qty, d.vas_in_qty," +
+                "  COALESCE(d.in_qty, 0), COALESCE(d.out_qty, 0)," +
+                "  COALESCE(d.in_cancel_qty, 0), COALESCE(d.out_cancel_qty, 0)," +
+                "  COALESCE(d.transfer_in_qty, 0), COALESCE(d.transfer_out_qty, 0)," +
+                "  COALESCE(d.adjust_plus_qty, 0), COALESCE(d.adjust_minus_qty, 0)," +
+                "  COALESCE(d.add_qty, 0), COALESCE(d.loss_qty, 0)," +
+                "  COALESCE(d.vas_out_qty, 0), COALESCE(d.vas_in_qty, 0)," +
                 "  COALESCE(o.opening_qty, 0)" +
-                "    + d.in_qty - d.in_cancel_qty" +
-                "    - d.out_qty + d.out_cancel_qty" +
-                "    + d.transfer_in_qty - d.transfer_out_qty" +
-                "    + d.adjust_plus_qty - d.adjust_minus_qty" +
-                "    + d.add_qty - d.loss_qty" +
-                "    + d.vas_in_qty - d.vas_out_qty," +
-                "  d.tran_count, now(), now()" +
-                " FROM daily d" +
-                " LEFT JOIN opening o ON o.wh_cd = d.wh_cd AND o.com_cd = d.com_cd AND o.sku_cd = d.sku_cd" +
-                " ON CONFLICT (domain_id, summary_date, wh_cd, com_cd, sku_cd) DO UPDATE SET" +
-                "  opening_qty     = EXCLUDED.opening_qty," +
-                "  in_qty          = EXCLUDED.in_qty," +
-                "  out_qty         = EXCLUDED.out_qty," +
-                "  in_cancel_qty   = EXCLUDED.in_cancel_qty," +
-                "  out_cancel_qty  = EXCLUDED.out_cancel_qty," +
-                "  transfer_in_qty = EXCLUDED.transfer_in_qty," +
-                "  transfer_out_qty = EXCLUDED.transfer_out_qty," +
-                "  adjust_plus_qty = EXCLUDED.adjust_plus_qty," +
-                "  adjust_minus_qty = EXCLUDED.adjust_minus_qty," +
-                "  add_qty         = EXCLUDED.add_qty," +
-                "  loss_qty        = EXCLUDED.loss_qty," +
-                "  vas_out_qty     = EXCLUDED.vas_out_qty," +
-                "  vas_in_qty      = EXCLUDED.vas_in_qty," +
-                "  closing_qty     = EXCLUDED.closing_qty," +
-                "  tran_count      = EXCLUDED.tran_count," +
-                "  updated_at      = now()";
+                "    + COALESCE(d.in_qty, 0) - COALESCE(d.in_cancel_qty, 0)" +
+                "    - COALESCE(d.out_qty, 0) + COALESCE(d.out_cancel_qty, 0)" +
+                "    + COALESCE(d.transfer_in_qty, 0) - COALESCE(d.transfer_out_qty, 0)" +
+                "    + COALESCE(d.adjust_plus_qty, 0) - COALESCE(d.adjust_minus_qty, 0)" +
+                "    + COALESCE(d.add_qty, 0) - COALESCE(d.loss_qty, 0)" +
+                "    + COALESCE(d.vas_in_qty, 0) - COALESCE(d.vas_out_qty, 0)," +
+                "  COALESCE(d.tran_count, 0), now(), now()" +
+                " FROM combined c" +
+                " LEFT JOIN opening o ON o.wh_cd = c.wh_cd AND o.com_cd = c.com_cd AND o.sku_cd = c.sku_cd" +
+                " LEFT JOIN daily d ON d.wh_cd = c.wh_cd AND d.com_cd = c.com_cd AND d.sku_cd = c.sku_cd";
 
-        Map<String, Object> params = ValueUtil.newMap("domainId,summaryDate", domainId, summaryDate);
-        this.queryManager.executeBySql(sql, params);
+        this.queryManager.executeBySql(insertSql, params);
 
         String countSql = "SELECT COUNT(*) FROM daily_stock_summaries WHERE domain_id = :domainId AND summary_date = :summaryDate";
         Long count = this.queryManager.selectBySql(countSql, params, Long.class);

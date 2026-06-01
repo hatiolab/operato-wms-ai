@@ -22,6 +22,7 @@ import operato.wms.stock.model.InvTransaction;
 import operato.wms.stock.service.StockTransactionService;
 import xyz.anythings.sys.model.BaseResponse;
 import xyz.anythings.sys.service.ICustomService;
+import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.sys.SysConstants;
@@ -649,11 +650,24 @@ public class InvTransactionController extends AbstractRestService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @RequestMapping(value = "/summarize_daily_stock", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiDesc(description = "Summarize Daily Stock")
     public BaseResponse summarizeDailyStock(@RequestBody Map<String, Object> input) {
         Long domainId = Domain.currentDomainId();
-        String closingDate = input.containsKey("close_date") ? (String) input.get("close_date") : DateUtil.todayStr();
+
+        String closingDate = input.containsKey("summary_date") ? (String) input.get("summary_date") : null;
+        if (ValueUtil.isEmpty(closingDate)) {
+            Map<String, Object> formParams = (Map<String, Object>) input.get("form");
+            if (formParams != null) {
+                closingDate = (String) formParams.get("summary_date");
+            }
+        }
+
+        if (ValueUtil.isEmpty(closingDate)) {
+            throw new ElidomValidationException("재고마감 날짜를 입력하세요.");
+        }
+
         this.invTrxSvc.summarizeDailyStock(domainId, closingDate);
         return new BaseResponse(true, "일간 재고 마감 완료.");
     }
