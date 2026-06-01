@@ -14,6 +14,8 @@ import operato.wms.base.entity.VasBomItem;
 import operato.wms.base.service.WmsBaseService;
 import operato.wms.oms.entity.StockAllocation;
 import operato.wms.stock.entity.Inventory;
+import operato.wms.stock.entity.InventoryTran;
+import operato.wms.stock.model.InvTransaction;
 import operato.wms.stock.service.StockTransactionService;
 import operato.wms.vas.WmsVasConstants;
 import operato.wms.vas.entity.VasOrder;
@@ -44,7 +46,6 @@ import xyz.elidom.util.ValueUtil;
  */
 @Component
 public class VasTransactionService extends AbstractQueryService {
-
 	/**
 	 * WMS 기본 서비스
 	 */
@@ -126,7 +127,8 @@ public class VasTransactionService extends AbstractQueryService {
 	 * BOM 기반 자재 전개
 	 *
 	 * - 세트 해체(DISASSEMBLY): 완성된 세트 상품(set_sku_cd)을 1건 생성 — 해체 대상이 되는 물품을 피킹
-	 * - 세트 구성 및 기타: vas_bom_items 기준으로 각 구성품 생성 (req_qty = plan_qty × component_qty)
+	 * - 세트 구성 및 기타: vas_bom_items 기준으로 각 구성품 생성 (req_qty = plan_qty ×
+	 * component_qty)
 	 *
 	 * @param vasOrder 작업 지시
 	 */
@@ -407,10 +409,12 @@ public class VasTransactionService extends AbstractQueryService {
 		String firstLotNo = null;
 
 		for (Inventory inv : candidates) {
-			if (remainQty <= 0) break;
+			if (remainQty <= 0)
+				break;
 
 			double avail = inv.getInvQty() - (inv.getReservedQty() == null ? 0 : inv.getReservedQty());
-			if (avail <= 0) continue;
+			if (avail <= 0)
+				continue;
 
 			double thisQty = Math.min(avail, remainQty);
 
@@ -454,7 +458,7 @@ public class VasTransactionService extends AbstractQueryService {
 		item.setLotNo(firstLotNo);
 		item.setStatus(WmsVasConstants.ITEM_STATUS_ALLOCATED);
 
-		this.queryManager.update(item, "allocQty", "srcLocCd", "lotNo", "status");
+		this.queryManager.update(item, "allocQty", "srcLocCd", "lotNo", "status", "updatedAt");
 
 		return item;
 	}
@@ -490,8 +494,8 @@ public class VasTransactionService extends AbstractQueryService {
 	@Transactional
 	public VasOrderItem cancelSingleAllocation(String allocId) {
 		// 1. 할당 레코드 조회
-		operato.wms.oms.entity.StockAllocation alloc =
-				this.queryManager.select(operato.wms.oms.entity.StockAllocation.class, allocId);
+		operato.wms.oms.entity.StockAllocation alloc = this.queryManager
+				.select(operato.wms.oms.entity.StockAllocation.class, allocId);
 		if (alloc == null) {
 			throw new ElidomValidationException("할당 내역을 찾을 수 없습니다. ID: " + allocId);
 		}
@@ -1082,23 +1086,28 @@ public class VasTransactionService extends AbstractQueryService {
 
 		Inventory inventory = this.queryManager.select(Inventory.class, allocation.getInventoryId());
 		if (inventory == null || !ValueUtil.isEqual(inventory.getDomainId(), vasOrder.getDomainId())) {
-			throw new ElidomValidationException("할당 원재고를 찾을 수 없습니다. ID: " + allocation.getInventoryId());
+			throw new ElidomValidationException("할당 원 재고를 찾을 수 없습니다. ID: " + allocation.getInventoryId());
 		}
 
-		double invQty = inventory.getInvQty() != null ? inventory.getInvQty() : 0.0;
-		double reservedQty = inventory.getReservedQty() != null ? inventory.getReservedQty() : 0.0;
+		/*
+		 * double invQty = inventory.getInvQty() != null ? inventory.getInvQty() : 0.0;
+		 * double reservedQty = inventory.getReservedQty() != null ?
+		 * inventory.getReservedQty() : 0.0;
+		 * 
+		 * if (consumeQty > invQty + 0.0001) {
+		 * throw new ElidomValidationException(
+		 * "할당 원재고 수량이 부족합니다. SKU: " + allocation.getSkuCd() +
+		 * ", 재고: " + invQty + ", 차감: " + consumeQty);
+		 * }
+		 * 
+		 * inventory.setInvQty(Math.max(invQty - consumeQty, 0.0));
+		 * inventory.setReservedQty(Math.max(reservedQty - releaseQty, 0.0));
+		 * inventory.setLastTranCd(Inventory.TRANSACTION_VAS_OUT);
+		 * inventory.setUpdatedAt(new Date());
+		 * this.queryManager.update(inventory);
+		 */
 
-		if (consumeQty > invQty + 0.0001) {
-			throw new ElidomValidationException(
-					"할당 원재고 수량이 부족합니다. SKU: " + allocation.getSkuCd() +
-							", 재고: " + invQty + ", 차감: " + consumeQty);
-		}
-
-		inventory.setInvQty(Math.max(invQty - consumeQty, 0.0));
-		inventory.setReservedQty(Math.max(reservedQty - releaseQty, 0.0));
-		inventory.setLastTranCd(Inventory.TRANSACTION_VAS_OUT);
-		inventory.setUpdatedAt(new Date());
-		this.queryManager.update(inventory);
+		this.stockTrxSvc.consumeSetAssembledInventory(inventory, consumeQty, releaseQty);
 	}
 
 	/**
@@ -1190,7 +1199,8 @@ public class VasTransactionService extends AbstractQueryService {
 		// remarks 조회 실패 시 vas_results의 dest_loc_cd + sku_cd 기반 fallback
 		if (inventories.isEmpty()) {
 			VasResult result = this.findFirstVasResult(vasOrder);
-			if (result != null && ValueUtil.isNotEmpty(result.getSetSkuCd()) && ValueUtil.isNotEmpty(result.getDestLocCd())) {
+			if (result != null && ValueUtil.isNotEmpty(result.getSetSkuCd())
+					&& ValueUtil.isNotEmpty(result.getDestLocCd())) {
 				String fallbackSql = "SELECT * FROM inventories " +
 						"WHERE domain_id = :domainId " +
 						"AND com_cd = :comCd " +
@@ -1330,21 +1340,20 @@ public class VasTransactionService extends AbstractQueryService {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public List<Map<String, Object>> listVasOrderItems(String vasOrderId) {
 		Long domainId = Domain.currentDomainId();
-		String sql =
-			"SELECT voi.*, " +
-			"  allocs.inv_barcds, allocs.inv_alloc_qtys, allocs.inv_loc_cds " +
-			"FROM vas_order_items voi " +
-			"LEFT JOIN ( " +
-			"  SELECT shipment_order_item_id, " +
-			"    STRING_AGG(barcode, ',' ORDER BY created_at ASC) AS inv_barcds, " +
-			"    STRING_AGG(CAST(alloc_qty AS TEXT), ',' ORDER BY created_at ASC) AS inv_alloc_qtys, " +
-			"    STRING_AGG(loc_cd, ',' ORDER BY created_at ASC) AS inv_loc_cds " +
-			"  FROM stock_allocations " +
-			"  WHERE domain_id = :domainId AND alloc_type = 'VAS' " +
-			"  GROUP BY shipment_order_item_id " +
-			") allocs ON allocs.shipment_order_item_id = voi.id " +
-			"WHERE voi.domain_id = :domainId AND voi.vas_order_id = :vasOrderId " +
-			"ORDER BY voi.vas_seq ASC";
+		String sql = "SELECT voi.*, " +
+				"  allocs.inv_barcds, allocs.inv_alloc_qtys, allocs.inv_loc_cds " +
+				"FROM vas_order_items voi " +
+				"LEFT JOIN ( " +
+				"  SELECT shipment_order_item_id, " +
+				"    STRING_AGG(barcode, ',' ORDER BY created_at ASC) AS inv_barcds, " +
+				"    STRING_AGG(CAST(alloc_qty AS TEXT), ',' ORDER BY created_at ASC) AS inv_alloc_qtys, " +
+				"    STRING_AGG(loc_cd, ',' ORDER BY created_at ASC) AS inv_loc_cds " +
+				"  FROM stock_allocations " +
+				"  WHERE domain_id = :domainId AND alloc_type = 'VAS' " +
+				"  GROUP BY shipment_order_item_id " +
+				") allocs ON allocs.shipment_order_item_id = voi.id " +
+				"WHERE voi.domain_id = :domainId AND voi.vas_order_id = :vasOrderId " +
+				"ORDER BY voi.vas_seq ASC";
 
 		List result = this.queryManager.selectListBySql(sql,
 				ValueUtil.newMap("domainId,vasOrderId", domainId, vasOrderId),
@@ -1501,35 +1510,36 @@ public class VasTransactionService extends AbstractQueryService {
 
 		StringBuilder sql = new StringBuilder(
 				"SELECT vo.id, vo.vas_no, vo.vas_type, vo.status, " +
-				"vo.plan_qty, vo.completed_qty, vo.com_cd, vo.wh_cd, " +
-				"vo.worker_id, vo.priority, vo.work_loc_cd, vo.putaway_loc_cd, " +
-				"vo.started_at, vo.approved_at, vo.vas_req_date, " +
-				"vo.vas_bom_id, vo.remarks, " +
-				"COALESCE(mi.total_items, 0) as total_items, " +
-				"COALESCE(mi.picked_items, 0) as picked_items, " +
-				"COALESCE(mi.total_req_qty, 0) as total_req_qty, " +
-				"COALESCE(mi.total_picked_qty, 0) as total_picked_qty, " +
-				"vr.dest_loc_cd " +
-				"FROM vas_orders vo " +
-				"LEFT JOIN ( " +
-				"  SELECT vas_order_id, " +
-				"    COUNT(*) as total_items, " +
-				"    SUM(CASE WHEN status IN ('PICKED','IN_USE','COMPLETED') THEN 1 ELSE 0 END) as picked_items, " +
-				"    SUM(COALESCE(req_qty, 0)) as total_req_qty, " +
-				"    SUM(COALESCE(picked_qty, 0)) as total_picked_qty " +
-				"  FROM vas_order_items " +
-				"  WHERE domain_id = :domainId " +
-				"  GROUP BY vas_order_id " +
-				") mi ON vo.id = mi.vas_order_id " +
-				"LEFT JOIN ( " +
-				"  SELECT DISTINCT ON (vas_order_id) vas_order_id, dest_loc_cd " +
-				"  FROM vas_results " +
-				"  WHERE domain_id = :domainId AND dest_loc_cd IS NOT NULL " +
-				"  ORDER BY vas_order_id, result_seq DESC " +
-				") vr ON vo.id = vr.vas_order_id " +
-				"WHERE vo.domain_id = :domainId " +
-				"AND vo.status IN (:statuses) " +
-				"AND vo.vas_req_date = :targetDate");
+						"vo.plan_qty, vo.completed_qty, vo.com_cd, vo.wh_cd, " +
+						"vo.worker_id, vo.priority, vo.work_loc_cd, vo.putaway_loc_cd, " +
+						"vo.started_at, vo.approved_at, vo.vas_req_date, " +
+						"vo.vas_bom_id, vo.remarks, " +
+						"COALESCE(mi.total_items, 0) as total_items, " +
+						"COALESCE(mi.picked_items, 0) as picked_items, " +
+						"COALESCE(mi.total_req_qty, 0) as total_req_qty, " +
+						"COALESCE(mi.total_picked_qty, 0) as total_picked_qty, " +
+						"vr.dest_loc_cd " +
+						"FROM vas_orders vo " +
+						"LEFT JOIN ( " +
+						"  SELECT vas_order_id, " +
+						"    COUNT(*) as total_items, " +
+						"    SUM(CASE WHEN status IN ('PICKED','IN_USE','COMPLETED') THEN 1 ELSE 0 END) as picked_items, "
+						+
+						"    SUM(COALESCE(req_qty, 0)) as total_req_qty, " +
+						"    SUM(COALESCE(picked_qty, 0)) as total_picked_qty " +
+						"  FROM vas_order_items " +
+						"  WHERE domain_id = :domainId " +
+						"  GROUP BY vas_order_id " +
+						") mi ON vo.id = mi.vas_order_id " +
+						"LEFT JOIN ( " +
+						"  SELECT DISTINCT ON (vas_order_id) vas_order_id, dest_loc_cd " +
+						"  FROM vas_results " +
+						"  WHERE domain_id = :domainId AND dest_loc_cd IS NOT NULL " +
+						"  ORDER BY vas_order_id, result_seq DESC " +
+						") vr ON vo.id = vr.vas_order_id " +
+						"WHERE vo.domain_id = :domainId " +
+						"AND vo.status IN (:statuses) " +
+						"AND vo.vas_req_date = :targetDate");
 
 		Map<String, Object> params = new java.util.HashMap<>();
 		params.put("domainId", Domain.currentDomainId());
@@ -1654,7 +1664,7 @@ public class VasTransactionService extends AbstractQueryService {
 
 		// 대시보드 카드 기준으로 합산하여 반환
 		// 승인완료 = APPROVED + MATERIAL_READY
-		// 완료     = COMPLETED + CLOSED
+		// 완료 = COMPLETED + CLOSED
 		Map<String, Object> statusCounts = new java.util.HashMap<>();
 		statusCounts.put("PLAN", raw.getOrDefault("PLAN", 0L));
 		statusCounts.put("APPROVED", raw.getOrDefault("APPROVED", 0L) + raw.getOrDefault("MATERIAL_READY", 0L));
@@ -1808,9 +1818,11 @@ public class VasTransactionService extends AbstractQueryService {
 	 * @param vasOrder 작업 지시
 	 * @param result   실적 정보
 	 */
-	private void processInventoryByVasType(VasOrder vasOrder, VasResult result) {
-		this.processInventoryByVasType(vasOrder, result, null);
-	}
+	/*
+	 * private void processInventoryByVasType(VasOrder vasOrder, VasResult result) {
+	 * this.processInventoryByVasType(vasOrder, result, null);
+	 * }
+	 */
 
 	/**
 	 * VAS 유형별 재고 처리
@@ -1844,19 +1856,24 @@ public class VasTransactionService extends AbstractQueryService {
 	 * @param vasOrder 작업 지시
 	 * @param result   실적 정보
 	 */
-	private void consumeComponentInventories(VasOrder vasOrder, VasResult result) {
-		Query bomQuery = new Query();
-		bomQuery.addFilter("domainId", vasOrder.getDomainId());
-		bomQuery.addFilter("vasBomId", vasOrder.getVasBomId());
-		bomQuery.addOrder("bomSeq", true);
-		List<VasBomItem> bomItems = this.queryManager.selectList(VasBomItem.class, bomQuery);
-
-		for (VasBomItem bomItem : bomItems) {
-			double usedQty = result.getResultQty() * bomItem.getComponentQty();
-			this.deductInventory(vasOrder.getDomainId(), vasOrder.getComCd(), vasOrder.getWhCd(),
-					bomItem.getSkuCd(), usedQty, vasOrder.getVasNo());
-		}
-	}
+	/*
+	 * private void consumeComponentInventories(VasOrder vasOrder, VasResult result)
+	 * {
+	 * Query bomQuery = new Query();
+	 * bomQuery.addFilter("domainId", vasOrder.getDomainId());
+	 * bomQuery.addFilter("vasBomId", vasOrder.getVasBomId());
+	 * bomQuery.addOrder("bomSeq", true);
+	 * List<VasBomItem> bomItems = this.queryManager.selectList(VasBomItem.class,
+	 * bomQuery);
+	 * 
+	 * for (VasBomItem bomItem : bomItems) {
+	 * double usedQty = result.getResultQty() * bomItem.getComponentQty();
+	 * this.deductInventory(vasOrder.getDomainId(), vasOrder.getComCd(),
+	 * vasOrder.getWhCd(),
+	 * bomItem.getSkuCd(), usedQty, vasOrder.getVasNo());
+	 * }
+	 * }
+	 */
 
 	/**
 	 * DISASSEMBLY 시 세트 SKU 재고 차감
@@ -1864,10 +1881,13 @@ public class VasTransactionService extends AbstractQueryService {
 	 * @param vasOrder 작업 지시
 	 * @param result   실적 정보
 	 */
-	private void consumeSetSkuInventory(VasOrder vasOrder, VasResult result) {
-		this.deductInventory(vasOrder.getDomainId(), vasOrder.getComCd(), vasOrder.getWhCd(),
-				result.getSetSkuCd(), result.getResultQty(), vasOrder.getVasNo());
-	}
+	/*
+	 * private void consumeSetSkuInventory(VasOrder vasOrder, VasResult result) {
+	 * this.deductInventory(vasOrder.getDomainId(), vasOrder.getComCd(),
+	 * vasOrder.getWhCd(),
+	 * result.getSetSkuCd(), result.getResultQty(), vasOrder.getVasNo());
+	 * }
+	 */
 
 	/**
 	 * 창고 내 특정 SKU 재고에서 qty 차감 (FIFO 순)
@@ -1881,38 +1901,45 @@ public class VasTransactionService extends AbstractQueryService {
 	 * @param qty      차감할 수량
 	 * @param vasNo    작업 지시 번호 (로그용)
 	 */
-	private void deductInventory(Long domainId, String comCd, String whCd, String skuCd, double qty, String vasNo) {
-		String sql = "SELECT * FROM inventories " +
-				"WHERE domain_id = :domainId AND com_cd = :comCd AND wh_cd = :whCd AND sku_cd = :skuCd " +
-				"AND (del_flag IS NULL OR del_flag = false) AND inv_qty > 0 " +
-				"ORDER BY created_at ASC";
-		List<Inventory> invList = this.queryManager.selectListBySql(sql,
-				ValueUtil.newMap("domainId,comCd,whCd,skuCd", domainId, comCd, whCd, skuCd),
-				Inventory.class, 0, 0);
-
-		if (invList.isEmpty()) {
-			this.logger.warn("VAS 재고 차감 실패 - 가용 재고 없음: vasNo={}, skuCd={}, qty={}", vasNo, skuCd, qty);
-			return;
-		}
-
-		double remainQty = qty;
-		for (Inventory inv : invList) {
-			if (remainQty <= 0.0001)
-				break;
-			double deductQty = Math.min(inv.getInvQty(), remainQty);
-			String deductSql = "UPDATE inventories " +
-					"SET inv_qty = inv_qty - :deductQty, last_tran_cd = :tranCd, updated_at = now() " +
-					"WHERE id = :invId AND domain_id = :domainId AND inv_qty >= :deductQty";
-			this.queryManager.executeBySql(deductSql, ValueUtil.newMap(
-					"deductQty,tranCd,invId,domainId",
-					deductQty, Inventory.TRANSACTION_VAS_OUT, inv.getId(), domainId));
-			remainQty -= deductQty;
-		}
-
-		if (remainQty > 0.0001) {
-			this.logger.warn("VAS 재고 부분 차감: vasNo={}, skuCd={}, 차감={}/{}", vasNo, skuCd, qty - remainQty, qty);
-		}
-	}
+	/*
+	 * private void deductInventory(Long domainId, String comCd, String whCd, String
+	 * skuCd, double qty, String vasNo) {
+	 * String sql = "SELECT * FROM inventories " +
+	 * "WHERE domain_id = :domainId AND com_cd = :comCd AND wh_cd = :whCd AND sku_cd = :skuCd "
+	 * +
+	 * "AND (del_flag IS NULL OR del_flag = false) AND inv_qty > 0 " +
+	 * "ORDER BY created_at ASC";
+	 * List<Inventory> invList = this.queryManager.selectListBySql(sql,
+	 * ValueUtil.newMap("domainId,comCd,whCd,skuCd", domainId, comCd, whCd, skuCd),
+	 * Inventory.class, 0, 0);
+	 * 
+	 * if (invList.isEmpty()) {
+	 * this.logger.warn("VAS 재고 차감 실패 - 가용 재고 없음: vasNo={}, skuCd={}, qty={}",
+	 * vasNo, skuCd, qty);
+	 * return;
+	 * }
+	 * 
+	 * double remainQty = qty;
+	 * for (Inventory inv : invList) {
+	 * if (remainQty <= 0.0001)
+	 * break;
+	 * double deductQty = Math.min(inv.getInvQty(), remainQty);
+	 * String deductSql = "UPDATE inventories " +
+	 * "SET inv_qty = inv_qty - :deductQty, last_tran_cd = :tranCd, updated_at = now() "
+	 * +
+	 * "WHERE id = :invId AND domain_id = :domainId AND inv_qty >= :deductQty";
+	 * this.queryManager.executeBySql(deductSql, ValueUtil.newMap(
+	 * "deductQty,tranCd,invId,domainId",
+	 * deductQty, Inventory.TRANSACTION_VAS_OUT, inv.getId(), domainId));
+	 * remainQty -= deductQty;
+	 * }
+	 * 
+	 * if (remainQty > 0.0001) {
+	 * this.logger.warn("VAS 재고 부분 차감: vasNo={}, skuCd={}, 차감={}/{}", vasNo, skuCd,
+	 * qty - remainQty, qty);
+	 * }
+	 * }
+	 */
 
 	/**
 	 * SET_ASSEMBLY 완성품(세트 SKU) 재고 생성
@@ -1929,8 +1956,8 @@ public class VasTransactionService extends AbstractQueryService {
 			return;
 		}
 
-		Inventory newInv = new Inventory();
-		newInv.setDomainId(vasOrder.getDomainId());
+		// 유통 가공 완성품 재고 생성
+		InvTransaction newInv = new InvTransaction();
 		newInv.setComCd(vasOrder.getComCd());
 		newInv.setWhCd(vasOrder.getWhCd());
 		newInv.setLocCd(workLocCd);
@@ -1938,9 +1965,9 @@ public class VasTransactionService extends AbstractQueryService {
 		newInv.setInvQty(result.getResultQty());
 		newInv.setLotNo(result.getLotNo());
 		newInv.setExpiredDate(expiredDate);
-		newInv.setStatus(Inventory.STATUS_STORED);
+		newInv.setRefDocNo(vasOrder.getVasNo());
 		newInv.setRemarks("VAS 완성품 재고 생성: " + vasOrder.getVasNo());
-		this.stockTrxSvc.createInventory(vasOrder.getDomainId(), newInv);
+		this.stockTrxSvc.createSetAssembledInventory(vasOrder.getDomainId(), newInv);
 	}
 
 	/**
@@ -1968,18 +1995,17 @@ public class VasTransactionService extends AbstractQueryService {
 		for (VasBomItem bomItem : bomItems) {
 			double compQty = result.getResultQty() * bomItem.getComponentQty();
 
-			Inventory newInv = new Inventory();
-			newInv.setDomainId(vasOrder.getDomainId());
+			// StockTransactionService의 createInventory 메서드를 사용하기 위한 객체
+			InvTransaction newInv = new InvTransaction();
 			newInv.setComCd(vasOrder.getComCd());
 			newInv.setWhCd(vasOrder.getWhCd());
 			newInv.setLocCd(workLocCd);
 			newInv.setSkuCd(bomItem.getSkuCd());
 			newInv.setInvQty(compQty);
 			newInv.setExpiredDate(expiredDate);
-			newInv.setStatus(Inventory.STATUS_STORED);
+			newInv.setRefDocNo(vasOrder.getVasNo());
 			newInv.setRemarks("VAS 해체 구성품 재고 생성: " + vasOrder.getVasNo());
-
-			this.stockTrxSvc.createInventory(vasOrder.getDomainId(), newInv);
+			this.stockTrxSvc.createSetDisassembledInventory(vasOrder.getDomainId(), newInv);
 		}
 	}
 
@@ -2021,9 +2047,9 @@ public class VasTransactionService extends AbstractQueryService {
 		// 산출품 적치 로케이션: destLocCd(프론트 전달) → putaway_loc_cd → work_loc_cd 순으로 적용
 		String finalLocCd = ValueUtil.isNotEmpty(destLocCd) ? destLocCd
 				: ValueUtil.isNotEmpty(vasOrder.getPutawayLocCd()) ? vasOrder.getPutawayLocCd()
-				: workLocCd;
+						: workLocCd;
 
-		// 할당 원재고(세트 상품) 소비
+		// 세트 상품 구성품들의 할당 원재고(세트 상품) 소비
 		this.consumeVasAllocatedInventoriesIfNeeded(vasOrder);
 
 		// 산출 행별 개별 재고 및 실적 생성
@@ -2033,18 +2059,19 @@ public class VasTransactionService extends AbstractQueryService {
 			double qty = ((Number) output.get("qty")).doubleValue();
 			String expiryDate = (String) output.get("expiryDate");
 
-			Inventory newInv = new Inventory();
-			newInv.setDomainId(vasOrder.getDomainId());
+			// 세트 구성품 재고 생성
+			InvTransaction newInv = new InvTransaction();
 			newInv.setComCd(vasOrder.getComCd());
 			newInv.setWhCd(vasOrder.getWhCd());
 			newInv.setLocCd(finalLocCd);
 			newInv.setSkuCd(skuCd);
 			newInv.setInvQty(qty);
 			newInv.setExpiredDate(expiryDate);
-			newInv.setStatus(Inventory.STATUS_STORED);
+			newInv.setRefDocNo(vasOrder.getVasNo());
 			newInv.setRemarks("VAS 해체 구성품 재고 생성: " + vasOrder.getVasNo());
-			this.stockTrxSvc.createInventory(vasOrder.getDomainId(), newInv);
+			this.stockTrxSvc.createSetDisassembledInventory(vasOrder.getDomainId(), newInv);
 
+			// 실적 생성
 			VasResult result = new VasResult();
 			result.setDomainId(vasOrder.getDomainId());
 			result.setVasOrderId(vasOrderId);
@@ -2071,6 +2098,8 @@ public class VasTransactionService extends AbstractQueryService {
 		this.queryManager.executeBySql(sql, ValueUtil.newMap(
 				"itemStatus,vasOrderId,domainId",
 				WmsVasConstants.ITEM_STATUS_COMPLETED, vasOrderId, vasOrder.getDomainId()));
+
+		// TODO 세트 상품 자체에 대한 소비는 어디서 하는지 확인 필요
 
 		vasSseService.publish(vasOrder.getDomainId(), new VasEventData(
 				"WORK_COMPLETED", vasOrder.getVasNo(), vasOrder.getId().toString(),

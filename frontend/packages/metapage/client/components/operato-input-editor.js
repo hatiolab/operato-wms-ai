@@ -60,7 +60,7 @@ export class OperatoInputEditor extends LitElement {
     }
 
     // resource-selector 의 경우 event 로 변경된 값을 받아야 한다. 
-    if(this.column.type == 'resource-selector'){
+    if (this.column.type == 'resource-selector' || this.column.type == 'resource-format-selector') {
       this.addEventListener('field-change', e => {
         let { after, before, column, record, row } = e.detail
         this.getInput().value = after
@@ -91,25 +91,31 @@ export class OperatoInputEditor extends LitElement {
       }
 
       return this.getInput().value
-    } else if(this.column.type == 'datetime'){
+
+    } else if (this.column.type == 'datetime') {
       if (inputObj._dirtyValue == inputObj.org_value) {
         return ''
       }
 
       return this.getInput()._dirtyValue
 
-    } else if(this.column.type == 'checkbox'){
+    } else if (this.column.type == 'checkbox') {
       if (inputObj._dirtyValue == inputObj.org_value) {
         return ''
       }
 
       return inputObj._dirtyValue
-    } else if(this.column.type == 'resource-selector'){
-      if(ValueUtil.isEmpty(inputObj.value)) return ''
-      if(ValueUtil.isEmpty(inputObj.org_value)) return inputObj.value
-      
-      if(inputObj.value.id == inputObj.org_value.id) return ''
 
+    } else if (this.column.type == 'resource-selector') {
+      if (ValueUtil.isEmpty(inputObj.value)) return ''
+      if (ValueUtil.isEmpty(inputObj.org_value)) return inputObj.value
+      if (inputObj.value.id == inputObj.org_value.id) return ''
+      return inputObj.value
+
+    } else if (this.column.type == 'resource-format-selector') {
+      if (ValueUtil.isEmpty(inputObj.value)) return ''
+      if (ValueUtil.isEmpty(inputObj.org_value)) return inputObj.value
+      if (inputObj.value.id == inputObj.org_value.id) return ''
       return inputObj.value
 
     } else {
@@ -148,14 +154,15 @@ export class OperatoInputEditor extends LitElement {
 
       this.getLeafInput().innerHTML = optionHtml
       this.getInput().value = initValue
-    } else if(this.column.type == 'datetime'){
+
+    } else if (this.column.type == 'datetime') {
       var datetime = new Date(newVal)
       var tzoffset = datetime.getTimezoneOffset() * 60000 //offset in milliseconds
-
       var setVal = new Date(newVal - tzoffset).toISOString().slice(0, -1)
       this.getInput().value = setVal
       this.getInput().org_value = newVal
       this.getInput()._dirtyValue = newVal
+
     } else {
       this.getInput().value = newVal
       this.getInput().org_value = newVal
@@ -174,9 +181,11 @@ export class OperatoInputEditor extends LitElement {
     if (this.column.type == 'select') {
       let element = this.getLeafInput()
       element.options.length = 0
+
     } else if (this.column.type == 'select-combo') {
       let element = this.getLeafInput()
       element.innerHTML = ''
+
     } else if (this.column.type == 'barcode') {
       let element = this.getLeafInput()
       element.value = ''
@@ -211,6 +220,8 @@ export class OperatoInputEditor extends LitElement {
     } else if (this.column.type == 'barcode') {
       return this.renderRoot.querySelector('ox-input-barcode').renderRoot.querySelector('input')
     } else if (this.column.type == 'resource-selector') {
+      return this.getInput()
+    } else if (this.column.type == 'resource-format-selector') {
       return this.getInput()
     } else {
       return this.renderRoot.firstElementChild.editor

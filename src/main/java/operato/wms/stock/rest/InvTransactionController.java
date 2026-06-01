@@ -28,6 +28,7 @@ import xyz.elidom.sys.SysConstants;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.system.service.AbstractRestService;
 import xyz.elidom.sys.util.ThrowUtil;
+import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
 /**
@@ -175,7 +176,8 @@ public class InvTransactionController extends AbstractRestService {
      * - 창고 일치 / 로케이션 유형(STORE 불가) / 출고·입고 제한 / 고정 SKU / 혼적 불가 / 출발지 출고 제한
      *
      * POST /rest/inventory_trx/validate_location_for_replenish
-     * Body: { "to_loc_cd": "...", "from_loc_cd": "...", "sku_cd": "...", "wh_cd": "..." }
+     * Body: { "to_loc_cd": "...", "from_loc_cd": "...", "sku_cd": "...", "wh_cd":
+     * "..." }
      *
      * @param input to_loc_cd, from_loc_cd, sku_cd, wh_cd 를 포함하는 요청 바디
      * @return 유효한 Location 엔티티
@@ -199,7 +201,8 @@ public class InvTransactionController extends AbstractRestService {
      * 유효하면 병합 대상 재고 정보를 반환하고, 불가한 경우 오류를 반환한다.
      *
      * POST /rest/inventory_trx/validate_inventory_for_merge
-     * Body: { "merge_barcode": "BARCODE123", "merge_loc_cd": "A-01-02", "base_inventory_id": "uuid" }
+     * Body: { "merge_barcode": "BARCODE123", "merge_loc_cd": "A-01-02",
+     * "base_inventory_id": "uuid" }
      *
      * @param input merge_barcode, merge_loc_cd, base_inventory_id(선택)를 포함하는 요청 바디
      * @return 유효한 병합 대상 Inventory 엔티티
@@ -271,7 +274,7 @@ public class InvTransactionController extends AbstractRestService {
      */
     @PostMapping(value = "/create_inventory", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiDesc(description = "Create Inventory")
-    public BaseResponse createInventory(@RequestBody Inventory input) {
+    public BaseResponse createInventory(@RequestBody InvTransaction input) {
         Long domainId = Domain.currentDomainId();
         input.setId(null);
 
@@ -644,6 +647,15 @@ public class InvTransactionController extends AbstractRestService {
             // 리턴
             return (Inventory) customResult;
         }
+    }
+
+    @RequestMapping(value = "/summarize_daily_stock", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Summarize Daily Stock")
+    public BaseResponse summarizeDailyStock(@RequestBody Map<String, Object> input) {
+        Long domainId = Domain.currentDomainId();
+        String closingDate = input.containsKey("close_date") ? (String) input.get("close_date") : DateUtil.todayStr();
+        this.invTrxSvc.summarizeDailyStock(domainId, closingDate);
+        return new BaseResponse(true, "일간 재고 마감 완료.");
     }
 
     /**

@@ -469,7 +469,8 @@ public class RwaTransactionService extends AbstractQueryService {
 	/**
 	 * 처분 유형별 재고 처리
 	 *
-	 * RESTOCK: Inventory 생성 (invQty=dispositionQty, locCd=restockLocCd, status=STORED)
+	 * RESTOCK: Inventory 생성 (invQty=dispositionQty, locCd=restockLocCd,
+	 * status=STORED)
 	 * DONATION: 기록만 (실제 재고 차감은 미구현)
 	 * SCRAP/REPAIR/RETURN_VENDOR: 재고 영향 없음
 	 *
@@ -497,6 +498,8 @@ public class RwaTransactionService extends AbstractQueryService {
 			inv.setLotNo(item.getLotNo());
 			inv.setExpiredDate(item.getExpiredDate());
 			inv.setProdDate(item.getPrdDate());
+			inv.setRcvNo(order.getOrderNo());
+			inv.setRcvSeq(item.getRwaSeq());
 			inv.setRemarks("RWA 반품 재입고 - " + order.getRwaNo());
 			this.queryManager.insert(inv);
 			return inv.getId();

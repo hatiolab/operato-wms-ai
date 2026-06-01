@@ -1,19 +1,16 @@
 package operato.wms.stock.service;
 
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import operato.wms.base.entity.Location;
 import operato.wms.base.entity.SKU;
 import operato.wms.base.entity.StoragePolicy;
-import operato.wms.base.service.WmsBaseService;
 import operato.wms.stock.entity.Inventory;
+import operato.wms.stock.entity.InventoryTran;
 import operato.wms.stock.model.InvTransaction;
-import xyz.anythings.sys.service.AbstractQueryService;
 import xyz.elidom.sys.util.ThrowUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -23,13 +20,7 @@ import xyz.elidom.util.ValueUtil;
  * @author shortstop
  */
 @Component
-public class StockTransactionService extends AbstractQueryService {
-    /**
-     * WMS 기본 서비스
-     */
-    @Autowired
-    protected WmsBaseService wmsBaseSvc;
-
+public class StockTransactionService extends BaseStockService {
     /**
      * 재고 임의 생성 처리
      * 
@@ -37,53 +28,79 @@ public class StockTransactionService extends AbstractQueryService {
      * @param input
      * @return
      */
-    public Inventory createInventory(Long domainId, Inventory input) {
-        // 화주사 데이터 체크
-        ValueUtil.checkEmptyData(input.getComCd(), "label.com_cd");
+    public Inventory createInventory(Long domainId, InvTransaction input) {
+        // 재고 생성 공통 체크 프로세스 실행
+        Object[] checkedObjects = this.checkForCreateInventory(domainId, input, Inventory.TRANSACTION_NEW);
+        InventoryTran newInventory = (InventoryTran) checkedObjects[0];
+        Location location = (Location) checkedObjects[1];
+        SKU sku = (SKU) checkedObjects[2];
 
-        // 로케이션 데이터 체크
-        ValueUtil.checkEmptyData(input.getLocCd(), "label.loc_cd");
+        // 재고 트랜잭션 생성 처리
+        return newInventory.createNewTransaction(location, sku);
+    }
 
-        // 상품 코드 데이터 체크
-        ValueUtil.checkEmptyData(input.getSkuCd(), "label.sku_cd");
+    /**
+     * 세트 상품 조립 완성품 재고 생성
+     * 
+     * @param domainId
+     * @param input
+     * @return
+     */
+    public Inventory createSetAssembledInventory(Long domainId, InvTransaction input) {
+        // 세트 상품 조립 완성품 재고 생성 공통 체크 프로세스 실행
+        Object[] checkedObjects = this.checkForCreateInventory(domainId, input, InventoryTran.TRAN_TYPE_VAS_IN);
+        InventoryTran newInventory = (InventoryTran) checkedObjects[0];
+        Location location = (Location) checkedObjects[1];
+        SKU sku = (SKU) checkedObjects[2];
 
-        // 재고 수량 데이터 체크
-        ValueUtil.checkEmptyNumber((Number) input.getInvQty(), "label.inv_qty");
+        // 세트 상품 조립 완성품 재고 생성 처리
+        return newInventory.createVasInTransaction(location, sku);
+    }
 
-        // 입력값으로 재고 객체 생성
-        Inventory newInventory = ValueUtil.populate(input, new Inventory());
+    /**
+     * 세트 상품 해체 시 구성품 재고 생성
+     * 
+     * @param domainId
+     * @param input
+     * @return
+     */
+    public Inventory createSetDisassembledInventory(Long domainId, InvTransaction input) {
+        // 세트 상품 조립 해체 시 구성품 재고 생성 공통 체크 프로세스 실행
+        Object[] checkedObjects = this.checkForCreateInventory(domainId, input, InventoryTran.TRAN_TYPE_VAS_IN);
+        InventoryTran newInventory = (InventoryTran) checkedObjects[0];
+        Location location = (Location) checkedObjects[1];
+        SKU sku = (SKU) checkedObjects[2];
 
-        // 로케이션 조회 & 기본 체크 포인트 체크
-        Location location = this.findAndCheckLocation(domainId, input.getLocCd(), Inventory.TRANSACTION_NEW);
+        // 세트 상품 해체 시 구성품 재고 생성 처리
+        return newInventory.createVasInTransaction(location, sku);
+    }
 
-        // 혼적 가능 여부 체크
-        this.checkMixableLocation(location, input.getSkuCd());
+    /**
+     * 세트 상품 조립 후 구성품 할당 재고로 부터 재고 차감
+     * 
+     * @param inventory
+     * @param consumeQty
+     * @param releaseQty
+     * @return
+     */
+    public Inventory consumeSetAssembledInventory(Inventory inventory, double consumeQty, double releaseQty) {
+        // 세트 상품 해체 구성품 재고 생성 처리
+        InventoryTran consumeTran = new InventoryTran();
+        return consumeTran.createVasConsumeAllocatedTransaction(inventory, consumeQty, releaseQty);
+    }
 
-        // 고정 SKU 로케이션 적치 제한 체크
-        this.checkFixedSkuLocation(location, input.getSkuCd());
-
-        // Find SKU
-        SKU sku = this.wmsBaseSvc.findSku(input.getComCd(), input.getSkuCd(), false, true);
-
-        // 위험물 상품 로케이션 허용 여부 체크
-        this.checkHazmatLocation(location, sku);
-
-        // 온도 유형 호환성 체크
-        this.checkTemperatureType(location, sku);
-
-        // 로케이션 최대 수량·중량 초과 검증
-        double addWeight = (sku.getSkuWt() != null) ? sku.getSkuWt() * input.getInvQty() : 0.0;
-        this.checkLocationCapacity(location, input.getInvQty(), addWeight);
-
-        // 사용자가 입력한 정보대로 재고 정보 생성
-        newInventory.setSkuNm(sku.getSkuNm());
-        newInventory.setSkuBcd(sku.getSkuBarcd());
-        newInventory.setVendCd(sku.getVendCd());
-        newInventory.setLastTranCd(Inventory.TRANSACTION_NEW);
-        this.queryManager.insert(newInventory);
-
-        // 생성 재고 정보 리턴
-        return newInventory;
+    /**
+     * 세트 상품 해체 시 세트 상품 할당 재고로 부터 재고 차감
+     * 
+     * @param inventory
+     * @param consumeQty
+     * @param releaseQty
+     * @return
+     */
+    public Inventory consumeSetDisassembledInventory(Inventory inventory, double consumeQty, double releaseQty) {
+        // 세트 상품 해체 구성품 재고 생성 처리
+        InventoryTran consumeTran = new InventoryTran();
+        return consumeTran.createVasConsumeAllocatedTransaction(inventory, consumeQty, releaseQty);
     }
 
     /**
@@ -94,69 +111,42 @@ public class StockTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory putAway(Long domainId, InvTransaction input) {
-        // 재고 조회 & 기본 체크 포인트 체크
-        Inventory inventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_IN);
+        // 1. 재고 적치 공통 체크 프로세스
+        Inventory inventory = this.checkForPutawayInventory(domainId, input);
 
-        // 트랜잭션 처리 체크
-        if (ValueUtil.isEqualIgnoreCase(inventory.getLastTranCd(), Inventory.TRANSACTION_IN)) {
-            throw ThrowUtil.newValidationErrorWithNoLog("이미 입고 처리되었습니다.");
-        }
-
-        // To 로케이션 체크
-        ValueUtil.checkEmptyData(input.getLocCd(), "label.loc_cd");
-
-        if (ValueUtil.isEmpty(input.getInvQty()) || input.getInvQty() == 0.0f) {
-            input.setInvQty(inventory.getInvQty());
-        }
-
-        if (input.getInvQty() > inventory.getInvQty()) {
-            throw ThrowUtil.newValidationErrorWithNoLog("입력 수량이 재고 수량보다 큽니다.");
-        }
-
-        // 로케이션 조회 & 기본 체크 포인트 체크
-        Location toLoc = this.findAndCheckLocation(domainId, input.getLocCd(), Inventory.TRANSACTION_IN);
-
-        // 혼적 가능 여부 체크
-        this.checkMixableLocation(toLoc, inventory.getSkuCd());
-
-        // 고정 SKU 로케이션 적치 제한 체크
-        this.checkFixedSkuLocation(toLoc, inventory.getSkuCd());
-
-        // 위험물 상품 로케이션 허용 여부 체크
-        SKU putawaySku = this.wmsBaseSvc.findSku(inventory.getComCd(), inventory.getSkuCd(), false, false);
-        this.checkHazmatLocation(toLoc, putawaySku);
-
-        // 온도 유형 호환성 체크
-        this.checkTemperatureType(toLoc, putawaySku);
-
-        // 바코드 재고 수량, 작업자 입력 수량 체크
+        // 2. 바코드 재고 수량, 작업자 입력 수량 체크
+        String toLocCd = input.getLocCd();
         double invQty = inventory.getInvQty();
         double inputQty = input.getInvQty();
 
-        // 로케이션 최대 수량·중량 초과 검증 (분할 시 비례 중량 계산)
-        double putawayWeight = (inventory.getWeight() != null && invQty > 0)
-                ? inventory.getWeight() * inputQty / invQty
-                : 0.0;
-        this.checkLocationCapacity(toLoc, inputQty, putawayWeight);
-
-        // 바코드 재고 수량이 입력 수량보다 크다면 재고 분할 처리
+        // 3. 바코드 재고 수량이 입력 수량보다 크다면 재고 분할 처리
         if (invQty > inputQty) {
-            Inventory[] invs = this.splitInventory(inventory, inputQty, null, false);
-            Inventory remainInv = invs[1];
-            this.queryManager.update(remainInv);
+            // 재고 분할 및 이동 처리
+            Inventory[] invs = this.splitInventory(inventory, toLocCd, inputQty, null, true);
             inventory = invs[0];
+            // return invs[0];
         }
 
-        // 적치 처리
-        inventory.setLastTranCd(Inventory.TRANSACTION_IN);
-        inventory.setStatus(Inventory.STATUS_STORED);
-        this.queryManager.upsert(inventory);
+        // 4.재고 적치 처리
+        InventoryTran tran = new InventoryTran();
+        tran.setTranQty(inventory.getInvQty());
+        tran.setToLocCd(toLocCd);
+        tran.setRefDocType(InventoryTran.REF_DOC_TYPE_RCV);
+        tran.setRefDocNo(inventory.getRcvNo());
+        tran.setRefLineNo(ValueUtil.toString(inventory.getRcvSeq()));
+        return tran.createReceiveTransaction(inventory);
+    }
 
-        // 재고 이동 처리
-        this.moveInventory(inventory, input.getLocCd(), null);
-
-        // 재고 리턴
-        return inventory;
+    /**
+     * 반품 재입고 처리
+     * 
+     * @param domainId
+     * @param inventory
+     * @return
+     */
+    public Inventory restockByRwa(Long domainId, Inventory inventory) {
+        InventoryTran invTran = new InventoryTran();
+        return invTran.createRestockByRwaTransaction(inventory);
     }
 
     /**
@@ -167,14 +157,8 @@ public class StockTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory moveInventory(Long domainId, InvTransaction input) {
-        // 이동 로케이션 값 체크
-        ValueUtil.checkEmptyData(input.getToLocCd(), "label.to_loc_cd");
-
-        // 재고 이동 사유값 체크
-        ValueUtil.checkEmptyData(input.getReason(), "label.reason");
-
-        // 재고 조회 & 기본 체크 포인트 체크
-        Inventory inventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_MOVE);
+        // 재고 이동 기본 체크 포인트 체크
+        Inventory inventory = this.checkForMoveInventory(domainId, input);
 
         // 재고 이동 처리
         if (ValueUtil.isEmpty(input.getToQty())) {
@@ -193,49 +177,6 @@ public class StockTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory moveInventory(Inventory inventory, String toLocCd, String remark) {
-        // To 로케이션 체크
-        ValueUtil.checkEmptyData(toLocCd, "label.to_loc_cd");
-
-        // 재고 조회 & 기본 체크 포인트 체크
-        this.checkInventoryForTrx(inventory, Inventory.TRANSACTION_MOVE);
-
-        // 재고 할당 여부 체크
-        if (inventory.getReservedQty() != null && inventory.getReservedQty() > 0) {
-            throw ThrowUtil.newValidationErrorWithNoLog("출고 예약된 재고입니다. 출고 예약 해제 후 이동 처리해주세요.");
-        }
-
-        // 로케이션 조회 & 기본 체크 포인트 체크
-        Location toLoc = this.findAndCheckLocation(inventory.getDomainId(), toLocCd, Inventory.TRANSACTION_MOVE);
-
-        if (ValueUtil.isEqualIgnoreCase(inventory.getLocCd(), toLoc.getLocCd())) {
-            throw ThrowUtil.newValidationErrorWithNoLog("이동하려는 로케이션이 재고의 로케이션과 동일합니다.");
-        }
-
-        if (ValueUtil.isNotEqual(inventory.getWhCd(), toLoc.getWhCd())) {
-            throw ThrowUtil.newValidationErrorWithNoLog(
-                    "이동하려는 로케이션의 창고와 재고의 창고가 다릅니다. 창고간의 이동은 Transfer 트랜잭션으로 출고/입고 처리되어야 합니다.");
-        }
-
-        // From 로케이션 조회 & 기본 체크 포인트 체크
-        this.findAndCheckLocation(inventory.getDomainId(), inventory.getLocCd(), null);
-
-        // 혼적 가능 여부 체크
-        this.checkMixableLocation(toLoc, inventory.getSkuCd());
-
-        // 고정 SKU 로케이션 적치 제한 체크
-        this.checkFixedSkuLocation(toLoc, inventory.getSkuCd());
-
-        // 위험물 상품 로케이션 허용 여부 체크
-        SKU moveSku = this.wmsBaseSvc.findSku(inventory.getComCd(), inventory.getSkuCd(), false, false);
-        this.checkHazmatLocation(toLoc, moveSku);
-
-        // 온도 유형 호환성 체크
-        this.checkTemperatureType(toLoc, moveSku);
-
-        // 로케이션 최대 수량·중량 초과 검증
-        double moveWeight = (inventory.getWeight() != null) ? inventory.getWeight() : 0.0;
-        this.checkLocationCapacity(toLoc, inventory.getInvQty(), moveWeight);
-
         // 로케이션에 동일 바코드 조회
         Inventory cond = new Inventory(inventory.getDomainId(), inventory.getBarcode(), toLocCd);
         cond.setSkuCd(inventory.getSkuCd());
@@ -244,43 +185,38 @@ public class StockTransactionService extends AbstractQueryService {
         // 로케이션에 동일 바코드 재고가 이미 있다면 병합 처리
         if (alreadyExistInv != null) {
             return this.mergeInventory(alreadyExistInv, inventory, remark);
+            // 재고 이동 트랜잭션 처리
+        } else {
+            InventoryTran tran = new InventoryTran();
+            tran.setTranQty(inventory.getInvQty());
+            tran.setToLocCd(toLocCd);
+            tran.setRemarks(remark);
+            return tran.createMoveTransaction(inventory);
         }
-
-        // 재고 이동 트랜잭션 처리
-        inventory.setLocCd(toLoc.getLocCd());
-        inventory.setLastTranCd(Inventory.TRANSACTION_MOVE);
-        if (ValueUtil.isNotEmpty(remark)) {
-            inventory.setRemarks(remark);
-        }
-        this.queryManager.upsert(inventory);
-
-        // 재고 정보 리턴
-        return inventory;
     }
 
     /**
      * 재고 바코드에서 모든 재고를 이동하는 것이 아니고 moveQty 만큼만 이동 처리
      * 
-     * @param inventory
-     * @param locCd
-     * @param moveQty
-     * @param remark
+     * @param inventory 이동하려는 재고 바코드
+     * @param toLocCd   이동 로케이션 코드
+     * @param moveQty   이동 수량
+     * @param remark    비고
      * @return
      */
-    public Inventory moveInventory(Inventory inventory, String locCd, double moveQty, String remark) {
+    public Inventory moveInventory(Inventory inventory, String toLocCd, double moveQty, String remark) {
         // 바코드 재고 수량, 작업자 입력 수량 체크
         double invQty = inventory.getInvQty();
 
         // 바코드 재고 수량이 이동할 수량보다 크다면 재고 분할 처리
         if (invQty > moveQty) {
-            Inventory[] invs = this.splitInventory(inventory, moveQty, null, false);
-            Inventory remainInv = invs[1];
-            this.queryManager.update(remainInv);
-            inventory = invs[0];
+            // 재고 분할 && 이동 처리
+            Inventory[] invs = this.splitInventory(inventory, toLocCd, moveQty, "이동 전 분할", true);
+            return invs[0];
+        } else {
+            // 재고 이동 처리
+            return this.moveInventory(inventory, toLocCd, remark);
         }
-
-        // 재고 이동 처리
-        return this.moveInventory(inventory, locCd, remark);
     }
 
     /**
@@ -292,25 +228,12 @@ public class StockTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory mergeInventory(Inventory mainInv, Inventory mergeInv, String remark) {
-        // 1. 원본 재고 수량 업데이트
-        mainInv.setInvQty(mainInv.getInvQty() + mergeInv.getInvQty());
-        mainInv.setLastTranCd(Inventory.TRANSACTION_MERGE);
-        if (ValueUtil.isNotEmpty(remark)) {
-            mainInv.setRemarks(remark);
-        }
-        this.queryManager.update(mainInv, "lastTranCd", "invQty", "remarks", "updatedAt");
+        // 1. 재고 이동 트랜잭션 처리
+        InventoryTran invTran = new InventoryTran();
+        invTran.setRemarks(remark);
+        invTran.createMergeTransaction(mainInv, mergeInv);
 
-        // 2. 병합된 재고 수량 0 처리하여 재고 이력에 남김
-        mergeInv.setLastTranCd(Inventory.TRANSACTION_MERGED);
-        mergeInv.setInvQty(0.0);
-        mergeInv.setRemarks(
-                "Merged to barcode : " + mainInv.getBarcode() + ", location : " + mainInv.getLocCd() + "-" + remark);
-        this.queryManager.update(mergeInv, "lastTranCd", "invQty", "status", "remarks", "updatedAt", "delFlag");
-
-        // 3. 병합된 재고 물리적 삭제
-        this.queryManager.delete(mergeInv);
-
-        // 4. 병합한 재고 리턴
+        // 2. 원본 재고 리턴
         return mainInv;
     }
 
@@ -322,37 +245,10 @@ public class StockTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory mergeInventory(Long domainId, InvTransaction input) {
-        // 원본 재고 조회 & 기본 체크 포인트 체크
-        Inventory mainInventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_MERGE);
-        // 병합할 바코드 체크
-        ValueUtil.checkEmptyData(input.getMergeBarcode(), "label.merge_barcode");
-        // 병합할 로케이션 체크
-        ValueUtil.checkEmptyData(input.getMergeLocCd(), "label.merge_loc_cd");
-        // 병합할 재고 조회 & 기본 체크 포인트 체크
-        Inventory mergeInventory = this.findAndCheckInventory(domainId, input.getMergeBarcode(), input.getMergeLocCd(),
-                Inventory.TRANSACTION_MERGE);
-
-        // 동일 재고 체크
-        if (mainInventory.getId().equals(mergeInventory.getId())) {
-            throw ThrowUtil.newValidationErrorWithNoLog("동일한 재고를 병합할 수 없습니다.");
-        }
-
-        // 동일 SKU 체크
-        if (!mainInventory.getSkuCd().equals(mergeInventory.getSkuCd())) {
-            throw ThrowUtil.newValidationErrorWithNoLog("동일한 SKU만 병합할 수 있습니다.");
-        }
-
-        // 소비기한이 있는 경우, 동일 소비기한 체크
-        if (ValueUtil.isNotEmpty(mainInventory.getExpiredDate())) {
-            if (!mainInventory.getExpiredDate().equals(mergeInventory.getExpiredDate())) {
-                throw ThrowUtil.newValidationErrorWithNoLog("동일한 소비기한을 가진 재고만 병합할 수 있습니다.");
-            }
-        }
-
-        // 할당 수량이 있다면 병합 불가
-        if (mainInventory.getReservedQty() > 0 || mergeInventory.getReservedQty() > 0) {
-            throw ThrowUtil.newValidationErrorWithNoLog("할당 수량이 있는 재고는 병합할 수 없습니다.");
-        }
+        // 병합 처리 전 공통 체크 프로세스 실행
+        Inventory[] invArray = this.checkForMergeInventory(domainId, input);
+        Inventory mainInventory = invArray[0];
+        Inventory mergeInventory = invArray[1];
 
         // 병합 처리 & 결과 리턴
         return this.mergeInventory(mainInventory, mergeInventory, input.getReason());
@@ -366,68 +262,31 @@ public class StockTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory splitInventory(Long domainId, InvTransaction input) {
-        Inventory[] inv = this.splitInventory(domainId, input.getId(), input.getToQty(), input.getReason(), true);
+        Inventory inventory = this.checkForSplitInventory(domainId, input);
+        Inventory[] inv = this.splitInventory(inventory, input.getToLocCd(), input.getToQty(), input.getRemarks(),
+                true);
         return inv[1];
     }
 
     /**
      * 재고 분할 처리
      * 
-     * @param domainId
-     * @param inventoryId
-     * @param splitQty
-     * @param remark
-     * @param saveFlag
-     * @return
-     */
-    public Inventory[] splitInventory(Long domainId, String inventoryId, double splitQty, String remark,
-            boolean saveFlag) {
-
-        // 분할 수량 값 체크
-        ValueUtil.checkEmptyNumber(splitQty, "label.split_qty");
-
-        // 사유 값 체크
-        ValueUtil.checkEmptyData(remark, "label.reason");
-
-        // 재고 조회 & 기본 체크 포인트 체크
-        Inventory inventory = this.findAndCheckInventory(domainId, inventoryId, Inventory.TRANSACTION_SPLIT);
-
-        // 재고 분할 처리
-        return this.splitInventory(inventory, splitQty, remark, saveFlag);
-    }
-
-    /**
-     * 재고 분할 처리
-     * 
      * @param inventory
+     * @param toLocCd
      * @param splitQty
      * @param remark
      * @param saveFlag
      * @return
      */
-    public Inventory[] splitInventory(Inventory inventory, double splitQty, String remark, boolean saveFlag) {
-        double remainQty = inventory.getInvQty() - splitQty;
-
-        if (remainQty < 0) {
-            throw ThrowUtil.newValidationErrorWithNoLog("분할 수량이 재고 수량보다 큽니다.");
-        }
-
-        // 재고 분할 트랜잭션 처리
-        inventory.setInvQty(remainQty);
-        inventory.setRemarks(remark);
-        inventory.setLastTranCd(Inventory.TRANSACTION_SPLIT);
-        if (saveFlag) {
-            this.queryManager.update(inventory);
-        }
-
-        // 재고 복사
-        Inventory splitInv = ValueUtil.populate(inventory, new Inventory());
-        splitInv.setId(null);
-        splitInv.setInvQty(splitQty);
-
-        if (saveFlag) {
-            this.queryManager.insert(splitInv);
-        }
+    private Inventory[] splitInventory(Inventory inventory, String toLocCd, double splitQty, String remark,
+            boolean saveFlag) {
+        // 재고 분할 처리
+        InventoryTran invTran = new InventoryTran();
+        invTran.setLocCd(inventory.getLocCd());
+        invTran.setToLocCd(toLocCd);
+        invTran.setTranQty(splitQty);
+        invTran.setRemarks(remark);
+        Inventory splitInv = invTran.createSplitTransaction(inventory);
 
         // 리턴
         return new Inventory[] { splitInv, inventory };
@@ -441,20 +300,15 @@ public class StockTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory holdInventory(Long domainId, InvTransaction input) {
-        // 사유 값 체크
-        ValueUtil.checkEmptyData(input.getReason(), "label.reason");
-
-        // 재고 조회 & 기본 체크 포인트 체크
-        Inventory inventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_HOLD);
+        // 재고 홀드 체크
+        Inventory inventory = this.checkForHoldInventory(domainId, input);
 
         // 재고 홀드 트랜잭션 처리
-        inventory.setStatus(Inventory.STATUS_LOCK);
-        inventory.setRemarks(input.getReason());
-        inventory.setLastTranCd(Inventory.TRANSACTION_HOLD);
-        this.queryManager.update(inventory);
-
-        // 리턴
-        return inventory;
+        InventoryTran invTran = new InventoryTran();
+        invTran.setReasonCd(input.getReasonCd());
+        invTran.setReason(input.getReason());
+        invTran.setRemarks(input.getRemarks());
+        return invTran.createHoldTransaction(inventory);
     }
 
     /**
@@ -465,58 +319,34 @@ public class StockTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory releaseHoldInventory(Long domainId, InvTransaction input) {
-        // 사유 값 체크
-        ValueUtil.checkEmptyData(input.getReason(), "label.reason");
-
-        // 재고 조회 & 기본 체크 포인트 체크
-        Inventory inventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_RELEASE_HOLD);
+        // 재고 홀드 해제 체크
+        Inventory inventory = this.checkForReleaseHoldInventory(domainId, input);
 
         // 재고 릴리즈 트랜잭션 처리 - 보관 중 상태로 전환 ...
-        inventory.setStatus(Inventory.STATUS_STORED);
-        inventory.setRemarks(input.getReason());
-        inventory.setLastTranCd(Inventory.TRANSACTION_RELEASE_HOLD);
-        this.queryManager.update(inventory);
-
-        // 리턴
-        return inventory;
+        InventoryTran invTran = new InventoryTran();
+        invTran.setReasonCd(input.getReasonCd());
+        invTran.setReason(input.getReason());
+        invTran.setRemarks(input.getRemarks());
+        return invTran.createReleaseHoldTransaction(inventory);
     }
 
     /**
-     * 재고 스크랩 로케이션 이동 처리
+     * 재고 폐기 처리
      * 
      * @param domainId
      * @param input
      * @return
      */
     public Inventory scrapInventory(Long domainId, InvTransaction input) {
-        // 이동 로케이션 값 체크
-        ValueUtil.checkEmptyData(input.getToLocCd(), "label.to_loc_cd");
+        // 재고 폐기 처리 전 체크
+        Inventory inventory = this.checkForScrapInventory(domainId, input);
 
-        // 사유 값 체크
-        ValueUtil.checkEmptyData(input.getReason(), "label.reason");
-
-        // 재고 조회 & 기본 체크 포인트 체크
-        Inventory inventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_SCRAP);
-
-        // 로케이션 조회 & 기본 체크 포인트 체크
-        Location toLoc = this.findAndCheckLocation(domainId, input.getToLocCd(), Inventory.TRANSACTION_SCRAP);
-
-        if (ValueUtil.isEqualIgnoreCase(inventory.getLocCd(), toLoc.getLocCd())) {
-            throw ThrowUtil.newValidationErrorWithNoLog("이동하려는 로케이션이 재고의 로케이션과 동일합니다.");
-        }
-
-        if (ValueUtil.isNotEqual(inventory.getWhCd(), toLoc.getWhCd())) {
-            throw ThrowUtil.newValidationErrorWithNoLog("이동하려는 로케이션의 창고와 재고의 창고가 다릅니다.");
-        }
-
-        // From 로케이션 조회 & 기본 체크 포인트 체크
-        this.findAndCheckLocation(domainId, inventory.getLocCd(), Inventory.TRANSACTION_MOVE);
-
-        // 재고 이동 트랜잭션 처리
-        inventory.setLocCd(toLoc.getLocCd());
-        inventory.setRemarks(input.getReason());
-        inventory.setLastTranCd(Inventory.TRANSACTION_SCRAP);
-        this.queryManager.update(inventory);
+        // 재고 폐기 트랜잭션 처리
+        InventoryTran invTran = new InventoryTran();
+        invTran.setReasonCd(input.getReasonCd());
+        invTran.setReason(input.getReason());
+        invTran.setRemarks(input.getRemarks());
+        invTran.createScrapTransaction(inventory);
 
         // 리턴
         return inventory;
@@ -530,31 +360,109 @@ public class StockTransactionService extends AbstractQueryService {
      * @return
      */
     public Inventory adjustInventory(Long domainId, InvTransaction input) {
-        // 재고 조정 수량 값 체크
-        ValueUtil.checkEmptyNumber(input.getToQty(), "label.to_qty");
+        // 재고 조정을 위한 재고 체크
+        Inventory inventory = this.checkForAdjustInventory(domainId, input, Inventory.TRANSACTION_ADJUST);
 
-        // 사유 값 체크
-        ValueUtil.checkEmptyData(input.getReason(), "label.reason");
-
-        // 재고 조회 & 기본 체크 포인트 체크
-        Inventory inventory = this.findAndCheckInventory(domainId, input.getId(), Inventory.TRANSACTION_ADJUST);
-
-        // 조정 수량 제약 조건 체크
-        double reservedQty = inventory.getReservedQty();
-        if (reservedQty > 0) {
-            if (input.getToQty() < reservedQty) {
-                throw ThrowUtil.newValidationErrorWithNoLog("조정 수량이 예약 수량보다 작을 수 없습니다.");
-            }
-        }
+        // 입력값으로 재고 객체 생성
+        InventoryTran invTran = ValueUtil.populate(inventory, new InventoryTran(), "domainId", "barcode", "whCd",
+                "comCd", "skuCd", "locCd", "lotNo", "serialNo", "expiredDate");
+        invTran.setTranQty(input.getToQty());
+        invTran.setReasonCd(input.getReasonCd());
+        invTran.setReason(input.getReason());
+        invTran.setRemarks(input.getRemarks());
 
         // 재고 조정 트랜잭션 처리
-        inventory.setInvQty(input.getToQty());
-        inventory.setRemarks(input.getReason());
-        inventory.setLastTranCd(Inventory.TRANSACTION_ADJUST);
-        this.queryManager.update(inventory);
+        return invTran.createAdjustTransaction(inventory);
+    }
 
-        // 리턴
-        return inventory;
+    /**
+     * 재고 할당 처리
+     * TODO 재고 할당시 재고 할당 방법에 따라 재고 할당 로직 수정 필요
+     * 
+     * @param inv
+     * @param allocateQty
+     */
+    public Inventory allocateInventory(Inventory inv, double allocateQty) {
+        /*
+         * inv.setReservedQty(inv.getReservedQty() == null ? allocateQty :
+         * inv.getReservedQty()
+         * + allocateQty);
+         * inv.setUpdatedAt(new Date());
+         * this.queryManager.update(inv);
+         * return inv;
+         */
+
+        // 재고 할당
+        InventoryTran invTran = new InventoryTran();
+        invTran.setTranQty(allocateQty);
+        return invTran.createAllocateTransaction(inv);
+    }
+
+    /**
+     * 재고 할당 해제 처리
+     * 
+     * @param domainId
+     * @param inventoryId
+     * @param deallocQty
+     */
+    public Inventory deallocateInventory(Long domainId, String inventoryId, double deallocQty) {
+        /*
+         * String updInvSql =
+         * "UPDATE inventories SET reserved_qty = GREATEST(COALESCE(reserved_qty, 0) - :deallocQty, 0), updated_at = now() WHERE domain_id = :domainId AND id = :invId"
+         * ;
+         * Map<String, Object> updInvParams =
+         * ValueUtil.newMap("deallocQty,domainId,invId", deallocQty, domainId,
+         * inventoryId);
+         * this.queryManager.executeBySql(updInvSql, updInvParams);
+         */
+
+        // 재고 체크
+        Inventory inventory = this.findAndCheckInventory(domainId, inventoryId, null);
+
+        // 재고 할당 해제
+        InventoryTran invTran = new InventoryTran();
+        invTran.setTranQty(deallocQty);
+        return invTran.createDeallocateTransaction(inventory);
+    }
+
+    /**
+     * 재고 최종 출고 마감 처리
+     * 
+     * @param inventory
+     * @param outQty
+     * @param shipmentOrderNo
+     * @return
+     */
+    public Inventory closeShipmentInventory(Inventory inventory, double outQty, String shipmentOrderNo) {
+        /*
+         * inventory.setReservedQty(inventory.getReservedQty() - outQty);
+         * inventory.setInvQty(inventory.getInvQty() - outQty);
+         * inventory.setLastTranCd(Inventory.TRANSACTION_OUT);
+         * inventory.setRlsOrdNo(shipmentOrderNo);
+         * inventory.setUpdatedAt(new Date());
+         * this.queryManager.update(inventory);
+         * return inventory;
+         */
+
+        // 출고 처리
+        InventoryTran invTran = new InventoryTran();
+        invTran.setTranQty(outQty);
+        invTran.setRefDocType(InventoryTran.REF_DOC_TYPE_SHIP);
+        invTran.setRefDocNo(shipmentOrderNo);
+        return invTran.createShipmentTransaction(inventory);
+    }
+
+    /**
+     * 재고 최종 출고 마감 처리
+     * 
+     * @param domainId
+     * @param inventoryId
+     * @param outQty
+     * @param shipmentOrderNo
+     */
+    public Inventory closeShipmentInventory(Long domainId, String inventoryId, double outQty, String shipmentOrderNo) {
+        Inventory inv = this.findAndCheckInventory(domainId, inventoryId, Inventory.TRANSACTION_OUT);
+        return this.closeShipmentInventory(inv, outQty, shipmentOrderNo);
     }
 
     /**
@@ -664,9 +572,11 @@ public class StockTransactionService extends AbstractQueryService {
     public Location validateLocationForMoveOut(Long domainId, String fromLocCd) {
         // 목적지 로케이션 코드 값 체크
         ValueUtil.checkEmptyData(fromLocCd, "label.from_loc_cd");
+
         // 로케이션 조회
         Location location = this.wmsBaseSvc.findLocation(fromLocCd, false, true);
 
+        // 출고 제한 로케이션 체크
         if (ValueUtil.isEqualIgnoreCase(location.getRestrictType(), Inventory.TRANSACTION_OUT)) {
             throw ThrowUtil.newValidationErrorWithNoLog("출고 제한이 걸린 로케이션이라 " + fromLocCd + " 에서 출고가 불가합니다.");
         }
@@ -697,8 +607,10 @@ public class StockTransactionService extends AbstractQueryService {
     public Inventory validateInventoryForMove(Long domainId, String fromLocCd, String barcode, String toLocCd) {
         // 출고 로케이션 코드 존재 여부 체크
         ValueUtil.checkEmptyData(fromLocCd, "label.from_loc_cd");
+
         // 바코드 존재 여부 체크
         ValueUtil.checkEmptyData(barcode, "label.barcode");
+
         // 목적지 로케이션 코드 존재 여부 체크
         ValueUtil.checkEmptyData(toLocCd, "label.to_loc_cd");
 
@@ -770,6 +682,7 @@ public class StockTransactionService extends AbstractQueryService {
             String baseInventoryId) {
         // 병합 바코드 값 체크
         ValueUtil.checkEmptyData(mergeBarcode, "label.merge_barcode");
+
         // 병합 로케이션 값 체크
         ValueUtil.checkEmptyData(mergeLocCd, "label.merge_loc_cd");
 
@@ -896,286 +809,6 @@ public class StockTransactionService extends AbstractQueryService {
     }
 
     /**
-     * 재고 할당 처리
-     * TODO 재고 할당시 재고 할당 방법에 따라 재고 할당 로직 수정 필요
-     * 
-     * @param inv
-     * @param qty
-     */
-    public void allocateInventory(Inventory inv, double qty) {
-        inv.setReservedQty(inv.getReservedQty() == null ? qty : inv.getReservedQty() + qty);
-        inv.setUpdatedAt(new Date());
-        this.queryManager.update(inv);
-    }
-
-    /**
-     * 재고 할당 취소 처리
-     * 
-     * @param domainId
-     * @param inventoryId
-     * @param deallocQty
-     */
-    public void deallocateInventory(Long domainId, String inventoryId, double deallocQty) {
-        String updInvSql = "UPDATE inventories SET reserved_qty = GREATEST(COALESCE(reserved_qty, 0) - :deallocQty, 0), updated_at = now() WHERE domain_id = :domainId AND id = :invId";
-        Map<String, Object> updInvParams = ValueUtil.newMap("deallocQty,domainId,invId", deallocQty, domainId,
-                inventoryId);
-        this.queryManager.executeBySql(updInvSql, updInvParams);
-    }
-
-    /**
-     * 재고 최종 출고 마감 처리
-     * 
-     * @param inventory
-     * @param qty
-     * @return
-     */
-    public Inventory closeShipmentInventory(Inventory inventory, double qty, String shipmentOrderNo) {
-        inventory.setReservedQty(inventory.getReservedQty() - qty);
-        inventory.setInvQty(inventory.getInvQty() - qty);
-        inventory.setLastTranCd(Inventory.TRANSACTION_OUT);
-        inventory.setRlsOrdNo(shipmentOrderNo);
-        inventory.setUpdatedAt(new Date());
-        this.queryManager.update(inventory);
-        return inventory;
-    }
-
-    /**
-     * 재고 최종 출고 마감 처리
-     * 
-     * @param domainId
-     * @param inventoryId
-     * @param qty
-     * @param shipmentOrderNo
-     */
-    public void closeShipmentInventory(Long domainId, String inventoryId, double qty, String shipmentOrderNo) {
-        Inventory inv = this.findAndCheckInventory(domainId, inventoryId, Inventory.TRANSACTION_OUT);
-        this.closeShipmentInventory(inv, qty, shipmentOrderNo);
-    }
-
-    /**
-     * 재고 ID로 재고 정보 조회 & 기본 체크 포인트 체크
-     * 
-     * @param domainId
-     * @param id
-     * @param tranCd
-     * @return
-     */
-    public Inventory findAndCheckInventory(Long domainId, String id, String tranCd) {
-        Inventory condition = new Inventory(id);
-        condition.setDomainId(domainId);
-        Inventory inventory = this.queryManager.select(condition);
-        this.checkInventoryForTrx(inventory, tranCd);
-        return inventory;
-    }
-
-    /**
-     * 재고 ID로 재고 정보 조회 & 기본 체크 포인트 체크
-     * 
-     * @param domainId
-     * @param id
-     * @param tranCd
-     * @return
-     */
-    public Inventory findAndCheckInventory(Long domainId, String barcode, String locCd, String tranCd) {
-        Inventory condition = new Inventory(domainId, barcode, locCd);
-        Inventory inventory = this.queryManager.selectByCondition(Inventory.class, condition);
-        this.checkInventoryForTrx(inventory, tranCd);
-        return inventory;
-    }
-
-    /**
-     * 재고 트랜잭션 전 재고 상태 체크
-     * 
-     * @param inventory
-     * @param tranCd
-     * @return
-     */
-    public Inventory checkInventoryForTrx(Inventory inventory, String tranCd) {
-        if (inventory == null) {
-            throw ThrowUtil.newValidationErrorWithNoLog("존재하지 않는 재고 바코드입니다.");
-        }
-
-        if (inventory.getDelFlag()) {
-            throw ThrowUtil.newValidationErrorWithNoLog("이미 종료된 재고 바코드입니다.");
-        }
-
-        if (inventory.getInvQty() == 0) {
-            throw ThrowUtil.newValidationErrorWithNoLog("재고 수량이 0 입니다.");
-        }
-
-        if (ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_HOLD)) {
-            if (ValueUtil.isEqualIgnoreCase(inventory.getStatus(), Inventory.STATUS_LOCK)) {
-                throw ThrowUtil.newValidationErrorWithNoLog("이미 홀드 처리된 재고입니다.");
-            }
-
-        } else if (ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_RELEASE_HOLD)) {
-            if (ValueUtil.isNotEqual(inventory.getStatus(), Inventory.STATUS_LOCK)) {
-                throw ThrowUtil.newValidationErrorWithNoLog("홀드 처리된 재고가 아닙니다.");
-            }
-
-        } else {
-            if (ValueUtil.isEqualIgnoreCase(inventory.getStatus(), Inventory.STATUS_LOCK)) {
-                throw ThrowUtil.newValidationErrorWithNoLog("홀드 처리된 재고입니다.");
-            }
-        }
-
-        return inventory;
-    }
-
-    /**
-     * 로케이션 코드로 로케이션 조회 & 기본 체크 포인트 체크
-     * 
-     * @param domainId
-     * @param locCd
-     * @param tranCd
-     * @return
-     */
-    public Location findAndCheckLocation(Long domainId, String locCd, String tranCd) {
-
-        Location location = this.wmsBaseSvc.findLocation(locCd, false, true);
-
-        if (ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_MOVE)) {
-            if (ValueUtil.isEqualIgnoreCase(location.getRestrictType(), Inventory.TRANSACTION_MOVE)) {
-                throw ThrowUtil.newValidationErrorWithNoLog("이동 제한이 걸린 로케이션이라 이동이 불가합니다.");
-            }
-        }
-
-        if (ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_IN)) {
-            if (ValueUtil.isEqualIgnoreCase(location.getLocType(), "RCV-WAIT")) {
-                throw ThrowUtil.newValidationErrorWithNoLog("입고 대기 존에 적치는 불가능합니다.");
-            }
-
-            if (ValueUtil.isEqualIgnoreCase(location.getRestrictType(), Inventory.TRANSACTION_IN)) {
-                throw ThrowUtil.newValidationErrorWithNoLog("입고 제한이 걸린 로케이션이라 입고가 불가합니다.");
-            }
-        }
-
-        if (ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_OUT)) {
-            if (ValueUtil.isEqualIgnoreCase(location.getRestrictType(), Inventory.TRANSACTION_OUT)) {
-                throw ThrowUtil.newValidationErrorWithNoLog("출고 제한이 걸린 로케이션이라 출고가 불가합니다.");
-            }
-        }
-
-        if (ValueUtil.isEqualIgnoreCase(tranCd, Inventory.TRANSACTION_SCRAP)) {
-            if (ValueUtil.isNotEqual(location.getLocType(), "DEFECT")) {
-                throw ThrowUtil.newValidationErrorWithNoLog("이동하려는 로케이션 유형이 불량(DEFECT) 유형이 아닙니다.");
-            }
-        }
-
-        return location;
-    }
-
-    /**
-     * 로케이션 혼적 체크
-     *
-     * @param toLoc
-     * @param skuCd
-     */
-    public void checkMixableLocation(Location toLoc, String skuCd) {
-        if (toLoc.getMixableFlag() == null || !toLoc.getMixableFlag()) {
-            String sql = "select distinct(sku_cd) from inventories where domain_id = :domainId and loc_cd = :locCd and (del_flag is null or del_flag = false) and inv_qty > 0";
-            List<String> skuList = this.queryManager.selectListBySql(sql,
-                    ValueUtil.newMap("domainId,locCd", toLoc.getDomainId(), toLoc.getLocCd()), String.class, 0, 0);
-            if (skuList.size() >= 1 && !skuList.contains(skuCd)) {
-                throw ThrowUtil.newValidationErrorWithNoLog("다른 상품과 혼적이 불가한 로케이션입니다.");
-            }
-        }
-    }
-
-    /**
-     * 고정 SKU 로케이션 적치 제한 체크
-     *
-     * Location.skuCd가 지정된 경우, 해당 로케이션에는 지정된 SKU만 적치할 수 있다.
-     * 다른 SKU를 적치하려 하면 예외를 발생시킨다.
-     *
-     * @param toLoc 대상 로케이션
-     * @param skuCd 적치하려는 SKU 코드
-     */
-    public void checkFixedSkuLocation(Location toLoc, String skuCd) {
-        if (ValueUtil.isNotEmpty(toLoc.getSkuCd()) && ValueUtil.isNotEqual(toLoc.getSkuCd(), skuCd)) {
-            throw ThrowUtil.newValidationErrorWithNoLog(
-                    "로케이션 [" + toLoc.getLocCd() + "]은 상품 [" + toLoc.getSkuCd() + "] 전용 고정 로케이션입니다.");
-        }
-    }
-
-    /**
-     * W23-FL-2: 위험물 상품 로케이션 허용 여부 검증
-     *
-     * SKU.hazmatFlag가 true인 경우, Location.hazmatFlag도 true여야 한다.
-     * sku가 null이거나 hazmatFlag가 false/null이면 검증을 건너뛴다.
-     *
-     * @param toLoc 대상 로케이션
-     * @param sku   적치하려는 SKU (null 허용)
-     */
-    public void checkHazmatLocation(Location toLoc, SKU sku) {
-        if (sku != null && Boolean.TRUE.equals(sku.getHazmatFlag())) {
-            if (!Boolean.TRUE.equals(toLoc.getHazmatFlag())) {
-                throw ThrowUtil.newValidationErrorWithNoLog(
-                        "위험물 상품은 위험물 허용 로케이션에만 적치 가능합니다. 로케이션 ["
-                                + toLoc.getLocCd() + "]은 위험물 적치가 불가합니다.");
-            }
-        }
-    }
-
-    /**
-     * W23-FL-4: 온도 유형 호환성 검증
-     *
-     * SKU.tempType과 Location.tempType이 모두 설정된 경우, 두 값이 일치해야 한다.
-     * 어느 한쪽이 null/empty이면 검증을 건너뛴다 (미설정 = 제한 없음).
-     *
-     * @param toLoc 대상 로케이션
-     * @param sku   적치하려는 SKU (null 허용)
-     */
-    public void checkTemperatureType(Location toLoc, SKU sku) {
-        if (sku != null && ValueUtil.isNotEmpty(sku.getTempType())
-                && ValueUtil.isNotEmpty(toLoc.getTempType())) {
-            if (!sku.getTempType().equals(toLoc.getTempType())) {
-                throw ThrowUtil.newValidationErrorWithNoLog(
-                        "상품의 보관 온도 조건(" + sku.getTempType() + ")과 "
-                                + "로케이션의 온도 유형(" + toLoc.getTempType() + ")이 맞지 않습니다.");
-            }
-        }
-    }
-
-    /**
-     * W1-FL-3: 로케이션 최대 수량·중량 초과 검증
-     *
-     * Location.maxQty 또는 Location.maxWeight가 설정된 경우,
-     * 현재 재고 합계에 추가 수량·중량을 더했을 때 초과하면 예외를 발생시킨다.
-     *
-     * @param toLoc     대상 로케이션
-     * @param addQty    추가될 수량
-     * @param addWeight 추가될 중량 (알 수 없으면 0)
-     */
-    public void checkLocationCapacity(Location toLoc, double addQty, double addWeight) {
-        if (toLoc.getMaxQty() != null && toLoc.getMaxQty() > 0) {
-            String sql = "SELECT COALESCE(SUM(inv_qty), 0) FROM inventories " +
-                    "WHERE domain_id = :domainId AND loc_cd = :locCd AND (del_flag IS NULL OR del_flag = false) AND inv_qty > 0";
-            Double currentQty = this.queryManager.selectBySql(sql,
-                    ValueUtil.newMap("domainId,locCd", toLoc.getDomainId(), toLoc.getLocCd()), Double.class);
-            if (currentQty == null)
-                currentQty = 0.0;
-            if (currentQty + addQty > toLoc.getMaxQty()) {
-                throw ThrowUtil.newValidationErrorWithNoLog(
-                        "로케이션 [" + toLoc.getLocCd() + "]의 최대 수량(" + toLoc.getMaxQty() + ")을 초과합니다.");
-            }
-        }
-
-        if (toLoc.getMaxWeight() != null && toLoc.getMaxWeight() > 0 && addWeight > 0) {
-            String sql = "SELECT COALESCE(SUM(weight), 0) FROM inventories " +
-                    "WHERE domain_id = :domainId AND loc_cd = :locCd AND (del_flag IS NULL OR del_flag = false) AND inv_qty > 0";
-            Double currentWeight = this.queryManager.selectBySql(sql,
-                    ValueUtil.newMap("domainId,locCd", toLoc.getDomainId(), toLoc.getLocCd()), Double.class);
-            if (currentWeight == null)
-                currentWeight = 0.0;
-            if (currentWeight + addWeight > toLoc.getMaxWeight()) {
-                throw ThrowUtil.newValidationErrorWithNoLog(
-                        "로케이션 [" + toLoc.getLocCd() + "]의 최대 중량(" + toLoc.getMaxWeight() + ")을 초과합니다.");
-            }
-        }
-    }
-
-    /**
      * 바코드로 SKU 정보 리스트 조회 — PDA 공통 바코드 스캔 지원
      *
      * 항상 리스트로 반환하며, 프론트엔드에서 결과 수에 따라 처리한다:
@@ -1232,5 +865,98 @@ public class StockTransactionService extends AbstractQueryService {
         }
 
         throw ThrowUtil.newValidationErrorWithNoLog("바코드에 해당하는 상품을 찾을 수 없습니다: " + barcode);
+    }
+
+    /**
+     * 일별 재고 수불 집계 — inventory_trans를 집계하여 daily_stock_summaries에 UPSERT한다.
+     * 이미 집계된 날짜를 재실행하면 전체 덮어쓰기(UPSERT)로 처리되므로 멱등성이 보장된다.
+     *
+     * @param domainId    도메인 ID
+     * @param summaryDate 집계 기준일 (YYYY-MM-DD)
+     * @return UPSERT된 레코드 수
+     */
+    public int summarizeDailyStock(Long domainId, String summaryDate) {
+        // opening CTE: summaryDate 이전 마지막 트랜잭션의 after_qty 합산 → 기초 재고
+        // daily CTE: summaryDate 당일 tran_type별 수량 집계
+        // INSERT ... ON CONFLICT: UPSERT (멱등 재실행 보장)
+        String sql = "WITH opening AS (" +
+                "  SELECT wh_cd, com_cd, sku_cd, SUM(after_qty) AS opening_qty" +
+                "  FROM (" +
+                "    SELECT DISTINCT ON (inventory_id) wh_cd, com_cd, sku_cd, after_qty" +
+                "    FROM inventory_trans" +
+                "    WHERE domain_id = :domainId AND tran_date < :summaryDate" +
+                "    ORDER BY inventory_id, tran_at DESC" +
+                "  ) last_trans" +
+                "  GROUP BY wh_cd, com_cd, sku_cd" +
+                ")," +
+                "daily AS (" +
+                "  SELECT wh_cd, com_cd, sku_cd," +
+                "    SUM(CASE WHEN tran_type IN ('IN','RWA_RESTOCK') THEN tran_qty ELSE 0 END) AS in_qty," +
+                "    SUM(CASE WHEN tran_type = 'OUT' THEN tran_qty ELSE 0 END) AS out_qty," +
+                "    SUM(CASE WHEN tran_type = 'IN_CANCEL' THEN tran_qty ELSE 0 END) AS in_cancel_qty," +
+                "    SUM(CASE WHEN tran_type = 'OUT_CANCEL' THEN tran_qty ELSE 0 END) AS out_cancel_qty," +
+                "    SUM(CASE WHEN tran_type = 'MOVE_IN' THEN tran_qty ELSE 0 END) AS transfer_in_qty," +
+                "    SUM(CASE WHEN tran_type = 'MOVE_OUT' THEN tran_qty ELSE 0 END) AS transfer_out_qty," +
+                "    SUM(CASE WHEN tran_type IN ('ADJUST','COUNT') AND direction = 'IN' THEN tran_qty ELSE 0 END) AS adjust_plus_qty,"
+                +
+                "    SUM(CASE WHEN tran_type IN ('ADJUST','COUNT') AND direction = 'OUT' THEN tran_qty ELSE 0 END) AS adjust_minus_qty,"
+                +
+                "    SUM(CASE WHEN tran_type = 'NEW' THEN tran_qty ELSE 0 END) AS add_qty," +
+                "    SUM(CASE WHEN tran_type = 'SCRAP' THEN tran_qty ELSE 0 END) AS loss_qty," +
+                "    SUM(CASE WHEN tran_type = 'VAS_OUT' THEN tran_qty ELSE 0 END) AS vas_out_qty," +
+                "    SUM(CASE WHEN tran_type = 'VAS_IN' THEN tran_qty ELSE 0 END) AS vas_in_qty," +
+                "    CAST(COUNT(*) AS integer) AS tran_count" +
+                "  FROM inventory_trans" +
+                "  WHERE domain_id = :domainId AND tran_date = :summaryDate" +
+                "  GROUP BY wh_cd, com_cd, sku_cd" +
+                ")" +
+                "INSERT INTO daily_stock_summaries (" +
+                "  id, domain_id, summary_date, wh_cd, com_cd, sku_cd," +
+                "  opening_qty, in_qty, out_qty, in_cancel_qty, out_cancel_qty," +
+                "  transfer_in_qty, transfer_out_qty, adjust_plus_qty, adjust_minus_qty," +
+                "  add_qty, loss_qty, vas_out_qty, vas_in_qty, closing_qty, tran_count," +
+                "  created_at, updated_at" +
+                ") SELECT" +
+                "  gen_random_uuid()::text, :domainId, :summaryDate," +
+                "  d.wh_cd, d.com_cd, d.sku_cd," +
+                "  COALESCE(o.opening_qty, 0)," +
+                "  d.in_qty, d.out_qty, d.in_cancel_qty, d.out_cancel_qty," +
+                "  d.transfer_in_qty, d.transfer_out_qty," +
+                "  d.adjust_plus_qty, d.adjust_minus_qty," +
+                "  d.add_qty, d.loss_qty, d.vas_out_qty, d.vas_in_qty," +
+                "  COALESCE(o.opening_qty, 0)" +
+                "    + d.in_qty - d.in_cancel_qty" +
+                "    - d.out_qty + d.out_cancel_qty" +
+                "    + d.transfer_in_qty - d.transfer_out_qty" +
+                "    + d.adjust_plus_qty - d.adjust_minus_qty" +
+                "    + d.add_qty - d.loss_qty" +
+                "    + d.vas_in_qty - d.vas_out_qty," +
+                "  d.tran_count, now(), now()" +
+                " FROM daily d" +
+                " LEFT JOIN opening o ON o.wh_cd = d.wh_cd AND o.com_cd = d.com_cd AND o.sku_cd = d.sku_cd" +
+                " ON CONFLICT (domain_id, summary_date, wh_cd, com_cd, sku_cd) DO UPDATE SET" +
+                "  opening_qty     = EXCLUDED.opening_qty," +
+                "  in_qty          = EXCLUDED.in_qty," +
+                "  out_qty         = EXCLUDED.out_qty," +
+                "  in_cancel_qty   = EXCLUDED.in_cancel_qty," +
+                "  out_cancel_qty  = EXCLUDED.out_cancel_qty," +
+                "  transfer_in_qty = EXCLUDED.transfer_in_qty," +
+                "  transfer_out_qty = EXCLUDED.transfer_out_qty," +
+                "  adjust_plus_qty = EXCLUDED.adjust_plus_qty," +
+                "  adjust_minus_qty = EXCLUDED.adjust_minus_qty," +
+                "  add_qty         = EXCLUDED.add_qty," +
+                "  loss_qty        = EXCLUDED.loss_qty," +
+                "  vas_out_qty     = EXCLUDED.vas_out_qty," +
+                "  vas_in_qty      = EXCLUDED.vas_in_qty," +
+                "  closing_qty     = EXCLUDED.closing_qty," +
+                "  tran_count      = EXCLUDED.tran_count," +
+                "  updated_at      = now()";
+
+        Map<String, Object> params = ValueUtil.newMap("domainId,summaryDate", domainId, summaryDate);
+        this.queryManager.executeBySql(sql, params);
+
+        String countSql = "SELECT COUNT(*) FROM daily_stock_summaries WHERE domain_id = :domainId AND summary_date = :summaryDate";
+        Long count = this.queryManager.selectBySql(countSql, params, Long.class);
+        return count != null ? count.intValue() : 0;
     }
 }

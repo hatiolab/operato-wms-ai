@@ -48,7 +48,7 @@ public class InvTransaction {
      */
     private String locCd;
     /**
-     * 원산지 
+     * 원산지
      */
     private String origin;
     /**
@@ -64,7 +64,7 @@ public class InvTransaction {
      */
     private Double toQty;
     /**
-     * 재고 병합시 병합 바코드 
+     * 재고 병합시 병합 바코드
      */
     private String mergeBarcode;
     /**
@@ -72,143 +72,240 @@ public class InvTransaction {
      */
     private String mergeLocCd;
     /**
+     * 잔여 수량
+     */
+    private String reasonCd;
+    /**
      * 각종 사유 정보
      */
     private String reason;
-    
+    /**
+     * 로트 번호
+     */
+    private String lotNo;
+    /**
+     * 시리얼 번호
+     */
+    private String serialNo;
+    /**
+     * 유통기한
+     */
+    private String expiredDate;
+    /**
+     * 참조 문서 유형
+     */
+    private String refDocType;
+    /**
+     * 참조 문서 번호
+     */
+    private String refDocNo;
+
+    /**
+     * 참조 문서 라인 번호
+     */
+    private String refLineNo;
+    /**
+     * 비고
+     */
+    private String remarks;
+
     public String getId() {
         return id;
     }
-    
+
     public void setId(String id) {
         this.id = id;
     }
-    
+
     public String getBarcode() {
         return barcode;
     }
-    
+
     public void setBarcode(String barcode) {
         this.barcode = barcode;
     }
-    
+
     public String getWhCd() {
         return whCd;
     }
-    
+
     public void setWhCd(String whCd) {
         this.whCd = whCd;
     }
-    
+
     public String getComCd() {
         return comCd;
     }
-    
+
     public void setComCd(String comCd) {
         this.comCd = comCd;
     }
-    
+
     public String getSkuCd() {
         return skuCd;
     }
+
     public void setSkuCd(String skuCd) {
         this.skuCd = skuCd;
     }
-    
+
     public String getSkuBcd() {
         return skuBcd;
     }
-    
+
     public void setSkuBcd(String skuBcd) {
         this.skuBcd = skuBcd;
     }
-    
+
     public String getSkuNm() {
         return skuNm;
     }
-    
+
     public void setSkuNm(String skuNm) {
         this.skuNm = skuNm;
     }
-    
+
     public String getVendCd() {
         return vendCd;
     }
-    
+
     public void setVendCd(String vendCd) {
         this.vendCd = vendCd;
     }
-    
+
     public Double getInvQty() {
         return invQty;
     }
-    
+
     public void setInvQty(Double invQty) {
         this.invQty = invQty;
     }
-    
+
     public String getLocCd() {
         return locCd;
     }
-    
+
     public void setLocCd(String locCd) {
         this.locCd = locCd;
     }
-    
+
     public String getTranCd() {
         return tranCd;
     }
-    
+
     public void setTranCd(String tranCd) {
         this.tranCd = tranCd;
     }
-    
+
     public String getToLocCd() {
         return toLocCd;
     }
-    
+
     public void setToLocCd(String toLocCd) {
         this.toLocCd = toLocCd;
     }
-    
+
     public Double getToQty() {
         return toQty;
     }
-    
+
     public void setToQty(Double toQty) {
         this.toQty = toQty;
     }
-    
+
     public String getMergeBarcode() {
         return mergeBarcode;
     }
-    
+
     public void setMergeBarcode(String mergeBarcode) {
         this.mergeBarcode = mergeBarcode;
     }
-    
+
     public String getMergeLocCd() {
         return mergeLocCd;
     }
-    
+
     public void setMergeLocCd(String mergeLocCd) {
         this.mergeLocCd = mergeLocCd;
     }
-    
+
     public String getReason() {
         return reason;
     }
-    
+
     public void setReason(String reason) {
         this.reason = reason;
     }
 
-	public String getOrigin() {
-		return origin;
-	}
+    public String getOrigin() {
+        return origin;
+    }
 
-	public void setOrigin(String origin) {
-		this.origin = origin;
-	}
-    
+    public void setOrigin(String origin) {
+        this.origin = origin;
+    }
+
+    public String getReasonCd() {
+        return reasonCd;
+    }
+
+    public void setReasonCd(String reasonCd) {
+        this.reasonCd = reasonCd;
+    }
+
+    public String getLotNo() {
+        return lotNo;
+    }
+
+    public void setLotNo(String lotNo) {
+        this.lotNo = lotNo;
+    }
+
+    public String getSerialNo() {
+        return serialNo;
+    }
+
+    public void setSerialNo(String serialNo) {
+        this.serialNo = serialNo;
+    }
+
+    public String getExpiredDate() {
+        return expiredDate;
+    }
+
+    public void setExpiredDate(String expiredDate) {
+        this.expiredDate = expiredDate;
+    }
+
+    public String getRefDocType() {
+        return refDocType;
+    }
+
+    public void setRefDocType(String refDocType) {
+        this.refDocType = refDocType;
+    }
+
+    public String getRefDocNo() {
+        return refDocNo;
+    }
+
+    public void setRefDocNo(String refDocNo) {
+        this.refDocNo = refDocNo;
+    }
+
+    public String getRefLineNo() {
+        return refLineNo;
+    }
+
+    public void setRefLineNo(String refLineNo) {
+        this.refLineNo = refLineNo;
+    }
+
+    public String getRemarks() {
+        return remarks;
+    }
+
+    public void setRemarks(String remarks) {
+        this.remarks = remarks;
+    }
 }

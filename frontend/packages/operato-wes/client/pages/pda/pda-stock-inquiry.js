@@ -55,17 +55,24 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     inv_qty: '',
     lot_no: '',
     expired_date: '',
+    reason_cd: '',
     remarks: ''
   }
   /** 창고 목록 (select 옵션용) */
   @state() warehouses = []
   /** 화주사 목록 (select 옵션용) */
   @state() companies = []
+  /** 재고 생성 사유 코드 목록 (INV_NEW_REASON) */
+  @state() _newReasonCodes = []
 
   /** 재고 조정 수량 입력값 */
   @state() _adjQty = ''
   /** 재고 조정 원인 입력값 */
   @state() _adjReason = ''
+  /** 재고 조정 사유 코드 선택값 */
+  @state() _adjReasonCd = ''
+  /** 재고 조정 사유 코드 목록 (INV_ADJUST_REASON) */
+  @state() _adjReasonCodes = []
 
   /** 재고 이동 To 로케이션 코드 */
   @state() _moveToLocCd = ''
@@ -890,6 +897,18 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         </div>
 
         <div class="form-field">
+          <label>${TermsUtil.tLabel('reason_cd') || '사유 코드'}</label>
+          <select @change=${e => this._updateAddForm('reason_cd', e.target.value)}>
+            <option value="">-- ${TermsUtil.tButton('select') || '선택'} --</option>
+            ${this._newReasonCodes.map(rc => html`
+              <option value="${rc.name}" ?selected=${this.addForm.reason_cd === rc.name}>
+                ${rc.name}${rc.description ? ` (${rc.description})` : ''}
+              </option>
+            `)}
+          </select>
+        </div>
+
+        <div class="form-field">
           <label>${TermsUtil.tLabel('remarks') || '비고'}</label>
           <input type="text"
             placeholder="${TermsUtil.tLabel('remarks') || '비고 입력'}"
@@ -974,12 +993,23 @@ export class PdaStockInquiry extends connect(store)(PageView) {
             @input=${e => (this._adjQty = e.target.value)}>
         </div>
         <div class="form-field">
+          <label>${TermsUtil.tLabel('reason_cd') || '사유 코드'}</label>
+          <select @change=${e => (this._adjReasonCd = e.target.value)}>
+            <option value="">-- ${TermsUtil.tButton('select') || '선택'} --</option>
+            ${this._adjReasonCodes.map(rc => html`
+              <option value="${rc.name}" ?selected=${this._adjReasonCd === rc.name}>
+                ${rc.name}${rc.description ? ` (${rc.description})` : ''}
+              </option>
+            `)}
+          </select>
+        </div>
+        <div class="form-field">
           <label>
-            ${TermsUtil.tLabel('reason') || '조정 원인'}
+            ${TermsUtil.tLabel('remarks') || '비고'}
             <span class="required">*</span>
           </label>
           <input type="text"
-            placeholder="${TermsUtil.tLabel('reason') || '조정 원인 입력'}"
+            placeholder="${TermsUtil.tLabel('remarks') || '비고'}"
             .value=${this._adjReason}
             @input=${e => (this._adjReason = e.target.value)}>
         </div>
@@ -1188,7 +1218,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   }
 
   /** 페이지 초기화 */
-  pageInitialized() {
+  async pageInitialized() {
     this.mode = 'list'
     this.inventories = []
     this.searchBarcode = ''
@@ -1201,6 +1231,8 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       const innerInput = oxInput?.shadowRoot?.querySelector('input')
       if (innerInput) innerInput.focus()
     }, 100)
+
+    await this._loadMasterData()
   }
 
   /**
@@ -1366,7 +1398,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   }
 
   /**
-   * 재고 추가 화면으로 이동 — 창고·화주사 마스터 로드
+   * 재고 추가 화면으로 이동 — 창고·화주사 마스터 + 사유 코드 로드
    */
   async _goAdd() {
     this.addForm = {
@@ -1377,27 +1409,63 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       inv_qty: '',
       lot_no: '',
       expired_date: '',
+      reason_cd: '',
       remarks: ''
     }
     this.lastFeedback = null
     this.mode = 'add'
-    await this._loadMasterData()
   }
 
   /**
-   * 창고·화주사 마스터 데이터 로드
-   * GET /rest/warehouses, GET /rest/companies
+   * 창고·화주사 마스터 데이터 + INV_NEW_REASON 사유 코드 로드
+   * GET /rest/warehouses, GET /rest/companies, GET /rest/common_codes
    */
   async _loadMasterData() {
+    // 창고, 화주사 정보 조회
     try {
       const [whResult, comResult] = await Promise.all([
         ServiceUtil.restGet('warehouses?limit=200'),
         ServiceUtil.restGet('companies?limit=200')
       ])
+
       this.warehouses = whResult?.items || whResult || []
       this.companies = comResult?.items || comResult || []
     } catch (error) {
       console.error('마스터 데이터 로드 실패:', error)
+    }
+
+    // 재고 생성, 재고 조정 사유 코드 조회
+    await Promise.all([
+      this._loadNewReasonCodes(),
+      this._loadAdjustReasonCodes()
+    ])
+  }
+
+  /**
+   * INV_NEW_REASON 공통코드 상세 목록 로드
+   * GET /rest/common_codes/show_by_name?name=INV_NEW_REASON
+   */
+  async _loadNewReasonCodes() {
+    try {
+      const codeMaster = await ServiceUtil.codeItems('INV_NEW_REASON')
+      if (!codeMaster || !codeMaster.id) return
+      this._newReasonCodes = codeMaster.items || []
+    } catch (error) {
+      console.error('재고 생성 사유 코드 로드 실패:', error)
+    }
+  }
+
+  /**
+   * INV_ADJUST_REASON 공통코드 상세 목록 로드
+   * GET /rest/common_codes/show_by_name?name=INV_ADJUST_REASON
+   */
+  async _loadAdjustReasonCodes() {
+    try {
+      const codeMaster = await ServiceUtil.codeItems('INV_ADJUST_REASON')
+      if (!codeMaster || !codeMaster.id) return
+      this._adjReasonCodes = codeMaster.items || []
+    } catch (error) {
+      console.error('재고 조정 사유 코드 로드 실패:', error)
     }
   }
 
@@ -1438,6 +1506,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         inv_qty: qty,
         lot_no: this.addForm.lot_no || null,
         expired_date: this.addForm.expired_date || null,
+        reason_cd: this.addForm.reason_cd || null,
         remarks: this.addForm.remarks || null
       }, null, null, (res) => {
         document.dispatchEvent(new CustomEvent('notify', {
@@ -1463,6 +1532,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   _goAdjust() {
     this._adjQty = ''
     this._adjReason = ''
+    this._adjReasonCd = ''
     this.lastFeedback = null
     this.mode = 'adjust'
     setTimeout(() => {
@@ -1740,7 +1810,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       return
     }
     if (!this._adjReason || !this._adjReason.trim()) {
-      this._showFeedback('조정 원인을 입력하세요', 'warning')
+      this._showFeedback('비고를 입력하세요', 'warning')
       return
     }
 
@@ -1755,7 +1825,8 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       const inv = this.selectedInventory
       await ServiceUtil.restPost(`inventory_trx/${inv.id}/adjust_inventory`, {
         to_qty: qty,
-        reason: this._adjReason.trim()
+        remarks: this._adjReason.trim(),
+        reason_cd: this._adjReasonCd || null
       }, null, null, (result) => {
         document.dispatchEvent(new CustomEvent('notify', {
           detail: { level: 'info', message: `재고 조정 완료: ${inv.barcode} (${qty > 0 ? '+' : ''}${qty})` }

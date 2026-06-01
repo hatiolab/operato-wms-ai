@@ -128,11 +128,17 @@ public class DailyStockSummary extends xyz.elidom.orm.entity.basic.DomainCreateS
 	private Double vasOutQty;
 
 	/**
+	 * 유통가공 재입고 수량 (VAS_IN) - 유통가공 완료 후 재고로 복귀한 수량
+	 */
+	@Column(name = "vas_in_qty", nullable = false)
+	private Double vasInQty;
+
+	/**
 	 * 기말 재고 수량 - closing_qty = opening_qty + in_qty - in_cancel_qty
 	 * - out_qty + out_cancel_qty
 	 * + transfer_in_qty - transfer_out_qty
 	 * + adjust_plus_qty - adjust_minus_qty
-	 * + add_qty - loss_qty - vas_out_qty
+	 * + add_qty - loss_qty + vas_in_qty - vas_out_qty
 	 */
 	@Column(name = "closing_qty", nullable = false)
 	private Double closingQty;
@@ -283,6 +289,14 @@ public class DailyStockSummary extends xyz.elidom.orm.entity.basic.DomainCreateS
 
 	public void setVasOutQty(Double vasOutQty) {
 		this.vasOutQty = vasOutQty;
+	}
+
+	public Double getVasInQty() {
+		return vasInQty;
+	}
+
+	public void setVasInQty(Double vasInQty) {
+		this.vasInQty = vasInQty;
 	}
 
 	public Double getClosingQty() {

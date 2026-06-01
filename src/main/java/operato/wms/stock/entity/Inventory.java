@@ -107,9 +107,13 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	 */
 	public static final String TRANSACTION_TRANSFER = "TRANSFER";
 	/**
-	 * 재고 트렌젝션 - RESERVE (피킹 예약)
+	 * 재고 트렌젝션 - ALLOCATE (피킹 할당)
 	 */
-	public static final String TRANSACTION_RESERVE = "RESERVE";
+	public static final String TRANSACTION_ALLOCATE = "ALLOCATE";
+	/**
+	 * 재고 트렌젝션 - DEALLOCATE (피킹 할당 해제)
+	 */
+	public static final String TRANSACTION_DEALLOCATE = "DEALLOCATE";
 	/**
 	 * 재고 트렌젝션 - HOLD (홀드)
 	 */
@@ -138,6 +142,10 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	 * 재고 트렌젝션 - ADJUST (재고 조정)
 	 */
 	public static final String TRANSACTION_ADJUST = "ADJUST";
+	/**
+	 * 재고 트렌젝션 - COUNT (재고 실사)
+	 */
+	public static final String TRANSACTION_COUNT = "COUNT";
 	/**
 	 * 재고 트렌젝션 - NEW (재고 생성)
 	 */
@@ -787,15 +795,19 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		// 유통기한 계산
 		this.calculateExpiryDate();
 
-		if (this.invQty <= 0) {
-			// 재고 소진시 상태 : 비어있음
-			this.status = Inventory.STATUS_EMPTY;
-			this.delFlag = true;
-			this.closedAt = DateUtil.currentTimeStr();
-		} else {
-			// 상태 초기화 : 보관 중
-			this.status = (this.status == null) ? Inventory.STATUS_STORED : this.status;
-		}
+		/*
+		 * if (this.invQty <= 0) {
+		 * // 재고 소진시 상태 : 비어있음
+		 * this.status = Inventory.STATUS_EMPTY;
+		 * this.delFlag = true;
+		 * this.closedAt = DateUtil.currentTimeStr();
+		 * } else {
+		 * // 상태 초기화 : 보관 중
+		 * this.status = (this.status == null) ? Inventory.STATUS_STORED : this.status;
+		 * }
+		 */
+
+		this.status = (this.status == null) ? Inventory.STATUS_STORED : this.status;
 	}
 
 	/**
@@ -838,14 +850,23 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	public void beforeUpdate() {
 		super.beforeUpdate();
 
-		if (this.invQty <= 0) {
-			this.status = Inventory.STATUS_EMPTY;
-			this.delFlag = true;
-			this.closedAt = DateUtil.currentTimeStr();
-		}
-
+		// 입고 시 입고 시간 자동 설정
 		if (ValueUtil.isEqualIgnoreCase(Inventory.TRANSACTION_IN, this.lastTranCd)) {
 			this.receivedAt = DateUtil.currentTimeStr();
+		}
+
+		// 재고 수량이 0이면 상태 변경 및 마감 처리
+		if (this.invQty <= 0) {
+			this.status = Inventory.STATUS_EMPTY;
+			this.closedAt = DateUtil.currentTimeStr();
+			// 삭제 플래그는 폐기 시에만 처리 - TODO delFlag 사용 부분 모두 체크 필요
+			// this.delFlag = true;
+		}
+
+		// 폐기 시 상태 : 폐기
+		if (ValueUtil.isEqualIgnoreCase(this.lastTranCd, Inventory.TRANSACTION_SCRAP)) {
+			this.closedAt = DateUtil.currentTimeStr();
+			this.delFlag = true;
 		}
 	}
 
