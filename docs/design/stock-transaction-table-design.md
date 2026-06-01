@@ -174,6 +174,7 @@ after_qty >= 0                     (재고 음수 불가)
 | `add_qty` | DOUBLE PRECISION | ✓ | 추가 수량 (NEW) |
 | `loss_qty` | DOUBLE PRECISION | ✓ | 손실 수량 (SCRAP / LOSS) |
 | `vas_out_qty` | DOUBLE PRECISION | ✓ | 유통가공 차감 (VAS_OUT) |
+| `vas_in_qty` | DOUBLE PRECISION | ✓ | 유통가공 재입고 (VAS_IN) - 유통가공 완료 후 재고 복귀 수량 |
 | `closing_qty` | DOUBLE PRECISION | ✓ | 기말 재고 (= 기초 + 당일 변동 합산) |
 | `tran_count` | INTEGER | ✓ | 해당일 총 트랜잭션 건수 |
 | `created_at` | TIMESTAMP | ✓ | 배치 생성 일시 |
@@ -189,6 +190,7 @@ closing_qty = opening_qty
             + adjust_plus_qty - adjust_minus_qty
             + add_qty
             - loss_qty
+            + vas_in_qty
             - vas_out_qty
 ```
 
