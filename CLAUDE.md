@@ -142,4 +142,5 @@
 | `/create_sample_in` | 입고 주문 샘플 데이터 생성 (도메인·주문수·아이템수·입고예정일·일수 입력 → receivings + receiving_items 자동 생성). 인자: 없음 (대화형) |
 | `/create_sample_stock` | 입고 완료 + 재고 샘플 데이터 생성 (도메인·화주사·주문수·아이템수·입고날짜 입력 → receivings(END) + receiving_items(END) + inventories + inventory_hists 자동 생성). 인자: 없음 (대화형) |
 | `/create_stock_by_sku` | Excel 파일을 읽어 재고 마이그레이션 데이터를 DB에 일괄 등록 (receivings 1건 + receiving_items/inventories/inventory_hists N건). 인자: `[파일경로]` (선택) |
+| `/sync_common_code` | 지정 도메인의 공통코드를 모든 도메인에 동기화 (생성/업데이트). 인자: `source_domain code_name` (예: `18 INVENTORY_TRANSACTION`) |
 | `/fix_classpath` | VSCode 실행 시 `logback-spring.xml not found` 오류 수정 (`.classpath`의 `excluding="**"` 제거). Gradle 동기화 후 재발 시 재실행 |
