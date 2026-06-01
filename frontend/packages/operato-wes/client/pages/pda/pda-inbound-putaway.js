@@ -51,6 +51,8 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
   @state() scannedBarcode = ''
   /** 적치할 로케이션 코드 */
   @state() locCd = ''
+  /** 입력한 적치 수량 */
+  @state() putawayQty = 0
 
   /** 적치 대기 건수 (전체) */
   @state() waitingCount = 0
@@ -404,6 +406,20 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
           --input-height: 24px;
           --input-font-size: 12px;
           font-size: 12px;
+        }
+
+        .scan-step input[type="number"] {
+          flex: 1;
+          height: 26px;
+          min-width: 0;
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 4px;
+          padding: 0 8px;
+          font-size: 14px;
+          font-weight: 600;
+          text-align: right;
+          color: var(--md-sys-color-on-surface, #333);
+          background: var(--md-sys-color-surface-container-lowest, #fff);
         }
 
         /* 로케이션 확인 텍스트 (스텝 2 완료 후) */
@@ -897,13 +913,13 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
 `
   }
 
-  /** 스캔 2단계 렌더링 — 각 단계를 한 줄로 배치, 확정 버튼은 로케이션 행에 인라인 */
+  /** 스캔 3단계 렌더링 — 바코드 → 로케이션 → 적치 수량 + 확정 */
   _renderScanSteps() {
-    const step1Done = this.scanStep === 'location' || !!this.locCd
-    const step2Done = !!this.locCd
+    const step1Done = this.scanStep === 'location' || this.scanStep === 'qty'
+    const step2Done = this.scanStep === 'qty'
 
     return html`
-      <!-- 스텝 1: 재고 바코드 스캔 — 뱃지 + 라벨 + input -->
+      <!-- 스텝 1: 재고 바코드 스캔 -->
       <div class="scan-step ${this.scanStep === 'barcode' ? 'active' : ''}">
         <span class="step-badge ${step1Done ? 'done-badge' : ''}">${step1Done ? '✓' : '1'}</span>
         <span class="step-label-text">${TermsUtil.tLabel('scan_barcode') || '바코드 스캔'}</span>
@@ -922,7 +938,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
 
       ${this._renderRecommendedLocations()}
 
-      <!-- 스텝 2: 로케이션 스캔 — 뱃지 + 라벨 + input + 확정 버튼 -->
+      <!-- 스텝 2: 로케이션 스캔 -->
       <div class="scan-step ${this.scanStep === 'location' ? 'active' : ''}">
         <span class="step-badge ${step2Done ? 'done-badge' : ''}">${step2Done ? '✓' : '2'}</span>
         <span class="step-label-text">${TermsUtil.tLabel('loc_cd') || '로케이션'}</span>
@@ -935,12 +951,26 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
         ` : html`
           <span class="location-confirmed">${this.locCd || ''}</span>
         `}
-        <button class="btn-confirm"
-          ?disabled=${this.processing || !this.locCd}
-          @click=${this._confirmPutaway}>
-          ${TermsUtil.tButton('confirm') || '확정'}
-        </button>
       </div>
+
+      <!-- 스텝 3: 적치 수량 입력 + 확정 버튼 (로케이션 확인 후 표시) -->
+      ${this.locCd ? html`
+        <div class="scan-step active">
+          <span class="step-badge">3</span>
+          <span class="step-label-text">${TermsUtil.tLabel('load_qty') || '적치 수량'}</span>
+          <input type="number" id="putawayQtyInput"
+            .value=${this.putawayQty}
+            min="0"
+            step="1"
+            ?disabled=${this.processing}
+            @input=${e => { this.putawayQty = parseFloat(e.target.value) || 0 }}>
+          <button class="btn-confirm"
+            ?disabled=${this.processing || !this.locCd}
+            @click=${this._confirmPutaway}>
+            ${TermsUtil.tButton('confirm') || '확정'}
+          </button>
+        </div>
+      ` : ''}
     `
   }
 
@@ -1178,7 +1208,10 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
   _onScanLocation(locCd) {
     if (!locCd || this.processing) return
     this.locCd = locCd
-    this._showFeedback(`로케이션 확인: ${locCd} — 확정 버튼을 눌러주세요`, 'success')
+    this.scanStep = 'qty'
+    const currentItem = this.currentItemIndex >= 0 ? this.workItems[this.currentItemIndex] : null
+    this.putawayQty = currentItem ? (currentItem.inv_qty || 0) : 0
+    this._showFeedback(`로케이션 확인: ${locCd} — 적치 수량을 확인하고 확정하세요`, 'success')
     if (this._locationInput) this._locationInput.value = ''
   }
 
@@ -1202,8 +1235,10 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
     try {
       await ServiceUtil.restPut(`inventory_trx/put_away/${item.id}`, {
         barcode: item.barcode,
-        loc_cd: this.locCd
-      }, null, null, async (res) => {
+        loc_cd: this.locCd,
+        inv_qty: this.putawayQty,
+        to_qty: item.inv_qty
+      }, null, null, async (_res) => {
         // 서버에서 최신 항목 목록 재조 회 
         await this._loadWorkItems(this.currentRcvNo)
 
@@ -1412,6 +1447,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
     this.scanStep = 'barcode'
     this.scannedBarcode = ''
     this.locCd = ''
+    this.putawayQty = 0
     this.recommendedLocations = []
     this.loadingLocations = false
   }

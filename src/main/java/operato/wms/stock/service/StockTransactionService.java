@@ -8,6 +8,8 @@ import org.springframework.stereotype.Component;
 import operato.wms.base.entity.Location;
 import operato.wms.base.entity.SKU;
 import operato.wms.base.entity.StoragePolicy;
+import operato.wms.inbound.WmsInboundConstants;
+import operato.wms.stock.WmsStockConstants;
 import operato.wms.stock.entity.Inventory;
 import operato.wms.stock.entity.InventoryTran;
 import operato.wms.stock.model.InvTransaction;
@@ -124,17 +126,25 @@ public class StockTransactionService extends BaseStockService {
             // 재고 분할 및 이동 처리
             Inventory[] invs = this.splitInventory(inventory, toLocCd, inputQty, null, true);
             inventory = invs[0];
-            // return invs[0];
         }
 
-        // 4.재고 적치 처리
+        // 4. 재고 적치 처리
         InventoryTran tran = new InventoryTran();
         tran.setTranQty(inventory.getInvQty());
         tran.setToLocCd(toLocCd);
         tran.setRefDocType(InventoryTran.REF_DOC_TYPE_RCV);
         tran.setRefDocNo(inventory.getRcvNo());
         tran.setRefLineNo(ValueUtil.toString(inventory.getRcvSeq()));
-        return tran.createReceiveTransaction(inventory);
+        tran.createReceiveTransaction(inventory);
+
+        // 5. 입고 지시 상태 변경
+        String sql = "update receivings set status = :status where domain_id = :domainId and rcv_no = :rcvNo and status = :prevStatus";
+        Map<String, Object> params = ValueUtil.newMap("domainId,rcvNo,status,prevStatus", domainId,
+                inventory.getRcvNo(), WmsInboundConstants.STATUS_PUTAWAY, WmsInboundConstants.STATUS_APPROVED);
+        this.queryManager.executeBySql(sql, params);
+
+        // 6. 재고 리턴
+        return inventory;
     }
 
     /**

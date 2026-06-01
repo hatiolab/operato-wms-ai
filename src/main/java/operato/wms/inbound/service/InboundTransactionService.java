@@ -15,13 +15,11 @@ import operato.wms.base.entity.StoragePolicy;
 import operato.wms.base.entity.Warehouse;
 import operato.wms.base.service.RuntimeConfigService;
 import operato.wms.base.service.WmsBaseService;
-import operato.wms.inbound.WmsInboundConfigConstants;
 import operato.wms.inbound.WmsInboundConstants;
 import operato.wms.inbound.entity.ImportReceivingOrder;
 import operato.wms.inbound.entity.Receiving;
 import operato.wms.inbound.entity.ReceivingItem;
 import operato.wms.inbound.query.store.InboundQueryStore;
-import operato.wms.stock.WmsStockConfigConstants;
 import operato.wms.stock.entity.Inventory;
 import xyz.anythings.sys.event.EventPublisher;
 import xyz.anythings.sys.event.model.PrintEvent;
@@ -100,7 +98,8 @@ public class InboundTransactionService extends AbstractQueryService {
         String rcvReqNo = firstOrder.getRcvReqNo();
         if (ValueUtil.isNotEmpty(rcvReqNo)) {
             String dupCheckSql = "SELECT count(id) FROM receivings WHERE domain_id = :domainId AND rcv_req_no = :rcvReqNo";
-            int count = this.queryManager.selectBySql(dupCheckSql, ValueUtil.newMap("domainId,rcvReqNo", domainId, rcvReqNo), Integer.class);
+            int count = this.queryManager.selectBySql(dupCheckSql,
+                    ValueUtil.newMap("domainId,rcvReqNo", domainId, rcvReqNo), Integer.class);
             if (count > 0) {
                 throw new ElidomRuntimeException("입고요청번호 [" + rcvReqNo + "]는 이미 등록된 입고 주문입니다. 기존 주문을 확인해 주세요.");
             }
@@ -117,7 +116,8 @@ public class InboundTransactionService extends AbstractQueryService {
         int rcvExpSeq = 1;
 
         for (ImportReceivingOrder order : list) {
-            if (ValueUtil.isEmpty(order.getSkuCd())) continue;
+            if (ValueUtil.isEmpty(order.getSkuCd()))
+                continue;
 
             if (order.getRcvExpQty() != null && order.getRcvExpQty() <= 0) {
                 throw new ElidomRuntimeException("SKU [" + order.getSkuCd() + "]의 예정수량은 0보다 커야 합니다.");
@@ -865,7 +865,8 @@ public class InboundTransactionService extends AbstractQueryService {
         }
 
         // 2. 입고 예정 정보 상태 체크
-        if (ValueUtil.isNotEqual(rcv.getStatus(), WmsInboundConstants.STATUS_END)) {
+        if (ValueUtil.isNotEqual(rcv.getStatus(), WmsInboundConstants.STATUS_APPROVED)
+                && ValueUtil.isNotEqual(rcv.getStatus(), WmsInboundConstants.STATUS_PUTAWAY)) {
             throw new ElidomRuntimeException("적치 작업을 처리할 수 있는 상태가 아닙니다.");
         }
 
@@ -1040,7 +1041,7 @@ public class InboundTransactionService extends AbstractQueryService {
                 " FROM receivings r" +
                 " JOIN inventories i ON r.domain_id = i.domain_id AND r.rcv_no = i.rcv_no" +
                 " WHERE r.domain_id = :domainId" +
-                " AND r.status = 'END'" +
+                " AND r.status IN ('APPROVED', 'STORED')" +
                 " AND (i.del_flag IS NULL OR i.del_flag = false)" +
                 " AND i.status IN ('WAITING', 'STORED')" +
                 " GROUP BY r.rcv_no, r.rcv_req_date, r.com_cd, r.vend_cd" +

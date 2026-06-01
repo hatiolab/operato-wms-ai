@@ -312,8 +312,7 @@ public class InboundDashboardService extends AbstractQueryService {
         Long domainId = Domain.currentDomainId();
         String today = DateUtil.todayStr();
 
-        String waitingSql =
-                "SELECT COUNT(*) " +
+        String waitingSql = "SELECT COUNT(*) " +
                 "FROM inventories i " +
                 "WHERE i.domain_id = :domainId " +
                 "AND i.status = 'WAITING' " +
@@ -323,8 +322,7 @@ public class InboundDashboardService extends AbstractQueryService {
         Integer waitingCount = this.queryManager.selectBySql(
                 waitingSql, ValueUtil.newMap("domainId", domainId), Integer.class);
 
-        String putawaySubQuery =
-                "SELECT ih.barcode, MAX(ih.inv_qty) AS inv_qty " +
+        String putawaySubQuery = "SELECT ih.barcode, MAX(ih.inv_qty) AS inv_qty " +
                 "FROM inventory_hists ih " +
                 "WHERE ih.domain_id = :domainId " +
                 "AND ih.rcv_no IS NOT NULL " +
@@ -342,24 +340,19 @@ public class InboundDashboardService extends AbstractQueryService {
                 ") " +
                 "GROUP BY ih.barcode";
 
-        String storedCountSql =
-                "SELECT COUNT(*) " +
+        String storedCountSql = "SELECT COUNT(*) " +
                 "FROM (" + putawaySubQuery + ") putaway";
 
         Integer storedCount = this.queryManager.selectBySql(
                 storedCountSql, ValueUtil.newMap("domainId,today", domainId, today), Integer.class);
 
-        String storedQtySql =
-                "SELECT COALESCE(SUM(putaway.inv_qty), 0) " +
+        String storedQtySql = "SELECT COALESCE(SUM(putaway.inv_qty), 0) " +
                 "FROM (" + putawaySubQuery + ") putaway";
 
         Double storedQty = this.queryManager.selectBySql(
                 storedQtySql, ValueUtil.newMap("domainId,today", domainId, today), Double.class);
 
-        Map<String, Object> result = new java.util.HashMap<>();
-        result.put("waiting_count", waitingCount != null ? waitingCount : 0);
-        result.put("stored_count", storedCount != null ? storedCount : 0);
-        result.put("stored_qty", storedQty != null ? storedQty : 0);
-        return result;
+        return ValueUtil.newMap("waiting_count,stored_count,stored_qty", ValueUtil.toInteger(waitingCount, 0),
+                ValueUtil.toInteger(storedCount, 0), ValueUtil.toInteger(storedQty, 0));
     }
 }

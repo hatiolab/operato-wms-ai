@@ -11,27 +11,27 @@ public class WmsInboundConstants {
 	 * 상태 : 작성중
 	 */
 	public static final String STATUS_INWORK = "INWORK";
-	
+
 	/**
-	 * 상태 : 요청 
+	 * 상태 : 요청
 	 */
 	public static final String STATUS_REQUEST = "REQUEST";
-	
+
 	/**
-	 * 상태 : 대기 
+	 * 상태 : 대기
 	 */
 	public static final String STATUS_READY = "READY";
-	
+
 	/**
-	 * 상태 : 작업중 
+	 * 상태 : 작업중
 	 */
 	public static final String STATUS_START = "START";
-	
+
 	/**
-	 * 상태 : 완료  
+	 * 상태 : 완료
 	 */
 	public static final String STATUS_END = "END";
-	
+
 	/**
 	 * 상태 : 취소
 	 */
@@ -46,9 +46,19 @@ public class WmsInboundConstants {
 	 * 상태 : 검수 승인 (화주사 검수 후 승인)
 	 */
 	public static final String STATUS_APPROVED = "APPROVED";
-	
+
 	/**
-	 * 검수 결과 : 정상 (합) 
+	 * 상태 : 적치 중
+	 */
+	public static final String STATUS_PUTAWAY = "PUTAWAY";
+
+	/**
+	 * 상태 : 적치 완료
+	 */
+	public static final String STATUS_STORED = "STORED";
+
+	/**
+	 * 검수 결과 : 정상 (합)
 	 */
 	public static final String INSP_STATUS_PASS = "PASS";
 
@@ -56,7 +66,7 @@ public class WmsInboundConstants {
 	 * 검수 결과 : 불량 (불)
 	 */
 	public static final String INSP_STATUS_FAIL = "FAIL";
-	
+
 	/**
 	 * 입고 유형 - 일반 입고
 	 */
