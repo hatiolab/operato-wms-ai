@@ -1041,7 +1041,7 @@ public class InboundTransactionService extends AbstractQueryService {
                 " FROM receivings r" +
                 " JOIN inventories i ON r.domain_id = i.domain_id AND r.rcv_no = i.rcv_no" +
                 " WHERE r.domain_id = :domainId" +
-                " AND r.status IN ('APPROVED', 'STORED')" +
+                " AND r.status IN ('APPROVED', 'PUTAWAY')" +
                 " AND (i.del_flag IS NULL OR i.del_flag = false)" +
                 " AND i.status IN ('WAITING', 'STORED')" +
                 " GROUP BY r.rcv_no, r.rcv_req_date, r.com_cd, r.vend_cd" +
