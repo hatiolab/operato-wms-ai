@@ -424,6 +424,27 @@ public class RwaTransactionController extends AbstractRestService {
 	}
 
 	/**
+	 * SKU 검색 (코드 또는 상품명 LIKE 검색)
+	 *
+	 * GET /rest/rwa_trx/sku/search?keyword=xxx&com_cd=xxx&page=1&limit=20
+	 *
+	 * @param keyword 검색어 (sku_cd 또는 sku_nm에 LIKE 검색)
+	 * @param comCd   화주사 코드 (optional)
+	 * @param page    페이지 번호 (기본값: 1)
+	 * @param limit   페이지 크기 (기본값: 20)
+	 * @return { items: [...], total: N }
+	 */
+	@GetMapping("/sku/search")
+	@ApiDesc(description = "Search SKU by keyword (sku_cd or sku_nm LIKE)")
+	public Map<String, Object> searchSku(
+			@RequestParam(name = "keyword", required = false) String keyword,
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "page", defaultValue = "1") int page,
+			@RequestParam(name = "limit", defaultValue = "20") int limit) {
+		return this.rwaService.searchSku(keyword, comCd, page, limit);
+	}
+
+	/**
 	 * 대시보드 - 알림 데이터 조회
 	 *
 	 * GET /rest/rwa_trx/dashboard/alerts

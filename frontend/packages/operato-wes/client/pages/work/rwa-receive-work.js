@@ -378,6 +378,16 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface-variant, #555);
         }
 
+        .form-group ox-input-barcode {
+          --barcodescan-input-font-size: 16px;
+          --barcodescan-input-padding: 12px 14px;
+          --barcodescan-input-border-radius: 10px;
+          --barcodescan-input-border: 1.5px solid var(--md-sys-color-outline-variant, #ccc);
+          --barcodescan-input-background: var(--md-sys-color-surface, #fff);
+          width: 100%;
+          box-sizing: border-box;
+        }
+
         .form-group input,
         .form-group select,
         .form-group textarea {
@@ -491,6 +501,99 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
         .done-card .done-sub   { font-size: 13px; color: #666; margin-top: 8px; }
 
         /* ======================================
+         * 반품 완료 요약 화면
+         * ====================================== */
+        .complete-screen {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .complete-header {
+          padding: 24px 16px 16px;
+          text-align: center;
+          background: var(--md-sys-color-surface, #fff);
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
+          flex-shrink: 0;
+        }
+
+        .complete-header .complete-icon { font-size: 52px; margin-bottom: 8px; }
+
+        .complete-header .complete-title {
+          font-size: 20px;
+          font-weight: 700;
+          color: #2E7D32;
+          margin-bottom: 4px;
+        }
+
+        .complete-header .complete-rwa-no {
+          font-size: 15px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-surface, #333);
+        }
+
+        .complete-header .complete-meta {
+          font-size: 13px;
+          color: var(--md-sys-color-on-surface-variant, #888);
+          margin-top: 4px;
+        }
+
+        .complete-body {
+          flex: 1;
+          overflow-y: auto;
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .complete-section-title {
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          margin-bottom: 6px;
+        }
+
+        .complete-item-card {
+          background: var(--md-sys-color-surface, #fff);
+          border-radius: 12px;
+          padding: 14px 16px;
+          box-shadow: 0 1px 4px rgba(0,0,0,.08);
+          border-left: 4px solid #4CAF50;
+        }
+
+        .complete-item-card .item-sku {
+          font-size: 15px;
+          font-weight: 700;
+          color: var(--md-sys-color-on-surface, #222);
+          margin-bottom: 8px;
+        }
+
+        .complete-item-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 13px;
+          padding: 3px 0;
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #f0f0f0);
+        }
+
+        .complete-item-row:last-child { border-bottom: none; }
+
+        .complete-item-row .row-label {
+          color: var(--md-sys-color-on-surface-variant, #888);
+        }
+
+        .complete-item-row .row-val {
+          font-weight: 600;
+          color: var(--md-sys-color-on-surface, #222);
+        }
+
+        .complete-item-row .row-val.good   { color: #2E7D32; }
+        .complete-item-row .row-val.defect { color: #C62828; }
+
+        /* ======================================
          * Step 3 처분 탭
          * ====================================== */
         .disp-target-tabs {
@@ -596,7 +699,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   static get properties() {
     return {
       loading:          { type: Boolean },
-      screen:           { type: String },    // 'order-select' | 'work'
+      screen:           { type: String },    // 'order-select' | 'work' | 'complete'
       filterStatus:     { type: String },    // 'WAITING' | 'WORKING' | 'DONE' | null
       orders:           { type: Array },
       selectedOrder:    { type: Object },
@@ -638,7 +741,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     super()
     this.loading = false
     this.screen = 'order-select'
-    this.filterStatus = null
+    this.filterStatus = 'WAITING'
     this.orders = []
     this.selectedOrder = null
     this.orderItems = []
@@ -679,10 +782,12 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
    * 렌더링 진입점
    * ============================================================ */
 
-  /** 화면 렌더링 — 주문 선택 또는 3단계 작업 화면 분기 */
+  /** 화면 렌더링 — 주문 선택 / 작업 / 완료 화면 분기 */
   render() {
     return html`
-      ${this.screen === 'order-select' ? this._renderOrderSelect() : this._renderWorkScreen()}
+      ${this.screen === 'order-select' ? this._renderOrderSelect()
+        : this.screen === 'complete'   ? this._renderCompleteScreen()
+        : this._renderWorkScreen()}
       ${this.feedbackMsg
         ? html`<div class="feedback-toast ${this.feedbackType}">${this.feedbackMsg}</div>`
         : ''}
@@ -696,12 +801,20 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   /** 주문 선택 화면 — 상태 카드 + 주문 목록 + 하단 바코드 스캔 */
   _renderOrderSelect() {
     const WAITING_STATUS = ['APPROVED']
-    const WORKING_STATUS = ['RECEIVING', 'RECEIVED', 'INSPECTING', 'INSPECTED', 'DISPOSING']
+    const WORKING_STATUS = ['RECEIVING', 'RECEIVED', 'INSPECTING']
     const DONE_STATUS    = ['COMPLETED', 'CANCELLED', 'REJECTED']
 
-    const waiting = this.orders.filter(o => WAITING_STATUS.includes(o.status))
-    const working = this.orders.filter(o => WORKING_STATUS.includes(o.status))
-    const done    = this.orders.filter(o => DONE_STATUS.includes(o.status))
+    const sortOrders = list => [...list].sort((a, b) => {
+      const dateA = (a.rwa_req_date || '').slice(0, 10)
+      const dateB = (b.rwa_req_date || '').slice(0, 10)
+      if (dateB !== dateA) return dateB.localeCompare(dateA)
+      return (b.rwa_req_no || '').localeCompare(a.rwa_req_no || '')
+    })
+
+    const today = new Date().toISOString().slice(0, 10)
+    const waiting = sortOrders(this.orders.filter(o => WAITING_STATUS.includes(o.status) && (o.rwa_req_date || '').slice(0, 10) === today))
+    const working = sortOrders(this.orders.filter(o => WORKING_STATUS.includes(o.status)))
+    const done    = sortOrders(this.orders.filter(o => DONE_STATUS.includes(o.status) && (o.updated_at || '').slice(0, 10) === today))
 
     const filtered =
       this.filterStatus === 'WAITING' ? waiting
@@ -745,7 +858,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
             : filtered.map(order => html`
                 <div class="order-item" @click="${() => this._selectOrder(order)}">
                   <div class="card-header">
-                    <span class="order-no">${order.rwa_req_no || order.rwa_no || '-'}</span>
+                    <span class="order-no">${order.rwa_no || order.rwa_req_no || '-'}</span>
                     <span class="order-badge ${order.status}">${this._statusLabel(order.status)}</span>
                   </div>
                   <div class="sub-info">
@@ -788,7 +901,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
         <!-- 헤더 -->
         <div class="work-header">
           <button class="back-btn" @click="${this._backToOrderSelect}">←</button>
-          <div class="work-title">${order?.rwa_req_no || order?.rwa_no || '-'}</div>
+          <div class="work-title">${order?.rwa_no || order?.rwa_req_no || '-'}</div>
           <span class="order-badge ${order?.status}">${this._statusLabel(order?.status)}</span>
         </div>
 
@@ -797,9 +910,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
 
         <!-- 콘텐츠 -->
         <div class="work-body">
-          ${this.step === 1 ? this._renderStep1Receive()
-          : this.step === 2 ? this._renderStep2Inspect()
-          : this._renderStep3Dispose()}
+          ${this.step === 1 ? this._renderStep1Receive() : this._renderStep2Inspect()}
         </div>
 
         <!-- 하단 버튼 -->
@@ -825,15 +936,8 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
         </div>
         <div class="step-line ${s > 1 ? 'active' : ''}"></div>
         <div class="step-wrap">
-          <div class="step-dot ${s === 2 ? 'active' : s > 2 ? 'completed' : ''}">
-            ${s > 2 ? '✓' : '2'}
-          </div>
+          <div class="step-dot ${s === 2 ? 'active' : ''}">2</div>
           <div class="step-label">검수</div>
-        </div>
-        <div class="step-line ${s > 2 ? 'active' : ''}"></div>
-        <div class="step-wrap">
-          <div class="step-dot ${s === 3 ? 'active' : ''}">3</div>
-          <div class="step-label">처분</div>
         </div>
       </div>
     `
@@ -858,38 +962,15 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
       `
     }
 
-    // ── Step 2 액션바: 확인은 인라인, 하단은 "다음" 버튼 ──
-    if (this.step === 2) {
-      const inspDoneStatuses = ['INSPECTED', 'DISPOSED', 'COMPLETED']
-      const allInspected = this.orderItems.length > 0 &&
-        this.orderItems.every(i => inspDoneStatuses.includes(i.status))
-      return html`
-        <div class="action-bar">
-          <button class="action-btn secondary" @click="${this._prevStep}">← 이전</button>
-          <button class="action-btn primary"
-            ?disabled="${!allInspected}"
-            @click="${this._nextStep}">
-            다음 →
-          </button>
-        </div>
-      `
-    }
-
-    // ── Step 3 액션바: 확인은 인라인, 하단은 "반품 완료" ──
-    const allItems3 = this.orderItems.filter(i => ['INSPECTED', 'DISPOSED', 'COMPLETED'].includes(i.status))
-    const allDecided = allItems3.length > 0 && allItems3.every(item => {
-      const dec = this.dispDecisions[item.id] || {}
-      const goodOk = (item.good_qty || 0) <= 0 || dec.good
-      const defectOk = (item.defect_qty || 0) <= 0 || dec.defect
-      return goodOk && defectOk
-    })
-
+    // ── Step 2 액션바: 확인은 인라인, 전체 완료 시 "반품 완료" 버튼 활성화 ──
+    const allInspected = this.orderItems.length > 0 &&
+      this.orderItems.every(i => i.status === 'COMPLETED')
     return html`
       <div class="action-bar">
         <button class="action-btn secondary" @click="${this._prevStep}">← 이전</button>
         <button class="action-btn success"
-          ?disabled="${!allDecided || this.actionLoading}"
-          @click="${this._finalizeOrder}">
+          ?disabled="${!allInspected || this.actionLoading}"
+          @click="${this._finishWork}">
           ${this.actionLoading ? '처리중...' : '반품 완료'}
         </button>
       </div>
@@ -939,12 +1020,11 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
 
       <div class="form-group">
         <label>보관 로케이션</label>
-        <input
-          type="text"
-          placeholder="로케이션 코드 (예: TEMP-01)"
+        <ox-input-barcode
+          placeholder="${this.returnLocCd || 'RWA-01-01'}"
           .value="${this.locCd}"
-          @input="${e => { this.locCd = e.target.value }}"
-        />
+          @change="${e => { this.locCd = e.target.value }}"
+        ></ox-input-barcode>
       </div>
 
       ${this._renderItemsProgressStep1()}
@@ -1315,7 +1395,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     this.currentItemIndex = 0
     if (this.step === 1) this._initStep1Selection()
     if (this.step === 2) this._initStep2Selection()
-    if (this.step === 3) this._initStep3Selection()
     this.requestUpdate()
   }
 
@@ -1348,16 +1427,14 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     this._resetForms()
     if (this.step === 1) this._initStep1Selection()
     if (this.step === 2) this._initStep2Selection()
-    if (this.step === 3) this._initStep3Selection()
   }
 
   /** 다음 단계 */
   _nextStep() {
-    this.step = Math.min(this.step + 1, 3)
+    this.step = Math.min(this.step + 1, 2)
     this.currentItemIndex = 0
     this._resetForms()
     if (this.step === 2) this._initStep2Selection()
-    if (this.step === 3) this._initStep3Selection()
   }
 
   /** 단계별 액션 실행 */
@@ -1584,7 +1661,80 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   }
 
   /**
-   * 반품 완료 — 모든 처분 결정을 /finalize 엔드포인트로 일괄 처리
+   * 검수 완료 후 반품 완료 요약 화면으로 전환
+   */
+  _finishWork() {
+    voiceService.success('반품 완료 처리되었습니다')
+    this.screen = 'complete'
+  }
+
+  /**
+   * 반품 완료 요약 화면 — 처리 결과를 한눈에 표시
+   */
+  _renderCompleteScreen() {
+    const order = this.selectedOrder
+    const completedAt = new Date().toLocaleString('ko-KR', { hour12: false })
+
+    return html`
+      <div class="complete-screen">
+        <!-- 완료 헤더 -->
+        <div class="complete-header">
+          <div class="complete-icon">✅</div>
+          <div class="complete-title">반품 처리 완료</div>
+          <div class="complete-rwa-no">${order?.rwa_no || order?.rwa_req_no || '-'}</div>
+          <div class="complete-meta">
+            ${this._rwaTypeLabel(order?.rwa_type)} &nbsp;|&nbsp; ${order?.com_cd || '-'}
+            ${order?.cust_nm ? ` · ${order.cust_nm}` : ''}
+          </div>
+          <div class="complete-meta">완료 시각: ${completedAt}</div>
+        </div>
+
+        <!-- 항목별 처리 결과 -->
+        <div class="complete-body">
+          <div class="complete-section-title">📦 반품 항목별 처리 결과</div>
+
+          ${this.orderItems.map(item => html`
+            <div class="complete-item-card">
+              <div class="item-sku">${item.sku_cd} &nbsp; ${item.sku_nm || ''}</div>
+
+              <div class="complete-item-row">
+                <span class="row-label">입고 수량</span>
+                <span class="row-val">${item.rwa_qty || 0} EA</span>
+              </div>
+              <div class="complete-item-row">
+                <span class="row-label">양품</span>
+                <span class="row-val good">
+                  ${item.good_qty || 0} EA
+                  ${(item.good_qty || 0) > 0 ? html`<span style="font-weight:400; color:#888"> → RETURN-GOOD</span>` : ''}
+                </span>
+              </div>
+              <div class="complete-item-row">
+                <span class="row-label">불량</span>
+                <span class="row-val ${(item.defect_qty || 0) > 0 ? 'defect' : ''}">
+                  ${item.defect_qty || 0} EA
+                  ${(item.defect_qty || 0) > 0 ? html`<span style="font-weight:400; color:#888"> → RETURN-DEF</span>` : ''}
+                </span>
+              </div>
+              ${item.loc_cd ? html`
+                <div class="complete-item-row">
+                  <span class="row-label">입고 로케이션</span>
+                  <span class="row-val">${item.loc_cd}</span>
+                </div>
+              ` : ''}
+            </div>
+          `)}
+        </div>
+
+        <!-- 목록으로 버튼 -->
+        <div class="action-bar">
+          <button class="action-btn primary" @click="${this._backToOrderSelect}">목록으로</button>
+        </div>
+      </div>
+    `
+  }
+
+  /**
+   * 반품 완료 — (레거시, 미사용)
    */
   async _finalizeOrder() {
     const allItems = this.orderItems.filter(i => ['INSPECTED', 'DISPOSED', 'COMPLETED'].includes(i.status))
@@ -1740,8 +1890,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
    *   DISPOSING, COMPLETED 등         → Step 3 (처분/완료)
    */
   _getStartStep(status) {
-    if (['RECEIVED', 'INSPECTING'].includes(status)) return 2
-    if (['INSPECTED', 'DISPOSING', 'COMPLETED', 'CANCELLED', 'REJECTED'].includes(status)) return 3
+    if (['RECEIVED', 'INSPECTING', 'COMPLETED', 'CANCELLED', 'REJECTED'].includes(status)) return 2
     return 1
   }
 

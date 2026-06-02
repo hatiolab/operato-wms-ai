@@ -388,6 +388,57 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
         .btn.danger:hover {
           background: #FFEBEE;
         }
+
+        /* 자동완성 드롭다운 */
+        .autocomplete-wrap {
+          position: relative;
+        }
+
+        .autocomplete-wrap input {
+          width: 100%;
+          box-sizing: border-box;
+        }
+
+        .autocomplete-list {
+          position: absolute;
+          top: calc(100% + 4px);
+          left: 0;
+          right: 0;
+          z-index: 9999;
+          background: var(--md-sys-color-surface);
+          border: 1px solid var(--md-sys-color-outline-variant);
+          border-radius: 8px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+          max-height: 220px;
+          overflow-y: auto;
+        }
+
+        .autocomplete-item {
+          padding: 10px 14px;
+          cursor: pointer;
+          font-size: 14px;
+          color: var(--md-sys-color-on-surface);
+          border-bottom: 1px solid var(--md-sys-color-outline-variant);
+          transition: background 0.12s;
+        }
+
+        .autocomplete-item:last-child {
+          border-bottom: none;
+        }
+
+        .autocomplete-item:hover,
+        .autocomplete-item.selected,
+        .autocomplete-item.highlighted {
+          background: var(--md-sys-color-primary-container, #e3f2fd);
+          color: var(--md-sys-color-on-primary-container, #0d47a1);
+        }
+
+        .autocomplete-empty {
+          padding: 10px 14px;
+          font-size: 13px;
+          color: var(--md-sys-color-on-surface-variant);
+          text-align: center;
+        }
       `
     ]
   }
@@ -400,7 +451,19 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
       saving: Boolean,
       companies: Array,
       warehouses: Array,
-      customers: Array
+      customers: Array,
+      /** 자동완성 입력값 */
+      companyInput: String,
+      warehouseInput: String,
+      customerInput: String,
+      /** 자동완성 드롭다운 표시 여부 */
+      showCompanySuggestions: Boolean,
+      showWarehouseSuggestions: Boolean,
+      showCustomerSuggestions: Boolean,
+      /** 자동완성 키보드 하이라이트 인덱스 (-1: 없음) */
+      companyHighlight: Number,
+      warehouseHighlight: Number,
+      customerHighlight: Number
     }
   }
 
@@ -426,6 +489,15 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
     this.companies = []
     this.warehouses = []
     this.customers = []
+    this.companyInput = ''
+    this.warehouseInput = ''
+    this.customerInput = ''
+    this.showCompanySuggestions = false
+    this.showWarehouseSuggestions = false
+    this.showCustomerSuggestions = false
+    this.companyHighlight = -1
+    this.warehouseHighlight = -1
+    this.customerHighlight = -1
   }
 
   connectedCallback() {
@@ -520,50 +592,105 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
 
         <div class="form-field">
           <label>화주사 <span class="required">*</span></label>
-          <select @change="${e => this._onCompanySelect(e.target.value)}">
-            <option value="">-- 화주사 선택 --</option>
-            ${this.companies.map(
-      c => html`
-                <option value="${c.com_cd}" ?selected="${this.rwaOrder.comCd === c.com_cd}">
-                  ${c.com_cd} - ${c.com_nm || c.name || c.com_cd}
-                </option>
-              `
-    )}
-          </select>
+          <div class="autocomplete-wrap">
+            <input
+              type="text"
+              placeholder="화주사 코드 또는 이름 입력"
+              .value="${this.companyInput}"
+              @input="${e => {
+                this.companyInput = e.target.value
+                this.showCompanySuggestions = true
+                this.companyHighlight = -1
+                if (!e.target.value) this._onCompanySelect('')
+              }}"
+              @focus="${() => { this.showCompanySuggestions = true }}"
+              @blur="${() => setTimeout(() => { this.showCompanySuggestions = false; this.companyHighlight = -1 }, 180)}"
+              @keydown="${e => this._onAutocompleteKeydown(e, 'company')}"
+            />
+            ${this.showCompanySuggestions ? html`
+              <div class="autocomplete-list">
+                ${this._filteredCompanies.length > 0
+                  ? this._filteredCompanies.map((c, idx) => html`
+                      <div
+                        class="autocomplete-item ${this.rwaOrder.comCd === c.com_cd ? 'selected' : ''} ${this.companyHighlight === idx ? 'highlighted' : ''}"
+                        @mousedown="${() => this._selectCompany(c.com_cd)}"
+                      >${c.com_cd} - ${c.com_nm || c.name || c.com_cd}</div>
+                    `)
+                  : html`<div class="autocomplete-empty">검색 결과 없음</div>`
+                }
+              </div>
+            ` : ''}
+          </div>
         </div>
 
         <div class="form-field">
           <label>창고 <span class="required">*</span></label>
-          <select @change="${e => this._updateOrder('whCd', e.target.value)}">
-            <option value="">-- 창고 선택 --</option>
-            ${this.warehouses.map(
-      w => html`
-                <option value="${w.wh_cd}" ?selected="${this.rwaOrder.whCd === w.wh_cd}">
-                  ${w.wh_cd} - ${w.wh_nm || w.name || w.wh_cd}
-                </option>
-              `
-    )}
-          </select>
+          <div class="autocomplete-wrap">
+            <input
+              type="text"
+              placeholder="창고 코드 또는 이름 입력"
+              .value="${this.warehouseInput}"
+              @input="${e => {
+                this.warehouseInput = e.target.value
+                this.showWarehouseSuggestions = true
+                this.warehouseHighlight = -1
+                if (!e.target.value) this._updateOrder('whCd', '')
+              }}"
+              @focus="${() => { this.showWarehouseSuggestions = true }}"
+              @blur="${() => setTimeout(() => { this.showWarehouseSuggestions = false; this.warehouseHighlight = -1 }, 180)}"
+              @keydown="${e => this._onAutocompleteKeydown(e, 'warehouse')}"
+            />
+            ${this.showWarehouseSuggestions ? html`
+              <div class="autocomplete-list">
+                ${this._filteredWarehouses.length > 0
+                  ? this._filteredWarehouses.map((w, idx) => html`
+                      <div
+                        class="autocomplete-item ${this.rwaOrder.whCd === w.wh_cd ? 'selected' : ''} ${this.warehouseHighlight === idx ? 'highlighted' : ''}"
+                        @mousedown="${() => this._selectWarehouse(w.wh_cd)}"
+                      >${w.wh_cd} - ${w.wh_nm || w.name || w.wh_cd}</div>
+                    `)
+                  : html`<div class="autocomplete-empty">검색 결과 없음</div>`
+                }
+              </div>
+            ` : ''}
+          </div>
         </div>
 
         <div class="form-field">
           <label>거래처</label>
-          <select @change="${e => this._onCustomerSelect(e.target.value)}">
-            <option value="">-- 거래처 선택 --</option>
-            ${this.customers.map(
-      c => html`
-                <option value="${c.cust_cd}" ?selected="${this.rwaOrder.custCd === c.cust_cd}">
-                  ${c.cust_cd} - ${c.cust_nm || c.name || c.cust_cd}
-                </option>
-              `
-    )}
-          </select>
+          <div class="autocomplete-wrap">
+            <input
+              type="text"
+              placeholder="거래처 코드 또는 이름 입력"
+              .value="${this.customerInput}"
+              ?disabled="${!this.rwaOrder.comCd}"
+              @input="${e => {
+                this.customerInput = e.target.value
+                this.showCustomerSuggestions = true
+                this.customerHighlight = -1
+                if (!e.target.value) this._onCustomerSelect('')
+              }}"
+              @focus="${() => { this.showCustomerSuggestions = true }}"
+              @blur="${() => setTimeout(() => { this.showCustomerSuggestions = false; this.customerHighlight = -1 }, 180)}"
+              @keydown="${e => this._onAutocompleteKeydown(e, 'customer')}"
+            />
+            ${this.showCustomerSuggestions && this.rwaOrder.comCd ? html`
+              <div class="autocomplete-list">
+                ${this._filteredCustomers.length > 0
+                  ? this._filteredCustomers.map((c, idx) => html`
+                      <div
+                        class="autocomplete-item ${this.rwaOrder.custCd === c.cust_cd ? 'selected' : ''} ${this.customerHighlight === idx ? 'highlighted' : ''}"
+                        @mousedown="${() => this._selectCustomer(c.cust_cd)}"
+                      >${c.cust_cd} - ${c.cust_nm || c.name || c.cust_cd}</div>
+                    `)
+                  : html`<div class="autocomplete-empty">검색 결과 없음</div>`
+                }
+              </div>
+            ` : ''}
+          </div>
         </div>
 
-        <div class="form-field">
-          <label>원 주문번호</label>
-          <input type="text" placeholder="원 주문번호" .value="${this.rwaOrder.orderNo}" @input="${e => this._updateOrder('orderNo', e.target.value)}" />
-        </div>
+        <!-- 원 주문번호: 미사용으로 숨김 처리 (추후 활성화 예정) -->
 
         <!-- 검수 필요 / 품질검사 필요 체크박스: 미사용으로 숨김 처리 (추후 활성화 예정) -->
 
@@ -601,7 +728,6 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
                   <th>상품명</th>
                   <th style="width:90px">반품 수량</th>
                   <th style="width:130px">반품 사유</th>
-                  <th style="width:80px">박스</th>
                   <th style="width:50px"></th>
                 </tr>
               </thead>
@@ -655,14 +781,6 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
                         </select>
                       </td>
                       <td>
-                        <input
-                          type="number"
-                          min="0"
-                          .value="${String(item.boxQty)}"
-                          @input="${e => this._updateItem(idx, 'boxQty', Number(e.target.value))}"
-                        />
-                      </td>
-                      <td>
                         <button class="delete-btn" @click="${() => this._removeItem(idx)}">✕</button>
                       </td>
                     </tr>
@@ -680,13 +798,149 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
                 <span class="label">총 수량:</span>
                 <span class="value">${this.items.reduce((sum, i) => sum + (i.rwaReqQty || 0), 0)} EA</span>
               </div>
-              <div class="summary-item">
-                <span class="label">총 박스:</span>
-                <span class="value">${this.items.reduce((sum, i) => sum + (i.boxQty || 0), 0)}개</span>
-              </div>
+              <!-- 총 박스: 미사용으로 숨김 처리 -->
             </div>
           `}
     `
+  }
+
+  /**
+   * 자동완성 키보드 네비게이션 처리
+   * - ArrowDown: 다음 항목으로 하이라이트 이동
+   * - ArrowUp: 이전 항목으로 하이라이트 이동
+   * - Enter: 하이라이트된 항목 선택
+   * - Escape: 드롭다운 닫기
+   */
+  _onAutocompleteKeydown(e, type) {
+    const config = {
+      company: {
+        items: () => this._filteredCompanies,
+        highlight: 'companyHighlight',
+        show: 'showCompanySuggestions',
+        select: item => this._selectCompany(item.com_cd)
+      },
+      warehouse: {
+        items: () => this._filteredWarehouses,
+        highlight: 'warehouseHighlight',
+        show: 'showWarehouseSuggestions',
+        select: item => this._selectWarehouse(item.wh_cd)
+      },
+      customer: {
+        items: () => this._filteredCustomers,
+        highlight: 'customerHighlight',
+        show: 'showCustomerSuggestions',
+        select: item => this._selectCustomer(item.cust_cd)
+      }
+    }
+
+    const cfg = config[type]
+    const items = cfg.items()
+    const currentIdx = this[cfg.highlight]
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      this[cfg.show] = true
+      this[cfg.highlight] = Math.min(currentIdx + 1, items.length - 1)
+      this._scrollHighlightedIntoView()
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      this[cfg.highlight] = Math.max(currentIdx - 1, -1)
+      this._scrollHighlightedIntoView()
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (currentIdx >= 0 && items[currentIdx]) {
+        cfg.select(items[currentIdx])
+        this[cfg.highlight] = -1
+      }
+    } else if (e.key === 'Escape') {
+      this[cfg.show] = false
+      this[cfg.highlight] = -1
+    }
+  }
+
+  /**
+   * 하이라이트된 자동완성 항목을 스크롤하여 보이도록 처리
+   */
+  _scrollHighlightedIntoView() {
+    requestAnimationFrame(() => {
+      const el = this.shadowRoot?.querySelector('.autocomplete-item.highlighted')
+      if (el) el.scrollIntoView({ block: 'nearest' })
+    })
+  }
+
+  /**
+   * 텍스트 입력값으로 화주사 목록 필터링 (LIKE 검색)
+   */
+  get _filteredCompanies() {
+    const q = (this.companyInput || '').toLowerCase().trim()
+    if (!q) return this.companies
+    return this.companies.filter(
+      c =>
+        (c.com_cd || '').toLowerCase().includes(q) ||
+        (c.com_nm || c.name || '').toLowerCase().includes(q)
+    )
+  }
+
+  /**
+   * 텍스트 입력값으로 창고 목록 필터링 (LIKE 검색)
+   */
+  get _filteredWarehouses() {
+    const q = (this.warehouseInput || '').toLowerCase().trim()
+    if (!q) return this.warehouses
+    return this.warehouses.filter(
+      w =>
+        (w.wh_cd || '').toLowerCase().includes(q) ||
+        (w.wh_nm || w.name || '').toLowerCase().includes(q)
+    )
+  }
+
+  /**
+   * 텍스트 입력값으로 거래처 목록 필터링 (LIKE 검색)
+   */
+  get _filteredCustomers() {
+    const q = (this.customerInput || '').toLowerCase().trim()
+    if (!q) return this.customers
+    return this.customers.filter(
+      c =>
+        (c.cust_cd || '').toLowerCase().includes(q) ||
+        (c.cust_nm || c.name || '').toLowerCase().includes(q)
+    )
+  }
+
+  /**
+   * 화주사 자동완성에서 항목 선택
+   */
+  _selectCompany(comCd) {
+    const comp = this.companies.find(c => c.com_cd === comCd)
+    if (comp) {
+      this.companyInput = `${comp.com_cd} - ${comp.com_nm || comp.name || comp.com_cd}`
+      this.showCompanySuggestions = false
+      this._onCompanySelect(comCd)
+    }
+  }
+
+  /**
+   * 창고 자동완성에서 항목 선택
+   */
+  _selectWarehouse(whCd) {
+    const wh = this.warehouses.find(w => w.wh_cd === whCd)
+    if (wh) {
+      this.warehouseInput = `${wh.wh_cd} - ${wh.wh_nm || wh.name || wh.wh_cd}`
+      this.showWarehouseSuggestions = false
+      this._updateOrder('whCd', whCd)
+    }
+  }
+
+  /**
+   * 거래처 자동완성에서 항목 선택
+   */
+  _selectCustomer(custCd) {
+    const cust = this.customers.find(c => c.cust_cd === custCd)
+    if (cust) {
+      this.customerInput = `${cust.cust_cd} - ${cust.cust_nm || cust.name || cust.cust_cd}`
+      this.showCustomerSuggestions = false
+      this._onCustomerSelect(custCd)
+    }
   }
 
   /**
@@ -718,7 +972,9 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
       const data = await ServiceUtil.searchByPagination('companies', [{ name: 'del_flag', value: false }], null, 1, 100)
       this.companies = data?.items || []
       if (this.companies.length === 1) {
-        const comCd = this.companies[0].com_cd
+        const comp = this.companies[0]
+        const comCd = comp.com_cd
+        this.companyInput = `${comp.com_cd} - ${comp.com_nm || comp.name || comp.com_cd}`
         this.rwaOrder = { ...this.rwaOrder, comCd }
         this._fetchCustomers(comCd)
       }
@@ -734,6 +990,7 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
   _onCompanySelect(comCd) {
     this.rwaOrder = { ...this.rwaOrder, comCd, custCd: '', custNm: '' }
     this.customers = []
+    this.customerInput = ''
     if (comCd) this._fetchCustomers(comCd)
   }
 

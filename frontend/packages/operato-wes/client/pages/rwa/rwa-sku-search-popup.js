@@ -270,22 +270,21 @@ class RwaSkuSearchPopup extends localize(i18next)(LitElement) {
     }
   }
 
-  /** SKU 목록 조회 */
+  /**
+   * SKU 목록 조회 — keyword로 sku_cd/sku_nm LIKE 검색
+   */
   async _search() {
     this.loading = true
     try {
-      const filters = []
-
-      if (this.comCd) {
-        filters.push({ name: 'com_cd', value: this.comCd })
-      }
-
+      const params = [`page=${this.page}`, `limit=${this._limit}`]
       if (this.keyword && this.keyword.trim()) {
-        filters.push({ name: 'sku_cd', value: this.keyword.trim() })
+        params.push(`keyword=${encodeURIComponent(this.keyword.trim())}`)
+      }
+      if (this.comCd) {
+        params.push(`com_cd=${encodeURIComponent(this.comCd)}`)
       }
 
-      const sort = [{ field: 'sku_cd', ascending: true }]
-      const data = await ServiceUtil.searchByPagination('sku', filters, sort, this.page, this._limit)
+      const data = await ServiceUtil.restGet(`rwa_trx/sku/search?${params.join('&')}`)
       this.skus = data?.items || []
       this.totalCount = data?.total || 0
     } catch (err) {

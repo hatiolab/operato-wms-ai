@@ -3,6 +3,7 @@ import { store } from '@operato/shell'
 import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
 import { IMPORT } from '@things-factory/import-base'
 import '@things-factory/import-ui-excel'
+import '../../component/code-label.js'
 
 /**
  * 입고 주문 임포트 팝업
@@ -585,7 +586,7 @@ class ReceivingOrderImportPopup extends LitElement {
                           <td class="${this._isFieldMissing(row, ['rcv_no', 'rcvNo', 'rcv_req_no', 'rcvReqNo']) ? 'cell-error' : ''}">${row.rcv_no || row.rcvNo || ''}</td>
                           <td class="${this._isFieldMissing(row, ['rcv_no', 'rcvNo', 'rcv_req_no', 'rcvReqNo']) ? 'cell-error' : ''}">${row.rcv_req_no || row.rcvReqNo || ''}</td>
                           <td class="${this._isFieldMissing(row, ['rcv_req_date', 'rcvReqDate']) ? 'cell-error' : ''}">${row.rcv_req_date || row.rcvReqDate || ''}</td>
-                          <td class="${this._isFieldMissing(row, ['rcv_type', 'rcvType']) ? 'cell-error' : ''}">${row.rcv_type || row.rcvType || ''}</td>
+                          <td class="${this._isFieldMissing(row, ['rcv_type', 'rcvType']) ? 'cell-error' : ''}"><code-label code-name="RECEIVING_TYPE" .value=${row.rcv_type || row.rcvType || ''}></code-label></td>
                           <td>${row.wh_cd || row.whCd || ''}</td>
                           <td>${row.com_cd || row.comCd || ''}</td>
                           <td>${row.vend_cd || row.vendCd || ''}</td>

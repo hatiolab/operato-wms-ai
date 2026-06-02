@@ -200,6 +200,7 @@ class RwaHome extends localize(i18next)(PageView) {
       loading: Boolean,
       statusCounts: Object,
       typeStats: Object,
+      rwaTypeCodes: Array,
       alerts: Array
     }
   }
@@ -213,12 +214,8 @@ class RwaHome extends localize(i18next)(PageView) {
       INSPECTING: 0,
       DISPOSED: 0
     }
-    this.typeStats = {
-      CUSTOMER_RETURN: 0,
-      VENDOR_RETURN: 0,
-      DEFECT_RETURN: 0,
-      OTHER: 0
-    }
+    this.typeStats = {}
+    this.rwaTypeCodes = []
     this.alerts = []
   }
 
@@ -312,6 +309,10 @@ class RwaHome extends localize(i18next)(PageView) {
     try {
       this.loading = true
 
+      // 공통코드에서 반품 유형 목록 조회 (차트 카테고리 구성용)
+      const codesResult = await ServiceUtil.codeItems('RWA_ORDER_RWA_TYPE')
+      this.rwaTypeCodes = codesResult?.items || []
+
       // 상태별 건수 조회
       const statusResponse = await this._fetchStatusCounts()
       this.statusCounts = statusResponse
@@ -346,10 +347,10 @@ class RwaHome extends localize(i18next)(PageView) {
   async _fetchTypeStats() {
     try {
       const data = await ServiceUtil.restGet('rwa_trx/dashboard/type-stats')
-      return data || { CUSTOMER_RETURN: 0, VENDOR_RETURN: 0, DEFECT_RETURN: 0, OTHER: 0 }
+      return data || {}
     } catch (error) {
       console.error('유형별 통계 조회 실패:', error)
-      return { CUSTOMER_RETURN: 0, VENDOR_RETURN: 0, DEFECT_RETURN: 0, OTHER: 0 }
+      return {}
     }
   }
 
@@ -372,21 +373,35 @@ class RwaHome extends localize(i18next)(PageView) {
       this._chart.destroy()
     }
 
+    // 공통코드 기반으로 차트 카테고리 구성 (없으면 기본 팔레트)
+    const defaultColors = ['#2196F3', '#4CAF50', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#8BC34A', '#9E9E9E']
+    const codes = this.rwaTypeCodes && this.rwaTypeCodes.length > 0
+      ? this.rwaTypeCodes
+      : [
+          { name: 'CUSTOMER_RETURN', description: '고객 반품' },
+          { name: 'VENDOR_RETURN', description: '공급업체 반품' },
+          { name: 'DEFECT_RETURN', description: '불량품 반품' },
+          { name: 'STOCK_ADJUST', description: '재고 조정' },
+          { name: 'EXPIRED_RETURN', description: '유통기한 임박' }
+        ]
+
+    // 중복 name 제거 (멀티도메인 환경에서 공통코드 중복 가능)
+    const uniqueCodes = codes.filter((code, idx, arr) => arr.findIndex(c => c.name === code.name) === idx)
+
+    const labels = uniqueCodes.map(code => code.description || code.name)
+    const data = uniqueCodes.map(code => this.typeStats[code.name] || 0)
+    const colors = uniqueCodes.map((_, idx) => defaultColors[idx % defaultColors.length])
+
     const ctx = canvas.getContext('2d')
     this._chart = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: ['고객 반품', '공급사 반품', '불량품', '기타'],
+        labels,
         datasets: [
           {
             label: '반품 건수',
-            data: [
-              this.typeStats.CUSTOMER_RETURN || 0,
-              this.typeStats.VENDOR_RETURN || 0,
-              this.typeStats.DEFECT_RETURN || 0,
-              this.typeStats.OTHER || 0
-            ],
-            backgroundColor: ['#2196F3', '#4CAF50', '#FF9800', '#9E9E9E'],
+            data,
+            backgroundColor: colors,
             borderRadius: 8
           }
         ]

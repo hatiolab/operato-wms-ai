@@ -43,8 +43,9 @@ import xyz.elidom.util.ValueUtil;
  * 3. 반품 거부 (REJECTED)     → rejectRwaOrder()       — 승인 전 단계에서만 가능
  * 4. 반품 취소 (CANCELLED)    → cancelRwaOrder()       — 완료 전 어느 단계든 가능
  * 5. 반품 입고 (RECEIVING/RECEIVED) → receiveRwaItem() — 아이템별 입고, 전체 완료 시 RECEIVED
- * 6. 반품 검수 (INSPECTING/INSPECTED) → inspectRwaItem()
- * 7. 반품 처분 (DISPOSING)    → disposeRwaItem()       — 전체 처분 완료 시 자동으로 COMPLETED
+ * 6. 반품 검수 완료 → inspectRwaItem() + completeInspection()
+ *    — 양품: RETURN-GOOD 로케이션 재고 생성, 불량: RETURN-DEF 로케이션 재고 생성
+ *    — 전체 완료 시 자동으로 COMPLETED (처분 단계 없음)
  *
  * @author HatioLab
  */
@@ -322,10 +323,11 @@ public class RwaTransactionService extends AbstractQueryService {
 			throw ThrowUtil.newValidationErrorWithNoLog("반품 상세를 찾을 수 없습니다. ID: " + rwaOrderItemId);
 		}
 
-		// 2. 상태 검증 (재검수를 위해 INSPECTED도 허용)
+		// 2. 상태 검증 (재검수를 위해 COMPLETED도 허용)
 		if (!WmsRwaConstants.STATUS_RECEIVED.equals(item.getStatus()) &&
 				!WmsRwaConstants.STATUS_INSPECTING.equals(item.getStatus()) &&
-				!WmsRwaConstants.STATUS_INSPECTED.equals(item.getStatus())) {
+				!WmsRwaConstants.STATUS_INSPECTED.equals(item.getStatus()) &&
+				!WmsRwaConstants.STATUS_COMPLETED.equals(item.getStatus())) {
 			throw ThrowUtil.newValidationErrorWithNoLog(
 					"검수 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
 		}
@@ -382,8 +384,8 @@ public class RwaTransactionService extends AbstractQueryService {
 			isReInspect = goodCount != null && goodCount > 0;
 		}
 
-		// 3. 상태 업데이트
-		item.setStatus(WmsRwaConstants.STATUS_INSPECTED);
+		// 3. 아이템 상태를 COMPLETED로 직접 전환 (INSPECTED/DISPOSING 단계 생략)
+		item.setStatus(WmsRwaConstants.STATUS_COMPLETED);
 		this.queryManager.update(item, "status");
 
 		// 4. 검수 분류 재고 처리 (RETURN-GOOD / RETURN-DEF)
@@ -1033,26 +1035,22 @@ public class RwaTransactionService extends AbstractQueryService {
 		}
 
 		// 3. 상태 판정
-		// 디테일 아이템 상태 진행 순서: APPROVED → RECEIVED → INSPECTED → DISPOSED → COMPLETED
+		// 단순화된 아이템 상태 진행 순서: APPROVED → RECEIVED → COMPLETED
 		// 마스터 상태 자동 전환 규칙:
 		//   일부 RECEIVED 이상 → RECEIVING
 		//   전체 RECEIVED 이상 → RECEIVED
-		//   일부 INSPECTED 이상 → INSPECTING
-		//   전체 INSPECTED 이상 → INSPECTED
-		//   일부 DISPOSED 이상 → DISPOSING
-		//   전체 DISPOSED 이상 → autoCompleteRwaOrder() (→ COMPLETED)
+		//   일부 COMPLETED → INSPECTING (검수 진행중)
+		//   전체 COMPLETED → autoCompleteRwaOrder() (→ COMPLETED)
 
 		boolean allReceived = true;
 		boolean anyReceived = false;
-		boolean allInspected = true;
-		boolean anyInspected = false;
-		boolean allDisposed = true;
-		boolean anyDisposed = false;
+		boolean allCompleted = true;
+		boolean anyCompleted = false;
 
 		for (Map<String, Object> statusCount : statusCounts) {
 			String status = (String) statusCount.get("status");
 
-			// RECEIVED 이상: RECEIVED, INSPECTED, DISPOSED, COMPLETED
+			// RECEIVED 이상: RECEIVED, COMPLETED (하위 호환: INSPECTED, DISPOSED 포함)
 			boolean isReceivedOrAbove = WmsRwaConstants.STATUS_RECEIVED.equals(status)
 					|| WmsRwaConstants.STATUS_INSPECTED.equals(status)
 					|| WmsRwaConstants.STATUS_DISPOSED.equals(status)
@@ -1060,33 +1058,21 @@ public class RwaTransactionService extends AbstractQueryService {
 			if (!isReceivedOrAbove) allReceived = false;
 			if (isReceivedOrAbove) anyReceived = true;
 
-			// INSPECTED 이상: INSPECTED, DISPOSED, COMPLETED
-			boolean isInspectedOrAbove = WmsRwaConstants.STATUS_INSPECTED.equals(status)
-					|| WmsRwaConstants.STATUS_DISPOSED.equals(status)
-					|| WmsRwaConstants.STATUS_COMPLETED.equals(status);
-			if (!isInspectedOrAbove) allInspected = false;
-			if (isInspectedOrAbove) anyInspected = true;
-
-			// DISPOSED 이상: DISPOSED, COMPLETED
-			boolean isDisposedOrAbove = WmsRwaConstants.STATUS_DISPOSED.equals(status)
-					|| WmsRwaConstants.STATUS_COMPLETED.equals(status);
-			if (!isDisposedOrAbove) allDisposed = false;
-			if (isDisposedOrAbove) anyDisposed = true;
+			// COMPLETED 이상
+			boolean isCompletedOrAbove = WmsRwaConstants.STATUS_COMPLETED.equals(status);
+			if (!isCompletedOrAbove) allCompleted = false;
+			if (isCompletedOrAbove) anyCompleted = true;
 		}
 
 		// 4. 상태 결정 및 업데이트
-		if (allDisposed) {
-			// 전체 처분 완료 → 자동 완료 처리 (status=COMPLETED, 완료일 기록, 아이템 일괄 COMPLETED)
+		if (allCompleted) {
+			// 전체 검수 완료 → 자동 완료 처리 (status=COMPLETED, 완료일 기록)
 			autoCompleteRwaOrder(rwaOrder);
 			return;
 		}
 
 		String newStatus = rwaOrder.getStatus();
-		if (anyDisposed) {
-			newStatus = WmsRwaConstants.STATUS_DISPOSING;
-		} else if (allInspected) {
-			newStatus = WmsRwaConstants.STATUS_INSPECTED;
-		} else if (anyInspected) {
+		if (anyCompleted) {
 			newStatus = WmsRwaConstants.STATUS_INSPECTING;
 		} else if (allReceived) {
 			newStatus = WmsRwaConstants.STATUS_RECEIVED;
@@ -1196,16 +1182,41 @@ public class RwaTransactionService extends AbstractQueryService {
 		List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
 				sql, params, Map.class, 0, 0);
 
-		// 결과를 Map으로 변환
-		Map<String, Object> typeStats = ValueUtil.newMap("CUSTOMER_RETURN", 0);
-		typeStats.put("VENDOR_RETURN", 0);
-		typeStats.put("DEFECT_RETURN", 0);
-		typeStats.put("OTHER", 0);
+		// 공통코드 RWA_ORDER_RWA_TYPE에서 반품 유형 목록을 조회하여 기본값 0으로 초기화
+		String codeSql = "SELECT ccd.name " +
+				"FROM common_codes cc " +
+				"INNER JOIN common_code_details ccd ON ccd.domain_id = cc.domain_id AND ccd.parent_id = cc.id " +
+				"WHERE cc.domain_id = :domainId AND cc.name = 'RWA_ORDER_RWA_TYPE' " +
+				"ORDER BY COALESCE(ccd.rank, 999999), ccd.name";
 
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> codeList = (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
+				codeSql, ValueUtil.newMap("domainId", Domain.currentDomainId()), Map.class, 0, 0);
+
+		Map<String, Object> typeStats = new java.util.LinkedHashMap<>();
+		for (Map<String, Object> code : codeList) {
+			String typeName = (String) code.get("name");
+			if (ValueUtil.isNotEmpty(typeName) && !typeStats.containsKey(typeName)) {
+				typeStats.put(typeName, 0);
+			}
+		}
+
+		// 공통코드가 없으면 기본값 fallback
+		if (typeStats.isEmpty()) {
+			typeStats.put(WmsRwaConstants.RWA_TYPE_CUSTOMER_RETURN, 0);
+			typeStats.put(WmsRwaConstants.RWA_TYPE_VENDOR_RETURN, 0);
+			typeStats.put(WmsRwaConstants.RWA_TYPE_DEFECT_RETURN, 0);
+			typeStats.put(WmsRwaConstants.RWA_TYPE_STOCK_ADJUST, 0);
+			typeStats.put(WmsRwaConstants.RWA_TYPE_EXPIRED_RETURN, 0);
+		}
+
+		// 실제 건수로 덮어쓰기
 		for (Map<String, Object> row : results) {
 			String rwaType = (String) row.get("rwa_type");
 			Object count = row.get("count");
-			typeStats.put(rwaType, count);
+			if (ValueUtil.isNotEmpty(rwaType)) {
+				typeStats.put(rwaType, count);
+			}
 		}
 
 		return typeStats;
@@ -1276,6 +1287,55 @@ public class RwaTransactionService extends AbstractQueryService {
 		}
 
 		return alerts;
+	}
+
+	/**
+	 * SKU 검색 — sku_cd 또는 sku_nm에 대한 LIKE 검색
+	 *
+	 * @param keyword 검색어 (null/빈값이면 전체 조회)
+	 * @param comCd   화주사 코드 (null이면 전체)
+	 * @param page    페이지 번호 (1부터)
+	 * @param limit   페이지 크기
+	 * @return { items: [...], total: N }
+	 */
+	public Map<String, Object> searchSku(String keyword, String comCd, int page, int limit) {
+		StringBuilder sql = new StringBuilder(
+				"SELECT sku_cd, sku_nm, sku_barcd, com_cd " +
+				"FROM sku " +
+				"WHERE domain_id = :domainId " +
+				"AND del_flag = false"
+		);
+
+		Map<String, Object> params = ValueUtil.newMap("domainId", Domain.currentDomainId());
+
+		if (ValueUtil.isNotEmpty(keyword)) {
+			String likeKeyword = "%" + keyword.trim() + "%";
+			sql.append(" AND (sku_cd ILIKE :keyword OR sku_nm ILIKE :keyword)");
+			params.put("keyword", likeKeyword);
+		}
+
+		if (ValueUtil.isNotEmpty(comCd)) {
+			sql.append(" AND com_cd = :comCd");
+			params.put("comCd", comCd);
+		}
+
+		// 전체 건수
+		String countSql = "SELECT COUNT(*) FROM (" + sql + ") t";
+		Integer total = this.queryManager.selectBySql(countSql, params, Integer.class);
+
+		// 페이지 데이터
+		sql.append(" ORDER BY sku_cd LIMIT :limit OFFSET :offset");
+		params.put("limit", limit);
+		params.put("offset", (page - 1) * limit);
+
+		List<Map<String, Object>> items =
+				(List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(
+						sql.toString(), params, Map.class, 0, 0);
+
+		Map<String, Object> result = new HashMap<>();
+		result.put("items", items != null ? items : new java.util.ArrayList<>());
+		result.put("total", total != null ? total : 0);
+		return result;
 	}
 
 }
