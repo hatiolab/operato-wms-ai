@@ -160,6 +160,12 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 	private String skuCd;
 
 	/**
+	 * 상품명
+	 */
+	@Column(name = "sku_nm", length = 200)
+	private String skuNm;
+
+	/**
 	 * 로케이션 코드 - 트랜잭션 발생 시점의 위치
 	 */
 	@Column(name = "loc_cd", length = 30)
@@ -325,6 +331,14 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 
 	public void setSkuCd(String skuCd) {
 		this.skuCd = skuCd;
+	}
+
+	public String getSkuNm() {
+		return skuNm;
+	}
+
+	public void setSkuNm(String skuNm) {
+		this.skuNm = skuNm;
 	}
 
 	public String getLocCd() {
@@ -645,7 +659,7 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 		BeanUtil.get(IQueryManager.class).update(inventory);
 
 		// 세트 상품에 대한 구성품 재고 차감 트랜잭션 생성
-		ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd", "skuCd",
+		ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd", "skuCd", "skuNm",
 				"lotNo", "serialNo", "expiredDate", "remarks");
 		this.inventoryId = inventory.getId();
 		this.tranType = InventoryTran.TRAN_TYPE_VAS_OUT;
@@ -686,7 +700,7 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 		BeanUtil.get(IQueryManager.class).upsert(inventory);
 
 		ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd",
-				"skuCd", "lotNo", "serialNo", "expiredDate");
+				"skuCd", "skuNm", "lotNo", "serialNo", "expiredDate");
 
 		// MOVE OUT 트랜잭션 생성
 		this.inventoryId = inventory.getId();
@@ -738,7 +752,7 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 
 		// 4. 원본 재고 병합 트랜잭션 이력 추가
 		ValueUtil.populate(mainInv, this, "domainId", "barcode", "whCd", "comCd",
-				"skuCd", "locCd", "lotNo", "serialNo", "expiredDate");
+				"skuCd", "skuNm", "locCd", "lotNo", "serialNo", "expiredDate");
 
 		this.inventoryId = mainInv.getId();
 		this.direction = InventoryTran.DIRECTION_IN;
@@ -806,7 +820,7 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 
 		// 4. 원본 재고 분할 트랜잭션 이력 추가
 		ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd",
-				"skuCd", "locCd", "lotNo", "serialNo", "expiredDate");
+				"skuCd", "skuNm", "locCd", "lotNo", "serialNo", "expiredDate");
 
 		this.inventoryId = inventory.getId();
 		this.toLocCd = inventory.getLocCd();
@@ -875,7 +889,7 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 
 		// 기본 재고 정보 복사
 		ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd",
-				"skuCd", "locCd", "lotNo", "serialNo", "expiredDate");
+				"skuCd", "skuNm", "locCd", "lotNo", "serialNo", "expiredDate");
 
 		// 재고 폐기 처리
 		inventory.setStatus(Inventory.STATUS_EMPTY);
@@ -914,7 +928,7 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 
 		// 기본 재고 정보 복사
 		ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd",
-				"skuCd", "locCd", "lotNo", "serialNo", "expiredDate");
+				"skuCd", "skuNm", "locCd", "lotNo", "serialNo", "expiredDate");
 
 		// 재고 홀드 트랜잭션 생성
 		this.beforeQty = inventory.getInvQty();
@@ -948,7 +962,7 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 
 		// 기본 재고 정보 복사
 		ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd",
-				"skuCd", "locCd", "lotNo", "serialNo", "expiredDate");
+				"skuCd", "skuNm", "locCd", "lotNo", "serialNo", "expiredDate");
 
 		// 재고 홀드 트랜잭션 생성
 		this.beforeQty = inventory.getInvQty();
@@ -986,7 +1000,7 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 
 		// 3. 재고 트랜잭션 이력 추가
 		ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd",
-				"skuCd", "lotNo", "serialNo", "expiredDate");
+				"skuCd", "skuNm", "lotNo", "serialNo", "expiredDate");
 
 		this.inventoryId = inventory.getId();
 		this.toLocCd = inventory.getLocCd();
@@ -1029,7 +1043,7 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 
 		// 3. 재고 기본 정보 복사
 		ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd",
-				"skuCd", "locCd", "lotNo", "serialNo", "expiredDate");
+				"skuCd", "skuNm", "locCd", "lotNo", "serialNo", "expiredDate");
 
 		// 4. 재고 트랜잭션 이력 추가
 		this.inventoryId = inventory.getId();
@@ -1069,7 +1083,7 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 
 		// 3. 트랜잭션 정보 설정
 		ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd",
-				"skuCd", "lotNo", "serialNo", "expiredDate");
+				"skuCd", "skuNm", "lotNo", "serialNo", "expiredDate");
 
 		this.inventoryId = inventory.getId();
 		this.toLocCd = inventory.getLocCd();
@@ -1116,7 +1130,7 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 
 		// 3. 재고 기본 정보 복사
 		ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd",
-				"skuCd", "locCd", "lotNo", "serialNo", "expiredDate");
+				"skuCd", "skuNm", "locCd", "lotNo", "serialNo", "expiredDate");
 
 		// 4. 재고 트랜잭션 이력 추가
 		this.inventoryId = inventory.getId();
@@ -1152,7 +1166,7 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 
 		// 3. 재고 트랜잭션 이력 추가
 		ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd",
-				"skuCd", "lotNo", "serialNo", "expiredDate");
+				"skuCd", "skuNm", "lotNo", "serialNo", "expiredDate");
 
 		this.inventoryId = inventory.getId();
 		this.toLocCd = inventory.getLocCd();

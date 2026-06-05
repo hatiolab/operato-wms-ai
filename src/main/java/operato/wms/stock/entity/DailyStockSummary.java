@@ -56,6 +56,12 @@ public class DailyStockSummary extends xyz.elidom.orm.entity.basic.DomainCreateS
 	private String skuCd;
 
 	/**
+	 * 상품명
+	 */
+	@Column(name = "sku_nm", length = 200)
+	private String skuNm;
+
+	/**
 	 * 기초 재고 수량 - 해당일 0시 기준
 	 */
 	@Column(name = "opening_qty", nullable = false)
@@ -193,6 +199,14 @@ public class DailyStockSummary extends xyz.elidom.orm.entity.basic.DomainCreateS
 
 	public void setSkuCd(String skuCd) {
 		this.skuCd = skuCd;
+	}
+
+	public String getSkuNm() {
+		return skuNm;
+	}
+
+	public void setSkuNm(String skuNm) {
+		this.skuNm = skuNm;
 	}
 
 	public Double getOpeningQty() {

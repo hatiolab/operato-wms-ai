@@ -374,7 +374,7 @@ public class StockTransactionService extends BaseStockService {
 
         // 입력값으로 재고 객체 생성
         InventoryTran invTran = ValueUtil.populate(inventory, new InventoryTran(), "domainId", "barcode", "whCd",
-                "comCd", "skuCd", "locCd", "lotNo", "serialNo", "expiredDate");
+                "comCd", "skuCd", "skuNm", "locCd", "lotNo", "serialNo", "expiredDate");
         invTran.setTranQty(input.getToQty());
         invTran.setReasonCd(input.getReasonCd());
         invTran.setReason(input.getReason());
@@ -892,30 +892,31 @@ public class StockTransactionService extends BaseStockService {
                 "DELETE FROM daily_stock_summaries WHERE domain_id = :domainId AND summary_date = :summaryDate",
                 params);
 
-        // 2. opening  CTE: summaryDate 이전 각 바코드의 마지막 after_qty 합산 → 기초 재고
-        //    daily    CTE: summaryDate 당일 tran_type별 수량 집계
-        //    combined CTE: 기초 재고가 있는 상품(트랜잭션 없음 포함) ∪ 당일 트랜잭션 상품
-        String insertSql =
-                "WITH opening AS (" +
-                "  SELECT wh_cd, com_cd, sku_cd, SUM(after_qty) AS opening_qty" +
+        // 2. opening CTE: summaryDate 이전 각 바코드의 마지막 after_qty 합산 → 기초 재고
+        // daily CTE: summaryDate 당일 tran_type별 수량 집계
+        // combined CTE: 기초 재고가 있는 상품(트랜잭션 없음 포함) ∪ 당일 트랜잭션 상품
+        String insertSql = "WITH opening AS (" +
+                "  SELECT wh_cd, com_cd, sku_cd, sku_nm, SUM(after_qty) AS opening_qty" +
                 "  FROM (" +
-                "    SELECT DISTINCT ON (inventory_id) wh_cd, com_cd, sku_cd, after_qty" +
+                "    SELECT DISTINCT ON (inventory_id) wh_cd, com_cd, sku_cd, sku_nm, after_qty" +
                 "    FROM inventory_trans" +
                 "    WHERE domain_id = :domainId AND tran_date < :summaryDate" +
                 "    ORDER BY inventory_id, tran_at DESC" +
                 "  ) last_trans" +
-                "  GROUP BY wh_cd, com_cd, sku_cd" +
+                "  GROUP BY wh_cd, com_cd, sku_cd, sku_nm" +
                 ")," +
                 "daily AS (" +
-                "  SELECT wh_cd, com_cd, sku_cd," +
+                "  SELECT wh_cd, com_cd, sku_cd, sku_nm," +
                 "    SUM(CASE WHEN tran_type IN ('IN','RWA_RESTOCK') THEN tran_qty ELSE 0 END) AS in_qty," +
                 "    SUM(CASE WHEN tran_type = 'OUT' THEN tran_qty ELSE 0 END) AS out_qty," +
                 "    SUM(CASE WHEN tran_type = 'IN_CANCEL' THEN tran_qty ELSE 0 END) AS in_cancel_qty," +
                 "    SUM(CASE WHEN tran_type = 'OUT_CANCEL' THEN tran_qty ELSE 0 END) AS out_cancel_qty," +
                 "    SUM(CASE WHEN tran_type = 'MOVE_IN' THEN tran_qty ELSE 0 END) AS transfer_in_qty," +
                 "    SUM(CASE WHEN tran_type = 'MOVE_OUT' THEN tran_qty ELSE 0 END) AS transfer_out_qty," +
-                "    SUM(CASE WHEN tran_type IN ('ADJUST','COUNT') AND direction = 'IN' THEN tran_qty ELSE 0 END) AS adjust_plus_qty," +
-                "    SUM(CASE WHEN tran_type IN ('ADJUST','COUNT') AND direction = 'OUT' THEN tran_qty ELSE 0 END) AS adjust_minus_qty," +
+                "    SUM(CASE WHEN tran_type IN ('ADJUST','COUNT') AND direction = 'IN' THEN tran_qty ELSE 0 END) AS adjust_plus_qty,"
+                +
+                "    SUM(CASE WHEN tran_type IN ('ADJUST','COUNT') AND direction = 'OUT' THEN tran_qty ELSE 0 END) AS adjust_minus_qty,"
+                +
                 "    SUM(CASE WHEN tran_type = 'NEW' THEN tran_qty ELSE 0 END) AS add_qty," +
                 "    SUM(CASE WHEN tran_type = 'SCRAP' THEN tran_qty ELSE 0 END) AS loss_qty," +
                 "    SUM(CASE WHEN tran_type = 'VAS_OUT' THEN tran_qty ELSE 0 END) AS vas_out_qty," +
@@ -923,22 +924,22 @@ public class StockTransactionService extends BaseStockService {
                 "    CAST(COUNT(*) AS integer) AS tran_count" +
                 "  FROM inventory_trans" +
                 "  WHERE domain_id = :domainId AND tran_date = :summaryDate" +
-                "  GROUP BY wh_cd, com_cd, sku_cd" +
+                "  GROUP BY wh_cd, com_cd, sku_cd, sku_nm" +
                 ")," +
                 "combined AS (" +
-                "  SELECT wh_cd, com_cd, sku_cd FROM opening WHERE opening_qty > 0" +
+                "  SELECT wh_cd, com_cd, sku_cd, sku_nm FROM opening WHERE opening_qty > 0" +
                 "  UNION" +
-                "  SELECT wh_cd, com_cd, sku_cd FROM daily" +
+                "  SELECT wh_cd, com_cd, sku_cd, sku_nm FROM daily" +
                 ")" +
                 "INSERT INTO daily_stock_summaries (" +
-                "  id, domain_id, summary_date, wh_cd, com_cd, sku_cd," +
+                "  id, domain_id, summary_date, wh_cd, com_cd, sku_cd, sku_nm," +
                 "  opening_qty, in_qty, out_qty, in_cancel_qty, out_cancel_qty," +
                 "  transfer_in_qty, transfer_out_qty, adjust_plus_qty, adjust_minus_qty," +
                 "  add_qty, loss_qty, vas_out_qty, vas_in_qty, closing_qty, tran_count," +
                 "  created_at, updated_at" +
                 ") SELECT" +
                 "  gen_random_uuid()::text, :domainId, :summaryDate," +
-                "  c.wh_cd, c.com_cd, c.sku_cd," +
+                "  c.wh_cd, c.com_cd, c.sku_cd, c.sku_nm," +
                 "  COALESCE(o.opening_qty, 0)," +
                 "  COALESCE(d.in_qty, 0), COALESCE(d.out_qty, 0)," +
                 "  COALESCE(d.in_cancel_qty, 0), COALESCE(d.out_cancel_qty, 0)," +

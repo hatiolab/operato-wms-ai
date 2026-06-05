@@ -105,8 +105,9 @@ public class BaseStockService extends AbstractQueryService {
         ValueUtil.checkEmptyNumber((Number) input.getInvQty(), "label.inv_qty");
 
         // 입력값으로 재고 객체 생성
-        InventoryTran newInventory = ValueUtil.populate(input, new InventoryTran(), "whCd", "comCd", "skuCd", "lotNo",
-                "serialNo", "expiredDate", "refDocType", "refDocNo", "refLineNo", "reasonCd", "reason", "remarks");
+        InventoryTran newInventory = ValueUtil.populate(input, new InventoryTran(), "whCd", "comCd", "skuCd", "skuNm",
+                "lotNo", "serialNo", "expiredDate", "refDocType", "refDocNo", "refLineNo", "reasonCd", "reason",
+                "remarks");
         newInventory.setDomainId(domainId);
         newInventory.setTranQty(input.getInvQty());
 
