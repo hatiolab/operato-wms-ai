@@ -3,6 +3,8 @@ import './pages/base/domain-storage-browser'
 
 import './pages/oms/oms-home'
 import './pages/oms/shipment-order-import'
+import './pages/oms/shipment-order-b2b-import'
+import './pages/oms/shipment-order-b2c-import'
 import './pages/oms/shipment-wave-list'
 import './pages/oms/shipment-order-detail'  // 팝업으로 사용
 import './pages/oms/shipment-wave-detail'  // 팝업으로 사용

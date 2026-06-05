@@ -9,6 +9,8 @@ export default {
 
     { tagname: 'oms-home', page: 'oms-home' },
     { tagname: 'shipment-order-import', page: 'shipment-order-import' },
+    { tagname: 'shipment-order-b2b-import', page: 'shipment-order-b2b-import' },
+    { tagname: 'shipment-order-b2c-import', page: 'shipment-order-b2c-import' },
     { tagname: 'shipment-wave-list', page: 'shipment-wave-list' },
     { tagname: 'shipment-wave-detail', page: 'shipment-wave-detail' },
     { tagname: 'stock-allocation-list', page: 'stock-allocation-list' },
