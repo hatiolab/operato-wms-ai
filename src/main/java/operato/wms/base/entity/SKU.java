@@ -294,6 +294,12 @@ public class SKU extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private Integer noOutPeriod;
 
 	/**
+	 * 반품 대기 가능 수량 - 동시에 반품 대기(RWA WAITING) 상태로 허용되는 최대 수량
+	 */
+	@Column(name = "rwa_max_wait_qty")
+	private Double rwaMaxWaitQty;
+
+	/**
 	 * 세트 상품 여부 - true이면 복수 상품으로 구성된 세트 상품
 	 */
 	@Column(name = "set_prd_flag")
@@ -708,6 +714,14 @@ public class SKU extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setNoOutPeriod(Integer noOutPeriod) {
 		this.noOutPeriod = noOutPeriod;
+	}
+
+	public Double getRwaMaxWaitQty() {
+		return rwaMaxWaitQty;
+	}
+
+	public void setRwaMaxWaitQty(Double rwaMaxWaitQty) {
+		this.rwaMaxWaitQty = rwaMaxWaitQty;
 	}
 
 	public Boolean getSetPrdFlag() {
