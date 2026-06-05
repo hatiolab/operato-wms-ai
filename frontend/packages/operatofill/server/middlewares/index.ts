@@ -34,11 +34,13 @@ async function processBaseUrl(context) {
  * @param method method
  */
 async function logError(error, request, restUrl, method) {
+  if (!error) return;
+
   // 여기서 클라이언트 에러 정보를 저장
   const errorData: any = {
     code: error.code,
     message: error.message,
-    status: error.response.status,
+    status: error.response ? error.response.status : '',
     error_type: error.name,
     uri: restUrl,
     method: method
