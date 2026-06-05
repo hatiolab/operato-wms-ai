@@ -26,6 +26,61 @@ async function processBaseUrl(context) {
 }
 
 /**
+ * 에러 로그를 백엔드 서버로 저장 요청
+ * 
+ * @param error axios에서 발생한 에러 객체
+ * @param request requset 객체
+ * @param restUrl rest api url
+ * @param method method
+ */
+async function logError(error, request, restUrl, method) {
+  // 여기서 클라이언트 에러 정보를 저장
+  const errorData: any = {
+    code: error.code,
+    message: error.message,
+    status: error.response.status,
+    error_type: error.name,
+    uri: restUrl,
+    method: method
+  }
+
+  await logErrorData(errorData, request)
+}
+
+/**
+ * 에러 로그를 백엔드 서버로 저장 요청
+ * 
+ * @param errorData 에러 데이터
+ * @param request requset 객체
+ * @param restUrl rest api url
+ * @param method method
+ */
+async function logErrorData(errorData, request) {
+  // 여기서 클라이언트 에러 정보를 저장
+  try {
+    let errAxiosConfig: AxiosRequestConfig = {
+      method: 'POST',
+      url: operatoBaseUrl + '/error_logs',
+      headers: {
+        'Content-type': 'application/json',
+        Accept: 'application/json',
+        ...request.headers
+      },
+      data: JSON.stringify(errorData),
+      responseType: 'arraybuffer'
+    }
+
+    axios(errAxiosConfig).then(response => {
+      // console.log(response)
+    }).catch(axiosErr => {
+      console.log(axiosErr)
+    })
+  } catch (err) {
+    console.log(err)
+  }
+}
+
+/**
  * multipart/form-data 업로드 요청을 백엔드로 파이핑한다.
  * axios/getRawBody로 바이너리 스트림을 읽으면 boundary가 손상되므로
  * Node.js http.request로 직접 파이핑한다.
@@ -124,6 +179,8 @@ async function processRest(restUrl, context) {
     .catch(error => {
       context.status = error.response?.status || 500
       context.body = error.response?.data || 'Internal Server Error'
+      // 에러 로깅
+      logError(error, request, restUrl, method)
     })
 }
 
@@ -148,9 +205,7 @@ async function processStreamRest(restUrl, context) {
     responseType: 'stream'
   }
 
-  let currentTimestamp = Date.now()
-
-  let fileName = currentTimestamp + '.pdf'
+  let fileName = Date.now() + '.pdf'
 
   // 에러 처리 포맷에 맟추기 위해 수정
   await axios(axiosConfig)
@@ -158,13 +213,14 @@ async function processStreamRest(restUrl, context) {
       context.status = response.status
       context.body = response.data
       context.set('Content-Type', 'application/pdf')
-      context.set('Content-Disposition', 'inline; filename="'+ fileName +'"')
+      context.set('Content-Disposition', 'inline; filename="' + fileName + '"')
     })
     .catch(error => {
       context.status = error.response.status
       context.body = error.response.data
+      // 에러 로깅
+      logError(error, request, restUrl, method)
     })
-
 }
 
 export function initMiddlewares(app) {
