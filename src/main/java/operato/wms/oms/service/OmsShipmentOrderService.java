@@ -13,6 +13,7 @@ import operato.wms.oms.entity.ShipmentOrder;
 import operato.wms.oms.entity.ShipmentOrderItem;
 import operato.wms.oms.entity.StockAllocation;
 import operato.wms.stock.entity.Inventory;
+import operato.wms.stock.entity.InventoryTran;
 import operato.wms.stock.service.StockTransactionService;
 import xyz.anythings.sys.service.AbstractQueryService;
 import xyz.elidom.exception.server.ElidomRuntimeException;
@@ -200,7 +201,9 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 		List<String> errors = new ArrayList<>();
 
 		for (String orderId : ids) {
+			// 출고 주문 조회
 			ShipmentOrder order = this.findOrder(domainId, orderId);
+
 			if (order == null) {
 				errors.add("주문을 찾을 수 없습니다: " + orderId);
 				continue;
@@ -213,10 +216,8 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 			}
 
 			// 주문 상세 조회
-			String itemSql = "SELECT * FROM shipment_order_items WHERE domain_id = :domainId AND shipment_order_id = :orderId ORDER BY line_no";
-			Map<String, Object> itemParams = ValueUtil.newMap("domainId,orderId", domainId, orderId);
-			List<ShipmentOrderItem> items = this.queryManager.selectListBySql(itemSql, itemParams,
-					ShipmentOrderItem.class, 0, 0);
+			List<ShipmentOrderItem> items = this.queryManager.selectList(ShipmentOrderItem.class,
+					new ShipmentOrderItem(domainId, orderId));
 
 			if (items.isEmpty()) {
 				errors.add("주문 [" + order.getShipmentNo() + "]에 상세 항목이 없습니다");
@@ -225,6 +226,9 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 
 			double totalAllocQty = 0;
 			boolean hasShort = false;
+
+			// 재고 할당 전략 조회
+			StoragePolicy policy = this.wmsBaseService.findStoragePolicy(domainId, order.getComCd(), order.getWhCd());
 
 			for (ShipmentOrderItem item : items) {
 				double orderQty = item.getOrderQty() != null ? item.getOrderQty() : 0;
@@ -236,17 +240,9 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 					continue;
 				}
 
-				/**
-				 * 재고 할당 전략 조회
-				 */
-				StoragePolicy policy = this.wmsBaseService.findStoragePolicy(domainId, order.getComCd(),
-						order.getWhCd());
-				/**
-				 * 가용 재고 조회 (StoragePolicy.releaseStrategy에 따라 정렬, needQty 충족분까지만 반환)
-				 */
+				// 가용 재고 조회 (StoragePolicy.releaseStrategy에 따라 정렬, needQty 충족분까지만 반환)
 				List<Inventory> inventories = this.stockTransactionService.searchAvailableInventory(domainId,
 						order.getComCd(), order.getWhCd(), item.getSkuCd(), needQty, policy.getReleaseStrategy());
-
 				double itemAllocQty = existingAllocQty;
 
 				for (Inventory inv : inventories) {
@@ -263,25 +259,29 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 					double allocQty = Math.min(needQty, availQty);
 
 					// StockAllocation 생성
-					StockAllocation alloc = new StockAllocation();
-					alloc.setDomainId(domainId);
-					alloc.setShipmentOrderId(orderId);
-					alloc.setShipmentOrderItemId(item.getId());
-					alloc.setInventoryId(inv.getId());
-					alloc.setSkuCd(item.getSkuCd());
-					alloc.setBarcode(inv.getBarcode());
-					alloc.setLocCd(inv.getLocCd());
-					alloc.setLotNo(inv.getLotNo());
-					alloc.setExpiredDate(inv.getExpiredDate());
-					alloc.setAllocQty(allocQty);
-					alloc.setAllocType(StockAllocation.ALLOC_TYPE_SHIPMENT);
-					alloc.setAllocStrategy(policy.getReleaseStrategy());
-					alloc.setStatus(StockAllocation.STATUS_HARD);
-					alloc.setAllocatedAt(now);
-					this.queryManager.insert(alloc);
+					/*
+					 * StockAllocation alloc = new StockAllocation();
+					 * alloc.setDomainId(domainId);
+					 * alloc.setShipmentOrderId(orderId);
+					 * alloc.setShipmentOrderItemId(item.getId());
+					 * alloc.setInventoryId(inv.getId());
+					 * alloc.setSkuCd(item.getSkuCd());
+					 * alloc.setBarcode(inv.getBarcode());
+					 * alloc.setLocCd(inv.getLocCd());
+					 * alloc.setLotNo(inv.getLotNo());
+					 * alloc.setExpiredDate(inv.getExpiredDate());
+					 * alloc.setAllocQty(allocQty);
+					 * alloc.setAllocType(StockAllocation.ALLOC_TYPE_SHIPMENT);
+					 * alloc.setAllocStrategy(policy.getReleaseStrategy());
+					 * alloc.setStatus(StockAllocation.STATUS_HARD);
+					 * alloc.setAllocatedAt(now);
+					 * this.queryManager.insert(alloc);
+					 */
 
 					// 재고 예약 처리
-					this.stockTransactionService.allocateInventory(inv, allocQty);
+					this.stockTransactionService.allocateInventory(inv, policy.getReleaseStrategy(), allocQty,
+							StockAllocation.ALLOC_TYPE_SHIPMENT,
+							order.getId(), order.getShipmentNo(), item.getId());
 
 					itemAllocQty += allocQty;
 					needQty -= allocQty;
@@ -289,24 +289,25 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 
 				// ShipmentOrderItem 업데이트
 				double shortQty = orderQty - itemAllocQty;
-				String updItemSql = "UPDATE shipment_order_items SET alloc_qty = :allocQty, short_qty = :shortQty, updated_at = now() WHERE domain_id = :domainId AND id = :itemId";
-				Map<String, Object> updItemParams = ValueUtil.newMap("allocQty,shortQty,domainId,itemId", itemAllocQty,
-						shortQty, domainId, item.getId());
-				this.queryManager.executeBySql(updItemSql, updItemParams);
+				item.setAllocQty(itemAllocQty);
+				item.setShortQty(shortQty);
+				this.queryManager.update(item, "allocQty", "shortQty", "updatedAt", "updaterId");
 
 				totalAllocQty += itemAllocQty;
+
 				if (shortQty > 0)
 					hasShort = true;
 			}
 
 			// 주문 헤더 상태 업데이트
 			String newStatus = hasShort ? ShipmentOrder.STATUS_BACK_ORDER : ShipmentOrder.STATUS_ALLOCATED;
-			String updOrderSql = "UPDATE shipment_orders SET status = :status, total_alloc = :totalAlloc, allocated_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-			Map<String, Object> updOrderParams = ValueUtil.newMap("status,totalAlloc,now,domainId,id",
-					newStatus, totalAllocQty, now, domainId, orderId);
-			this.queryManager.executeBySql(updOrderSql, updOrderParams);
+			order.setStatus(newStatus);
+			order.setTotalAlloc(totalAllocQty);
+			order.setAllocatedAt(now);
+			this.queryManager.update(order, "status", "totalAlloc", "allocatedAt", "updatedAt", "updaterId");
 
 			successCount++;
+
 			if (hasShort) {
 				backOrderCount++;
 				this.omsReplenishOrderService.createReplenishForOrder(domainId, orderId, order.getComCd(),
@@ -335,9 +336,11 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 	 */
 	public Map<String, Object> deallocateShipmentOrder(String id) {
 		Long domainId = Domain.currentDomainId();
-		String now = DateUtil.currentTimeStr();
+		// String now = DateUtil.currentTimeStr();
 
+		// 출고 주문 조회
 		ShipmentOrder order = this.findOrder(domainId, id);
+
 		if (order == null) {
 			throw new ElidomValidationException("주문을 찾을 수 없습니다: " + id);
 		}
@@ -358,14 +361,7 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 		// 각 할당 해제
 		for (StockAllocation alloc : allocations) {
 			// Inventory reserved_qty 복원
-			this.stockTransactionService.deallocateInventory(alloc.getDomainId(), alloc.getInventoryId(),
-					alloc.getAllocQty());
-
-			// StockAllocation 상태 변경
-			String updAllocSql = "UPDATE stock_allocations SET status = :status, released_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :allocId";
-			Map<String, Object> updAllocParams = ValueUtil.newMap("status,now,domainId,allocId",
-					StockAllocation.STATUS_CANCELLED, now, domainId, alloc.getId());
-			this.queryManager.executeBySql(updAllocSql, updAllocParams);
+			this.stockTransactionService.deallocateInventory(alloc);
 		}
 
 		// ShipmentOrderItem alloc_qty, short_qty 초기화 (할당해제 → CONFIRMED 복원, 부족수량도 0으로)
@@ -374,10 +370,10 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 		this.queryManager.executeBySql(updItemsSql, updItemsParams);
 
 		// 주문 헤더 상태 복원
-		String updOrderSql = "UPDATE shipment_orders SET status = :status, total_alloc = 0, allocated_at = null, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-		Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id",
-				ShipmentOrder.STATUS_CONFIRMED, domainId, id);
-		this.queryManager.executeBySql(updOrderSql, updOrderParams);
+		order.setStatus(ShipmentOrder.STATUS_CONFIRMED);
+		order.setTotalAlloc(0.0);
+		order.setAllocatedAt(null);
+		this.queryManager.update(order, "status", "totalAlloc", "allocatedAt", "updatedAt", "updaterId");
 
 		// 결과 리턴
 		return ValueUtil.newMap("success,released_count", true, allocations.size());
@@ -397,13 +393,15 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 	 */
 	public Map<String, Object> cancelShipmentOrders(List<String> ids) {
 		Long domainId = Domain.currentDomainId();
-		String now = DateUtil.currentTimeStr();
+		// String now = DateUtil.currentTimeStr();
 		int successCount = 0;
 		int failCount = 0;
 		List<String> errors = new ArrayList<>();
 
 		for (String id : ids) {
+			// 출고 주문 조회
 			ShipmentOrder order = this.findOrder(domainId, id);
+
 			if (order == null) {
 				errors.add("주문을 찾을 수 없습니다: " + id);
 				failCount++;
@@ -432,13 +430,7 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 						StockAllocation.class, 0, 0);
 
 				for (StockAllocation alloc : allocations) {
-					this.stockTransactionService.deallocateInventory(domainId, alloc.getInventoryId(),
-							alloc.getAllocQty());
-
-					String updAllocSql = "UPDATE stock_allocations SET status = :status, released_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :allocId";
-					Map<String, Object> updAllocParams = ValueUtil.newMap("status,now,domainId,allocId",
-							StockAllocation.STATUS_CANCELLED, now, domainId, alloc.getId());
-					this.queryManager.executeBySql(updAllocSql, updAllocParams);
+					this.stockTransactionService.deallocateInventory(alloc);
 				}
 			}
 

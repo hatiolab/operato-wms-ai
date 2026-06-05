@@ -5,14 +5,18 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.annotation.JacksonInject.Value;
+
 import operato.wms.base.entity.Location;
 import operato.wms.base.entity.SKU;
 import operato.wms.base.entity.StoragePolicy;
 import operato.wms.inbound.WmsInboundConstants;
+import operato.wms.oms.entity.StockAllocation;
 import operato.wms.stock.entity.Inventory;
 import operato.wms.stock.entity.InventoryTran;
 import operato.wms.stock.model.InvTransaction;
 import xyz.elidom.sys.util.ThrowUtil;
+import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
 /**
@@ -386,23 +390,42 @@ public class StockTransactionService extends BaseStockService {
 
     /**
      * 재고 할당 처리
-     * TODO 재고 할당시 재고 할당 방법에 따라 재고 할당 로직 수정 필요
      * 
-     * @param inv
-     * @param allocateQty
+     * @param inv           재고
+     * @param allocStrategy 할당 전략
+     * @param allocateQty   할당 수량
+     * @param allocType     할당 유형
+     * @param orderId       주문 아이디
+     * @param orderNo       주문 번호
+     * @param orderItemId   주문 아이템 아이디
      */
-    public Inventory allocateInventory(Inventory inv, double allocateQty) {
-        /*
-         * inv.setReservedQty(inv.getReservedQty() == null ? allocateQty :
-         * inv.getReservedQty()
-         * + allocateQty);
-         * inv.setUpdatedAt(new Date());
-         * this.queryManager.update(inv);
-         * return inv;
-         */
+    public Inventory allocateInventory(Inventory inv, String allocStrategy, double allocateQty, String allocType,
+            String orderId, String orderNo, String orderItemId) {
+
+        // 출고 혹은 유통가공 StockAllocation 생성 (HARD)
+        StockAllocation alloc = new StockAllocation();
+        alloc.setDomainId(inv.getDomainId());
+        alloc.setShipmentOrderId(orderId);
+        alloc.setShipmentOrderItemId(orderItemId);
+        alloc.setInventoryId(inv.getId());
+        alloc.setSkuCd(inv.getSkuCd());
+        alloc.setBarcode(inv.getBarcode());
+        alloc.setLocCd(inv.getLocCd());
+        alloc.setLotNo(inv.getLotNo());
+        alloc.setExpiredDate(inv.getExpiredDate());
+        alloc.setAllocQty(allocateQty);
+        alloc.setAllocType(allocType);
+        alloc.setAllocStrategy(allocStrategy);
+        alloc.setStatus(StockAllocation.STATUS_HARD);
+        alloc.setAllocatedAt(DateUtil.currentTimeStr());
+        this.queryManager.insert(alloc);
 
         // 재고 할당
         InventoryTran invTran = new InventoryTran();
+        invTran.setRefDocType(ValueUtil.isEqualIgnoreCase(StockAllocation.ALLOC_TYPE_SHIPMENT, allocType)
+                ? InventoryTran.REF_DOC_TYPE_SHIP
+                : InventoryTran.REF_DOC_TYPE_VAS);
+        invTran.setRefDocNo(orderNo);
         invTran.setTranQty(allocateQty);
         return invTran.createAllocateTransaction(inv);
     }
@@ -410,28 +433,29 @@ public class StockTransactionService extends BaseStockService {
     /**
      * 재고 할당 해제 처리
      * 
-     * @param domainId
-     * @param inventoryId
-     * @param deallocQty
+     * @param stockAllocation
+     * @return
      */
-    public Inventory deallocateInventory(Long domainId, String inventoryId, double deallocQty) {
-        /*
-         * String updInvSql =
-         * "UPDATE inventories SET reserved_qty = GREATEST(COALESCE(reserved_qty, 0) - :deallocQty, 0), updated_at = now() WHERE domain_id = :domainId AND id = :invId"
-         * ;
-         * Map<String, Object> updInvParams =
-         * ValueUtil.newMap("deallocQty,domainId,invId", deallocQty, domainId,
-         * inventoryId);
-         * this.queryManager.executeBySql(updInvSql, updInvParams);
-         */
-
+    public Inventory deallocateInventory(StockAllocation stockAllocation) {
         // 재고 체크
-        Inventory inventory = this.findAndCheckInventory(domainId, inventoryId, null);
+        Inventory inventory = this.findAndCheckInventory(stockAllocation.getDomainId(),
+                stockAllocation.getInventoryId(), Inventory.TRANSACTION_DEALLOCATE);
 
         // 재고 할당 해제
         InventoryTran invTran = new InventoryTran();
-        invTran.setTranQty(deallocQty);
-        return invTran.createDeallocateTransaction(inventory);
+        invTran.setTranQty(stockAllocation.getAllocQty());
+        invTran.setRefDocType(
+                ValueUtil.isEqualIgnoreCase(stockAllocation.getAllocType(), StockAllocation.ALLOC_TYPE_SHIPMENT)
+                        ? InventoryTran.REF_DOC_TYPE_SHIP
+                        : InventoryTran.REF_DOC_TYPE_VAS);
+        invTran.setRefDocNo(stockAllocation.getShipmentOrderId());
+        invTran.createDeallocateTransaction(inventory);
+
+        // 재고 할당 삭제
+        this.queryManager.delete(stockAllocation);
+
+        // 재고 리턴
+        return inventory;
     }
 
     /**

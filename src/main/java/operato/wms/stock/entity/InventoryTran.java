@@ -1236,9 +1236,9 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 		/*
 		 * this.beforeQty = oriReservedQty;
 		 * this.afterQty = newReservedQty;
-		 * 
 		 * ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd",
-		 * "skuCd", "lotNo", "serialNo", "expiredDate");
+		 * "skuCd", "skuNm", "locCd", "lotNo",
+		 * "serialNo", "expiredDate");
 		 * 
 		 * this.inventoryId = inventory.getId();
 		 * this.toLocCd = inventory.getLocCd();
@@ -1275,9 +1275,8 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 		/*
 		 * this.beforeQty = oriReservedQty;
 		 * this.afterQty = newReservedQty;
-		 * 
 		 * ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd",
-		 * "skuCd", "lotNo", "serialNo", "expiredDate");
+		 * "skuCd", "skuNm", "locCd", "lotNo", "serialNo", "expiredDate");
 		 * 
 		 * this.inventoryId = inventory.getId();
 		 * this.toLocCd = inventory.getLocCd();

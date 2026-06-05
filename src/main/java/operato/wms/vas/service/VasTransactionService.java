@@ -14,7 +14,6 @@ import operato.wms.base.entity.VasBomItem;
 import operato.wms.base.service.WmsBaseService;
 import operato.wms.oms.entity.StockAllocation;
 import operato.wms.stock.entity.Inventory;
-import operato.wms.stock.entity.InventoryTran;
 import operato.wms.stock.model.InvTransaction;
 import operato.wms.stock.service.StockTransactionService;
 import operato.wms.vas.WmsVasConstants;
@@ -403,7 +402,6 @@ public class VasTransactionService extends AbstractQueryService {
 		}
 
 		// 6. 분할 배정 — 재고별 stock_allocations 생성 및 reserved_qty 증가
-		String now = xyz.elidom.util.DateUtil.currentTimeStr();
 		double remainQty = allocQty;
 		String firstLocCd = null;
 		String firstLotNo = null;
@@ -418,30 +416,15 @@ public class VasTransactionService extends AbstractQueryService {
 
 			double thisQty = Math.min(avail, remainQty);
 
-			// stock_allocations 생성 (HARD)
-			operato.wms.oms.entity.StockAllocation alloc = new operato.wms.oms.entity.StockAllocation();
-			alloc.setDomainId(item.getDomainId());
-			alloc.setShipmentOrderId(order.getId());
-			alloc.setShipmentOrderItemId(item.getId());
-			alloc.setInventoryId(inv.getId());
-			alloc.setSkuCd(item.getSkuCd());
-			alloc.setBarcode(inv.getBarcode());
-			alloc.setLocCd(inv.getLocCd());
-			alloc.setLotNo(ValueUtil.isNotEmpty(lotNo) ? lotNo : inv.getLotNo());
-			alloc.setExpiredDate(inv.getExpiredDate());
-			alloc.setAllocQty(thisQty);
-			alloc.setAllocType(operato.wms.oms.entity.StockAllocation.ALLOC_TYPE_VAS);
-			alloc.setStatus(operato.wms.oms.entity.StockAllocation.STATUS_HARD);
-			alloc.setAllocatedAt(now);
-			this.queryManager.insert(alloc);
-
 			// reserved_qty 증가
-			this.stockTrxSvc.allocateInventory(inv, thisQty);
+			this.stockTrxSvc.allocateInventory(inv, null, thisQty, StockAllocation.ALLOC_TYPE_VAS, order.getId(),
+					order.getVasNo(), item.getId());
 
 			if (firstLocCd == null) {
 				firstLocCd = inv.getLocCd();
 				firstLotNo = ValueUtil.isNotEmpty(lotNo) ? lotNo : inv.getLotNo();
 			}
+
 			remainQty -= thisQty;
 		}
 
@@ -457,9 +440,9 @@ public class VasTransactionService extends AbstractQueryService {
 		item.setSrcLocCd(firstLocCd);
 		item.setLotNo(firstLotNo);
 		item.setStatus(WmsVasConstants.ITEM_STATUS_ALLOCATED);
-
 		this.queryManager.update(item, "allocQty", "srcLocCd", "lotNo", "status", "updatedAt");
 
+		// 8. 유통가공 오더 아이템 리턴
 		return item;
 	}
 
@@ -472,16 +455,15 @@ public class VasTransactionService extends AbstractQueryService {
 		String sql = "SELECT * FROM stock_allocations " +
 				"WHERE domain_id = :domainId AND shipment_order_item_id = :itemId " +
 				"AND alloc_type = :allocType AND status = :status";
-		List<operato.wms.oms.entity.StockAllocation> existing = this.queryManager.selectListBySql(sql,
+		List<StockAllocation> existing = this.queryManager.selectListBySql(sql,
 				ValueUtil.newMap("domainId,itemId,allocType,status",
 						item.getDomainId(), item.getId(),
-						operato.wms.oms.entity.StockAllocation.ALLOC_TYPE_VAS,
-						operato.wms.oms.entity.StockAllocation.STATUS_HARD),
-				operato.wms.oms.entity.StockAllocation.class, 0, 0);
+						StockAllocation.ALLOC_TYPE_VAS,
+						StockAllocation.STATUS_HARD),
+				StockAllocation.class, 0, 0);
 
-		for (operato.wms.oms.entity.StockAllocation alloc : existing) {
-			this.stockTrxSvc.deallocateInventory(item.getDomainId(), alloc.getInventoryId(), alloc.getAllocQty());
-			this.queryManager.delete(alloc);
+		for (StockAllocation alloc : existing) {
+			this.stockTrxSvc.deallocateInventory(alloc);
 		}
 	}
 
@@ -494,14 +476,14 @@ public class VasTransactionService extends AbstractQueryService {
 	@Transactional
 	public VasOrderItem cancelSingleAllocation(String allocId) {
 		// 1. 할당 레코드 조회
-		operato.wms.oms.entity.StockAllocation alloc = this.queryManager
-				.select(operato.wms.oms.entity.StockAllocation.class, allocId);
+		StockAllocation alloc = this.queryManager.select(StockAllocation.class, allocId);
+
 		if (alloc == null) {
 			throw new ElidomValidationException("할당 내역을 찾을 수 없습니다. ID: " + allocId);
 		}
 
 		// 2. VAS 할당 유형 검증
-		if (!operato.wms.oms.entity.StockAllocation.ALLOC_TYPE_VAS.equals(alloc.getAllocType())) {
+		if (!StockAllocation.ALLOC_TYPE_VAS.equals(alloc.getAllocType())) {
 			throw new ElidomValidationException("VAS 할당 내역이 아닙니다.");
 		}
 
@@ -518,12 +500,9 @@ public class VasTransactionService extends AbstractQueryService {
 		}
 
 		// 5. 재고 reserved_qty 차감
-		this.stockTrxSvc.deallocateInventory(alloc.getDomainId(), alloc.getInventoryId(), alloc.getAllocQty());
+		this.stockTrxSvc.deallocateInventory(alloc);
 
-		// 6. stock_allocation 삭제
-		this.queryManager.delete(alloc);
-
-		// 7. vas_order_item alloc_qty 차감 및 상태 복구
+		// 6. vas_order_item alloc_qty 차감 및 상태 복구
 		double currentAllocQty = item.getAllocQty() == null ? 0 : item.getAllocQty();
 		double newAllocQty = Math.max(currentAllocQty - alloc.getAllocQty(), 0);
 		item.setAllocQty(newAllocQty);
@@ -537,6 +516,7 @@ public class VasTransactionService extends AbstractQueryService {
 
 		this.queryManager.update(item, "allocQty", "srcLocCd", "lotNo", "status");
 
+		// 7. 유통가공 주문 상세 리턴
 		return item;
 	}
 
@@ -546,15 +526,14 @@ public class VasTransactionService extends AbstractQueryService {
 	 * @param vasOrderItemId 작업 지시 상세 ID
 	 * @return 재고 할당 목록
 	 */
-	public List<operato.wms.oms.entity.StockAllocation> listVasItemAllocations(String vasOrderItemId) {
+	public List<StockAllocation> listVasItemAllocations(String vasOrderItemId) {
 		String sql = "SELECT * FROM stock_allocations " +
 				"WHERE domain_id = :domainId AND shipment_order_item_id = :itemId " +
 				"AND alloc_type = :allocType ORDER BY created_at ASC";
 		return this.queryManager.selectListBySql(sql,
-				ValueUtil.newMap("domainId,itemId,allocType",
-						xyz.elidom.sys.entity.Domain.currentDomainId(), vasOrderItemId,
-						operato.wms.oms.entity.StockAllocation.ALLOC_TYPE_VAS),
-				operato.wms.oms.entity.StockAllocation.class, 0, 0);
+				ValueUtil.newMap("domainId,itemId,allocType", Domain.currentDomainId(), vasOrderItemId,
+						StockAllocation.ALLOC_TYPE_VAS),
+				StockAllocation.class, 0, 0);
 	}
 
 	/**
