@@ -4,19 +4,19 @@ import { PageView } from '@operato/shell'
 import { OxInputBarcode } from '@operato/input'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import { voiceService } from './voice-service.js'
+import '../../component/entity-label.js'
 
 /**
  * RWA 반품 통합 PDA 작업 화면
  *
  * vas-work-page 레이아웃 기준으로 구현:
  * - 주문 선택 화면: 대기 / 작업중 / 완료 요약 카드 + 주문 목록
- * - 작업 화면: 3단계 스텝
+ * - 작업 화면: 2단계 스텝
  *   - Step 1: 반품 입고  — 항목별 수량 + 로케이션 입력 → POST .../items/{id}/receive
- *   - Step 2: 검수       — 양품/불량 수량, 불량 유형    → POST .../items/{id}/inspect
- *   - Step 3: 처분 결정  — 처분 유형 + 세부 옵션        → POST .../items/{id}/dispose → POST .../complete
+ *   - Step 2: 검수       — 양품/불량 수량, 불량 유형    → POST .../items/{id}/inspect → 즉시 완료
  *
  * 상태 흐름:
- *   APPROVED → RECEIVING → INSPECTING → INSPECTED → DISPOSING → COMPLETED / CANCELLED / REJECTED
+ *   APPROVED → RECEIVING → RECEIVED → INSPECTING → COMPLETED / CANCELLED / REJECTED
  */
 class RwaReceiveWork extends localize(i18next)(PageView) {
   /** 컴포넌트 스타일 */
@@ -594,39 +594,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
         .complete-item-row .row-val.defect { color: #C62828; }
 
         /* ======================================
-         * Step 3 처분 탭
-         * ====================================== */
-        .disp-target-tabs {
-          display: flex;
-          gap: 8px;
-          margin-bottom: 12px;
-        }
-        .disp-tab {
-          flex: 1;
-          padding: 10px 8px;
-          border: 2px solid #ddd;
-          border-radius: 8px;
-          background: #fff;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          position: relative;
-          color: #555;
-        }
-        .disp-tab.active {
-          border-color: var(--md-sys-color-primary, #1976D2);
-          color: var(--md-sys-color-primary, #1976D2);
-          background: #e3f2fd;
-        }
-        .disp-tab .tab-badge {
-          position: absolute;
-          top: 4px;
-          right: 6px;
-          font-size: 12px;
-          color: #2e7d32;
-        }
-
-        /* ======================================
          * 피드백 토스트
          * ====================================== */
         .feedback-toast {
@@ -705,7 +672,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
       selectedOrder:    { type: Object },
       orderItems:       { type: Array },
       currentItemIndex: { type: Number },
-      step:             { type: Number },    // 1 | 2 | 3
+      step:             { type: Number },    // 1 | 2
       actionLoading:    { type: Boolean },
       feedbackMsg:      { type: String },
       feedbackType:     { type: String },
@@ -718,21 +685,14 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
       defectType:       { type: String },
       defectDesc:       { type: String },
       inspRemarks:      { type: String },
-      // Step 3 - 처분 폼 (현재 편집중인 값)
-      dispType:         { type: String },
-      dispLocCd:        { type: String },
-      dispExpiredDate:  { type: String },
-      dispScrapMethod:  { type: String },
-      // Step 3 - 선택/결정 상태
-      selectedDispItemId:   { type: String },  // 현재 선택된 아이템 ID
-      dispTarget:           { type: String },  // 'good' | 'defect' — 현재 편집 대상
-      dispDecisions:        { type: Object },  // { [itemId]: { good: {...}|null, defect: {...}|null, confirmed: false } }
       // 기본 RETURN 로케이션
       returnLocCd:          { type: String },
       // Step 1 에서 선택된 아이템 ID
       selectedOrderItemId:  { type: String },
       // Step 2 에서 선택된 아이템 ID
-      selectedInspItemId:   { type: String }
+      selectedInspItemId:   { type: String },
+      // 주문 진입 시점의 초기 상태 (isDone 판단용 — 작업 중 상태 변경과 구분)
+      enteredOrderStatus:   { type: String }
     }
   }
 
@@ -753,9 +713,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     this.returnLocCd = ''
     this.selectedOrderItemId = ''
     this.selectedInspItemId = ''
-    this.selectedDispItemId = ''
-    this.dispTarget = 'good'
-    this.dispDecisions = {}
+    this.enteredOrderStatus = ''
     this._resetForms()
   }
 
@@ -894,7 +852,8 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   /** 작업 화면 전체 레이아웃 */
   _renderWorkScreen() {
     const order = this.selectedOrder
-    const isDone = ['COMPLETED', 'CANCELLED', 'REJECTED'].includes(order?.status)
+    // 진입 시점 상태 기준으로 판단 — 작업 중 상태 변경(COMPLETED)과 구분
+    const isDone = ['COMPLETED', 'CANCELLED', 'REJECTED'].includes(this.enteredOrderStatus)
 
     return html`
       <div class="work-screen">
@@ -1142,191 +1101,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     `
   }
 
-  /* ============================================================
-   * Step 3: 처분 결정 (양품/불량 분리)
-   * ============================================================ */
 
-  /** Step 3 — 양품/불량 분리 처분 UI */
-  _renderStep3Dispose() {
-    const allItems = this.orderItems.filter(i => ['INSPECTED', 'DISPOSED', 'COMPLETED'].includes(i.status))
-
-    const currentItem = this.selectedDispItemId
-      ? allItems.find(i => i.id === this.selectedDispItemId)
-      : allItems[0]
-
-    const itemNo = currentItem ? allItems.indexOf(currentItem) + 1 : '-'
-    const dec = currentItem ? (this.dispDecisions[currentItem.id] || {}) : {}
-
-    return html`
-      <p class="section-title">처분 작업 (${itemNo} / ${allItems.length})</p>
-
-      ${currentItem ? html`
-        <div class="item-card">
-          <div class="sku-info">${currentItem.sku_cd} · ${currentItem.sku_nm || '-'}</div>
-          <div class="qty-info">
-            양품: ${currentItem.good_qty || 0} EA &nbsp;|&nbsp; 불량: ${currentItem.defect_qty || 0} EA
-          </div>
-        </div>
-
-        <!-- 양품/불량 탭 선택 -->
-        <div class="disp-target-tabs">
-          ${(currentItem.good_qty || 0) > 0 ? html`
-            <button class="disp-tab ${this.dispTarget === 'good' ? 'active' : ''}"
-              @click="${() => this._selectDispTarget('good', currentItem)}">
-              양품 ${currentItem.good_qty} EA
-              ${dec.good ? html`<span class="tab-badge">✓</span>` : ''}
-            </button>
-          ` : ''}
-          ${(currentItem.defect_qty || 0) > 0 ? html`
-            <button class="disp-tab ${this.dispTarget === 'defect' ? 'active' : ''}"
-              @click="${() => this._selectDispTarget('defect', currentItem)}">
-              불량 ${currentItem.defect_qty} EA
-              ${dec.defect ? html`<span class="tab-badge">✓</span>` : ''}
-            </button>
-          ` : ''}
-        </div>
-
-        <!-- 처분 폼 -->
-        ${this._renderDispForm(currentItem)}
-
-      ` : html`
-        <div class="done-card">
-          <div class="done-icon">✅</div>
-          <div class="done-title">모든 항목 처분 결정 완료</div>
-          <div class="done-sub">반품 완료 버튼을 눌러 일괄 처리하세요</div>
-        </div>
-      `}
-
-      ${this._renderItemsProgressStep3(allItems)}
-    `
-  }
-
-  /** Step 3 처분 폼 (양품 또는 불량) */
-  _renderDispForm(item) {
-    const isGood = this.dispTarget === 'good'
-    const targetQty = isGood ? (item.good_qty || 0) : (item.defect_qty || 0)
-    if (targetQty <= 0) return ''
-
-    return html`
-      <div class="form-group">
-        <label>처분 유형 (${isGood ? '양품' : '불량'} ${targetQty} EA)</label>
-        <select .value="${this.dispType}"
-          @change="${e => { this.dispType = e.target.value; this.requestUpdate() }}">
-          <option value="">선택하세요</option>
-          <option value="RESTOCK">재입고 (정상 재고)</option>
-          <option value="SCRAP">폐기</option>
-          <option value="REPAIR">수리/재가공</option>
-          <option value="RETURN_VENDOR">공급업체 반송</option>
-          <option value="DONATION">기부</option>
-        </select>
-      </div>
-
-      ${this.dispType === 'RESTOCK' ? html`
-        <div class="form-group">
-          <label>재입고 로케이션</label>
-          <div class="scan-row" style="margin-bottom:0">
-            <ox-input-barcode
-              placeholder="로케이션 스캔 또는 직접 입력"
-              .value="${this.dispLocCd}"
-              @change="${e => { this.dispLocCd = e.target.value }}"
-            ></ox-input-barcode>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>소비기한 (선택)</label>
-          <input
-            type="date"
-            .value="${this.dispExpiredDate}"
-            @change="${e => { this.dispExpiredDate = e.target.value }}"
-          />
-        </div>
-      ` : ''}
-
-      ${this.dispType === 'SCRAP' ? html`
-        <div class="form-group">
-          <label>폐기 방법</label>
-          <select @change="${e => { this.dispScrapMethod = e.target.value }}">
-            <option value="">선택하세요</option>
-            <option value="INCINERATION">소각</option>
-            <option value="LANDFILL">매립</option>
-            <option value="RECYCLE">재활용</option>
-          </select>
-        </div>
-      ` : ''}
-
-      <div class="qty-confirm-row" style="margin-top:8px">
-        <div style="flex:1"></div>
-        <button class="btn-confirm-inline"
-          ?disabled="${this.actionLoading}"
-          @click="${() => this._doConfirmDispose(item)}">
-          확인
-        </button>
-      </div>
-    `
-  }
-
-  /**
-   * Step 3 항목 현황 — 양품/불량 처분 결정 상태 표시, 클릭으로 선택
-   * @param {Array} allItems - 처분 대상 전체 항목
-   */
-  _renderItemsProgressStep3(allItems) {
-    return html`
-      <div class="items-progress">
-        <div class="progress-title">항목 현황 (${allItems.length}건)</div>
-        ${allItems.map(item => {
-          const dec = this.dispDecisions[item.id] || {}
-          const isSelected = item.id === this.selectedDispItemId
-          const goodConfirmed = (item.good_qty || 0) <= 0 || dec.good
-          const defectConfirmed = (item.defect_qty || 0) <= 0 || dec.defect
-          const allConfirmed = goodConfirmed && defectConfirmed
-
-          const goodLabel = dec.good ? `✓ ${this._dispTypeLabel(dec.good.disposition_type)}` : ((item.good_qty || 0) > 0 ? '미결정' : '-')
-          const defLabel = dec.defect ? `✓ ${this._dispTypeLabel(dec.defect.disposition_type)}` : ((item.defect_qty || 0) > 0 ? '미결정' : '-')
-
-          return html`
-            <div class="progress-item ${isSelected ? 'current-item' : ''}"
-              @click="${() => this._selectDispItem(item)}">
-              <div style="flex:1">
-                <div class="sku">${item.sku_cd} · ${item.rwa_qty || 0} EA</div>
-                <div style="font-size:11px; color: #666; margin-top:2px">
-                  양품: <span style="color:${dec.good ? '#2e7d32' : '#e65100'}">${goodLabel}</span>
-                  &nbsp;|&nbsp;
-                  불량: <span style="color:${dec.defect ? '#2e7d32' : (item.defect_qty > 0 ? '#e65100' : '#999')}">${defLabel}</span>
-                </div>
-              </div>
-              <span class="${allConfirmed ? 'status-done' : 'status-todo'}">
-                ${allConfirmed ? '✓ 결정' : '미결정'}
-              </span>
-            </div>
-          `
-        })}
-      </div>
-    `
-  }
-
-  /** 항목 진행 현황 */
-  _renderItemsProgress(phase) {
-    const doneStatuses = {
-      receive: ['RECEIVED', 'INSPECTED', 'DISPOSED', 'COMPLETED'],
-      inspect: ['INSPECTED', 'DISPOSED', 'COMPLETED'],
-      dispose: ['DISPOSED', 'COMPLETED']
-    }
-    const done = doneStatuses[phase] || []
-
-    return html`
-      <div class="items-progress">
-        <div class="progress-title">항목 현황 (${this.orderItems.length}건)</div>
-        ${this.orderItems.map(item => html`
-          <div class="progress-item">
-            <span class="sku">${item.sku_cd} · ${item.rwa_req_qty || item.rwa_qty || 0} EA</span>
-            <span class="${done.includes(item.status) ? 'status-done' : 'status-todo'}">
-              ${done.includes(item.status) ? '✓ 완료' : this._statusLabel(item.status)}
-            </span>
-          </div>
-        `)}
-      </div>
-    `
-  }
 
   /* ============================================================
    * 데이터 조회
@@ -1336,16 +1111,16 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   async _fetchOrders() {
     this.loading = true
     try {
-      const [approved, receiving, received, inspecting, inspected, disposing, completed] = await Promise.all([
+      const [approved, receiving, received, inspecting, completed, cancelled, rejected] = await Promise.all([
         ServiceUtil.restGet('rwa_trx/rwa_orders?status=APPROVED').catch(() => []),
         ServiceUtil.restGet('rwa_trx/rwa_orders?status=RECEIVING').catch(() => []),
         ServiceUtil.restGet('rwa_trx/rwa_orders?status=RECEIVED').catch(() => []),
         ServiceUtil.restGet('rwa_trx/rwa_orders?status=INSPECTING').catch(() => []),
-        ServiceUtil.restGet('rwa_trx/rwa_orders?status=INSPECTED').catch(() => []),
-        ServiceUtil.restGet('rwa_trx/rwa_orders?status=DISPOSING').catch(() => []),
-        ServiceUtil.restGet('rwa_trx/rwa_orders?status=COMPLETED').catch(() => [])
+        ServiceUtil.restGet('rwa_trx/rwa_orders?status=COMPLETED').catch(() => []),
+        ServiceUtil.restGet('rwa_trx/rwa_orders?status=CANCELLED').catch(() => []),
+        ServiceUtil.restGet('rwa_trx/rwa_orders?status=REJECTED').catch(() => [])
       ])
-      this.orders = [...approved, ...receiving, ...received, ...inspecting, ...inspected, ...disposing, ...completed]
+      this.orders = [...approved, ...receiving, ...received, ...inspecting, ...completed, ...cancelled, ...rejected]
     } catch (err) {
       console.error('반품 주문 조회 실패:', err)
       this.orders = []
@@ -1388,9 +1163,18 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   /** 주문 선택 → 작업 화면 전환, 주문 상태에 따라 적절한 step으로 이동 */
   async _selectOrder(order) {
     this.selectedOrder = order
-    this.screen = 'work'
+    this.enteredOrderStatus = order.status  // 진입 시점 상태 저장
     this._resetForms()
     await this._fetchOrderItems(order.id)
+
+    // 완료된 주문은 반품완료 요약 화면으로 바로 이동
+    if (order.status === 'COMPLETED') {
+      this.screen = 'complete'
+      this.requestUpdate()
+      return
+    }
+
+    this.screen = 'work'
     this.step = this._getStartStep(order.status)
     this.currentItemIndex = 0
     if (this.step === 1) this._initStep1Selection()
@@ -1441,7 +1225,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   async _handleStepAction() {
     if (this.step === 1) await this._doReceive()
     else if (this.step === 2) await this._doInspect()
-    else if (this.step === 3) { /* Step 3는 확인=_doConfirmDispose, 완료=_finalizeOrder */ }
   }
 
   /* ============================================================
@@ -1519,7 +1302,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     }
 
     // 완료 항목 수정 시 변경 여부 체크
-    const isAlreadyInspected = item.status === 'INSPECTED'
+    const isAlreadyInspected = ['INSPECTED', 'COMPLETED'].includes(item.status)
     if (isAlreadyInspected) {
       const sameGood = Number(this.goodQty) === Number(item.good_qty)
       const sameDef  = Number(this.defectQty) === Number(item.defect_qty)
@@ -1566,101 +1349,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   }
 
   /**
-   * Step 3: 처분 확인 — 로컬 dispDecisions에 결정 저장 (API 호출 없음)
-   * @param {Object} item - 현재 아이템
-   */
-  _doConfirmDispose(item) {
-    if (!this.dispType) {
-      this._showFeedback('처분 유형을 선택하세요', 'error')
-      return
-    }
-    if (this.dispType === 'RESTOCK' && !this.dispLocCd) {
-      this._showFeedback('재입고 로케이션을 입력하세요', 'error')
-      return
-    }
-
-    const decision = {
-      disposition_type: this.dispType,
-      restock_loc_cd: this.dispLocCd || null,
-      restock_expired_date: this.dispExpiredDate || null,
-      scrap_method: this.dispScrapMethod || null
-    }
-
-    const prev = this.dispDecisions[item.id] || {}
-    this.dispDecisions = {
-      ...this.dispDecisions,
-      [item.id]: {
-        ...prev,
-        [this.dispTarget]: decision
-      }
-    }
-
-    this._showFeedback(`${item.sku_cd} ${this.dispTarget === 'good' ? '양품' : '불량'} 처분 결정 저장`, 'success')
-
-    // 폼 초기화 후 다음 미결정 탭으로 이동
-    this.dispType = ''
-    this.dispLocCd = ''
-    this.dispExpiredDate = ''
-    this.dispScrapMethod = ''
-
-    const updatedDec = this.dispDecisions[item.id] || {}
-    if (this.dispTarget === 'good' && (item.defect_qty || 0) > 0 && !updatedDec.defect) {
-      this.dispTarget = 'defect'
-    } else if (this.dispTarget === 'defect' && (item.good_qty || 0) > 0 && !updatedDec.good) {
-      this.dispTarget = 'good'
-    } else {
-      // 현재 아이템 완료 → 다음 미결정 아이템으로
-      const allItems = this.orderItems.filter(i => ['INSPECTED', 'DISPOSED', 'COMPLETED'].includes(i.status))
-      const nextItem = allItems.find(i => {
-        if (i.id === item.id) return false
-        const d = this.dispDecisions[i.id] || {}
-        return ((i.good_qty || 0) > 0 && !d.good) || ((i.defect_qty || 0) > 0 && !d.defect)
-      })
-      if (nextItem) {
-        this.selectedDispItemId = nextItem.id
-        this.dispTarget = (nextItem.good_qty || 0) > 0 ? 'good' : 'defect'
-      }
-    }
-    this.requestUpdate()
-  }
-
-  /**
-   * Step 3 항목 선택
-   * @param {Object} item - 선택된 아이템
-   */
-  _selectDispItem(item) {
-    this.selectedDispItemId = item.id
-    this.dispType = ''
-    this.dispLocCd = ''
-    this.dispExpiredDate = ''
-    this.dispScrapMethod = ''
-    // 미결정 탭 우선 선택
-    const dec = this.dispDecisions[item.id] || {}
-    if ((item.good_qty || 0) > 0 && !dec.good) {
-      this.dispTarget = 'good'
-    } else if ((item.defect_qty || 0) > 0 && !dec.defect) {
-      this.dispTarget = 'defect'
-    } else {
-      this.dispTarget = (item.good_qty || 0) > 0 ? 'good' : 'defect'
-    }
-    this.requestUpdate()
-  }
-
-  /**
-   * Step 3 양품/불량 탭 전환
-   * @param {string} target - 'good' | 'defect'
-   * @param {Object} item - 현재 아이템
-   */
-  _selectDispTarget(target, item) {
-    this.dispTarget = target
-    this.dispType = ''
-    this.dispLocCd = ''
-    this.dispExpiredDate = ''
-    this.dispScrapMethod = ''
-    this.requestUpdate()
-  }
-
-  /**
    * 검수 완료 후 반품 완료 요약 화면으로 전환
    */
   _finishWork() {
@@ -1683,7 +1371,8 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
           <div class="complete-title">반품 처리 완료</div>
           <div class="complete-rwa-no">${order?.rwa_no || order?.rwa_req_no || '-'}</div>
           <div class="complete-meta">
-            ${this._rwaTypeLabel(order?.rwa_type)} &nbsp;|&nbsp; ${order?.com_cd || '-'}
+            ${this._rwaTypeLabel(order?.rwa_type)} &nbsp;|&nbsp;
+            <entity-label table="companies" key-col="com_cd" display-col="com_nm" .value="${order?.com_cd || ''}" .fallback="${order?.com_cd || '-'}"></entity-label>
             ${order?.cust_nm ? ` · ${order.cust_nm}` : ''}
           </div>
           <div class="complete-meta">완료 시각: ${completedAt}</div>
@@ -1703,17 +1392,11 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
               </div>
               <div class="complete-item-row">
                 <span class="row-label">양품</span>
-                <span class="row-val good">
-                  ${item.good_qty || 0} EA
-                  ${(item.good_qty || 0) > 0 ? html`<span style="font-weight:400; color:#888"> → RETURN-GOOD</span>` : ''}
-                </span>
+                <span class="row-val good">${item.good_qty || 0} EA</span>
               </div>
               <div class="complete-item-row">
                 <span class="row-label">불량</span>
-                <span class="row-val ${(item.defect_qty || 0) > 0 ? 'defect' : ''}">
-                  ${item.defect_qty || 0} EA
-                  ${(item.defect_qty || 0) > 0 ? html`<span style="font-weight:400; color:#888"> → RETURN-DEF</span>` : ''}
-                </span>
+                <span class="row-val ${(item.defect_qty || 0) > 0 ? 'defect' : ''}">${item.defect_qty || 0} EA</span>
               </div>
               ${item.loc_cd ? html`
                 <div class="complete-item-row">
@@ -1733,47 +1416,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     `
   }
 
-  /**
-   * 반품 완료 — (레거시, 미사용)
-   */
-  async _finalizeOrder() {
-    const allItems = this.orderItems.filter(i => ['INSPECTED', 'DISPOSED', 'COMPLETED'].includes(i.status))
-
-    const decisions = allItems.map(item => {
-      const dec = this.dispDecisions[item.id] || {}
-      return {
-        item_id: item.id,
-        good_disposition: dec.good || null,
-        defect_disposition: dec.defect || null
-      }
-    })
-
-    this.actionLoading = true
-    try {
-      await ServiceUtil.restPost(
-        `rwa_trx/rwa_orders/${this.selectedOrder.id}/finalize`,
-        { decisions }
-      )
-      voiceService.success('반품 완료 처리되었습니다')
-      this._showFeedback('반품 완료!', 'success')
-      setTimeout(() => this._backToOrderSelect(), 1500)
-    } catch (err) {
-      this._showFeedback(err.message || '완료 처리 실패', 'error')
-      voiceService.error('처리 실패')
-    } finally {
-      this.actionLoading = false
-    }
-  }
-
-  /** 처분 유형 코드 → 한국어 짧은 라벨 */
-  _dispTypeLabel(type) {
-    const map = {
-      RESTOCK: '재입고', SCRAP: '폐기', REPAIR: '수리',
-      RETURN_VENDOR: '반송', DONATION: '기부'
-    }
-    return map[type] || type || '-'
-  }
-
   /* ============================================================
    * 유틸리티
    * ============================================================ */
@@ -1787,18 +1429,12 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     this.defectType = ''
     this.defectDesc = ''
     this.inspRemarks = ''
-    this.dispType = ''
-    this.dispLocCd = ''
-    this.dispExpiredDate = ''
-    this.dispScrapMethod = ''
-    this.dispTarget = 'good'
   }
 
   /**
    * 현재 step에서 처리할 아이템 목록 반환
-   *   Step 1: 미입고 항목 (RECEIVED/INSPECTED/DISPOSED/COMPLETED 제외)
+   *   Step 1: 미입고 항목 (RECEIVED 이상 상태 제외)
    *   Step 2: 입고 완료 항목 (RECEIVED 또는 INSPECTING)
-   *   Step 3: 검수 완료 항목 (INSPECTED)
    */
   _getCurrentStepItems() {
     if (!this.orderItems.length) return []
@@ -1811,9 +1447,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
       return this.orderItems.filter(i =>
         ['RECEIVED', 'INSPECTING'].includes(i.status)
       )
-    }
-    if (this.step === 3) {
-      return this.orderItems.filter(i => i.status === 'INSPECTED')
     }
     return []
   }
@@ -1862,17 +1495,15 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   /**
    * 현재 항목 처리 후 다음 항목으로 이동
    * - 남은 항목 있으면 첫 번째 미처리 항목(index 0)으로 이동
-   * - Step 1/2 완료 시 자동으로 다음 단계 진입 (완료 화면 생략)
-   * - Step 3 완료 시 완료 카드 표시 유지
+   * - Step 1 완료 시 자동으로 Step 2 진입
    */
   _advanceItem(phase) {
     const items = this._getCurrentStepItems()
     if (items.length === 0) {
-      if (this.step < 3) {
-        // 입고/검수 스텝 모두 완료 → 자동으로 다음 단계 이동
+      if (this.step < 2) {
+        // 입고 스텝 완료 → 자동으로 다음 단계 이동
         this._nextStep()
       } else {
-        // 처분 스텝 완료 → 완료 카드 표시
         this.currentItemIndex = 0
         this.requestUpdate()
       }
@@ -1885,9 +1516,8 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
 
   /**
    * 주문 상태 → 시작 step 결정
-   *   APPROVED, RECEIVING            → Step 1 (입고)
-   *   RECEIVED, INSPECTING, INSPECTED → Step 2 (검수)
-   *   DISPOSING, COMPLETED 등         → Step 3 (처분/완료)
+   *   APPROVED, RECEIVING                          → Step 1 (입고)
+   *   RECEIVED, INSPECTING, COMPLETED 등           → Step 2 (검수)
    */
   _getStartStep(status) {
     if (['RECEIVED', 'INSPECTING', 'COMPLETED', 'CANCELLED', 'REJECTED'].includes(status)) return 2
@@ -1918,24 +1548,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
       DEFECT_RETURN: '불량품 반품', STOCK_ADJUST: '재고 조정', EXPIRED_RETURN: '유통기한 임박'
     }
     return labels[type] || type || '-'
-  }
-
-  /**
-   * Step 3 진입 시 선택 항목 초기화
-   * - 미결정 항목이 있으면 첫 번째 선택, 없으면 첫 번째 항목
-   */
-  _initStep3Selection() {
-    this.dispDecisions = {}
-    const allItems = this.orderItems.filter(i => ['INSPECTED', 'DISPOSED', 'COMPLETED'].includes(i.status))
-    const first = allItems.find(i => {
-      const dec = this.dispDecisions[i.id] || {}
-      return ((i.good_qty || 0) > 0 && !dec.good) || ((i.defect_qty || 0) > 0 && !dec.defect)
-    }) || allItems[0]
-
-    if (first) {
-      this.selectedDispItemId = first.id
-      this.dispTarget = (first.good_qty || 0) > 0 ? 'good' : 'defect'
-    }
   }
 
   /**
