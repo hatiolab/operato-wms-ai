@@ -583,7 +583,7 @@ class ShipmentOrderB2BImport extends localize(i18next)(PageView) {
         </div>
 
         <div style="display:flex; gap:12px; justify-content:center;">
-          <button class="btn btn-primary" @click="${() => this._navigateTo('shipment-orders')}">주문 목록으로 이동</button>
+          <button class="btn btn-primary" @click="${() => this._navigateTo('shipment-orders-b2b')}">주문 목록으로 이동</button>
           <button class="btn btn-success" @click="${this._resetWizard}">추가 임포트</button>
         </div>
       </div>
@@ -720,7 +720,7 @@ class ShipmentOrderB2BImport extends localize(i18next)(PageView) {
       let dataToImport = this.validationResult.rows
       if (this.excludeErrors && this.validationResult.error > 0) {
         const validRowNos = this.validationResult.rows.filter(r => r.valid).map(r => r.row_no)
-        dataToImport = this.parsedData.filter((_, idx) => validRowNos.includes(idx + 1))
+        dataToImport = this.validationResult.rows.filter((_, idx) => validRowNos.includes(idx + 1))
       }
 
       const result = await ServiceUtil.restPost('oms_trx/shipment_orders/import/confirm', dataToImport)

@@ -738,7 +738,7 @@ class ShipmentOrderB2CImport extends localize(i18next)(PageView) {
       let dataToImport = this.validationResult.rows
       if (this.excludeErrors && this.validationResult.error > 0) {
         const validRowNos = this.validationResult.rows.filter(r => r.valid).map(r => r.row_no)
-        dataToImport = this.parsedData.filter((_, idx) => validRowNos.includes(idx + 1))
+        dataToImport = this.validationResult.rows.filter((_, idx) => validRowNos.includes(idx + 1))
       }
 
       const result = await ServiceUtil.restPost('oms_trx/shipment_orders/import/confirm', dataToImport)
