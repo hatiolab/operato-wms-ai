@@ -316,16 +316,20 @@ public class FulfillmentPackingService extends AbstractQueryService {
 		String cols = "po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.carrier_cd,"
 				+ " po.status, po.created_at, po.started_at, po.completed_at,"
 				+ " po.total_box, po.total_wt, po.invoice_no,"
+				+ " so.biz_type,"
+				+ " so.cust_nm,"
 				+ " (SELECT SUM(poi.order_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,"
 				+ " (SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,"
 				+ " (SELECT SUM(poi.pack_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty";
 
+		String join = " LEFT JOIN shipment_orders so ON so.domain_id = po.domain_id AND so.shipment_no = po.shipment_no";
+
 		// 대기: 오늘 날짜 order_date만 / 작업중: 날짜 무관 전체
 		// order_date는 varchar 타입이므로 TO_CHAR로 문자열 캐스팅
-		String sql = "SELECT " + cols + " FROM packing_orders po"
+		String sql = "SELECT " + cols + " FROM packing_orders po" + join
 				+ " WHERE po.domain_id = :domainId AND po.status = 'CREATED' AND po.order_date = TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD')"
 				+ " UNION ALL"
-				+ " SELECT " + cols + " FROM packing_orders po"
+				+ " SELECT " + cols + " FROM packing_orders po" + join
 				+ " WHERE po.domain_id = :domainId AND po.status = 'IN_PROGRESS'"
 				+ " ORDER BY created_at";
 
@@ -347,13 +351,16 @@ public class FulfillmentPackingService extends AbstractQueryService {
 		String sql = "SELECT po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.carrier_cd,"
 				+ " po.status, po.created_at, po.started_at, po.completed_at,"
 				+ " po.total_box, po.total_wt, po.invoice_no,"
+				+ " so.biz_type,"
+				+ " so.cust_nm,"
 				+ " (SELECT SUM(poi.order_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,"
 				+ " (SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,"
 				+ " (SELECT SUM(poi.pack_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty"
 				+ " FROM packing_orders po"
+				+ " LEFT JOIN shipment_orders so ON so.domain_id = po.domain_id AND so.shipment_no = po.shipment_no"
 				+ " WHERE po.domain_id = :domainId"
 				+ " AND po.status NOT IN ('CREATED', 'IN_PROGRESS', 'CANCELLED')"
-				+ " AND po.completed_at::date = CURRENT_DATE"
+				+ " AND LEFT(po.completed_at, 8) = TO_CHAR(CURRENT_DATE, 'YYYYMMDD')"
 				+ " ORDER BY po.completed_at DESC";
 
 		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);

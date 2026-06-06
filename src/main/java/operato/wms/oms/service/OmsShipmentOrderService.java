@@ -13,7 +13,6 @@ import operato.wms.oms.entity.ShipmentOrder;
 import operato.wms.oms.entity.ShipmentOrderItem;
 import operato.wms.oms.entity.StockAllocation;
 import operato.wms.stock.entity.Inventory;
-import operato.wms.stock.entity.InventoryTran;
 import operato.wms.stock.service.StockTransactionService;
 import xyz.anythings.sys.service.AbstractQueryService;
 import xyz.elidom.exception.server.ElidomRuntimeException;
@@ -59,6 +58,7 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 	public Map<String, Object> confirmAndAllocateShipmentOrder(String id) {
 		Long domainId = Domain.currentDomainId();
 
+		// 1. 주문 조회
 		ShipmentOrder order = this.findOrder(domainId, id);
 		if (order == null) {
 			throw new ElidomValidationException("주문을 찾을 수 없습니다: " + id);
@@ -66,12 +66,11 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 
 		if (!ShipmentOrder.STATUS_REGISTERED.equals(order.getStatus())) {
 			throw new ElidomValidationException(
-					"주문 상태가 [" + order.getStatus() + "]이므로 확정+할당할 수 없습니다 (REGISTERED 상태만 가능)");
+					"주문 상태가 [" + order.getStatus() + "] 이므로 확정+할당할 수 없습니다 (REGISTERED 상태만 가능)");
 		}
 
-		// 1. 확정 처리
-		List<String> ids = new ArrayList<>();
-		ids.add(id);
+		// 2. 주문 확정 처리
+		List<String> ids = ValueUtil.toList(id);
 		Map<String, Object> confirmResult = this.confirmShipmentOrders(ids);
 
 		int confirmSuccess = (int) confirmResult.getOrDefault("success_count", 0);
@@ -82,15 +81,15 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 			throw new ElidomRuntimeException(errorMsg);
 		}
 
-		// 2. 재고 할당 처리
+		// 3. 재고 할당 처리
 		Map<String, Object> allocResult = this.allocateShipmentOrders(ids);
 		int allocSuccess = (int) allocResult.getOrDefault("success_count", 0);
 		int backOrderCount = (int) allocResult.getOrDefault("back_order_count", 0);
 
-		// 최종 주문 상태 조회
+		// 4. 최종 주문 상태 조회
 		ShipmentOrder updatedOrder = this.findOrder(domainId, id);
 
-		// 결과 리턴
+		// 5. 결과 리턴
 		Map<String, Object> result = ValueUtil.newMap("success", allocSuccess > 0);
 		result.put("status", updatedOrder != null ? updatedOrder.getStatus() : null);
 		result.put("allocated_qty", updatedOrder != null ? updatedOrder.getTotalAlloc() : 0);

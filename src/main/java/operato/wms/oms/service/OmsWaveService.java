@@ -174,6 +174,7 @@ public class OmsWaveService extends AbstractQueryService {
 				: new ArrayList<>();
 		String pickType = ValueUtil.isNotEmpty(params.get("pick_type")) ? params.get("pick_type").toString() : "TOTAL";
 
+		// 주문 리스트 존재 여부 체크
 		if (orders.isEmpty()) {
 			throw new ElidomValidationException("웨이브에 포함할 주문을 선택해 주세요");
 		}
@@ -199,30 +200,37 @@ public class OmsWaveService extends AbstractQueryService {
 	public Map<String, Object> createWave(List<ShipmentOrder> list, String pickType) {
 		Long domainId = Domain.currentDomainId();
 
+		// 주문 리스트 존재 여부 체크
 		if (ValueUtil.isEmpty(list)) {
 			throw new ElidomValidationException("웨이브에 포함할 주문을 선택해 주세요");
 		}
 
-		// ALLOCATED 상태 주문만 필터링
+		// 할당 완료 (ALLOCATED) 상태 주문만 필터링
 		List<ShipmentOrder> validOrders = new ArrayList<ShipmentOrder>();
 		List<String> errors = new ArrayList<String>();
 
 		for (ShipmentOrder so : list) {
+			// 출고 주문 조회
 			ShipmentOrder order = this.findOrder(domainId, so.getId());
+
+			// 출고 주문 존재 여부 체크
 			if (order == null) {
 				errors.add("주문을 찾을 수 없습니다: " + so.getId());
 				continue;
 			}
 
+			// 주문 상태 체크
 			if (!ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus())) {
 				errors.add("주문 [" + order.getShipmentNo() + "] 상태가 [" + order.getStatus()
 						+ "]이므로 웨이브에 포함할 수 없습니다 (ALLOCATED 상태만 가능)");
 				continue;
 			}
 
+			// 유효 주문 추가
 			validOrders.add(order);
 		}
 
+		// 유효 주문이 없으면 예외 처리
 		if (validOrders.isEmpty()) {
 			throw new ElidomValidationException("웨이브에 포함할 수 있는 주문이 없습니다. (ALLOCATED 상태의 주문만 가능)");
 		}
@@ -230,7 +238,9 @@ public class OmsWaveService extends AbstractQueryService {
 		// 계획 수량 집계
 		int planOrderCnt = validOrders.size();
 		double planTotalQty = 0;
-		List<String> validOrderIds = new ArrayList<>();
+		List<String> validOrderIds = new ArrayList<String>();
+
+		// 주문별 계획 수량 집계
 		for (ShipmentOrder ord : validOrders) {
 			planTotalQty += (ord.getTotalOrder() != null ? ord.getTotalOrder() : 0);
 			validOrderIds.add(ord.getId());
@@ -271,7 +281,8 @@ public class OmsWaveService extends AbstractQueryService {
 			this.queryManager.update(ord, "waveNo", "status", "updatedAt");
 		}
 
-		Map<String, Object> result = ValueUtil.newMap("wave,wave_no", wave, wave.getWaveNo());
+		// 결과 리턴
+		Map<String, Object> result = ValueUtil.newMap("wave,wave_no,wave_seq", wave, wave.getWaveNo());
 		result.put("wave_seq", wave.getWaveSeq());
 		result.put("order_count", planOrderCnt);
 		result.put("sku_count", planItemCnt);

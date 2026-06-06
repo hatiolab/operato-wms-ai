@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import operato.wms.oms.WmsOmsConfigConstants;
-import operato.wms.oms.WmsOmsConstants;
 import operato.wms.oms.entity.ImportShipmentOrder;
 import operato.wms.oms.entity.ShipmentDelivery;
 import operato.wms.oms.entity.ShipmentOrder;

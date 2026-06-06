@@ -1141,7 +1141,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
             </div>
 
             <div class="complete-actions">
-              <button class="btn-action" @click="${this._printPickingSheet}">📄 피킹 지시서 출력</button>
+              <!--button class="btn-action" @click="${this._printPickingSheet}">📄 피킹 지시서 출력</button-->
               <button class="btn-action primary" @click="${this._startNextPicking}">📋 다음 피킹 지시 (Enter)</button>
               <button class="btn-action" @click="${this._closeWork}">🏠 목록으로</button>
             </div>

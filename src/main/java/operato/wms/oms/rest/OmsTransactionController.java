@@ -356,6 +356,7 @@ public class OmsTransactionController extends AbstractRestService {
 		params.put("confirmed_ids", result.get("confirmed_ids"));
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CONFIRM_SHIPMENT, params);
 
+		// 4. 결과 리턴
 		return result;
 	}
 
@@ -372,20 +373,22 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Cancel confirm shipment orders (CONFIRMED → REGISTERED)")
 	public Map<String, Object> cancelConfirmOrders(@RequestBody Map<String, Object> params) {
 		Long domainId = Domain.currentDomainId();
+
+		// 1. 출고 주문 ID 파라미터 추출
 		List<String> ids = (List<String>) params.get("ids");
 
-		// 1. 커스텀 서비스 - 전 처리
+		// 2. 커스텀 서비스 - 전 처리
 		Map<String, Object> customParams = ValueUtil.newMap("ids", ids);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CANCEL_CONFIRM_SHIPMENT, customParams);
 
-		// 2. 본 로직 실행
+		// 3. 본 로직 실행
 		Map<String, Object> result = this.orderService.cancelConfirmShipmentOrders(ids);
 
-		// 3. 커스텀 서비스 - 후 처리
+		// 4. 커스텀 서비스 - 후 처리
 		customParams.put("result", result);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CANCEL_CONFIRM_SHIPMENT, customParams);
 
-		// 4. 결과 리턴
+		// 5. 결과 리턴
 		return result;
 	}
 
@@ -401,20 +404,22 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Cancel confirm shipment orders (CONFIRMED → REGISTERED)")
 	public Map<String, Object> cancelConfirmOrderList(@RequestBody List<ShipmentOrder> list) {
 		Long domainId = Domain.currentDomainId();
+
+		// 1. 출고 주문 ID 파라미터 추출
 		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
 
-		// 1. 커스텀 서비스 - 전 처리
+		// 2. 커스텀 서비스 - 전 처리
 		Map<String, Object> params = ValueUtil.newMap("ids", ids);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CANCEL_CONFIRM_SHIPMENT, params);
 
-		// 2. 본 로직 실행
+		// 3. 본 로직 실행
 		Map<String, Object> result = this.orderService.cancelConfirmShipmentOrders(ids);
 
-		// 3. 커스텀 서비스 - 후 처리
+		// 4. 커스텀 서비스 - 후 처리
 		params.put("result", result);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CANCEL_CONFIRM_SHIPMENT, params);
 
-		// 4. 결과 리턴
+		// 5. 결과 리턴
 		return result;
 	}
 
@@ -461,20 +466,22 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Allocate inventory for shipment orders (CONFIRMED → ALLOCATED)")
 	public Map<String, Object> allocateOrders(@RequestBody Map<String, Object> params) {
 		Long domainId = Domain.currentDomainId();
+
+		// 1. 출고 주문 ID 파라미터 추출
 		List<String> ids = (List<String>) params.get("ids");
 
-		// 1. 커스텀 서비스 - 전 처리
+		// 2. 커스텀 서비스 - 전 처리
 		Map<String, Object> customParams = ValueUtil.newMap("ids", ids);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_ALLOCATE_SHIPMENT, customParams);
 
-		// 2. 본 로직 실행
+		// 3. 본 로직 실행
 		Map<String, Object> result = this.orderService.allocateShipmentOrders(ids);
 
-		// 3. 커스텀 서비스 - 후 처리
+		// 4. 커스텀 서비스 - 후 처리
 		customParams.put("allocations", result);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_ALLOCATE_SHIPMENT, customParams);
 
-		// 4. 결과 리턴
+		// 5. 결과 리턴
 		return result;
 	}
 
@@ -490,20 +497,22 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Allocate inventory for shipment orders (CONFIRMED → ALLOCATED)")
 	public Map<String, Object> allocateOrderList(@RequestBody List<ShipmentOrder> list) {
 		Long domainId = Domain.currentDomainId();
+
+		// 1. 출고 주문 ID 파라미터 추출
 		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
 
-		// 1. 커스텀 서비스 - 전 처리
+		// 2. 커스텀 서비스 - 전 처리
 		Map<String, Object> params = ValueUtil.newMap("ids", ids);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_ALLOCATE_SHIPMENT, params);
 
-		// 2. 본 로직 실행
+		// 3. 본 로직 실행
 		Map<String, Object> result = this.orderService.allocateShipmentOrders(ids);
 
-		// 3. 커스텀 서비스 - 후 처리
+		// 4. 커스텀 서비스 - 후 처리
 		params.put("allocations", result);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_ALLOCATE_SHIPMENT, params);
 
-		// 4. 결과 리턴
+		// 5. 결과 리턴
 		return result;
 	}
 
@@ -519,20 +528,22 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Deallocate inventory from shipment order (ALLOCATED → CONFIRMED)")
 	public Map<String, Object> deallocateOrder(@RequestBody Map<String, Object> params) {
 		Long domainId = Domain.currentDomainId();
+
+		// 1. 주문 ID 파라미터 추출
 		String id = (String) params.get("id");
 
-		// 1. 커스텀 서비스 - 전 처리
+		// 2. 커스텀 서비스 - 전 처리
 		Map<String, Object> customParams = ValueUtil.newMap("id", id);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_DEALLOCATE_SHIPMENT, customParams);
 
-		// 2. 본 로직 실행
+		// 3. 본 로직 실행
 		Map<String, Object> result = this.orderService.deallocateShipmentOrder(id);
 
-		// 3. 커스텀 서비스 - 후 처리
+		// 4. 커스텀 서비스 - 후 처리
 		customParams.put("result", result);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_DEALLOCATE_SHIPMENT, customParams);
 
-		// 4. 결과 리턴
+		// 5. 결과 리턴
 		return result;
 	}
 
@@ -548,13 +559,15 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Deallocate inventory from shipment order (ALLOCATED → CONFIRMED)")
 	public Map<String, Object> deallocateOrderList(@RequestBody List<ShipmentOrder> list) {
 		Long domainId = Domain.currentDomainId();
+
+		// 1. 주문 ID 파라미터 추출
 		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
 
-		// 1. 커스텀 서비스 - 전 처리
+		// 2. 커스텀 서비스 - 전 처리
 		Map<String, Object> params = ValueUtil.newMap("ids", ids);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_DEALLOCATE_SHIPMENT, params);
 
-		// 2. 본 로직 실행 (개별 처리 후 결과 집계)
+		// 3. 본 로직 실행 (개별 처리 후 결과 집계)
 		Map<String, Object> result = ValueUtil.newMap("success,released_count", true, 0);
 		for (String id : ids) {
 			Map<String, Object> itemResult = this.orderService.deallocateShipmentOrder(id);
@@ -566,11 +579,11 @@ public class OmsTransactionController extends AbstractRestService {
 			}
 		}
 
-		// 3. 커스텀 서비스 - 후 처리
+		// 4. 커스텀 서비스 - 후 처리
 		params.put("result", result);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_DEALLOCATE_SHIPMENT, params);
 
-		// 4. 결과 리턴
+		// 5. 결과 리턴
 		return result;
 	}
 
@@ -587,20 +600,22 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Cancel shipment orders")
 	public Map<String, Object> cancelOrders(@RequestBody Map<String, Object> params) {
 		Long domainId = Domain.currentDomainId();
+
+		// 1. 주문 ID 파라미터 추출
 		List<String> ids = (List<String>) params.get("ids");
 
-		// 1. 커스텀 서비스 - 전 처리
+		// 2. 커스텀 서비스 - 전 처리
 		Map<String, Object> customParams = ValueUtil.newMap("ids", ids);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CANCEL_SHIPMENT, customParams);
 
-		// 2. 본 로직 실행
+		// 3. 본 로직 실행
 		Map<String, Object> result = this.orderService.cancelShipmentOrders(ids);
 
-		// 3. 커스텀 서비스 - 후 처리
+		// 4. 커스텀 서비스 - 후 처리
 		customParams.put("result", result);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CANCEL_SHIPMENT, customParams);
 
-		// 4. 결과 리턴
+		// 5. 결과 리턴
 		return result;
 	}
 
@@ -616,20 +631,22 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Cancel shipment orders")
 	public Map<String, Object> cancelOrdersList(@RequestBody List<ShipmentOrder> list) {
 		Long domainId = Domain.currentDomainId();
+
+		// 1. 주문 ID 파라미터 추출
 		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
 
-		// 1. 커스텀 서비스 - 전 처리
+		// 2. 커스텀 서비스 - 전 처리
 		Map<String, Object> params = ValueUtil.newMap("ids", ids);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CANCEL_SHIPMENT, params);
 
-		// 2. 본 로직 실행
+		// 3. 본 로직 실행
 		Map<String, Object> result = this.orderService.cancelShipmentOrders(ids);
 
-		// 3. 커스텀 서비스 - 후 처리
+		// 4. 커스텀 서비스 - 후 처리
 		params.put("result", result);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CANCEL_SHIPMENT, params);
 
-		// 4. 결과 리턴
+		// 5. 결과 리턴
 		return result;
 	}
 
@@ -673,22 +690,24 @@ public class OmsTransactionController extends AbstractRestService {
 	@ApiDesc(description = "Close shipment order (SHIPPED → CLOSED)")
 	public Map<String, Object> closeOrderList(@RequestBody List<ShipmentOrder> list) {
 		Long domainId = Domain.currentDomainId();
+
+		// 1. 주문 ID 파라미터 추출
 		List<String> ids = list.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
 
-		// 1. 커스텀 서비스 - 전 처리
+		// 2. 커스텀 서비스 - 전 처리
 		Map<String, Object> params = ValueUtil.newMap("ids", ids);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CLOSE_SHIPMENT, params);
 
-		// 2. 본 로직 실행 (개별 처리)
+		// 3. 본 로직 실행 (개별 처리)
 		for (String id : ids) {
 			this.orderService.closeShipmentOrder(id);
 		}
 
-		// 3. 커스텀 서비스 - 후 처리
+		// 4. 커스텀 서비스 - 후 처리
 		params.put("result", ValueUtil.newMap("success", true));
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CLOSE_SHIPMENT, params);
 
-		// 4. 결과 리턴
+		// 5. 결과 리턴
 		return ValueUtil.newMap("success", true);
 	}
 

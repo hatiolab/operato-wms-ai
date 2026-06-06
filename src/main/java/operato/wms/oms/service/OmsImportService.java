@@ -51,7 +51,7 @@ public class OmsImportService extends AbstractQueryService {
 
 		for (int i = 0; i < list.size(); i++) {
 			ImportShipmentOrder row = list.get(i);
-			List<String> errors = new ArrayList<>();
+			List<String> errors = new ArrayList<String>();
 
 			// 1. 필수 필드 검증
 			if (ValueUtil.isEmpty(row.getRefOrderNo())) {

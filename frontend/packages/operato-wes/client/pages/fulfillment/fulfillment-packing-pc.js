@@ -1096,7 +1096,8 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
               </thead>
               <tbody>
                 ${this.packingItems.map((item, idx) => {
-      const isCompleted = item.status === 'COMPLETED'
+      const orderQty = item.pack_qty || item.order_qty || 1
+      const isCompleted = item.status === 'COMPLETED' || (item.insp_qty || 0) >= orderQty
       const isCurrent = idx === this.currentItemIndex && !isCompleted
 
       return html`
@@ -1116,7 +1117,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
           </div>
 
           <!-- 현재 스캔 대상 패널 -->
-          ${currentItem && currentItem.status !== 'COMPLETED' ? html`
+          ${currentItem && currentItem.status !== 'COMPLETED' && (currentItem.insp_qty || 0) < (currentItem.pack_qty || currentItem.order_qty || 1) ? html`
             <div class="current-item-panel">
               <div class="item-header">
                 <span class="sku-code">상품 : ${currentItem.sku_cd || currentItem.product_cd || '-'}</span>
@@ -1138,6 +1139,19 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
               </div>
             </div>
           ` : ''}
+
+          <!-- 전체 검수 완료 → 포장 단계 이동 버튼 (재진입 시 포함) -->
+          ${this.totalCount > 0 && this.completedCount >= this.totalCount ? html`
+            <div class="current-item-panel" style="border-left-color: #4CAF50; text-align: center;">
+              <div style="font-size: 15px; font-weight: 700; color: #2E7D32; margin-bottom: 12px;">
+                ✅ 모든 항목 검수 완료 (${this.completedCount}/${this.totalCount})
+              </div>
+              <button class="btn-confirm" style="width: 100%; padding: 10px 0; font-size: 14px;"
+                @click="${this._onInspectionComplete}">
+                포장 단계로 이동 →
+              </button>
+            </div>
+          ` : ''}
         </div>
       </div>
     `
@@ -1150,8 +1164,9 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     const order = this.selectedOrder
     if (!order) return this._renderEmptyPanel()
 
+    const isB2B = order.biz_type === 'B2B_OUT'
     const elapsed = this._formatElapsed(Date.now() - this.startTime)
-    const canRelease = this.trackingNo.trim().length > 0
+    const canRelease = isB2B || this.trackingNo.trim().length > 0
 
     return html`
       <div class="right-panel">
@@ -1211,25 +1226,43 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
             </div>
           </div>
 
-          <!-- 운송장 등록 -->
-          <div class="tracking-area">
-            <h4>운송장 등록</h4>
-            <input
-              id="trackingInput"
-              type="text"
-              placeholder="운송장번호 스캔 또는 입력"
-              .value="${this.trackingNo}"
-              @input="${e => { this.trackingNo = e.target.value }}"
-              @keydown="${e => { if (e.key === 'Enter') this._confirmRelease() }}"
-            />
-          </div>
+          <!-- 운송장 등록 - B2C만 표시 -->
+          ${!isB2B ? html`
+            <div class="tracking-area">
+              <h4>운송장 등록</h4>
+              <input
+                id="trackingInput"
+                type="text"
+                placeholder="운송장번호 스캔 또는 입력"
+                .value="${this.trackingNo}"
+                @input="${e => { this.trackingNo = e.target.value }}"
+                @keydown="${e => { if (e.key === 'Enter') this._confirmRelease() }}"
+              />
+            </div>
+          ` : ''}
 
-          <!-- 출고 확정 버튼 -->
-          <button
-            class="btn-release"
-            ?disabled="${!canRelease}"
-            @click="${this._confirmRelease}"
-          >출고 확정</button>
+          <!-- 출고 확정 버튼 영역 -->
+          ${isB2B ? html`
+            <div style="display:flex; gap:12px; margin-bottom:16px;">
+              <button
+                class="btn-release"
+                style="flex:1; margin-bottom:0;"
+                ?disabled="${!canRelease}"
+                @click="${this._confirmRelease}"
+              >출고 확정</button>
+              <button
+                class="btn-release"
+                style="flex:1; margin-bottom:0; background: linear-gradient(135deg, #1565C0, #0D47A1); box-shadow: 0 2px 8px rgba(21,101,192,0.3);"
+                @click="${this._printDeliveryStatement}"
+              >거래명세서 출력</button>
+            </div>
+          ` : html`
+            <button
+              class="btn-release"
+              ?disabled="${!canRelease}"
+              @click="${this._confirmRelease}"
+            >출고 확정</button>
+          `}
         </div>
       </div>
     `
@@ -1336,7 +1369,16 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
   async _loadPackingItems(packingOrderId) {
     try {
       const items = await ServiceUtil.restGet(`ful_trx/packing_order_items?packing_order_id=${packingOrderId}`)
-      this.packingItems = Array.isArray(items) ? items : []
+      // insp_qty >= pack_qty 인 항목은 서버 status와 무관하게 COMPLETED 로 정규화
+      this.packingItems = (Array.isArray(items) ? items : []).map(item => {
+        const orderQty = item.pack_qty || item.order_qty || 1
+        const inspQty = item.insp_qty || 0
+        if (item.status !== 'COMPLETED' && inspQty >= orderQty) {
+          return { ...item, status: 'COMPLETED' }
+        }
+        return item
+      })
+      this.currentItemIndex = -1
       this.totalCount = this.packingItems.length
       this.completedCount = this.packingItems.filter(i => i.status === 'COMPLETED').length
       this._moveToNextItem()
@@ -1422,7 +1464,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
    * ============================================================== */
 
   /** 상품 바코드 스캔 처리 - sku-barcode-input이 SKU 해석 후 발생시키는 sku-select 이벤트 핸들러 */
-  _onSkuSelect(e) {
+  async _onSkuSelect(e) {
     const { sku_cd, sku_nm } = e.detail
 
     // 미완료 항목 중 SKU 코드 매칭
@@ -1442,6 +1484,8 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
           message: `${item.sku_cd} — 이미 검수가 완료된 상품입니다 (${currentInspQty}/${orderQty})`
         }
         this._showFeedback('warning', `${item.sku_cd} 이미 검수 완료 (${currentInspQty}/${orderQty})`)
+        await this.updateComplete
+        this.shadowRoot?.querySelector('sku-barcode-input')?.focus()
         return
       }
 
@@ -1464,7 +1508,10 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
       if (newInspQty >= orderQty) {
         this._confirmInspection()
       } else {
-        this._showFeedback('success', `${item.sku_cd} 스캔 완료 (${newInspQty}/${orderQty})`)
+        // 아직 남은 수량이 있으면 동일 바코드 재스캔을 위해 포커스 유지
+        this._showFeedback('success', `${item.sku_cd} 스캔 완료 (${newInspQty}/${orderQty}) — ${orderQty - newInspQty}개 더 스캔하세요`)
+        await this.updateComplete
+        this.shadowRoot?.querySelector('sku-barcode-input')?.focus()
       }
     } else {
       this.lastScannedItem = {
@@ -1472,6 +1519,8 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
         message: `상품 "${sku_cd}" — 포장 항목에 없는 상품입니다`
       }
       this._showFeedback('error', '포장 항목에 없는 상품입니다')
+      await this.updateComplete
+      this.shadowRoot?.querySelector('sku-barcode-input')?.focus()
     }
   }
 
@@ -1560,7 +1609,8 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
 
   /** 출고 확정 - 포장/운송장 정보로 포장 주문 완료 처리 */
   async _confirmRelease() {
-    if (!this.trackingNo.trim()) {
+    const isB2B = this.selectedOrder?.biz_type === 'B2B_OUT'
+    if (!isB2B && !this.trackingNo.trim()) {
       this._showFeedback('warning', '운송장번호를 입력해주세요')
       return
     }
@@ -1614,6 +1664,18 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
       this._showFeedback('info', '배송 라벨 출력 요청 완료')
     } catch (err) {
       console.error('배송 라벨 출력 실패:', err)
+      this._showFeedback('error', '출력 요청 중 오류가 발생했습니다')
+    }
+  }
+
+  /** 거래명세서 출력 - B2B 전용 */
+  async _printDeliveryStatement() {
+    if (!this.selectedOrder) return
+    try {
+      await ServiceUtil.restPost(`ful_trx/packing_orders/${this.selectedOrder.id}/print_statement`, {})
+      this._showFeedback('info', '거래명세서 출력 요청 완료')
+    } catch (err) {
+      console.error('거래명세서 출력 실패:', err)
       this._showFeedback('error', '출력 요청 중 오류가 발생했습니다')
     }
   }
