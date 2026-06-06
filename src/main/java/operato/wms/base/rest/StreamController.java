@@ -18,11 +18,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import operato.wms.base.entity.SKU;
 import operato.wms.fulfillment.rest.PickingTaskController;
 import operato.wms.inbound.rest.InboundTransactionController;
+import operato.wms.stock.rest.InventoryController;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
-import xyz.elidom.print.rest.PrintoutController;
 import xyz.elidom.sys.system.service.AbstractRestService;
-import xyz.elidom.util.ValueUtil;
 
 @RestController
 @Transactional
@@ -49,6 +48,11 @@ public class StreamController extends AbstractRestService {
      */
     @Autowired
     private InboundTransactionController inboundTrxCtrl;
+    /**
+     * 재고 컨트롤러
+     */
+    @Autowired
+    private InventoryController invCtrl;
     /**
      * 피킹 컨트롤러
      */
@@ -132,5 +136,15 @@ public class StreamController extends AbstractRestService {
             @RequestParam(name = "printer_id", required = false) String printerId) {
 
         this.pickingCtrl.downloadPickingSheet(req, res, id, template, printerId);
+    }
+
+    @RequestMapping(value = "/inventories/{id}/download_barcode", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Download Inventory Barcode")
+    public void downloadInventoryBarcode(
+            HttpServletRequest req,
+            HttpServletResponse res,
+            @PathVariable("id") String id) {
+
+        this.invCtrl.downloadInventoryBarcode(req, res, id);
     }
 }
