@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import xyz.elidom.dbist.dml.Filter;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,14 +19,21 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import operato.wms.fulfillment.entity.PackingOrder;
+import operato.wms.base.entity.StoragePolicy;
+import operato.wms.base.service.WmsBaseService;
 import operato.wms.fulfillment.entity.PackingBox;
 import operato.wms.fulfillment.entity.PackingOrderItem;
 
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
+import xyz.elidom.print.rest.PrintoutController;
 import xyz.elidom.sys.system.service.AbstractRestService;
+import xyz.elidom.sys.util.ValueUtil;
 import xyz.elidom.dbist.dml.Page;
+import xyz.elidom.exception.server.ElidomRuntimeException;
 
 @RestController
 @Transactional
@@ -33,6 +41,16 @@ import xyz.elidom.dbist.dml.Page;
 @RequestMapping("/rest/packing_orders")
 @ServiceDesc(description = "PackingOrder Service API")
 public class PackingOrderController extends AbstractRestService {
+	/**
+	 * WMS Base Service
+	 */
+	@Autowired
+	private WmsBaseService wmsBaseService;
+	/**
+	 * 리포트 컨트롤러
+	 */
+	@Autowired
+	protected PrintoutController printoutCtrl;
 
 	@Override
 	protected Class<?> entityClass() {
@@ -132,4 +150,42 @@ public class PackingOrderController extends AbstractRestService {
 		return this.findPackingOrderItems(id);
 	}
 
+	/**
+	 * 출고 주문 ID로 거래명세서 출력을 위한 PDF 다운로드
+	 * 
+	 * @param req
+	 * @param res
+	 * @param id
+	 * @param template
+	 * @param printerId
+	 * @return
+	 */
+	@GetMapping(value = "/{id}/download_packing_sheet", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Download Packing Sheet")
+	public void downloadForPackingSheet(
+			HttpServletRequest req,
+			HttpServletResponse res,
+			@PathVariable("id") String id,
+			@RequestParam(name = "template", required = false) String template,
+			@RequestParam(name = "printer_id", required = false) String printerId) {
+
+		// 1. 조회
+		PackingOrder packingOrder = this.queryManager.select(PackingOrder.class, id);
+
+		// 2. 템플릿이 비어 있다면 기본 거래명세서 템플릿 명 조회
+		if (ValueUtil.isEmpty(template)) {
+			StoragePolicy policy = this.wmsBaseService.findStoragePolicy(packingOrder.getDomainId(),
+					packingOrder.getComCd(), packingOrder.getWhCd());
+
+			template = policy.getOutboundSheetTmpl();
+
+			if (ValueUtil.isEmpty(template)) {
+				throw new ElidomRuntimeException("거래명세서 템플릿이 보관피킹 정책 설정에 설정되지 않았습니다.");
+			}
+		}
+
+		// 3. 거래명세서 출력을 위한 PDF 다운로드
+		this.printoutCtrl.showPdfByPrintTemplateName(req, res, template,
+				ValueUtil.newMap("packingOrder", packingOrder));
+	}
 }

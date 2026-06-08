@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import operato.wms.base.entity.SKU;
+import operato.wms.fulfillment.rest.PackingOrderController;
 import operato.wms.fulfillment.rest.PickingTaskController;
 import operato.wms.inbound.rest.InboundTransactionController;
 import operato.wms.stock.rest.InventoryController;
@@ -58,12 +60,24 @@ public class StreamController extends AbstractRestService {
      */
     @Autowired
     private PickingTaskController pickingCtrl;
+    /**
+     * 포장 컨트롤러
+     */
+    @Autowired
+    private PackingOrderController packingCtrl;
 
     @Override
     protected Class<?> entityClass() {
         return SKU.class;
     }
 
+    /**
+     * SKU 정보 다운로드
+     * 
+     * @param req
+     * @param res
+     * @param id
+     */
     @RequestMapping(value = "/sku/{id}/download_sku_code", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiDesc(description = "Download SKU Code")
     public void downloadSKUCode(
@@ -74,6 +88,13 @@ public class StreamController extends AbstractRestService {
         this.skuCtrl.downloadSKUCode(req, res, id);
     }
 
+    /**
+     * SKU 바코드 다운로드
+     * 
+     * @param req
+     * @param res
+     * @param id
+     */
     @RequestMapping(value = "/sku/{id}/download_sku_barcode", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiDesc(description = "Download SKU Barcode")
     public void downloadSKUBarcode(
@@ -84,6 +105,13 @@ public class StreamController extends AbstractRestService {
         this.skuCtrl.downloadSKUBarcode(req, res, id);
     }
 
+    /**
+     * 로케이션 바코드 다운로드
+     * 
+     * @param req
+     * @param res
+     * @param id
+     */
     @RequestMapping(value = "/locations/{id}/download_barcode", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiDesc(description = "Download Location Barcode")
     public void downloadLocationBarcode(
@@ -138,6 +166,13 @@ public class StreamController extends AbstractRestService {
         this.pickingCtrl.downloadPickingSheet(req, res, id, template, printerId);
     }
 
+    /**
+     * 재고 바코드 출력을 위한 PDF 다운로드
+     * 
+     * @param req
+     * @param res
+     * @param id
+     */
     @RequestMapping(value = "/inventories/{id}/download_barcode", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiDesc(description = "Download Inventory Barcode")
     public void downloadInventoryBarcode(
@@ -146,5 +181,27 @@ public class StreamController extends AbstractRestService {
             @PathVariable("id") String id) {
 
         this.invCtrl.downloadInventoryBarcode(req, res, id);
+    }
+
+    /**
+     * 출고 주문 ID로 거래명세서 출력을 위한 PDF 다운로드
+     * 
+     * @param req
+     * @param res
+     * @param id
+     * @param template
+     * @param printerId
+     * @return
+     */
+    @GetMapping(value = "/packing_orders/{id}/download_packing_sheet", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Download Packing Sheet")
+    public void downloadForPackingSheet(
+            HttpServletRequest req,
+            HttpServletResponse res,
+            @PathVariable("id") String id,
+            @RequestParam(name = "template", required = false) String template,
+            @RequestParam(name = "printer_id", required = false) String printerId) {
+
+        this.packingCtrl.downloadForPackingSheet(req, res, id, template, printerId);
     }
 }

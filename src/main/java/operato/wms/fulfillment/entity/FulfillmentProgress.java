@@ -14,7 +14,7 @@ SELECT
     pt.shipment_order_id,
     pt.shipment_no,
     pt.order_date,
-    pt.com_cd, pt.wh_cd,
+    pt.com_cd, pt.wh_cd, po.biz_type,
     pt.pick_type, pt.pick_method,
     pt.worker_id,
     pt.plan_order, pt.plan_item, pt.plan_total,
@@ -88,6 +88,12 @@ public class FulfillmentProgress extends xyz.elidom.orm.entity.basic.DomainTimeS
 	 */
 	@Column(name = "shipment_no", length = 30)
 	private String shipmentNo;
+
+	/**
+	 * 출고 유형 - B2B_OUT / B2C_OUT
+	 */
+	@Column(name = "biz_type", length = 20)
+	private String bizType;
 
 	/**
 	 * 작업 일자
@@ -283,6 +289,14 @@ public class FulfillmentProgress extends xyz.elidom.orm.entity.basic.DomainTimeS
 
 	public void setShipmentNo(String shipmentNo) {
 		this.shipmentNo = shipmentNo;
+	}
+
+	public String getBizType() {
+		return bizType;
+	}
+
+	public void setBizType(String bizType) {
+		this.bizType = bizType;
 	}
 
 	public String getOrderDate() {

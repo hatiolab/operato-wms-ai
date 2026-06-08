@@ -94,6 +94,12 @@ public class PackingOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String shipmentNo;
 
 	/**
+	 * 출고 유형 - B2B_OUT / B2C_OUT
+	 */
+	@Column(name = "biz_type", length = 20)
+	private String bizType;
+
+	/**
 	 * 웨이브 번호
 	 */
 	@Column(name = "wave_no", length = 30)
@@ -305,6 +311,14 @@ public class PackingOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setShipmentNo(String shipmentNo) {
 		this.shipmentNo = shipmentNo;
+	}
+
+	public String getBizType() {
+		return bizType;
+	}
+
+	public void setBizType(String bizType) {
+		this.bizType = bizType;
 	}
 
 	public String getWaveNo() {
