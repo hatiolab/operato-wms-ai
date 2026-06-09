@@ -2,7 +2,7 @@ import '@things-factory/barcode-ui'
 import { html, css } from 'lit'
 import { customElement, query, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
-import { ServiceUtil, TermsUtil, UiUtil } from '@operato-app/metapage/dist-client'
+import { MetaApi, ServiceUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import { store, PageView } from '@operato/shell'
 import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
 import '../../component/sku-barcode-input.js'
@@ -348,6 +348,75 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
           font-size: 12px;
           margin-top: 4px;
           opacity: 0.8;
+        }
+
+        /* 수량 직접 입력 행 */
+        .current-item-section .qty-input-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 10px;
+          padding: 8px 10px;
+          background: rgba(255, 255, 255, 0.7);
+          border-radius: 8px;
+        }
+
+        .current-item-section .qty-input-row label {
+          flex-shrink: 0;
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--md-sys-color-on-primary-container, #1565c0);
+          white-space: nowrap;
+        }
+
+        .current-item-section .qty-input-row input[type='number'] {
+          flex: 1;
+          height: 28px;
+          padding: 0 8px;
+          font-size: 14px;
+          font-weight: 700;
+          text-align: center;
+          border: 2px solid var(--md-sys-color-primary, #1976D2);
+          border-radius: 6px;
+          background: #fff;
+          color: var(--md-sys-color-on-surface, #333);
+          outline: none;
+          min-width: 0;
+        }
+
+        .current-item-section .qty-input-row input[type='number']:focus {
+          border-color: var(--md-sys-color-secondary, #388E3C);
+          box-shadow: 0 0 0 2px rgba(56, 142, 60, 0.2);
+        }
+
+        .current-item-section .qty-input-row .btn-qty-confirm {
+          flex-shrink: 0;
+          padding: 0 12px;
+          height: 28px;
+          border: none;
+          border-radius: 6px;
+          background: var(--md-sys-color-primary, #1976D2);
+          color: #fff;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .current-item-section .qty-input-row .btn-qty-confirm:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+
+        .current-item-section .qty-input-row .btn-qty-confirm:active {
+          opacity: 0.85;
+        }
+
+        .current-item-section .qty-input-row .unit {
+          flex-shrink: 0;
+          font-size: 13px;
+          color: var(--md-sys-color-on-primary-container, #1565c0);
+          white-space: nowrap;
         }
 
         .current-item-section .barcode-input {
@@ -763,6 +832,7 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
   /** 포장 지시 카드 렌더링 */
   _renderOrderCard(order) {
     const isInProgress = order.status === 'IN_PROGRESS'
+    const isB2C = order.biz_type !== 'B2B_OUT'
     const packedQty = order.packed_qty || 0
     const totalItems = order.total_items || order.total_item || 0
     const progressPct = totalItems > 0 ? Math.round((packedQty / totalItems) * 100) : 0
@@ -778,7 +848,7 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
           </span>
         </div>
         <div class="sub-info">
-          ${order.shipment_no || ''} · ${order.carrier_cd || ''} · ${order.total_items || 0}종 ${order.total_qty || 0}EA
+          ${order.shipment_no || ''} · ${order.invoice_no || ''} · ${order.cust_nm || ''} · ${order.total_items || 0}종 ${order.total_qty || 0}EA
         </div>
         ${isInProgress ? html`
           <div class="progress-bar">
@@ -807,10 +877,24 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
       ${currentItem ? html`
         <div class="current-item-section">
           <div class="item-info">
-            <div class="sku">상품 : ${currentItem.sku_cd} ${currentItem.sku_nm ? `(${currentItem.sku_nm})` : ''}</div>
-            <div class="qty">검수 수량 : ${currentItem.insp_qty || 0} / ${currentItem.order_qty || 0} EA</div>
-            ${currentItem.lot_no ? html`<div class="lot">LOT: ${currentItem.lot_no} ${currentItem.expired_date ? `· ${currentItem.expired_date}` : ''}</div>` : ''}
+            <div class="sku">상품: ${currentItem.sku_cd} / ${this.selectedOrder.invoice_no ? '송장: ' + this.selectedOrder.invoice_no : '출고: ' + this.selectedOrder.shipment_no}</div>
+            <div class="lot">${currentItem.sku_nm}</div>
+            <div class="qty">주문 수량 : ${currentItem.order_qty || 0} / 소비기한 : ${currentItem.expired_date || ''}</div>
           </div>
+
+          <!-- 수량 직접 입력 (스캔 대체/보완) — 바코드 스캔 위 -->
+          <div class="qty-input-row">
+            <label>검수 수량</label>
+            <input type="number"
+              min="0"
+              max="${currentItem.order_qty || 0}"
+              .value="${String(currentItem.insp_qty || 0)}"
+              @change=${e => this._onManualQtyInput(this.currentItemIndex, e.target.value)}
+              @focus=${e => e.target.select()}
+            />
+            <span class="unit">/ ${currentItem.order_qty || 0} EA</span>
+          </div>
+
           <div class="barcode-input">
             <sku-barcode-input
               .comCd="${this.selectedOrder?.com_cd || ''}"
@@ -892,6 +976,8 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
 
   /** packing 모드 렌더링 — 포장 정보 입력 + 출고 확정 버튼 */
   _renderPackingMode() {
+    const isB2B = this.selectedOrder?.biz_type === 'B2B_OUT'
+
     return html`
       <div class="packing-section">
         <div class="complete-banner">
@@ -920,21 +1006,38 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
             @input=${e => (this.boxWeight = parseFloat(e.target.value) || 0)} />
         </div>
 
-        <div class="form-group">
-          <label>${TermsUtil.tLabel('invoice_no') || '운송장번호'}</label>
-          <ox-input-barcode id="trackingInput"
-            .value=${this.trackingNo}
-            placeholder="운송장번호 스캔 또는 입력"
-            @change=${e => (this.trackingNo = e.target.value)}>
-          </ox-input-barcode>
-        </div>
+        ${!isB2B ? html`
+          <div class="form-group">
+            <label>${TermsUtil.tLabel('invoice_no') || '운송장번호'}</label>
+            <ox-input-barcode id="trackingInput"
+              .value=${this.trackingNo}
+              placeholder="운송장번호 스캔 또는 입력"
+              @change=${e => (this.trackingNo = e.target.value)}>
+            </ox-input-barcode>
+          </div>
+        ` : ''}
       </div>
 
-      <button class="btn-confirm"
-        ?disabled=${this.processing}
-        @click=${this._confirmRelease}>
-        ${TermsUtil.tButton('confirm_release') || '출고 확정'}
-      </button>
+      ${isB2B ? html`
+        <div style="display:flex; gap:8px; margin:12px;">
+          <button class="btn-confirm" style="flex:1; margin:0; width:auto;"
+            ?disabled=${this.processing}
+            @click=${this._confirmRelease}>
+            ${TermsUtil.tButton('confirm_release') || '출고 확정'}
+          </button>
+          <button class="btn-confirm" style="flex:1; margin:0; width:auto; background:#7B1FA2;"
+            ?disabled=${this.processing}
+            @click=${this._printDeliveryStatement}>
+            ${TermsUtil.tButton('print_trade_statement') || '거래명세서 출력'}
+          </button>
+        </div>
+      ` : html`
+        <button class="btn-confirm"
+          ?disabled=${this.processing}
+          @click=${this._confirmRelease}>
+          ${TermsUtil.tButton('confirm_release') || '출고 확정'}
+        </button>
+      `}
     `
   }
 
@@ -1011,9 +1114,14 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
   async _loadPackingItems(orderId) {
     try {
       const items = await ServiceUtil.restGet('ful_trx/packing_order_items', { packing_order_id: orderId })
-      this.packingItems = items || []
+      // PACKED / INSPECTED 상태를 COMPLETED 로 정규화 (탭 필터 기준 통일)
+      this.packingItems = (items || []).map(item =>
+        (item.status === 'PACKED' || item.status === 'INSPECTED')
+          ? { ...item, status: 'COMPLETED' }
+          : item
+      )
       this.totalCount = this.packingItems.length
-      this.completedCount = this.packingItems.filter(i => i.status === 'PACKED' || i.status === 'INSPECTED').length
+      this.completedCount = this.packingItems.filter(i => i.status === 'COMPLETED').length
       this._moveToNextItem()
     } catch (error) {
       console.error('포장 항목 조회 실패:', error)
@@ -1110,7 +1218,11 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
   /** 포장번호 바코드 스캔으로 빠른 선택 */
   _onScanPackingOrder(barcode) {
     if (!barcode) return
-    const order = this.packingOrders.find(o => o.pack_order_no === barcode || (o.invoice_no && o.invoice_no === barcode))
+    const order = this.packingOrders.find(o =>
+      o.pack_order_no === barcode ||
+      (o.shipment_no && o.shipment_no === barcode) ||
+      (o.invoice_no && o.invoice_no === barcode)
+    )
     if (order) {
       this._selectOrder(order)
     } else {
@@ -1121,6 +1233,32 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
     }
     if (this._packOrderScanInput) {
       this._packOrderScanInput.value = ''
+    }
+  }
+
+  /**
+   * 검수 수량 직접 입력 처리 — 스캔 대신 수량을 타이핑하여 설정
+   * 0 이상 주문 수량 이하로 클램핑하며, 주문 수량과 같아지면 자동 검수 완료
+   */
+  async _onManualQtyInput(itemIndex, value) {
+    const item = this.packingItems[itemIndex]
+    if (!item) return
+    const orderQty = item.pack_qty || item.order_qty || 1
+    const qty = Math.max(0, Math.min(Number(value) || 0, orderQty))
+
+    this.packingItems = this.packingItems.map((it, idx) =>
+      idx === itemIndex ? { ...it, insp_qty: qty } : it
+    )
+
+    if (qty > 0) {
+      this.lastScannedItem = {
+        success: qty >= orderQty,
+        message: `${item.sku_cd} — 수량 입력: ${qty}/${orderQty}`
+      }
+    }
+
+    if (qty >= orderQty) {
+      await this._confirmInspection(itemIndex)
     }
   }
 
@@ -1165,6 +1303,7 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
         document.dispatchEvent(new CustomEvent('notify', {
           detail: { level: 'info', message: `스캔 확인 (${newInspQty}/${orderQty})` }
         }))
+        this._focusBarcodeInput()
       }
     } else {
       this.lastScannedItem = { success: false, message: `포장 항목에 없는 상품: ${sku_cd}` }
@@ -1172,6 +1311,7 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
         detail: { level: 'error', message: `포장 항목에 없는 상품입니다: ${sku_cd}` }
       }))
       navigator.vibrate?.(200)
+      this._focusBarcodeInput()
     }
   }
 
@@ -1190,9 +1330,9 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
         expiredDate: item.expired_date || ''
       }, null, null, (res) => {
         this.packingItems = this.packingItems.map((it, idx) =>
-          idx === itemIndex ? { ...it, status: 'PACKED' } : it
+          idx === itemIndex ? { ...it, status: 'COMPLETED' } : it
         )
-        this.completedCount = this.packingItems.filter(i => i.status === 'PACKED' || i.status === 'INSPECTED').length
+        this.completedCount = this.packingItems.filter(i => i.status === 'COMPLETED').length
 
         document.dispatchEvent(new CustomEvent('notify', {
           detail: { level: 'info', message: `검수 완료 (${this.completedCount}/${this.totalCount})` }
@@ -1202,6 +1342,12 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
           this._onInspectionComplete()
         } else {
           this._moveToNextItem()
+          // 완료된 항목이 생겼으므로 완료 탭으로 이동 후 다시 대기 탭으로 복귀
+          this.currentTabKey = 'done'
+          setTimeout(() => {
+            this.currentTabKey = 'waiting'
+            this._focusBarcodeInput()
+          }, 800)
         }
 
       }, (err) => {
@@ -1231,7 +1377,8 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
 
   /** 출고 확정 API 호출 — 포장 정보 전송 */
   async _confirmRelease() {
-    if (!this.trackingNo.trim()) {
+    const isB2B = this.selectedOrder?.biz_type === 'B2B_OUT'
+    if (!isB2B && !this.trackingNo.trim()) {
       document.dispatchEvent(new CustomEvent('notify', {
         detail: { level: 'warn', message: '운송장번호를 입력해주세요' }
       }))
@@ -1265,6 +1412,30 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
 
     } finally {
       this.processing = false
+    }
+  }
+
+  /** 거래명세서 출력 - B2B 전용 */
+  _printDeliveryStatement() {
+    if (!this.selectedOrder) return
+
+    if (window.innerWidth < 768) {
+      // PDA: 브라우저 기본 PDF 뷰어로 새 탭에서 열어 내장 인쇄 기능 사용
+      window.open(
+        `/rest/stream/packing_orders/${this.selectedOrder.id}/download_packing_sheet`,
+        '_blank'
+      )
+    } else {
+      // PC: 팝업으로 출력
+      MetaApi.openDynamicPopup('거래명세서 출력', {
+        "module": "metapage",
+        "import": "pages/basic-pdf-element.js",
+        "tagname": "basic-pdf-element",
+        "menu": "TradeStatementSheet",
+        "size": "large",
+        "title": "button.print_trade_statement",
+        "title_field": "name"
+      }, this.selectedOrder, this.selectedOrder.id, null)
     }
   }
 

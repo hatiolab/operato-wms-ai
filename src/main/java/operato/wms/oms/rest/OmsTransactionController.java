@@ -253,7 +253,7 @@ public class OmsTransactionController extends AbstractRestService {
 	}
 
 	/**
-	 * 웨이브 구성되지 않은 출고 주문에 대한 웨이브 구성
+	 * 웨이브 구성되지 않은 출고 주문에 대한 웨이브 구성 - 이 부분은 동시에 처리되면 안 되므로 메소드 동기화 처리가 필요하다.
 	 *
 	 * POST /rest/oms_trx/waves/config_wave
 	 *
@@ -263,7 +263,7 @@ public class OmsTransactionController extends AbstractRestService {
 	 */
 	@RequestMapping(value = "waves/config_wave", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Configuration wave with unwaved orders")
-	public Map<String, Object> configWave(@RequestBody List<ShipmentOrder> orders) {
+	public synchronized Map<String, Object> configWave(@RequestBody List<ShipmentOrder> orders) {
 		Long domainId = Domain.currentDomainId();
 
 		// 1. 커스텀 서비스 - 전 처리

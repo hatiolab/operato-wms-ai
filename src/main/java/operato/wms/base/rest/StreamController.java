@@ -20,6 +20,7 @@ import operato.wms.base.entity.SKU;
 import operato.wms.fulfillment.rest.PackingOrderController;
 import operato.wms.fulfillment.rest.PickingTaskController;
 import operato.wms.inbound.rest.InboundTransactionController;
+import operato.wms.oms.rest.ShipmentOrderController;
 import operato.wms.stock.rest.InventoryController;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
@@ -55,6 +56,11 @@ public class StreamController extends AbstractRestService {
      */
     @Autowired
     private InventoryController invCtrl;
+    /**
+     * 출고 컨트롤러
+     */
+    @Autowired
+    private ShipmentOrderController shipmentCtrl;
     /**
      * 피킹 컨트롤러
      */
@@ -184,6 +190,25 @@ public class StreamController extends AbstractRestService {
     }
 
     /**
+     * 로케이션 바코드 + 재고 바코드 출력을 위한 PDF 다운로드
+     * 
+     * @param req
+     * @param res
+     * @param barcode
+     * @param locCd
+     */
+    @RequestMapping(value = "/inventories/{barcode}/{loc_cd}/download_barcode", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Download Inventory Barcode")
+    public void downloadInventoryBarcodeByBarcodeLocation(
+            HttpServletRequest req,
+            HttpServletResponse res,
+            @PathVariable("barcode") String barcode,
+            @PathVariable("loc_cd") String locCd) {
+
+        this.invCtrl.downloadInventoryBarcode(req, res, barcode, locCd);
+    }
+
+    /**
      * 출고 주문 ID로 거래명세서 출력을 위한 PDF 다운로드
      * 
      * @param req
@@ -203,5 +228,49 @@ public class StreamController extends AbstractRestService {
             @RequestParam(name = "printer_id", required = false) String printerId) {
 
         this.packingCtrl.downloadForPackingSheet(req, res, id, template, printerId);
+    }
+
+    /**
+     * 포장 주문 ID로 송장 출력을 위한 PDF 다운로드
+     * 
+     * @param req
+     * @param res
+     * @param id
+     * @param template
+     * @param printerId
+     * @return
+     */
+    @GetMapping(value = "/packing_orders/{id}/download_invoice_label", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Download Invoice Label by packing")
+    public void downloadInvoiceLabelByPacking(
+            HttpServletRequest req,
+            HttpServletResponse res,
+            @PathVariable("id") String id,
+            @RequestParam(name = "template", required = false) String template,
+            @RequestParam(name = "printer_id", required = false) String printerId) {
+
+        this.packingCtrl.downloadInvoiceLabel(req, res, id, template, printerId);
+    }
+
+    /**
+     * 출고 주문 ID로 송장 출력을 위한 PDF 다운로드
+     * 
+     * @param req
+     * @param res
+     * @param id
+     * @param template
+     * @param printerId
+     * @return
+     */
+    @GetMapping(value = "/shipment_orders/{id}/download_invoice_label", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Download Invoice Label by Shipment")
+    public void downloadInvoiceLabelByShipment(
+            HttpServletRequest req,
+            HttpServletResponse res,
+            @PathVariable("id") String id,
+            @RequestParam(name = "template", required = false) String template,
+            @RequestParam(name = "printer_id", required = false) String printerId) {
+
+        this.shipmentCtrl.downloadInvoiceLabel(req, res, id, template, printerId);
     }
 }

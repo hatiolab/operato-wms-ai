@@ -188,4 +188,32 @@ public class PackingOrderController extends AbstractRestService {
 		this.printoutCtrl.showPdfByPrintTemplateName(req, res, template,
 				ValueUtil.newMap("packingOrder", packingOrder));
 	}
+
+	/**
+	 * 포장 주문 ID로 거래명세서 출력을 위한 PDF 다운로드
+	 * 
+	 * @param req
+	 * @param res
+	 * @param id
+	 * @param template
+	 * @param printerId
+	 * @return
+	 */
+	@GetMapping(value = "/{id}/download_invoice_label", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Download Invoice Label")
+	public void downloadInvoiceLabel(
+			HttpServletRequest req,
+			HttpServletResponse res,
+			@PathVariable("id") String id,
+			@RequestParam(name = "template", required = false) String template,
+			@RequestParam(name = "printer_id", required = false) String printerId) {
+
+		// 1. 템플릿이 비어 있다면 기본 거래명세서 템플릿 명 조회
+		if (ValueUtil.isEmpty(template)) {
+			template = "INVOICE_LABEL_SHEET_BY_PACKING";
+		}
+
+		// 2. 송장 라벨 출력을 위한 PDF 다운로드
+		this.printoutCtrl.showPdfByPrintTemplateName(req, res, template, ValueUtil.newMap("id", id));
+	}
 }

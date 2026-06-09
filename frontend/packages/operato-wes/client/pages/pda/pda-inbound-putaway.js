@@ -581,6 +581,23 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
           color: #2e7d32;
         }
 
+        .item-card .btn-print {
+          flex-shrink: 0;
+          padding: 4px 10px;
+          border: 1px solid var(--md-sys-color-primary, #1976D2);
+          border-radius: 6px;
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          color: var(--md-sys-color-primary, #1976D2);
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .item-card .btn-print:active {
+          background: var(--md-sys-color-primary-container, #e3f2fd);
+        }
+
         /* 완료 화면 */
         .complete-section {
           display: flex;
@@ -1052,6 +1069,12 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
                   ${item.lot_no ? ` · LOT: ${item.lot_no}` : ''}
                 </div>
               </div>
+              ${!isTodo && item.barcode && item.loc_cd ? html`
+                <button class="btn-print"
+                  @click=${e => { e.stopPropagation(); this._printBarcode(item) }}>
+                  🖨️ 인쇄
+                </button>
+              ` : ''}
               <span class="loc-badge ${!isTodo ? 'done' : ''}">
                 ${isTodo ? (item.inv_qty || 0) : (item.loc_cd || '-')}
               </span>
@@ -1414,6 +1437,17 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
    */
   _showFeedback(message, type) {
     this.lastFeedback = { type, message }
+  }
+
+  /**
+   * 재고 바코드 라벨 PDF 출력
+   * GET /rest/inventories/{barcode}/{loc_cd}/download_barcode
+   * @param {object} item - 완료된 재고 항목 (barcode, loc_cd 사용)
+   */
+  _printBarcode(item) {
+    const barcode = encodeURIComponent(item.barcode)
+    const locCd = encodeURIComponent(item.loc_cd)
+    window.open(`/rest/inventories/${barcode}/${locCd}/download_barcode`, '_blank')
   }
 
   /**

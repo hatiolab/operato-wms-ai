@@ -796,12 +796,28 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     const doneQty = this.receivingItems.reduce((s, i) => s + (i.rcv_qty || 0), 0)
     const currentItem = this.currentItemIndex >= 0 ? this.receivingItems[this.currentItemIndex] : null
 
+    const rcv = this.currentReceiving
+
     return html`
       <div class="progress-section">
         <div class="progress-bar-large">
           <div class="fill" style="width: ${progressPct}%"></div>
         </div>
         <div class="progress-text">${this.completedCount}/${this.totalCount}건 (${doneQty}/${totalQty})</div>
+      </div>
+
+      <!-- 입고 주문 요약 정보 -->
+      <div style="
+        display:flex; gap:12px; flex-wrap:wrap;
+        padding:6px 12px 4px;
+        font-size:12px;
+        color:var(--md-sys-color-on-surface-variant,#666);
+        border-bottom:1px solid var(--md-sys-color-outline-variant,#e0e0e0);
+        background:var(--md-sys-color-surface-container-low,#f5f5f5);
+      ">
+        <span>📅 ${TermsUtil.tLabel('rcv_req_date') || '입고예정일'}: <strong>${rcv?.rcv_req_date || '-'}</strong></span>
+        <span>🏢 ${TermsUtil.tLabel('com_cd') || '화주사'}: <strong>${rcv?.com_cd || '-'}</strong></span>
+        <span>🚚 ${TermsUtil.tLabel('vend_cd') || '공급사'}: <strong>${rcv?.vend_cd || '-'}</strong></span>
       </div>
 
       ${currentItem ? html`
@@ -918,9 +934,14 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
                 <div class="loc">
                   #${item.rcv_exp_seq || '-'}
                   ${item.loc_cd ? `로케이션 : ${item.loc_cd}` : ''}
-                  상품 : ${item.sku_cd} 
+                  상품 : ${item.sku_cd}
                 </div>
                 <div class="sku">${item.sku_nm || ''}</div>
+                ${isDone && item.barcode ? html`
+                  <div class="loc" style="margin-top:2px; color:var(--md-sys-color-primary,#1976D2); font-family:'Courier New',monospace; font-size:12px;">
+                    📦 ${item.barcode}
+                  </div>
+                ` : ''}
               </div>
               <span class="qty-badge ${isDone ? 'done' : ''}">
                 ${isDone

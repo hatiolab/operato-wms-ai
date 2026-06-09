@@ -3,7 +3,7 @@ import { css, html } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { openPopup } from '@operato/layout'
 import { PageView } from '@operato/shell'
-import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
+import { MetaApi, ServiceUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 
 import './packing-order-detail'
 import '../../component/sku-barcode-input.js'
@@ -943,7 +943,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
         <div class="search-area">
           <input
             type="text"
-            placeholder="포장번호 또는 고객명 검색"
+            placeholder="포장번호 / 출고번호 / 송장번호 / 고객명"
             .value="${this.searchKeyword}"
             @input="${e => { this.searchKeyword = e.target.value }}"
           />
@@ -982,6 +982,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
   _renderOrderCard(order) {
     const isSelected = this.selectedOrder && this.selectedOrder.id === order.id
     const isCompleted = order.status != 'CREATED' && order.status != 'IN_PROGRESS'
+    const isB2C = order.biz_type !== 'B2B_OUT'
     const customerNm = order.cust_nm || ''
     const itemCount = order.total_items || 0
     const totalQty = order.total_qty || 0
@@ -994,6 +995,11 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
       >
         <div class="order-no">포장 번호 : ${order.pack_order_no || '-'}</div>
         <div class="order-no">출고 번호 : ${order.shipment_no || '-'}</div>
+        ${isB2C && order.invoice_no ? html`
+          <div class="order-no" style="color:var(--md-sys-color-secondary,#388E3C); font-size:12px;">
+            송장 번호 : ${order.invoice_no}
+          </div>
+        ` : ''}
         <div class="meta">${customerNm}${itemCount ? ` | ${itemCount}종 ${totalQty}EA` : ''}</div>
         ${progressPct > 0 && progressPct < 100 ? html`
           <div class="progress-mini">
@@ -1131,8 +1137,18 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
                 </div>
               ` : ''}
               <div class="qty-row">
-                <label>주문 수량: ${currentItem.pack_qty || currentItem.order_qty || 0} EA</label>
-                <span style="margin-left: auto">검수 수량: <strong>${currentItem.insp_qty || 0}</strong> / ${currentItem.pack_qty || currentItem.order_qty || 0} EA</span>
+                <label>주문 수량:</label>
+                <span class="unit">${currentItem.pack_qty || currentItem.order_qty || 0} EA</span>
+                <label style="margin-left:auto;">검수 수량:</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="${currentItem.pack_qty || currentItem.order_qty || 0}"
+                  .value="${String(currentItem.insp_qty || 0)}"
+                  @change="${e => this._onManualQtyInput(this.currentItemIndex, e.target.value)}"
+                  @focus="${e => e.target.select()}"
+                />
+                <span class="unit">/ ${currentItem.pack_qty || currentItem.order_qty || 0} EA</span>
               </div>
               <div class="actions">
                 <button class="btn-confirm" @click="${this._confirmInspection}">검수 완료</button>
@@ -1314,7 +1330,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
    * ============================================================== */
 
   /** 페이지 활성화 시 데이터 조회 및 키보드 단축키 설정 */
-  async pageUpdated(changes, lifecycle, before) {
+  async pageUpdated(_changes, _lifecycle, _before) {
     if (this.active) {
       await this._refresh()
       this._setupKeyboardShortcuts()
@@ -1324,7 +1340,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
   }
 
   /** 페이지 해제 시 키보드 단축키 이벤트 리스너 제거 */
-  pageDisposed(lifecycle) {
+  pageDisposed(_lifecycle) {
     this._removeKeyboardShortcuts()
   }
 
@@ -1346,14 +1362,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
 
       const allOrders = [...(waitingOrders || []), ...(completedOrders || [])]
 
-      // 항목 수/수량 계산을 위해 항목도 조회
-      const itemResults = await Promise.all(
-        allOrders.map(o =>
-          ServiceUtil.restGet(`ful_trx/packing_order_items?packing_order_id=${o.id}`).catch(() => [])
-        )
-      )
-
-      allOrders.forEach((order, i) => {
+      allOrders.forEach(order => {
         order._progressPct = order.total_items > 0 ? Math.round((order.packed_qty / order.total_items) * 100) : 0
       })
 
@@ -1404,6 +1413,8 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
       const kw = this.searchKeyword.toLowerCase()
       orders = orders.filter(o =>
         (o.pack_order_no || '').toLowerCase().includes(kw) ||
+        (o.shipment_no || '').toLowerCase().includes(kw) ||
+        (o.invoice_no || '').toLowerCase().includes(kw) ||
         (o.cust_nm || '').toLowerCase().includes(kw)
       )
     }
@@ -1464,6 +1475,26 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
    * ============================================================== */
 
   /** 상품 바코드 스캔 처리 - sku-barcode-input이 SKU 해석 후 발생시키는 sku-select 이벤트 핸들러 */
+  /**
+   * 검수 수량 직접 입력 처리 — 스캔 대신 수량을 타이핑하여 설정
+   * 0 이상 주문 수량 이하로 클램핑하며, 주문 수량과 같아지면 검수 완료 버튼이 활성화됨
+   */
+  _onManualQtyInput(itemIndex, value) {
+    const item = this.packingItems[itemIndex]
+    if (!item) return
+    const orderQty = item.pack_qty || item.order_qty || 1
+    const qty = Math.max(0, Math.min(Number(value) || 0, orderQty))
+    this.packingItems = this.packingItems.map((it, idx) =>
+      idx === itemIndex ? { ...it, insp_qty: qty } : it
+    )
+    if (qty > 0) {
+      this.lastScannedItem = {
+        success: qty >= orderQty,
+        message: `${item.sku_cd} — 수량 입력: ${qty}/${orderQty}`
+      }
+    }
+  }
+
   async _onSkuSelect(e) {
     const { sku_cd, sku_nm } = e.detail
 
@@ -1671,13 +1702,17 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
   /** 거래명세서 출력 - B2B 전용 */
   async _printDeliveryStatement() {
     if (!this.selectedOrder) return
-    try {
-      await ServiceUtil.restPost(`ful_trx/packing_orders/${this.selectedOrder.id}/print_statement`, {})
-      this._showFeedback('info', '거래명세서 출력 요청 완료')
-    } catch (err) {
-      console.error('거래명세서 출력 실패:', err)
-      this._showFeedback('error', '출력 요청 중 오류가 발생했습니다')
-    }
+
+    // title, popupConfig, paramData, parentIdValue, popupCloseCallback
+    MetaApi.openDynamicPopup('거래명세서 출력', {
+      "module": "metapage",
+      "import": "pages/basic-pdf-element.js",
+      "tagname": "basic-pdf-element",
+      "menu": "TradeStatementSheet",
+      "size": "large",
+      "title": "button.print_trade_statement",
+      "title_field": "name"
+    }, this.selectedOrder, this.selectedOrder.id, null)
   }
 
   /** 다음 검수 시작 - 대기 중인 다음 포장 주문 자동 선택 */

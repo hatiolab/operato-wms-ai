@@ -25,6 +25,7 @@ import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.print.rest.PrintoutController;
+import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.system.service.AbstractRestService;
 import xyz.elidom.util.ValueUtil;
 
@@ -132,6 +133,28 @@ public class InventoryController extends AbstractRestService {
 		return this.cudMultipleData(this.entityClass(), list);
 	}
 
+	@RequestMapping(value = "/{barcode}/{loc_cd}/download_barcode", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Download Inventory Barcode")
+	public void downloadInventoryBarcode(
+			HttpServletRequest req,
+			HttpServletResponse res,
+			@PathVariable("barcode") String barcode,
+			@PathVariable("loc_cd") String locCd) {
+
+		// 1. 조회
+		Inventory inventory = this.queryManager.selectByCondition(Inventory.class,
+				new Inventory(Domain.currentDomainId(), barcode, locCd));
+
+		// 2. 재고 존재 여부 체크
+		if (inventory == null) {
+			throw new ElidomRuntimeException("재고를 찾을 수 없습니다.");
+		}
+
+		// 3. 로케이션 바코드 생성을 위한 PDF 다운로드
+		this.printoutCtrl.showPdfByPrintTemplateName(req, res, "GENERAL_BARCODE_SHEET",
+				ValueUtil.newMap("barcode", inventory.getBarcode()));
+	}
+
 	@RequestMapping(value = "/{id}/download_barcode", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Download Inventory Barcode")
 	public void downloadInventoryBarcode(
@@ -142,7 +165,12 @@ public class InventoryController extends AbstractRestService {
 		// 1. 조회
 		Inventory inventory = this.queryManager.select(Inventory.class, id);
 
-		// 2. 로케이션 바코드 생성을 위한 PDF 다운로드
+		// 2. 재고 존재 여부 체크
+		if (inventory == null) {
+			throw new ElidomRuntimeException("재고를 찾을 수 없습니다.");
+		}
+
+		// 3. 로케이션 바코드 생성을 위한 PDF 다운로드
 		this.printoutCtrl.showPdfByPrintTemplateName(req, res, "GENERAL_BARCODE_SHEET",
 				ValueUtil.newMap("barcode", inventory.getBarcode()));
 	}
