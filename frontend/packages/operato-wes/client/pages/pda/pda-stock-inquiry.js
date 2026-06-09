@@ -788,6 +788,9 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           <button class="btn-secondary" @click=${this._goAdjust}>
             ${TermsUtil.tButton('adjust') || '조정'}
           </button>
+          <button class="btn-secondary" @click=${this._printBarcode}>
+            🖨️ ${TermsUtil.tButton('print') || '인쇄'}
+          </button>
         </div>
       </div>
     `
@@ -1942,6 +1945,15 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     } finally {
       this.processing = false
     }
+  }
+
+  /**
+   * 재고 바코드 라벨 PDF 출력
+   * GET /rest/inventories/{id}/download_barcode
+   */
+  _printBarcode() {
+    if (!this.selectedInventory) return
+    window.open(`/rest/inventories/${this.selectedInventory.id}/download_barcode`, '_blank')
   }
 
   /**
