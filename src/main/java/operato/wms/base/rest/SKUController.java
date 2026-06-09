@@ -128,7 +128,7 @@ public class SKUController extends AbstractRestService {
         SKU sku = this.queryManager.select(SKU.class, id);
 
         // 2. 로케이션 바코드 생성을 위한 PDF 다운로드
-        this.printoutCtrl.showPdfByPrintTemplateName(req, res, "GENERAL_BARCODE_SHEET",
+        this.printoutCtrl.showPdfByPrintTemplateName(req, res, "SIMPLE_BARCODE",
                 ValueUtil.newMap("barcode", sku.getSkuCd()));
     }
 
@@ -143,7 +143,7 @@ public class SKUController extends AbstractRestService {
         SKU sku = this.queryManager.select(SKU.class, id);
 
         // 2. 로케이션 바코드 생성을 위한 PDF 다운로드
-        this.printoutCtrl.showPdfByPrintTemplateName(req, res, "GENERAL_BARCODE_SHEET",
+        this.printoutCtrl.showPdfByPrintTemplateName(req, res, "SIMPLE_BARCODE",
                 ValueUtil.newMap("barcode", sku.getSkuBarcd()));
     }
 }

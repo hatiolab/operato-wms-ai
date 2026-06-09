@@ -76,7 +76,7 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 		// 3. 주문 확정 처리
 		List<String> ids = ValueUtil.toList(id);
 
-		// 4. 출고 주문 상태가 '등록' 인 경우 확정 처리
+		// 4. 출고 주문 상태가 '등록' 인 경우 확정 / 재고 할당 연속 처리
 		if (ShipmentOrder.STATUS_REGISTERED.equals(status)) {
 			this.confirmShipmentOrders(ids);
 			this.allocateShipmentOrders(ids);

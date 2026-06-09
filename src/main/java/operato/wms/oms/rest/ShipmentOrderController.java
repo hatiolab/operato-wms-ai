@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import operato.wms.oms.WmsOmsConfigConstants;
 import operato.wms.oms.entity.ImportShipmentOrder;
 import operato.wms.oms.entity.ShipmentDelivery;
@@ -27,6 +29,7 @@ import operato.wms.oms.entity.ShipmentOrderItem;
 import operato.wms.oms.service.OmsImportService;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
+import xyz.elidom.print.rest.PrintoutController;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.system.service.AbstractRestService;
 import xyz.elidom.util.ValueUtil;
@@ -53,6 +56,11 @@ public class ShipmentOrderController extends AbstractRestService {
 	 */
 	@Autowired
 	private OmsImportService importService;
+	/**
+	 * 리포트 컨트롤러
+	 */
+	@Autowired
+	protected PrintoutController printoutCtrl;
 
 	@Override
 	protected Class<?> entityClass() {
@@ -262,5 +270,33 @@ public class ShipmentOrderController extends AbstractRestService {
 				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT, list);
 		this.customSvc.doCustomService(Domain.currentDomainId(), "diy-validate-b2b-shipment-order", params);
 		return list;
+	}
+
+	/**
+	 * 출고 주문 ID로 송장 출력을 위한 PDF 다운로드
+	 * 
+	 * @param req
+	 * @param res
+	 * @param id
+	 * @param template
+	 * @param printerId
+	 * @return
+	 */
+	@GetMapping(value = "/{id}/download_invoice_label", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Download Invoice Label")
+	public void downloadInvoiceLabel(
+			HttpServletRequest req,
+			HttpServletResponse res,
+			@PathVariable("id") String id,
+			@RequestParam(name = "template", required = false) String template,
+			@RequestParam(name = "printer_id", required = false) String printerId) {
+
+		// 1. 템플릿이 비어 있다면 기본 거래명세서 템플릿 명 조회
+		if (ValueUtil.isEmpty(template)) {
+			template = "INVOICE_LABEL_SHEET_BY_SHIPMENT";
+		}
+
+		// 2. 송장 라벨 출력을 위한 PDF 다운로드
+		this.printoutCtrl.showPdfByPrintTemplateName(req, res, template, ValueUtil.newMap("id", id));
 	}
 }

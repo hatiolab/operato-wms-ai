@@ -100,7 +100,7 @@ public class LocationController extends AbstractRestService {
 		Location location = this.queryManager.select(Location.class, id);
 
 		// 2. 로케이션 바코드 생성을 위한 PDF 다운로드
-		this.printoutCtrl.showPdfByPrintTemplateName(req, res, "GENERAL_BARCODE_SHEET",
+		this.printoutCtrl.showPdfByPrintTemplateName(req, res, "SIMPLE_BARCODE",
 				ValueUtil.newMap("barcode", location.getLocCd()));
 	}
 }
