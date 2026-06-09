@@ -575,6 +575,7 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 		inventory.setVendCd(sku.getVendCd());
 		inventory.setLastTranCd(InventoryTran.TRAN_TYPE_VAS_IN);
 		inventory.setStatus(Inventory.STATUS_STORED);
+		inventory.setRcvNo(this.getRefDocNo());
 		BeanUtil.get(IQueryManager.class).insert(inventory);
 
 		// 재고 생성 트랜잭션 생성
