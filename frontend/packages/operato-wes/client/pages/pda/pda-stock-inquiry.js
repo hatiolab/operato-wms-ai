@@ -1,5 +1,6 @@
 import '@things-factory/barcode-ui'
 import { html, css } from 'lit'
+import '../../component/sku-barcode-input.js'
 import { customElement, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
 import { ServiceUtil, TermsUtil } from '@operato-app/metapage/dist-client'
@@ -64,6 +65,11 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   @state() companies = []
   /** 재고 생성 사유 코드 목록 (INV_NEW_REASON) */
   @state() _newReasonCodes = []
+
+  /** 바코드 입력 필드 값 유무 (placeholder overlay 제어용) */
+  @state() _hasBarcodeValue = false
+  /** 로케이션 입력 필드 값 유무 (placeholder overlay 제어용) */
+  @state() _hasLocCdValue = false
 
   /** 재고 조정 수량 입력값 */
   @state() _adjQty = ''
@@ -167,6 +173,40 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           flex: 1;
           --input-height: 30px;
           --input-font-size: 13px;
+        }
+
+        .search-row sku-barcode-input {
+          flex: 1;
+        }
+
+        /* ox-input-barcode는 placeholder를 지원하지 않으므로
+           wrapper + 절대위치 오버레이로 placeholder 효과를 구현 */
+        .ox-input-wrapper {
+          flex: 1;
+          position: relative;
+        }
+
+        .ox-input-wrapper ox-input-barcode {
+          width: 100%;
+        }
+
+        .ox-placeholder {
+          position: absolute;
+          top: 50%;
+          left: 8px;
+          right: 40px;
+          transform: translateY(-50%);
+          pointer-events: none;
+          color: var(--md-sys-color-outline, #aaa);
+          font-size: 13px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          z-index: 1;
+        }
+
+        .ox-input-wrapper:focus-within .ox-placeholder {
+          display: none;
         }
 
         .search-row input {
@@ -590,27 +630,36 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       <div class="search-area">
         <div class="search-row">
           <span class="s-label">${TermsUtil.tLabel('barcode') || '바코드'}</span>
-          <ox-input-barcode
-            id="barcodeInput"
-            placeholder="${TermsUtil.tLabel('scan_barcode') || '재고 바코드 스캔/입력'}"
-            @change=${e => this._onBarcodeChange(e.target.value)}>
-          </ox-input-barcode>
+          <div class="ox-input-wrapper">
+            <ox-input-barcode
+              id="barcodeInput"
+              @change=${e => this._onBarcodeChange(e.target.value)}>
+            </ox-input-barcode>
+            ${!this._hasBarcodeValue ? html`
+              <span class="ox-placeholder">${TermsUtil.tLabel('scan_barcode') || '재고 바코드 스캔/입력'}</span>
+            ` : ''}
+          </div>
         </div>
         <div class="search-row">
           <span class="s-label">${TermsUtil.tLabel('loc_cd') || '로케이션'}</span>
-          <ox-input-barcode
-            id="locCdInput"
-            placeholder="${TermsUtil.tLabel('loc_cd') || '로케이션 코드 스캔/입력'}"
-            @change=${e => this._onLocCdChange(e.target.value)}>
-          </ox-input-barcode>
+          <div class="ox-input-wrapper">
+            <ox-input-barcode
+              id="locCdInput"
+              @change=${e => this._onLocCdChange(e.target.value)}>
+            </ox-input-barcode>
+            ${!this._hasLocCdValue ? html`
+              <span class="ox-placeholder">${TermsUtil.tLabel('loc_cd') || '로케이션 코드 스캔/입력'}</span>
+            ` : ''}
+          </div>
         </div>
         <div class="search-row">
           <span class="s-label">${TermsUtil.tLabel('sku_cd') || '상품코드'}</span>
-          <ox-input-barcode
+          <sku-barcode-input
             id="skuCdInput"
-            placeholder="${TermsUtil.tLabel('sku_cd') || '상품 코드/바코드 스캔/입력'}"
-            @change=${e => this._onSkuCdChange(e.target.value)}>
-          </ox-input-barcode>
+            placeholder="${TermsUtil.tLabel('sku_cd') || '상품코드 또는 88코드 스캔/입력'}"
+            .skipInventory=${true}
+            @sku-select=${e => this._onSkuSelect(e.detail)}>
+          </sku-barcode-input>
         </div>
       </div>
 
@@ -1237,63 +1286,78 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
   /**
    * 바코드 스캔/입력 시 자동 조회 트리거
-   * 조회 결과가 없으면 바코드 입력 박스를 초기화한다
+   * 빈 문자열 입력(텍스트 직접 삭제) 시 searchBarcode를 즉시 초기화한다
+   * — 초기화하지 않으면 이후 다른 조건으로 검색할 때 이전 바코드 조건이
+   *   AND로 함께 적용되어 결과가 필터링되는 문제가 발생한다
    * @param {string} barcode
    */
   async _onBarcodeChange(barcode) {
-    if (!barcode) return
+    if (!barcode) {
+      this.searchBarcode = ''
+      this._hasBarcodeValue = false
+      return
+    }
 
+    this._hasBarcodeValue = true
     this.searchBarcode = barcode
     await this._search()
 
-    if (!this.inventories.length) {
-      this.searchBarcode = ''
-      const oxInput = this.shadowRoot?.querySelector('#barcodeInput')
-      const innerInput = oxInput?.shadowRoot?.querySelector('input')
-      if (innerInput) innerInput.value = ''
+    // 결과 유무와 관계없이 입력값 초기화 (스캐너 연속 입력 대응)
+    this.searchBarcode = ''
+    this._hasBarcodeValue = false
+    const oxInput = this.shadowRoot?.querySelector('#barcodeInput')
+    const innerInput = oxInput?.shadowRoot?.querySelector('input')
+    if (innerInput) innerInput.value = ''
 
-    } else {
-      const oxInput = this.shadowRoot?.querySelector('#locCdInput')
-      const innerInput = oxInput?.shadowRoot?.querySelector('input')
-      if (innerInput) innerInput.focus()
+    if (this.inventories.length) {
+      // 결과 있으면 로케이션 입력으로 포커스 이동
+      const locInput = this.shadowRoot?.querySelector('#locCdInput')
+      const locInner = locInput?.shadowRoot?.querySelector('input')
+      if (locInner) locInner.focus()
     }
   }
 
   /**
    * 로케이션 스캔/입력 시 자동 조회 트리거
-   * 조회 결과가 없으면 로케이션 입력 박스를 초기화한다
+   * 빈 문자열 입력(텍스트 직접 삭제) 시 searchLocCd를 즉시 초기화한다
+   * — 초기화하지 않으면 이후 다른 조건으로 검색할 때 이전 로케이션 조건이
+   *   AND로 함께 적용되어 결과가 필터링되는 문제가 발생한다
    * @param {string} locCd
    */
   async _onLocCdChange(locCd) {
-    if (!locCd) return
+    if (!locCd) {
+      this.searchLocCd = ''
+      this._hasLocCdValue = false
+      return
+    }
 
+    this._hasLocCdValue = true
     this.searchLocCd = locCd
     await this._search()
 
-    if (!this.inventories.length) {
-      this.searchLocCd = ''
-      const input = this.shadowRoot?.querySelector('#locCdInput')
-      const innerInput = input?.shadowRoot?.querySelector('input')
-      if (innerInput) innerInput.value = ''
-    }
+    // 결과 유무와 관계없이 입력값 초기화 (스캐너 연속 입력 대응)
+    this.searchLocCd = ''
+    this._hasLocCdValue = false
+    const input = this.shadowRoot?.querySelector('#locCdInput')
+    const innerInput = input?.shadowRoot?.querySelector('input')
+    if (innerInput) innerInput.value = ''
   }
 
   /**
-   * 상품 코드 스캔/입력 시 자동 조회 트리거
-   * 조회 결과가 없으면 상품 코드 입력 박스를 초기화한다
-   * @param {string} skuCd
+   * sku-barcode-input의 sku-select 이벤트 처리
+   * 상품코드(sku_cd) 또는 88코드(sku_barcd) 스캔 시 호출된다
+   * resolve_barcode API가 88코드 → sku_cd 변환을 담당하므로
+   * 여기서는 항상 sku_cd 값으로 inventories 조회를 수행한다
+   * @param {{ com_cd, sku_cd, sku_nm, barcode }} detail
    */
-  async _onSkuCdChange(skuCd) {
-    if (!skuCd) return
+  async _onSkuSelect(detail) {
+    if (!detail?.sku_cd) return
 
-    this.searchSkuCd = skuCd
+    this.searchSkuCd = detail.sku_cd
     await this._search()
 
     if (!this.inventories.length) {
       this.searchSkuCd = ''
-      const input = this.shadowRoot?.querySelector('#skuCdInput')
-      const innerInput = input?.shadowRoot?.querySelector('input')
-      if (innerInput) innerInput.value = ''
     }
   }
 
@@ -1349,14 +1413,17 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     this.searchBarcode = ''
     this.searchLocCd = ''
     this.searchSkuCd = ''
+    this._hasBarcodeValue = false
+    this._hasLocCdValue = false
     this.inventories = []
     this.lastFeedback = null
 
-    for (const id of ['#barcodeInput', '#locCdInput', '#skuCdInput']) {
+    for (const id of ['#barcodeInput', '#locCdInput']) {
       const el = this.shadowRoot?.querySelector(id)
       const innerEl = el?.shadowRoot?.querySelector('input')
       if (innerEl) innerEl.value = ''
     }
+    // sku-barcode-input은 스캔 완료 후 자동으로 내부 입력값을 초기화함
 
     const oxInput = this.shadowRoot?.querySelector('#barcodeInput')
     const innerInput = oxInput?.shadowRoot?.querySelector('input')
