@@ -22,6 +22,7 @@ import operato.wms.rwa.entity.RwaInspection;
 import operato.wms.rwa.entity.RwaOrder;
 import operato.wms.rwa.entity.RwaOrderItem;
 import operato.wms.stock.entity.Inventory;
+import operato.wms.stock.entity.InventoryTran;
 import xyz.anythings.sys.service.AbstractQueryService;
 import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.dev.entity.RangedSeq;
@@ -447,6 +448,7 @@ public class RwaTransactionService extends AbstractQueryService {
 			inv.setRemarks("RWA 반품 양품 - " + order.getRwaNo());
 			this.queryManager.insert(inv);
 			goodBarcode = inv.getBarcode(); // beforeCreate()에서 채번된 바코드
+			recordRwaTran(inv, order);      // 재고 트랜잭션 이력 기록
 		}
 
 		// 4. 불량 재고 생성 (barcode=null → beforeCreate()에서 입고 형식으로 자동 채번)
@@ -456,6 +458,7 @@ public class RwaTransactionService extends AbstractQueryService {
 			inv.setRemarks("RWA 반품 불량 - " + order.getRwaNo());
 			this.queryManager.insert(inv);
 			defectBarcode = inv.getBarcode(); // beforeCreate()에서 채번된 바코드
+			recordRwaTran(inv, order);        // 재고 트랜잭션 이력 기록
 		}
 
 		// 5. 대표 바코드 저장 (양품 우선)
@@ -484,14 +487,21 @@ public class RwaTransactionService extends AbstractQueryService {
 			int updated = this.queryManager.executeBySql(updGood,
 					ValueUtil.newMap("qty,domainId,barcode", goodQty, order.getDomainId(), item.getBarcode()));
 
-			// 기존 양품 재고가 없고 수량이 생긴 경우 새로 생성
-			if (updated == 0 && goodQty > 0) {
+			if (updated > 0) {
+				// 재검수로 인한 수량 변경 → 재고 트랜잭션 이력 기록
+				Inventory goodInv = this.queryManager.selectBySql(
+						"SELECT * FROM inventories WHERE domain_id = :domainId AND barcode = :barcode AND last_tran_cd = 'RWA_GOOD'",
+						ValueUtil.newMap("domainId,barcode", order.getDomainId(), item.getBarcode()), Inventory.class);
+				if (goodInv != null) recordRwaTran(goodInv, order);
+			} else if (goodQty > 0) {
+				// 기존 양품 재고가 없고 수량이 생긴 경우 새로 생성
 				String goodLocCd = findLocCdByType(order.getDomainId(), order.getWhCd(), "RETURN-GOOD");
 				if (ValueUtil.isEmpty(goodLocCd)) goodLocCd = "RETURN-GOOD";
 				Inventory inv = buildReturnInventory(item, order, item.getBarcode(), goodQty,
 						goodLocCd, Inventory.STATUS_STORED, "RWA_GOOD");
 				inv.setRemarks("RWA 반품 양품 - " + order.getRwaNo());
 				this.queryManager.insert(inv);
+				recordRwaTran(inv, order); // 재고 트랜잭션 이력 기록
 			}
 		}
 
@@ -504,15 +514,57 @@ public class RwaTransactionService extends AbstractQueryService {
 				ValueUtil.newMap("qty,domainId,whCd,skuCd,remarks",
 						defectQty, order.getDomainId(), order.getWhCd(), item.getSkuCd(), defRemarks));
 
-		// 기존 불량 재고가 없고 수량이 생긴 경우 새로 생성 (barcode=null → 입고 형식 자동 채번)
-		if (updatedDef == 0 && defectQty > 0) {
+		if (updatedDef > 0) {
+			// 재검수로 인한 수량 변경 → 재고 트랜잭션 이력 기록
+			Inventory defInv = this.queryManager.selectBySql(
+					"SELECT * FROM inventories WHERE domain_id = :domainId AND wh_cd = :whCd " +
+					"AND sku_cd = :skuCd AND last_tran_cd = 'RWA_DEFECT' AND remarks = :remarks LIMIT 1",
+					ValueUtil.newMap("domainId,whCd,skuCd,remarks",
+							order.getDomainId(), order.getWhCd(), item.getSkuCd(), defRemarks), Inventory.class);
+			if (defInv != null) recordRwaTran(defInv, order);
+		} else if (defectQty > 0) {
+			// 기존 불량 재고가 없고 수량이 생긴 경우 새로 생성 (barcode=null → 입고 형식 자동 채번)
 			String defectLocCd = findLocCdByType(order.getDomainId(), order.getWhCd(), "RETURN-DEF");
 			if (ValueUtil.isEmpty(defectLocCd)) defectLocCd = "RETURN-DEF";
 			Inventory inv = buildReturnInventory(item, order, null, defectQty,
 					defectLocCd, Inventory.STATUS_BAD, "RWA_DEFECT");
 			inv.setRemarks(defRemarks);
 			this.queryManager.insert(inv);
+			recordRwaTran(inv, order); // 재고 트랜잭션 이력 기록
 		}
+	}
+
+	/**
+	 * 반품 검수 완료 시 재고 트랜잭션 이력 기록
+	 *
+	 * assignBatchBarcodes / updateInspectionInventories 에서 재고 INSERT 후 호출.
+	 * tran_type = RWA_RESTOCK, direction = IN, ref_doc_type = RWA 로 기록한다.
+	 *
+	 * @param inv   INSERT 된 재고 객체 (id, barcode 등 채번 완료 상태)
+	 * @param order 반품 지시 (rwa_no 참조문서 번호로 사용)
+	 */
+	private void recordRwaTran(Inventory inv, RwaOrder order) {
+		InventoryTran tran = new InventoryTran();
+		tran.setDomainId(inv.getDomainId());
+		tran.setInventoryId(inv.getId());
+		tran.setBarcode(inv.getBarcode());
+		tran.setWhCd(inv.getWhCd());
+		tran.setComCd(inv.getComCd());
+		tran.setSkuCd(inv.getSkuCd());
+		tran.setSkuNm(inv.getSkuNm());
+		tran.setLocCd(null);                 // 출발지 없음 (신규 재고 생성)
+		tran.setToLocCd(inv.getLocCd());     // 목적지 = 생성된 재고 로케이션
+		tran.setLotNo(inv.getLotNo());
+		tran.setExpiredDate(inv.getExpiredDate());
+		tran.setTranType(InventoryTran.TRAN_TYPE_RWA_RESTOCK);
+		tran.setDirection(InventoryTran.DIRECTION_IN);
+		tran.setBeforeQty(0.0);
+		tran.setTranQty(inv.getInvQty());
+		tran.setAfterQty(inv.getInvQty());
+		tran.setRefDocType(InventoryTran.REF_DOC_TYPE_RWA);
+		tran.setRefDocNo(order.getRwaNo());
+		tran.setRemarks(inv.getRemarks());
+		this.queryManager.insert(tran);
 	}
 
 	/**

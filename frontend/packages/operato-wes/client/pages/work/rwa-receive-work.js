@@ -1398,12 +1398,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
                 <span class="row-label">불량</span>
                 <span class="row-val ${(item.defect_qty || 0) > 0 ? 'defect' : ''}">${item.defect_qty || 0} EA</span>
               </div>
-              ${item.loc_cd ? html`
-                <div class="complete-item-row">
-                  <span class="row-label">입고 로케이션</span>
-                  <span class="row-val">${item.loc_cd}</span>
-                </div>
-              ` : ''}
             </div>
           `)}
         </div>

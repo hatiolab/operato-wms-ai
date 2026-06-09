@@ -329,8 +329,18 @@ public class RwaInspection extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 				double currentGoodQty = item.getGoodQty() != null ? item.getGoodQty() : 0.0;
 				double currentDefectQty = item.getDefectQty() != null ? item.getDefectQty() : 0.0;
 
-				item.setGoodQty(currentGoodQty + (this.goodQty != null ? this.goodQty : 0.0));
-				item.setDefectQty(currentDefectQty + (this.defectQty != null ? this.defectQty : 0.0));
+				// 재검수 여부 판단 (COMPLETED = complete_inspection이 이미 실행된 상태 → 대체 방식)
+				// 분할 검수(RECEIVED/INSPECTING/INSPECTED) = 누적 방식
+				boolean isReInspect = WmsRwaConstants.STATUS_COMPLETED.equals(item.getStatus());
+				if (isReInspect) {
+					// 재검수: 이전 값을 그대로 유지하지 않고 이번 검수 값으로 대체
+					item.setGoodQty(this.goodQty != null ? this.goodQty : 0.0);
+					item.setDefectQty(this.defectQty != null ? this.defectQty : 0.0);
+				} else {
+					// 분할 검수: 기존 값에 누적
+					item.setGoodQty(currentGoodQty + (this.goodQty != null ? this.goodQty : 0.0));
+					item.setDefectQty(currentDefectQty + (this.defectQty != null ? this.defectQty : 0.0));
+				}
 				item.setInspectedQty(item.getGoodQty() + item.getDefectQty());
 
 				// 검수 완료 상태로 변경
