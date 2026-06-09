@@ -421,10 +421,10 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
 
       await ServiceUtil.restPost(`oms_trx/shipment_orders/${order.id}/confirm_and_allocate`, {}, null, null,
         (result) => {
-          const newStatus = result?.status || (result?.back_order ? 'BACK_ORDER' : 'ALLOCATED')
+          const newStatus = result?.status
           this.orders = this.orders.map(o =>
             o.id === order.id
-              ? { ...o, status: newStatus, _readyStatus: newStatus === 'ALLOCATED' ? 'ALLOCATED' : 'BACK_ORDER' }
+              ? { ...o, status: newStatus, _readyStatus: newStatus }
               : o
           )
         },
