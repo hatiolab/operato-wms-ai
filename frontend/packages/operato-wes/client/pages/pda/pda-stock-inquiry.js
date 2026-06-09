@@ -1905,16 +1905,28 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       return
     }
 
+    const inv = this.selectedInventory
+    const reservedQty = inv?.reserved_qty ?? 0
+    if (qty === (inv?.inv_qty ?? 0)) {
+      this._showFeedback(`현재 수량(${qty})과 동일합니다. 변경할 수량을 입력하세요.`, 'warning')
+      return
+    }
+    if (qty < reservedQty) {
+      this._showFeedback(`조정 수량(${qty})이 예약 수량(${reservedQty})보다 작을 수 없습니다`, 'warning')
+      return
+    }
+
     this.processing = true
     try {
-      const inv = this.selectedInventory
       await ServiceUtil.restPost(`inventory_trx/${inv.id}/adjust_inventory`, {
         to_qty: qty,
         remarks: this._adjReason.trim(),
         reason_cd: this._adjReasonCd || null
       }, null, null, (result) => {
+        const diff = qty - (inv.inv_qty ?? 0)
+        const diffStr = diff > 0 ? `+${diff}` : `${diff}`
         document.dispatchEvent(new CustomEvent('notify', {
-          detail: { level: 'info', message: `재고 조정 완료: ${inv.barcode} (${qty > 0 ? '+' : ''}${qty})` }
+          detail: { level: 'info', message: `재고 조정 완료: ${inv.barcode} (${inv.inv_qty} → ${qty}, ${diffStr})` }
         }))
 
         this.selectedInventory = result || inv
