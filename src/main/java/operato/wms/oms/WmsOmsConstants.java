@@ -48,6 +48,12 @@ public class WmsOmsConstants {
 	/** 커스텀 서비스 - 확정+할당 후 처리 */
 	public static final String TRX_OMS_POST_CONFIRM_AND_ALLOCATE = "diy-oms-post-confirm-and-allocate";
 
+	// === 웨이브 구성 + 주문에 웨이브 번호 할당 ===
+	/** 커스텀 서비스 - 웨이브 구성 전 처리 */
+	public static final String TRX_OMS_PRE_CONFIG_WAVE = "diy-oms-pre-config-wave";
+	/** 커스텀 서비스 - 웨이브 구성 후 처리 */
+	public static final String TRX_OMS_POST_CONFIG_WAVE = "diy-oms-post-config-wave";
+
 	// === 웨이브 생성 ===
 	/** 커스텀 서비스 - 웨이브 생성 전 처리 */
 	public static final String TRX_OMS_PRE_CREATE_WAVE = "diy-oms-pre-create-wave";

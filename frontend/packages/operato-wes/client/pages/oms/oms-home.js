@@ -6,6 +6,7 @@ import { openPopup } from '@operato/layout'
 import { ServiceUtil, UiUtil, ValueUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import Chart from 'chart.js/auto'
 import './auto-wave-create-popup'
+import './manual-wave-create-popup'
 import './shipment-order-detail'
 
 class OmsHome extends localize(i18next)(PageView) {
@@ -756,15 +757,13 @@ class OmsHome extends localize(i18next)(PageView) {
   /** 웨이브 생성 팝업 열기 */
   _openWaveNewPopup() {
     openPopup(
-      html`<auto-wave-create-popup
-        @wave-created="${() => {
-          this._fetchDashboardData()
-        }}"
-      ></auto-wave-create-popup>`,
+      html`<manual-wave-create-popup
+        @wave-ready="${() => { this._fetchDashboardData() }}"
+      ></manual-wave-create-popup>`,
       {
         backdrop: true,
-        size: 'medium',
-        title: i18next.t('title.auto_wave_create', { defaultValue: '자동 웨이브 생성' })
+        size: 'large',
+        title: i18next.t('title.manual_wave_create', { defaultValue: '출고 준비 / 웨이브 생성' })
       }
     )
   }

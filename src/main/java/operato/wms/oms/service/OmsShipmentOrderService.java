@@ -64,36 +64,37 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 			throw new ElidomValidationException("주문을 찾을 수 없습니다: " + id);
 		}
 
-		if (!ShipmentOrder.STATUS_REGISTERED.equals(order.getStatus())) {
+		// 2. 상태 체크
+		String status = order.getStatus();
+		if (!ShipmentOrder.STATUS_REGISTERED.equals(status)
+				&& !ShipmentOrder.STATUS_CONFIRMED.equals(status)
+				&& !ShipmentOrder.STATUS_ALLOCATED.equals(status)) {
 			throw new ElidomValidationException(
-					"주문 상태가 [" + order.getStatus() + "] 이므로 확정+할당할 수 없습니다 (REGISTERED 상태만 가능)");
+					"주문 상태가 [" + status + "] 이므로 확정+할당할 수 없습니다 (등록, 확정, 할당 상태만 가능)");
 		}
 
-		// 2. 주문 확정 처리
+		// 3. 주문 확정 처리
 		List<String> ids = ValueUtil.toList(id);
-		Map<String, Object> confirmResult = this.confirmShipmentOrders(ids);
 
-		int confirmSuccess = (int) confirmResult.getOrDefault("success_count", 0);
-		if (confirmSuccess == 0) {
-			@SuppressWarnings("unchecked")
-			List<String> confirmErrors = (List<String>) confirmResult.getOrDefault("errors", new ArrayList<>());
-			String errorMsg = confirmErrors.isEmpty() ? "확정 처리 실패" : confirmErrors.get(0);
-			throw new ElidomRuntimeException(errorMsg);
+		// 4. 출고 주문 상태가 '등록' 인 경우 확정 처리
+		if (ShipmentOrder.STATUS_REGISTERED.equals(status)) {
+			this.confirmShipmentOrders(ids);
 		}
 
-		// 3. 재고 할당 처리
-		Map<String, Object> allocResult = this.allocateShipmentOrders(ids);
-		int allocSuccess = (int) allocResult.getOrDefault("success_count", 0);
-		int backOrderCount = (int) allocResult.getOrDefault("back_order_count", 0);
+		// 5. 재고 할당 처리
+		if (ShipmentOrder.STATUS_CONFIRMED.equals(status) || ShipmentOrder.STATUS_BACK_ORDER.equals(status)) {
+			this.allocateShipmentOrders(ids);
+		}
 
-		// 4. 최종 주문 상태 조회
-		ShipmentOrder updatedOrder = this.findOrder(domainId, id);
+		// 6. 최종 주문 상태 조회
+		order = this.findOrder(domainId, id);
 
-		// 5. 결과 리턴
-		Map<String, Object> result = ValueUtil.newMap("success", allocSuccess > 0);
-		result.put("status", updatedOrder != null ? updatedOrder.getStatus() : null);
-		result.put("allocated_qty", updatedOrder != null ? updatedOrder.getTotalAlloc() : 0);
-		result.put("back_order", backOrderCount > 0);
+		// 7. 결과 리턴
+		boolean success = ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus());
+		Map<String, Object> result = ValueUtil.newMap("success", success);
+		result.put("status", order.getStatus());
+		result.put("allocated_qty", order.getTotalAlloc());
+		result.put("back_order", ShipmentOrder.STATUS_BACK_ORDER.equals(order.getStatus()));
 		return result;
 	}
 

@@ -253,6 +253,35 @@ public class OmsTransactionController extends AbstractRestService {
 	}
 
 	/**
+	 * 웨이브 구성되지 않은 출고 주문에 대한 웨이브 구성
+	 *
+	 * POST /rest/oms_trx/waves/config_wave
+	 *
+	 * @param params { orders : [{ id, ... }] }
+	 * @return { wave_no, wave_seq, order_count, sku_count, total_qty,
+	 *         skipped_count, errors }
+	 */
+	@RequestMapping(value = "waves/config_wave", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Configuration wave with unwaved orders")
+	public Map<String, Object> configWave(@RequestBody List<ShipmentOrder> orders) {
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("orders", orders);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CONFIG_WAVE, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.waveService.createWaveAndConfigOrders(orders);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("wave", result.get("wave"));
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CONFIG_WAVE, params);
+
+		// 4. 결과 리턴
+		return result;
+	}
+
+	/**
 	 * 수동 웨이브 생성 (주문 직접 선택)
 	 *
 	 * POST /rest/oms_trx/waves/create_manual

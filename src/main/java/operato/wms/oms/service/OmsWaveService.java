@@ -14,6 +14,7 @@ import operato.wms.common.event.WaveReleasedEvent;
 import operato.wms.oms.entity.ShipmentOrder;
 import operato.wms.oms.entity.ShipmentWave;
 import xyz.anythings.sys.service.AbstractQueryService;
+import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.util.DateUtil;
@@ -154,6 +155,82 @@ public class OmsWaveService extends AbstractQueryService {
 		result.put("total_orders", totalOrderCount);
 		result.put("waves", waveResults);
 		return result;
+	}
+
+	/**
+	 * 웨이브에 포함되지 않은 출고 주문 리스트로 웨이브 생성
+	 * 
+	 * @param orderList
+	 * @return
+	 */
+	public Map<String, Object> createWaveAndConfigOrders(List<ShipmentOrder> orderList) {
+		Long domainId = Domain.currentDomainId();
+		List<ShipmentOrder> validOrders = new ArrayList<ShipmentOrder>();
+
+		for (ShipmentOrder so : orderList) {
+			// 출고 주문 조회
+			ShipmentOrder order = this.findOrder(domainId, so.getId());
+
+			// 출고 주문 존재 여부 체크
+			if (order == null) {
+				throw new ElidomRuntimeException("주문을 찾을 수 없습니다: " + so.getId());
+			}
+
+			// 출고 주문 웨이브 포함 여부 체크
+			if (ValueUtil.isNotEmpty(order.getWaveNo())) {
+				throw new ElidomRuntimeException("주문 [" + order.getShipmentNo() + "]는 이미 다른 웨이브에 포함되어 있습니다.");
+			}
+
+			// 주문 상태 체크
+			String status = order.getStatus();
+			if (!ShipmentOrder.STATUS_ALLOCATED.equals(status)) {
+				throw new ElidomRuntimeException("주문 [" + order.getShipmentNo() + "] 상태가 [" + order.getStatus()
+						+ "]이므로 웨이브에 포함할 수 없습니다. (할당 (ALLOCATED) 상태만 가능)");
+			}
+
+			// 유효 주문 추가
+			validOrders.add(order);
+		}
+
+		// 유효 주문이 없으면 예외 처리
+		if (validOrders.isEmpty()) {
+			throw new ElidomValidationException("웨이브에 포함할 수 있는 주문이 없습니다. (할당 (ALLOCATED) 상태만 가능)");
+		}
+
+		// 계획 수량 집계
+		int planOrderCnt = validOrders.size();
+		double planTotalQty = 0;
+
+		// 주문별 계획 수량 집계
+		for (ShipmentOrder ord : validOrders) {
+			planTotalQty += (ord.getTotalOrder() != null ? ord.getTotalOrder() : 0);
+		}
+
+		// ShipmentWave 생성
+		ShipmentWave wave = new ShipmentWave();
+		wave.setDomainId(domainId);
+		wave.setPickType("TOTAL");
+		wave.setPlanOrder(planOrderCnt);
+		wave.setPlanTotal(planTotalQty);
+		wave.setResultOrder(0);
+		wave.setResultItem(0);
+		wave.setResultTotal(0.0);
+		wave.setStatus(ShipmentWave.STATUS_CREATED);
+		this.queryManager.insert(wave);
+
+		// 주문에 wave_no 업데이트 및 상태 변경
+		for (ShipmentOrder ord : validOrders) {
+			ord.setWaveNo(wave.getWaveNo());
+			this.queryManager.update(ord, "waveNo", "updatedAt");
+		}
+
+		// SKU 종류 수 집계
+		String updateSkuCountSql = "update shipment_waves set plan_item = (SELECT COUNT(DISTINCT sku_cd) FROM shipment_order_items WHERE domain_id = :domainId AND shipment_order_id IN (select id from shipment_orders where domain_id = :domainId and wave_no = :waveNo)) where domain_id = :domainId and id = :id";
+		this.queryManager.executeBySql(updateSkuCountSql, ValueUtil.newMap("domainId,id,waveNo", domainId, wave.getId(),
+				wave.getWaveNo()));
+
+		// 결과 리턴
+		return ValueUtil.newMap("wave_no,list", wave.getWaveNo(), validOrders);
 	}
 
 	/**
@@ -468,11 +545,9 @@ public class OmsWaveService extends AbstractQueryService {
 		}
 
 		// 4. 웨이브 상태 변경: RELEASED → CREATED
-		String updWaveSql = "UPDATE shipment_waves SET status = :status, updated_at = now() " +
-				"WHERE domain_id = :domainId AND id = :id";
-		Map<String, Object> updWaveParams = ValueUtil.newMap("status,domainId,id",
-				ShipmentWave.STATUS_CREATED, domainId, id);
-		this.queryManager.executeBySql(updWaveSql, updWaveParams);
+		String updWaveSql = "UPDATE shipment_waves SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+		this.queryManager.executeBySql(updWaveSql, ValueUtil.newMap("status,domainId,id",
+				ShipmentWave.STATUS_CREATED, domainId, id));
 
 		// 5. 주문 상태 변경: RELEASED/PICKING → WAVED
 		String updOrdersSql = "UPDATE shipment_orders SET status = :newStatus, updated_at = now() " +
@@ -502,7 +577,10 @@ public class OmsWaveService extends AbstractQueryService {
 	public Map<String, Object> cancelWave(String id) {
 		Long domainId = Domain.currentDomainId();
 
+		// 1. 웨이브 조회
 		ShipmentWave wave = this.findWave(domainId, id);
+
+		// 2. 웨이브 존재 여부 & 상태 체크
 		if (wave == null) {
 			throw new ElidomValidationException("웨이브를 찾을 수 없습니다: " + id);
 		}
@@ -511,22 +589,22 @@ public class OmsWaveService extends AbstractQueryService {
 			throw new ElidomValidationException("웨이브 상태가 [" + wave.getStatus() + "]이므로 취소할 수 없습니다");
 		}
 
-		// 포함된 주문 상태 복원 (WAVED → ALLOCATED, wave_no 제거)
+		// 3. 포함된 주문 상태 복원 (WAVED → ALLOCATED, wave_no 제거)
 		String updOrdersSql = "UPDATE shipment_orders SET status = :status, wave_no = null, updated_at = now() WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :currentStatus";
 		Map<String, Object> updOrdersParams = ValueUtil.newMap("status,domainId,waveNo,currentStatus",
 				ShipmentOrder.STATUS_ALLOCATED, domainId, wave.getWaveNo(), ShipmentOrder.STATUS_WAVED);
 		this.queryManager.executeBySql(updOrdersSql, updOrdersParams);
 
-		int restoredCount = wave.getPlanOrder() != null ? wave.getPlanOrder() : 0;
+		// 4. wave_no null로 업데이트
+		updOrdersSql = "UPDATE shipment_orders SET wave_no = null WHERE domain_id = :domainId AND wave_no = :waveNo";
+		this.queryManager.executeBySql(updOrdersSql, updOrdersParams);
 
-		// 웨이브 상태 변경
-		String updWaveSql = "UPDATE shipment_waves SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-		Map<String, Object> updWaveParams = ValueUtil.newMap("status,domainId,id",
-				ShipmentWave.STATUS_CANCELLED, domainId, id);
-		this.queryManager.executeBySql(updWaveSql, updWaveParams);
+		// 5. 웨이브 상태 변경
+		wave.setStatus(ShipmentWave.STATUS_CANCELLED);
+		this.queryManager.update(wave, "status", "updatedAt", "updaterId");
 
-		// 결과 리턴
-		return ValueUtil.newMap("success,restored_order_count", true, restoredCount);
+		// 6. 결과 리턴
+		return ValueUtil.newMap("success,restored_order_count", true, wave.getPlanOrder());
 	}
 
 	/**
