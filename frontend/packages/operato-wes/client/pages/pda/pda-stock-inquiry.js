@@ -1,6 +1,8 @@
 import '@things-factory/barcode-ui'
 import { html, css } from 'lit'
 import '../../component/sku-barcode-input.js'
+import '../../component/code-label.js'
+import '../../component/entity-label.js'
 import { customElement, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
 import { ServiceUtil, TermsUtil } from '@operato-app/metapage/dist-client'
@@ -763,11 +765,11 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           ${this._detailRow(TermsUtil.tLabel('reserved_qty') || '할당 수량', inv.reserved_qty ?? '0', inv.reserved_qty > 0 ? 'danger' : '')}
           ${this._detailRow(TermsUtil.tLabel('lot_no') || 'LOT 번호', inv.lot_no || '-')}
           ${this._detailRow(TermsUtil.tLabel('expired_date') || '유효기간', inv.expired_date || '-')}
-          ${this._detailRow(TermsUtil.tLabel('com_cd') || '화주사', inv.com_cd || '-')}
-          ${this._detailRow(TermsUtil.tLabel('wh_cd') || '창고', inv.wh_cd || '-')}
+          ${this._detailRow(TermsUtil.tLabel('com_cd') || '화주사', html`<entity-label table="companies" key-col="com_cd" display-col="com_nm" .value=${inv.com_cd || ''} .fallback=${inv.com_cd || '-'}></entity-label>`)}
+          ${this._detailRow(TermsUtil.tLabel('wh_cd') || '창고', html`<entity-label table="warehouses" key-col="wh_cd" display-col="wh_nm" .value=${inv.wh_cd || ''} .fallback=${inv.wh_cd || '-'}></entity-label>`)}
           ${this._detailRow(TermsUtil.tLabel('rcv_no') || '입고번호', inv.rcv_no || '-')}
           ${this._detailRow(TermsUtil.tLabel('created_at') || '입고 시간', createdAt)}
-          ${this._detailRow(TermsUtil.tLabel('last_tran_cd') || '마지막 트랜잭션', inv.last_tran_cd || '-')}
+          ${this._detailRow(TermsUtil.tLabel('last_tran_cd') || '마지막 트랜잭션', html`<code-label code-name="INVENTORY_TRANSACTION" .value=${inv.last_tran_cd || ''}></code-label>`)}
           ${this._detailRow(TermsUtil.tLabel('remarks') || '비고', inv.remarks || '-')}
         </div>
       </div>
@@ -823,7 +825,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           ${this.historyItems.map(h => html`
             <div class="history-card">
               <div class="h-top">
-                <span class="h-tran">${h.last_tran_cd || '-'}</span>
+                <span class="h-tran"><code-label code-name="INVENTORY_TRANSACTION" .value=${h.last_tran_cd || ''}></code-label></span>
                 <span class="h-seq">#${h.hist_seq || '-'}</span>
               </div>
               <div class="h-info">
@@ -1501,7 +1503,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       console.error('마스터 데이터 로드 실패:', error)
     }
 
-    // 재고 생성, 재고 조정 사유 코드 조회
+    // 재고 생성, 재고 조정 사유 코드 + 트랜잭션 유형 코드 조회
     await Promise.all([
       this._loadNewReasonCodes(),
       this._loadAdjustReasonCodes()
@@ -1639,6 +1641,11 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       await ServiceUtil.restPost('inventory_trx/validate_location_for_move', {
         to_loc_cd: locCd
       }, null, null, (res) => {
+        // To 로케이션이 현재 재고의 From 로케이션과 동일한 경우 이동 불가
+        if (locCd === this.selectedInventory?.loc_cd) {
+          this.clearForValidateMoveFailed('현재 로케이션과 동일합니다. 다른 로케이션을 입력하세요.')
+          return
+        }
         this._moveToLocCd = locCd
         this._moveToLocation = res
         this._showFeedback(`${locCd} 로케이션 확인`, 'success')
@@ -1685,6 +1692,10 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     const qty = parseFloat(this._moveQty)
     if (isNaN(qty) || qty <= 0) {
       this._showFeedback('이동 수량은 1 이상이어야 합니다', 'warning')
+      return
+    }
+    if (!Number.isInteger(qty)) {
+      this._showFeedback('이동 수량은 정수만 입력 가능합니다', 'warning')
       return
     }
 

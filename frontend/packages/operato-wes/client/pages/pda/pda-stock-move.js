@@ -617,6 +617,15 @@ export class PdaStockMove extends connect(store)(PageView) {
   async _onScanFromLocation(locCd) {
     if (!locCd || this.processing) return
 
+    // From 로케이션이 To 로케이션과 동일한 경우 이동 불가
+    if (locCd === this.toLocCd) {
+      this._showFeedback('From 로케이션과 To 로케이션이 동일합니다. 다른 로케이션을 스캔하세요.', 'error')
+      navigator.vibrate?.(200)
+      if (this._fromLocationInput) this._fromLocationInput.value = ''
+      setTimeout(() => this._focusFromLocationInput(), 100)
+      return
+    }
+
     this.processing = true
     try {
       await ServiceUtil.restPost('inventory_trx/validate_location_for_move', {
