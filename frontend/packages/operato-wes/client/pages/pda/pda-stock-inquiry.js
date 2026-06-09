@@ -1787,6 +1787,13 @@ export class PdaStockInquiry extends connect(store)(PageView) {
    */
   async _validateMergeInventory() {
     const inv = this.selectedInventory
+
+    // 기준 재고와 동일한 바코드 + 로케이션이면 자기 자신 병합 — 차단
+    if (this._mergeBarcode === inv?.barcode && this._mergeMergeLocCd === inv?.loc_cd) {
+      this.clearForValidateMergeFailed('기준 재고와 동일한 재고입니다. 다른 재고를 입력하세요.')
+      return
+    }
+
     try {
       await ServiceUtil.restPost('inventory_trx/validate_inventory_for_merge', {
         merge_barcode: this._mergeBarcode,
