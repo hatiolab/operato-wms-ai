@@ -533,10 +533,15 @@ export class PdaStockMove extends connect(store)(PageView) {
   /** complete 모드 렌더링 — 처리 결과 요약 */
   _renderCompleteMode() {
     const res = this.moveResult
+    const hasFailure = res?.failed > 0
     return html`
       <div class="complete-section">
-        <div class="check-icon">✅</div>
-        <h3>${TermsUtil.tText('processed') || '재고 이동 완료!'}</h3>
+        <div class="check-icon">${hasFailure ? '⚠️' : '✅'}</div>
+        <h3 style="color: ${hasFailure ? '#f57f17' : '#4caf50'}">
+          ${hasFailure
+            ? `재고 이동 부분 완료 (${res.failed}건 실패)`
+            : (TermsUtil.tText('processed') || '재고 이동 완료!')}
+        </h3>
 
         <div class="result-card">
           <div class="stat-row">
@@ -551,7 +556,7 @@ export class PdaStockMove extends connect(store)(PageView) {
             <span class="r-label">${TermsUtil.tLabel('success') || '성공'}</span>
             <span class="r-value success">${res?.success || 0}건</span>
           </div>
-          ${res?.failed > 0 ? html`
+          ${hasFailure ? html`
             <div class="stat-row">
               <span class="r-label">${TermsUtil.tTitle('failure') || '실패'}</span>
               <span class="r-value error">${res.failed}건</span>
@@ -718,8 +723,12 @@ export class PdaStockMove extends connect(store)(PageView) {
 
   /**
    * 목적지 로케이션 초기화 — From + 스캔 목록도 함께 초기화
+   * 스캔된 항목이 있으면 확인 후 초기화
    */
   _clearToLocation() {
+    if (this.scannedItems.length > 0) {
+      if (!confirm(`스캔된 ${this.scannedItems.length}건이 모두 삭제됩니다. 계속하시겠습니까?`)) return
+    }
     this.toLocCd = ''
     this.toLocation = null
     this.fromLocCd = ''
@@ -745,6 +754,10 @@ export class PdaStockMove extends connect(store)(PageView) {
    */
   async _confirmMove() {
     if (!this.toLocCd || !this.scannedItems.length) return
+    if (!this.reason || !this.reason.trim()) {
+      this._showFeedback('이동 사유를 입력하세요', 'warning')
+      return
+    }
 
     this.processing = true
     let success = 0
@@ -784,6 +797,9 @@ export class PdaStockMove extends connect(store)(PageView) {
 
       if (success > 0) {
         this.mode = 'complete'
+      } else {
+        this._showFeedback('모든 재고 이동에 실패했습니다. 다시 시도하세요.', 'error')
+        navigator.vibrate?.(300)
       }
     } finally {
       this.processing = false
