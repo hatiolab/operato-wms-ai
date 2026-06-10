@@ -209,19 +209,33 @@ public class OmsWaveService extends AbstractQueryService {
 		// ShipmentWave 생성
 		ShipmentWave wave = new ShipmentWave();
 		wave.setDomainId(domainId);
-		wave.setPickType("TOTAL");
 		wave.setPlanOrder(planOrderCnt);
 		wave.setPlanTotal(planTotalQty);
 		wave.setResultOrder(0);
 		wave.setResultItem(0);
 		wave.setResultTotal(0.0);
+		wave.setInspFlag(true);
 		wave.setStatus(ShipmentWave.STATUS_CREATED);
+
+		// TODO 아래 내용은 커스텀 서비스로 추후 이동 처리
+		wave.setPickType("TOTAL");
+		wave.setDlvType("PARCEL");
+		wave.setCarrierCd("CJ");
 		this.queryManager.insert(wave);
 
 		// 주문에 wave_no 업데이트 및 상태 변경
 		for (ShipmentOrder ord : validOrders) {
 			ord.setWaveNo(wave.getWaveNo());
-			this.queryManager.update(ord, "waveNo", "updatedAt");
+
+			if (ValueUtil.isEmpty(ord.getDlvType())) {
+				ord.setDlvType(wave.getDlvType());
+			}
+
+			if (ValueUtil.isEmpty(ord.getCarrierCd())) {
+				ord.setCarrierCd(wave.getCarrierCd());
+			}
+
+			this.queryManager.update(ord, "waveNo", "dlvType", "carrierCd", "updatedAt", "updaterId");
 		}
 
 		// SKU 종류 수 집계
