@@ -3,7 +3,6 @@ package operato.wms.oms.rest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import xyz.elidom.dbist.dml.Filter;
 

@@ -124,6 +124,12 @@ public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private Boolean inspFlag;
 
 	/**
+	 * 검수/포장 작업대 코드
+	 */
+	@Column(name = "station_cd", length = 20)
+	private String stationCd;
+
+	/**
 	 * 라벨 템플릿 코드
 	 */
 	@Column(name = "label_template_cd", length = 36)
@@ -311,6 +317,14 @@ public class ShipmentWave extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setInspFlag(Boolean inspFlag) {
 		this.inspFlag = inspFlag;
+	}
+
+	public String getStationCd() {
+		return stationCd;
+	}
+
+	public void setStationCd(String stationCd) {
+		this.stationCd = stationCd;
 	}
 
 	public String getLabelTemplateCd() {
