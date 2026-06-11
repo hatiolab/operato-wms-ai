@@ -24,6 +24,47 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
           overflow: hidden;
         }
 
+        /* 작업장 선택 바 */
+        .station-bar {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 20px;
+          background: var(--md-sys-color-primary-container, #e3f2fd);
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
+          flex-shrink: 0;
+        }
+
+        .station-bar label {
+          flex-shrink: 0;
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--md-sys-color-on-primary-container, #1565c0);
+          white-space: nowrap;
+        }
+
+        .station-bar select {
+          flex: 0 0 220px;
+          padding: 5px 10px;
+          border: 1px solid var(--md-sys-color-primary, #1976D2);
+          border-radius: 6px;
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-surface, #333);
+          background: var(--md-sys-color-surface, #fff);
+          outline: none;
+          cursor: pointer;
+        }
+
+        .station-bar select:focus {
+          box-shadow: 0 0 0 2px rgba(25,118,210,0.2);
+        }
+
+        .station-bar .required-hint {
+          font-size: 12px;
+          color: var(--md-sys-color-error, #d32f2f);
+        }
+
         /* 상단 요약 */
         .summary-bar {
           display: flex;
@@ -224,6 +265,8 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
       processing: Boolean,
       currentProcessingId: String,
       statusOptions: Array,
+      stationOptions: Array,
+      stationCd: String,
       waveNo: String
     }
   }
@@ -236,6 +279,8 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
     this.processing = false
     this.currentProcessingId = null
     this.statusOptions = []
+    this.stationOptions = []
+    this.stationCd = ''
     this.waveNo = ''
   }
 
@@ -245,15 +290,30 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
     const totalCount = this.orders.length
 
     return html`
-      <!-- 상단 요약 -->
+      <!-- 작업장 선택 -->
+      <!-- 상단 요약 + 작업장 선택 (한 행) -->
       <div class="summary-bar">
-        <span>${TermsUtil.tLabel('wave_no') || '웨이브번호'}:
-          <span class="count">${this.waveNo || '-'}</span>
-        </span>
+        <span>${TermsUtil.tLabel('wave_no') || '웨이브번호'}: <span class="count">${this.waveNo || '-'}</span></span>
         <span style="color:var(--md-sys-color-outline-variant,#ccc)">|</span>
         <span>조회된 주문: <span class="count">${totalCount}건</span></span>
         <span>출고 준비 완료: <span class="ready-count">${readyCount}건</span></span>
-        <span style="margin-left:auto; font-size:12px; color:var(--md-sys-color-on-surface-variant,#888); background:var(--md-sys-color-surface,#fff); border:1px solid var(--md-sys-color-outline-variant,#ddd); border-radius:4px; padding:2px 8px;">
+        <!-- 작업장 선택 (준비완료 우측) -->
+        <span style="color:var(--md-sys-color-outline-variant,#ccc)">|</span>
+        <label style="flex-shrink:0; font-size:12px; font-weight:700; color:var(--md-sys-color-on-surface-variant,#555); white-space:nowrap;">
+          🏭 ${TermsUtil.tLabel('station_cd') || '작업장'}<span style="color:var(--md-sys-color-error,#d32f2f)">*</span>
+        </label>
+        <select style="padding:3px 8px; border:1px solid var(--md-sys-color-primary,#1976D2); border-radius:6px; font-size:12px; font-weight:600; color:var(--md-sys-color-on-surface,#333); background:var(--md-sys-color-surface,#fff); outline:none; cursor:pointer; flex-shrink:0;"
+          .value="${this.stationCd}"
+          @change="${e => { this.stationCd = e.target.value }}">
+          <option value="">-- 선택 --</option>
+          ${this.stationOptions.map(opt => html`
+            <option value="${opt.name}" ?selected="${this.stationCd === opt.name}">
+              ${opt.description || opt.name}
+            </option>
+          `)}
+        </select>
+        <!-- 웨이브 최대 500건 안내 (우측) -->
+        <span style="margin-left:auto; font-size:12px; color:var(--md-sys-color-on-surface-variant,#888); background:var(--md-sys-color-surface,#fff); border:1px solid var(--md-sys-color-outline-variant,#ddd); border-radius:4px; padding:2px 8px; flex-shrink:0;">
           웨이브 당 최대 500건
         </span>
         ${this.processing ? html`
@@ -296,6 +356,11 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
 
       <!-- 하단 버튼 -->
       <div class="action-bar">
+        <span style="flex:1; font-size:12px; color:var(--md-sys-color-on-surface-variant,#888); line-height:1.4;">
+          💡 <strong>출고 준비</strong> 버튼을 눌러 먼저 출고 준비를 한 후,<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<strong>웨이브 확정</strong> 버튼을 눌러 웨이브 확정 처리하세요.<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;웨이브 확정 전 <strong>작업장 선택</strong>을 해주세요.
+        </span>
         <button class="btn btn-primary"
           ?disabled="${this.processing || this.orders.length === 0}"
           @click="${this._startReadyProcess}">
@@ -360,7 +425,22 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
   /** 컴포넌트 연결 시 데이터 조회 */
   connectedCallback() {
     super.connectedCallback()
-    Promise.all([this._fetchStatusOptions(), this._fetchOrders()])
+    Promise.all([this._fetchStatusOptions(), this._fetchStationOptions(), this._fetchOrders()])
+  }
+
+  /** PACKING_STATION 공통코드 조회 */
+  async _fetchStationOptions() {
+    try {
+      const codeMaster = await ServiceUtil.codeItems('PACKING_STATION')
+      if (!codeMaster || !codeMaster.id) return
+      this.stationOptions = codeMaster.items || []
+      // 옵션이 하나이면 자동 선택
+      if (this.stationOptions.length === 1) {
+        this.stationCd = this.stationOptions[0].name
+      }
+    } catch (e) {
+      console.error('PACKING_STATION 공통코드 조회 실패:', e)
+    }
   }
 
   /** SHIPMENT_ORDER_STATUS 공통코드 조회 */
@@ -450,31 +530,39 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
    * ALLOCATED 상태 주문을 config_wave로 웨이브에 구성한다.
    */
   async _confirmWave() {
-    // 1. 할당 주문 필터링
+    // 1. 작업장 체크
+    if (!this.stationCd) {
+      UiUtil.showToast('warning', '작업장을 선택해주세요. 웨이브 확정을 진행할 수 없습니다.')
+      return
+    }
+
+    // 2. 할당 주문 필터링
     const allocatedOrders = this.orders.filter(o => o.status === 'ALLOCATED')
 
-    // 2. 할당 주문 개수 체크
+    // 3. 할당 주문 개수 체크
     if (allocatedOrders.length === 0) {
       UiUtil.showToast('warning', '할당 상태의 주문이 없어서 웨이브 구성을 할 수 없습니다.')
       return
     }
 
-    // 3. 웨이브 확정 confirm
+    // 4. 웨이브 확정 confirm
+    const stationLabel = this.stationOptions.find(o => o.name === this.stationCd)?.description || this.stationCd
     const confirmed = await UiUtil.showAlertPopup(
       'label.confirm',
-      `웨이브 구성할 수 있는 주문은 ${allocatedOrders.length}개입니다. 웨이브를 확정하시겠습니까?`,
+      `작업장 [${stationLabel}] 에서 웨이브를 확정합니다.\n구성 주문: ${allocatedOrders.length}개. 진행하시겠습니까?`,
       'question', 'confirm', 'cancel'
     )
     if (!confirmed) return
 
-    // 4. 프로그레스 바 진행
+    // 5. 프로그레스 바 진행
     this.processing = true
 
-    // 5. 웨이브 생성 — 전체 대상 주문 ID 목록을 전달
+    // 6. 웨이브 생성 — 전체 대상 주문 ID + 작업장 전달
     try {
-      await ServiceUtil.restPost('oms_trx/waves/config_wave', allocatedOrders.map(o => ({ id: o.id })), null, null,
+      const payload = { stationCd: this.stationCd, orders: allocatedOrders };
+      await ServiceUtil.restPost('oms_trx/waves/config_wave', payload, null, null,
         (result) => {
-          this.waveNo = result?.wave_no || ''
+          this.waveNo = result?.wave?.wave_no || ''
           const allocatedIds = new Set(allocatedOrders.map(o => o.id))
           this.orders = this.orders.map(o =>
             allocatedIds.has(o.id) ? { ...o, wave_no: this.waveNo } : o

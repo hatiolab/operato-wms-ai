@@ -223,6 +223,12 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String labelTemplateCd;
 
 	/**
+	 * 검수/포장 작업대 코드
+	 */
+	@Column(name = "station_cd", length = 20)
+	private String stationCd;
+
+	/**
 	 * 상태
 	 * (REGISTERED/CONFIRMED/ALLOCATED/WAVED/RELEASED/PICKING/PACKING/SHIPPED/CLOSED/BACK_ORDER/CANCELLED)
 	 */
@@ -503,6 +509,14 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setLabelTemplateCd(String labelTemplateCd) {
 		this.labelTemplateCd = labelTemplateCd;
+	}
+
+	public String getStationCd() {
+		return stationCd;
+	}
+
+	public void setStationCd(String stationCd) {
+		this.stationCd = stationCd;
 	}
 
 	public String getStatus() {

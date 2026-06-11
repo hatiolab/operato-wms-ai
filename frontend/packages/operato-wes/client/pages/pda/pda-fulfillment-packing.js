@@ -877,7 +877,7 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
       ${currentItem ? html`
         <div class="current-item-section">
           <div class="item-info">
-            <div class="sku">상품: ${currentItem.sku_cd} / ${this.selectedOrder.invoice_no ? '송장: ' + this.selectedOrder.invoice_no : '출고: ' + this.selectedOrder.shipment_no}</div>
+            <div class="sku">상품: ${currentItem.sku_cd} / ${this.selectedOrder.invoice_no ? '송장: ' + this.selectedOrder.invoice_no : '주문: ' + this.selectedOrder.shipment_no}</div>
             <div class="lot">${currentItem.sku_nm}</div>
             <div class="qty">주문 수량 : ${currentItem.order_qty || 0} / 소비기한 : ${currentItem.expired_date || ''}</div>
           </div>
