@@ -357,9 +357,9 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
       <!-- 하단 버튼 -->
       <div class="action-bar">
         <span style="flex:1; font-size:12px; color:var(--md-sys-color-on-surface-variant,#888); line-height:1.4;">
-          💡 <strong>출고 준비</strong> 버튼을 눌러 먼저 출고 준비를 한 후,<br>
-          &nbsp;&nbsp;&nbsp;&nbsp;<strong>웨이브 확정</strong> 버튼을 눌러 웨이브 확정 처리하세요.<br>
-          &nbsp;&nbsp;&nbsp;&nbsp;웨이브 확정 전 <strong>작업장 선택</strong>을 해주세요.
+          💡 <strong>출고 준비</strong> 버튼을 눌러 먼저 출고 준비를 한 후, 주문이 할당 완료 상태인지 확인한 후<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<strong>웨이브 생성</strong> 버튼을 눌러 웨이브 생성 처리하세요.<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;웨이브 생성 전 <strong>작업장 선택</strong>을 해주세요.
         </span>
         <button class="btn btn-primary"
           ?disabled="${this.processing || this.orders.length === 0}"
@@ -370,7 +370,7 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
           style="background: linear-gradient(135deg, #7B1FA2, #4A148C);"
           ?disabled="${this.processing || this.orders.length === 0}"
           @click="${this._confirmWave}">
-          🌊 웨이브 확정
+          🌊 웨이브 생성
         </button>
         <button class="btn btn-default"
           ?disabled="${this.processing}"
@@ -502,9 +502,10 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
       await ServiceUtil.restPost(`oms_trx/shipment_orders/${order.id}/confirm_and_allocate`, {}, null, null,
         (result) => {
           const newStatus = result?.status
+          const invoiceNo = result?.invoice_no
           this.orders = this.orders.map(o =>
             o.id === order.id
-              ? { ...o, status: newStatus, _readyStatus: newStatus }
+              ? { ...o, status: newStatus, _readyStatus: newStatus, invoice_no: invoiceNo }
               : o
           )
         },
@@ -526,13 +527,13 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
   }
 
   /**
-   * 웨이브 확정 처리
+   * 웨이브 생성 처리
    * ALLOCATED 상태 주문을 config_wave로 웨이브에 구성한다.
    */
   async _confirmWave() {
     // 1. 작업장 체크
     if (!this.stationCd) {
-      UiUtil.showToast('warning', '작업장을 선택해주세요. 웨이브 확정을 진행할 수 없습니다.')
+      UiUtil.showToast('warning', '작업장을 선택해주세요. 웨이브 생성을 진행할 수 없습니다.')
       return
     }
 
@@ -545,11 +546,11 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
       return
     }
 
-    // 4. 웨이브 확정 confirm
+    // 4. 웨이브 생성 confirm
     const stationLabel = this.stationOptions.find(o => o.name === this.stationCd)?.description || this.stationCd
     const confirmed = await UiUtil.showAlertPopup(
       'label.confirm',
-      `작업장 [${stationLabel}] 에서 웨이브를 확정합니다.\n구성 주문: ${allocatedOrders.length}개. 진행하시겠습니까?`,
+      `작업장 [${stationLabel}] 에서 웨이브 생성합니다.\n구성 주문: ${allocatedOrders.length}개. 진행하시겠습니까?`,
       'question', 'confirm', 'cancel'
     )
     if (!confirmed) return
@@ -568,11 +569,11 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
             allocatedIds.has(o.id) ? { ...o, wave_no: this.waveNo } : o
           )
 
-          UiUtil.showToast('success', `웨이브 확정 완료! 웨이브번호: ${this.waveNo} (${result?.order_count || allocatedOrders.length}건)`)
+          UiUtil.showToast('success', `웨이브 생성 완료! 웨이브번호: ${this.waveNo} (${result?.order_count || allocatedOrders.length}건)`)
         },
         (error) => {
-          console.error('웨이브 확정 실패:', error)
-          UiUtil.showToast('error', '웨이브 확정 처리 중 오류가 발생했습니다.')
+          console.error('웨이브 생성 실패:', error)
+          UiUtil.showToast('error', '웨이브 생성 처리 중 오류가 발생했습니다.')
         }
       )
 
@@ -584,8 +585,8 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
         }))
       }
     } catch (e) {
-      console.error('웨이브 확정 실패:', e)
-      UiUtil.showToast('error', '웨이브 확정 처리 중 오류가 발생했습니다.')
+      console.error('웨이브 생성 실패:', e)
+      UiUtil.showToast('error', '웨이브 생성 처리 중 오류가 발생했습니다.')
     } finally {
       this.processing = false
     }

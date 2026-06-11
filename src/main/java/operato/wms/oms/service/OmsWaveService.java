@@ -160,20 +160,22 @@ public class OmsWaveService extends AbstractQueryService {
 	/**
 	 * 웨이브에 포함되지 않은 출고 주문 리스트로 웨이브 생성
 	 * 
+	 * @param waveConfig
 	 * @param orderList
 	 * @return
 	 */
-	public Map<String, Object> createWaveAndConfigOrders(List<ShipmentOrder> orderList) {
+	public Map<String, Object> createWaveAndConfigOrders(Map<String, Object> waveConfig,
+			List<Map<String, Object>> orderList) {
 		Long domainId = Domain.currentDomainId();
 		List<ShipmentOrder> validOrders = new ArrayList<ShipmentOrder>();
 
-		for (ShipmentOrder so : orderList) {
+		for (Map<String, Object> so : orderList) {
 			// 출고 주문 조회
-			ShipmentOrder order = this.findOrder(domainId, so.getId());
+			ShipmentOrder order = this.findOrder(domainId, so.get("id").toString());
 
 			// 출고 주문 존재 여부 체크
 			if (order == null) {
-				throw new ElidomRuntimeException("주문을 찾을 수 없습니다: " + so.getId());
+				throw new ElidomRuntimeException("주문을 찾을 수 없습니다: " + so.get("id"));
 			}
 
 			// 출고 주문 웨이브 포함 여부 체크
@@ -214,28 +216,21 @@ public class OmsWaveService extends AbstractQueryService {
 		wave.setResultOrder(0);
 		wave.setResultItem(0);
 		wave.setResultTotal(0.0);
-		wave.setInspFlag(true);
 		wave.setStatus(ShipmentWave.STATUS_CREATED);
-
-		// TODO 아래 내용은 커스텀 서비스로 추후 이동 처리
-		wave.setPickType("TOTAL");
-		wave.setDlvType("PARCEL");
-		wave.setCarrierCd("CJ");
+		wave.setPickType(waveConfig.containsKey("pickType") ? (String) waveConfig.get("pickType") : "TOTAL");
+		wave.setDlvType(waveConfig.containsKey("dlvType") ? (String) waveConfig.get("dlvType") : "PARCEL");
+		wave.setCarrierCd(waveConfig.containsKey("carrierCd") ? (String) waveConfig.get("carrierCd") : "CJ");
+		wave.setInspFlag(waveConfig.containsKey("inspFlag") ? (Boolean) waveConfig.get("inspFlag") : true);
+		wave.setStationCd((String) waveConfig.get("stationCd"));
 		this.queryManager.insert(wave);
 
 		// 주문에 wave_no 업데이트 및 상태 변경
 		for (ShipmentOrder ord : validOrders) {
 			ord.setWaveNo(wave.getWaveNo());
-
-			if (ValueUtil.isEmpty(ord.getDlvType())) {
-				ord.setDlvType(wave.getDlvType());
-			}
-
-			if (ValueUtil.isEmpty(ord.getCarrierCd())) {
-				ord.setCarrierCd(wave.getCarrierCd());
-			}
-
-			this.queryManager.update(ord, "waveNo", "dlvType", "carrierCd", "updatedAt", "updaterId");
+			ord.setDlvType(wave.getDlvType());
+			ord.setCarrierCd(wave.getCarrierCd());
+			ord.setStationCd(wave.getStationCd());
+			this.queryManager.update(ord, "waveNo", "dlvType", "carrierCd", "stationCd", "updatedAt", "updaterId");
 		}
 
 		// SKU 종류 수 집계
@@ -244,7 +239,7 @@ public class OmsWaveService extends AbstractQueryService {
 				wave.getWaveNo()));
 
 		// 결과 리턴
-		return ValueUtil.newMap("wave_no,list", wave.getWaveNo(), validOrders);
+		return ValueUtil.newMap("wave,orders", wave, validOrders);
 	}
 
 	/**

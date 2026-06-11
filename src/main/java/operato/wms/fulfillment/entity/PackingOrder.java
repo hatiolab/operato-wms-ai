@@ -554,9 +554,7 @@ public class PackingOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		// pick_task_no 자동 채번
 		if (ValueUtil.isEmpty(this.packOrderNo)) {
 			Integer seq = RangedSeq.increaseSequence(Domain.currentDomainId(), "PACK_ORDER_NO", "DATE",
-					this.orderDate,
-					null,
-					null, null);
+					this.orderDate, null, null, null);
 			String serialNo = StringUtils.leftPad(String.valueOf(seq), 5, "0");
 			this.packOrderNo = "PO-" + this.orderDate.replaceAll("-", "").substring(2) + "-" + serialNo;
 		}

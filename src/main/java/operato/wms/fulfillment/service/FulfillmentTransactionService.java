@@ -22,6 +22,7 @@ import xyz.anythings.sys.service.ICustomService;
 import xyz.anythings.sys.util.AnyOrmUtil;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
+import xyz.elidom.sys.entity.User;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -320,6 +321,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		Long domainId = Domain.currentDomainId();
 		String today = DateUtil.todayStr();
 
+		// 피킹 지시 조회
 		PickingTask task = this.findPickingTask(domainId, pickTaskId);
 
 		if (!PickingTask.STATUS_COMPLETED.equals(task.getStatus())) {
@@ -335,7 +337,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		// 출하 주문 조회
 		ShipmentOrder order = this.findShipmentOrder(domainId, task.getShipmentOrderId());
 
-		// PackingOrder 생성
+		// 포장 지시 생성
 		String carrierCd = order != null ? order.getCarrierCd() : null;
 		String dockCd = this.findDockCdByCarrierCd(domainId, carrierCd);
 
@@ -348,6 +350,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		packOrder.setOrderDate(today);
 		packOrder.setComCd(task.getComCd());
 		packOrder.setWhCd(task.getWhCd());
+		packOrder.setStationCd(order != null ? order.getStationCd() : null);
 		packOrder.setCarrierCd(carrierCd);
 		packOrder.setCarrierServiceType(order != null ? order.getCarrierServiceType() : null);
 		packOrder.setDockCd(dockCd);
@@ -383,16 +386,15 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			packItems.add(poi);
 		}
 
+		// 패킹 지시 아이템 저장
 		if (!packItems.isEmpty()) {
 			AnyOrmUtil.insertBatch(packItems, 100);
 		}
 
 		// 출하 주문 상태를 PACKING으로 변경
 		if (order != null) {
-			String updOrderSql = "UPDATE shipment_orders SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-			Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id", ShipmentOrder.STATUS_PACKING,
-					domainId, order.getId());
-			this.queryManager.executeBySql(updOrderSql, updOrderParams);
+			order.setStatus(ShipmentOrder.STATUS_PACKING);
+			this.queryManager.update(order, "status", "updaterId", "updatedAt");
 		}
 
 		return ValueUtil.newMap("pack_order_no,item_count", packOrder.getPackOrderNo(), packItems.size());
@@ -432,16 +434,12 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		String seqSql = "SELECT COUNT(*) FROM packing_orders WHERE domain_id = :domainId AND order_date = :orderDate";
 		Map<String, Object> seqParams = ValueUtil.newMap("domainId,orderDate", domainId, today);
 		Integer existCount = this.queryManager.selectBySql(seqSql, seqParams, Integer.class);
-		int nextSeq = (existCount != null ? existCount : 0) + 1;
 
 		int packOrderCount = 0;
 		int totalItemCount = 0;
 		List<Map<String, Object>> packOrderResults = new ArrayList<>();
 
 		for (ShipmentOrder order : orders) {
-			// String packOrderNo = "PACK-" + today.replace("-", "") + "-" +
-			// String.format("%04d", nextSeq);
-
 			// 주문별 할당 정보 조회
 			String allocSql = "SELECT sa.*, soi.sku_cd, soi.sku_nm, soi.id AS soi_id"
 					+ " FROM stock_allocations sa"
@@ -457,6 +455,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 
 			PackingOrder packOrder = new PackingOrder();
 			packOrder.setDomainId(domainId);
+			packOrder.setPackOrderNo(order.getShipmentNo());
 			packOrder.setPickTaskNo(task.getPickTaskNo());
 			packOrder.setShipmentOrderId(order.getId());
 			packOrder.setShipmentNo(order.getShipmentNo());
@@ -511,7 +510,6 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			packOrderResults.add(packInfo);
 
 			packOrderCount++;
-			nextSeq++;
 		}
 
 		return ValueUtil.newMap("pack_order_count,total_item_count,pack_orders", packOrderCount,

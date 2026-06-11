@@ -3,14 +3,12 @@ package operato.wms.fulfillment.service;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import operato.wms.base.entity.StoragePolicy;
 import operato.wms.base.service.RuntimeConfigService;
 import operato.wms.base.service.WmsBaseService;
-import operato.wms.fulfillment.WmsFulfillmentConfigConstants;
 import operato.wms.fulfillment.entity.PickingTask;
 import operato.wms.fulfillment.entity.PickingTaskItem;
 import operato.wms.oms.entity.ReplenishOrder;
@@ -19,7 +17,6 @@ import xyz.anythings.sys.event.EventPublisher;
 import xyz.anythings.sys.event.model.PrintEvent;
 import xyz.anythings.sys.model.BaseResponse;
 import xyz.anythings.sys.service.AbstractQueryService;
-import xyz.elidom.dev.entity.RangedSeq;
 import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;

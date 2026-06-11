@@ -257,25 +257,25 @@ public class OmsTransactionController extends AbstractRestService {
 	 *
 	 * POST /rest/oms_trx/waves/config_wave
 	 *
-	 * @param params { orders : [{ id, ... }] }
-	 * @return { wave_no, wave_seq, order_count, sku_count, total_qty,
-	 *         skipped_count, errors }
+	 * @param params { orders : [{ id, ... }], stationCd : '01' }
+	 * @return { wave : {id : ....}, orders : [{ id, ... }] }
 	 */
+	@SuppressWarnings("unchecked")
 	@RequestMapping(value = "waves/config_wave", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Configuration wave with unwaved orders")
-	public synchronized Map<String, Object> configWave(@RequestBody List<ShipmentOrder> orders) {
+	public synchronized Map<String, Object> configWave(@RequestBody Map<String, Object> waveConfig) {
 		Long domainId = Domain.currentDomainId();
 
 		// 1. 커스텀 서비스 - 전 처리
-		Map<String, Object> params = ValueUtil.newMap("orders", orders);
+		Map<String, Object> params = ValueUtil.newMap("waveConfig", waveConfig);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CONFIG_WAVE, params);
 
 		// 2. 본 로직 실행
-		Map<String, Object> result = this.waveService.createWaveAndConfigOrders(orders);
+		List<Map<String, Object>> orders = (List<Map<String, Object>>) waveConfig.remove("orders");
+		Map<String, Object> result = this.waveService.createWaveAndConfigOrders(waveConfig, orders);
 
 		// 3. 커스텀 서비스 - 후 처리
-		params.put("wave", result.get("wave"));
-		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CONFIG_WAVE, params);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CONFIG_WAVE, result);
 
 		// 4. 결과 리턴
 		return result;
@@ -475,7 +475,7 @@ public class OmsTransactionController extends AbstractRestService {
 		Map<String, Object> result = this.orderService.confirmAndAllocateShipmentOrder(id);
 
 		// 3. 커스텀 서비스 - 후 처리
-		params.put("allocations", result);
+		params.put("result", result);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CONFIRM_AND_ALLOCATE, params);
 
 		// 4. 결과 리턴
