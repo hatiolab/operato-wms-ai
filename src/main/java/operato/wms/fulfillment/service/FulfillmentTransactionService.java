@@ -81,8 +81,6 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 	 */
 	public Map<String, Object> createPickingTasks(Map<String, Object> params) {
 		Long domainId = Domain.currentDomainId();
-		String today = DateUtil.todayStr();
-
 		String waveNo = params.get("wave_no") != null ? params.get("wave_no").toString() : null;
 		String pickType = params.get("pick_type") != null ? params.get("pick_type").toString() : "INDIVIDUAL";
 
@@ -102,9 +100,10 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		}
 
 		// 웨이브의 택배사 코드로 주문 carrier_cd 일괄 업데이트
-		String waveSql = "SELECT carrier_cd FROM shipment_waves WHERE domain_id = :domainId AND wave_no = :waveNo";
-		Map<String, Object> waveParams = ValueUtil.newMap("domainId,waveNo", domainId, waveNo);
-		String waveCarrierCd = this.queryManager.selectBySql(waveSql, waveParams, String.class);
+		ShipmentWave wave = this.queryManager.selectByCondition(ShipmentWave.class,
+				ValueUtil.newMap("domainId,waveNo", domainId, waveNo));
+		String waveCarrierCd = wave.getCarrierCd();
+		String waveDate = wave.getWaveDate();
 
 		if (ValueUtil.isNotEmpty(waveCarrierCd)) {
 			String updCarrierSql = "UPDATE shipment_orders SET carrier_cd = :carrierCd, updated_at = now()"
@@ -124,7 +123,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 
 		// 당일 최대 pick_task_no 시퀀스 조회
 		String seqSql = "SELECT COUNT(*) FROM picking_tasks WHERE domain_id = :domainId AND order_date = :orderDate";
-		Map<String, Object> seqParams = ValueUtil.newMap("domainId,orderDate", domainId, today);
+		Map<String, Object> seqParams = ValueUtil.newMap("domainId,orderDate", domainId, waveDate);
 		Integer existCount = this.queryManager.selectBySql(seqSql, seqParams, Integer.class);
 		int nextSeq = (existCount != null ? existCount : 0) + 1;
 
@@ -150,7 +149,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				task.setWaveNo(waveNo);
 				task.setShipmentOrderId(order.getId());
 				task.setShipmentNo(order.getShipmentNo());
-				task.setOrderDate(today);
+				task.setOrderDate(waveDate);
 				task.setComCd(order.getComCd());
 				task.setWhCd(ValueUtil.isNotEmpty(order.getWhCd()) ? order.getWhCd() : "DEFAULT");
 				task.setPickType(pickType);
@@ -240,7 +239,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			PickingTask task = new PickingTask();
 			task.setDomainId(domainId);
 			task.setWaveNo(waveNo);
-			task.setOrderDate(today);
+			task.setOrderDate(waveDate);
 			task.setComCd(orders.get(0).getComCd());
 			task.setWhCd(ValueUtil.isNotEmpty(orders.get(0).getWhCd()) ? orders.get(0).getWhCd() : "DEFAULT");
 			task.setPickType(pickType);

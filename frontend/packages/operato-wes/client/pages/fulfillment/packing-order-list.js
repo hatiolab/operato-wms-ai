@@ -382,7 +382,9 @@ class PackingOrderList extends localize(i18next)(PageView) {
       totalCount: Number,
       pageSize: Number,
       selectedIds: Array,
-      bizTypeOptions: Array
+      bizTypeOptions: Array,
+      stationOptions: Array,
+      statusOptions: Array
     }
   }
 
@@ -405,7 +407,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
       order_date_to: this._todayStr(),
       status: '',
       biz_type: '',
-      insp_type: '',
+      station_cd: '',
       carrier_cd: '',
       dock_cd: '',
       pack_order_no: '',
@@ -416,6 +418,8 @@ class PackingOrderList extends localize(i18next)(PageView) {
     this.pageSize = 20
     this.selectedIds = []
     this.bizTypeOptions = []
+    this.stationOptions = []
+    this.statusOptions = []
   }
 
   /** 페이지 컨텍스트 반환 */
@@ -457,13 +461,9 @@ class PackingOrderList extends localize(i18next)(PageView) {
               <select .value="${this.searchParams.status}"
                 @change="${e => this._updateSearch('status', e.target.value)}">
                 <option value="">${i18next.t('label.all', { defaultValue: '전체' })}</option>
-                <option value="CREATED">${i18next.t('label.created', { defaultValue: '생성' })}</option>
-                <option value="IN_PROGRESS">${i18next.t('label.in_progress', { defaultValue: '진행중' })}</option>
-                <option value="COMPLETED">${i18next.t('label.completed', { defaultValue: '완료' })}</option>
-                <option value="LABEL_PRINTED">${i18next.t('label.label_printed', { defaultValue: '라벨출력' })}</option>
-                <option value="MANIFESTED">${i18next.t('label.manifested', { defaultValue: '적하' })}</option>
-                <option value="SHIPPED">${i18next.t('label.shipped', { defaultValue: '출하완료' })}</option>
-                <option value="CANCELLED">${i18next.t('label.cancelled', { defaultValue: '취소' })}</option>
+                ${this.statusOptions.map(opt => html`
+                  <option value="${opt.name}">${opt.description || opt.name}</option>
+                `)}
               </select>
             </div>
             <div class="form-group">
@@ -477,13 +477,13 @@ class PackingOrderList extends localize(i18next)(PageView) {
               </select>
             </div>
             <div class="form-group">
-              <label>${i18next.t('label.insp_type', { defaultValue: '검수유형' })}</label>
-              <select .value="${this.searchParams.insp_type}"
-                @change="${e => this._updateSearch('insp_type', e.target.value)}">
+              <label>${i18next.t('label.station_cd', { defaultValue: '출고 작업장' })}</label>
+              <select .value="${this.searchParams.station_cd}"
+                @change="${e => this._updateSearch('station_cd', e.target.value)}">
                 <option value="">${i18next.t('label.all', { defaultValue: '전체' })}</option>
-                <option value="FULL">FULL</option>
-                <option value="SAMPLING">SAMPLING</option>
-                <option value="SKIP">SKIP</option>
+                ${this.stationOptions.map(opt => html`
+                  <option value="${opt.name}">${opt.description || opt.name}</option>
+                `)}
               </select>
             </div>
             <div class="form-group">
@@ -655,13 +655,27 @@ class PackingOrderList extends localize(i18next)(PageView) {
   async pageUpdated(changes, lifecycle, before) {
     if (this.active) {
       await Promise.all([
+        this._fetchStatusOptions(),
         this._fetchBizTypeOptions(),
+        this._fetchStationOptions(),
         this._fetchData()
       ])
     }
   }
 
-  /** SHIPMENT_ORDER_SHIP_TYPE 공통코드 상세 목록 조회 */
+  /** PACKING_ORDER_STATUS 공통코드 목록 조회 */
+  async _fetchStatusOptions() {
+    try {
+      const codeMaster = await ServiceUtil.codeItems('PACKING_ORDER_STATUS')
+      if (!codeMaster || !codeMaster.id) return
+      this.statusOptions = codeMaster.items || []
+    } catch (error) {
+      console.error('PACKING_ORDER_STATUS 공통코드 조회 실패:', error)
+      this.statusOptions = []
+    }
+  }
+
+  /** SHIPMENT_ORDER_BIZ_TYPE 공통코드 목록 조회 */
   async _fetchBizTypeOptions() {
     try {
       const codeMaster = await ServiceUtil.codeItems('SHIPMENT_ORDER_BIZ_TYPE')
@@ -670,6 +684,18 @@ class PackingOrderList extends localize(i18next)(PageView) {
     } catch (error) {
       console.error('SHIPMENT_ORDER_BIZ_TYPE 공통코드 조회 실패:', error)
       this.bizTypeOptions = []
+    }
+  }
+
+  /** PACKING_STATION 공통코드 목록 조회 */
+  async _fetchStationOptions() {
+    try {
+      const codeMaster = await ServiceUtil.codeItems('PACKING_STATION')
+      if (!codeMaster || !codeMaster.id) return
+      this.stationOptions = codeMaster.items || []
+    } catch (error) {
+      console.error('PACKING_STATION 공통코드 조회 실패:', error)
+      this.stationOptions = []
     }
   }
 
@@ -704,8 +730,8 @@ class PackingOrderList extends localize(i18next)(PageView) {
       if (this.searchParams.biz_type) {
         filters.push({ name: 'biz_type', value: this.searchParams.biz_type })
       }
-      if (this.searchParams.insp_type) {
-        filters.push({ name: 'insp_type', value: this.searchParams.insp_type })
+      if (this.searchParams.station_cd) {
+        filters.push({ name: 'station_cd', value: this.searchParams.station_cd })
       }
       if (this.searchParams.carrier_cd) {
         filters.push({ name: 'carrier_cd', operator: 'like', value: this.searchParams.carrier_cd })
@@ -768,7 +794,7 @@ class PackingOrderList extends localize(i18next)(PageView) {
       order_date_to: this._todayStr(),
       status: '',
       biz_type: '',
-      insp_type: '',
+      station_cd: '',
       carrier_cd: '',
       dock_cd: '',
       pack_order_no: '',

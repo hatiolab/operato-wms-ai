@@ -444,39 +444,66 @@ public class FulfillmentTransactionController {
 
 	/**
 	 * 포장 주문 목록 조회 (상태/날짜 필터)
-	 * GET /rest/ful_trx/packing_orders?status=INSPECTED&order_date=2024-01-01
+	 * GET
+	 * /rest/ful_trx/packing_orders?status=INSPECTED&order_date=2024-01-01&biz_type=B2C_OUT&station_cd=ST01
 	 */
 	@GetMapping(value = "packing_orders", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description = "Search packing orders by status and order date")
+	@ApiDesc(description = "Search packing orders by status, order date, biz type and station")
 	@SuppressWarnings("rawtypes")
 	public List<Map> searchPackingOrders(
+			@org.springframework.web.bind.annotation.RequestParam(name = "biz_type", required = false) String bizType,
+			@org.springframework.web.bind.annotation.RequestParam(name = "order_date", required = false) String orderDate,
 			@org.springframework.web.bind.annotation.RequestParam(name = "status", required = false) String status,
-			@org.springframework.web.bind.annotation.RequestParam(name = "order_date", required = false) String orderDate) {
-		return this.packingService.searchPackingOrders(status, orderDate);
+			@org.springframework.web.bind.annotation.RequestParam(name = "station_cd", required = false) String stationCd) {
+		return this.packingService.searchPackingOrders(bizType, orderDate, status, stationCd);
 	}
 
 	/**
-	 * 대기중인 포장 주문 목록 조회 (상태/날짜 필터)
-	 * GET /rest/ful_trx/packing_orders/todo?order_date=2024-01-01
+	 * 포장 주문 건수 집계 (대기/완료/전체)
+	 * GET /rest/ful_trx/packing_orders/count?order_date=2024-01-01&biz_type=B2C_OUT&station_cd=ST01&wave_seq=1
+	 */
+	@GetMapping(value = "packing_orders/count", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Count packing orders by status group (total/waiting/completed)")
+	public Map<String, Object> countPackingOrders(
+			@org.springframework.web.bind.annotation.RequestParam(name = "biz_type", required = false) String bizType,
+			@org.springframework.web.bind.annotation.RequestParam(name = "order_date", required = false) String orderDate,
+			@org.springframework.web.bind.annotation.RequestParam(name = "station_cd", required = false) String stationCd,
+			@org.springframework.web.bind.annotation.RequestParam(name = "wave_seq", required = false) String waveSeq) {
+		return this.packingService.countPackingOrders(bizType, orderDate, stationCd, waveSeq);
+	}
+
+	/**
+	 * 대기중인 포장 주문 목록 조회 (상태/날짜/업무유형/작업장/웨이브 필터)
+	 * GET
+	 * /rest/ful_trx/packing_orders/todo?order_date=2024-01-01&biz_type=B2C_OUT&station_cd=ST01&wave_no=W001
 	 */
 	@GetMapping(value = "packing_orders/todo", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description = "Search todo packing orders by status and order date")
+	@ApiDesc(description = "Search todo packing orders by status, order date, biz type, station and wave")
 	@SuppressWarnings("rawtypes")
 	public List<Map> searchTodoPackingOrders(
-			@org.springframework.web.bind.annotation.RequestParam(name = "order_date", required = false) String orderDate) {
-		return this.packingService.searchTodoPackingOrders(orderDate);
+			@org.springframework.web.bind.annotation.RequestParam(name = "biz_type", required = false) String bizType,
+			@org.springframework.web.bind.annotation.RequestParam(name = "order_date", required = false) String orderDate,
+			@org.springframework.web.bind.annotation.RequestParam(name = "station_cd", required = false) String stationCd,
+			@org.springframework.web.bind.annotation.RequestParam(name = "keyword", required = false) String keyword,
+			@org.springframework.web.bind.annotation.RequestParam(name = "wave_seq", required = false) String waveSeq) {
+		return this.packingService.searchTodoPackingOrders(bizType, orderDate, stationCd, keyword, waveSeq);
 	}
 
 	/**
-	 * 완료된 포장 주문 목록 조회 (상태/날짜 필터)
-	 * GET /rest/ful_trx/packing_orders/done?order_date=2024-01-01
+	 * 완료된 포장 주문 목록 조회 (상태/날짜/업무유형/작업장 필터)
+	 * GET
+	 * /rest/ful_trx/packing_orders/done?order_date=2024-01-01&biz_type=B2C_OUT&station_cd=ST01
 	 */
 	@GetMapping(value = "packing_orders/done", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description = "Search done packing orders by status and order date")
+	@ApiDesc(description = "Search done packing orders by status, order date, biz type and station")
 	@SuppressWarnings("rawtypes")
 	public List<Map> searchDonePackingOrders(
-			@org.springframework.web.bind.annotation.RequestParam(name = "order_date", required = false) String orderDate) {
-		return this.packingService.searchDonePackingOrders(orderDate);
+			@org.springframework.web.bind.annotation.RequestParam(name = "biz_type", required = false) String bizType,
+			@org.springframework.web.bind.annotation.RequestParam(name = "order_date", required = false) String orderDate,
+			@org.springframework.web.bind.annotation.RequestParam(name = "station_cd", required = false) String stationCd,
+			@org.springframework.web.bind.annotation.RequestParam(name = "keyword", required = false) String keyword,
+			@org.springframework.web.bind.annotation.RequestParam(name = "wave_seq", required = false) String waveSeq) {
+		return this.packingService.searchDonePackingOrders(bizType, orderDate, stationCd, keyword, waveSeq);
 	}
 
 	/**

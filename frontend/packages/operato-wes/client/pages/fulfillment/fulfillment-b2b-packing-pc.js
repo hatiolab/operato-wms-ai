@@ -9,21 +9,22 @@ import './packing-order-detail'
 import '../../component/sku-barcode-input.js'
 
 /**
- * 풀필먼트 검수/포장 PC 화면
+ * 풀필먼트 B2B 전용 검수/포장 PC 화면
  *
- * 2패널 레이아웃:
- * - 좌측: CREATED / IN_PROGRESS 상태 포장 주문 목록 (필터/검색)
- * - 우측: 검수 작업 → 포장/운송장 → 출고 확정
+ * fulfillment-packing-pc.js 기반의 B2B 전용 버전:
+ * - biz_type = B2B_OUT 고정 (B2C 주문 제외)
+ * - 운송장번호 입력 없음 (B2B는 거래명세서로 대체)
+ * - 출고 확정 + 거래명세서 출력 버튼 항상 표시
  *
  * 작업 흐름:
  * 1. 좌측에서 포장 주문 선택 (카드 클릭 또는 바코드 스캔)
  * 2. 우측 검수: 바코드 스캔 → 항목 매칭 → 검수 확인 (수량 1이면 자동)
- * 3. 전체 검수 완료 → 포장 정보 + 운송장 입력
- * 4. 출고 확정 → 배송 라벨/거래명세서 출력
+ * 3. 전체 검수 완료 → 포장 정보 입력
+ * 4. 출고 확정 → 거래명세서 출력
  *
  * 바코드 입력: USB 바코드 스캐너 (키보드 에뮬레이션)
  */
-class FulfillmentPackingPc extends localize(i18next)(PageView) {
+class FulfillmentB2bPackingPc extends localize(i18next)(PageView) {
   /** 컴포넌트 스타일 정의 */
   static get styles() {
     return [
@@ -128,30 +129,6 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
           align-items: center;
         }
 
-        .search-filters .radio-group {
-          display: flex;
-          gap: 5px;
-          align-items: center;
-          flex: 1;
-        }
-
-        .search-filters .radio-group label {
-          display: flex;
-          align-items: center;
-          gap: 2px;
-          font-size: 11px;
-          cursor: pointer;
-          color: var(--md-sys-color-on-surface, #333);
-          white-space: nowrap;
-        }
-
-        .search-filters .radio-group input[type='radio'] {
-          width: 13px;
-          height: 13px;
-          cursor: pointer;
-          accent-color: var(--md-sys-color-primary, #1976D2);
-        }
-
         .order-list {
           flex: 1;
           overflow-y: auto;
@@ -171,7 +148,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
           padding: 12px 14px;
           margin-bottom: 6px;
           border: 1px solid #F0F0F0;
-          border-left: 3px solid #FF9800;
+          border-left: 3px solid #1565C0;
           cursor: pointer;
           transition: all 0.15s;
         }
@@ -228,7 +205,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
 
         .order-card .progress-mini-fill {
           height: 100%;
-          background: linear-gradient(90deg, #FF9800, #4CAF50);
+          background: linear-gradient(90deg, #1565C0, #4CAF50);
           border-radius: 2px;
           transition: width 0.3s;
         }
@@ -294,7 +271,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
 
         .progress-fill {
           height: 100%;
-          background: linear-gradient(90deg, #FF9800, #4CAF50);
+          background: linear-gradient(90deg, #1565C0, #4CAF50);
           border-radius: 4px;
           transition: width 0.3s ease;
         }
@@ -429,9 +406,9 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
         }
 
         .inspection-table tr.current {
-          background: #FFF3E0;
+          background: #E3F2FD;
           font-weight: 600;
-          border-left: 3px solid #FF9800;
+          border-left: 3px solid #1565C0;
         }
 
         .inspection-table tr:hover:not(.completed) {
@@ -452,7 +429,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
           padding: 16px 20px;
           box-shadow: 0 1px 4px rgba(0,0,0,0.06);
           margin-bottom: 16px;
-          border-left: 4px solid #FF9800;
+          border-left: 4px solid #1565C0;
         }
 
         .current-item-panel .item-header {
@@ -532,7 +509,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
         .btn-confirm:hover { background: #388E3C; }
         .btn-confirm:disabled { background: #BDBDBD; cursor: default; }
 
-        /* ===== 포장/운송장 영역 ===== */
+        /* ===== 포장 영역 ===== */
         .packing-section {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -624,39 +601,6 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
         .form-group input:focus {
           border-color: var(--md-sys-color-primary, #2196F3);
           box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.12);
-        }
-
-        .tracking-area {
-          background: var(--md-sys-color-surface, white);
-          border-radius: 8px;
-          padding: 16px 20px;
-          box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-          margin-bottom: 16px;
-        }
-
-        .tracking-area h4 {
-          font-size: 13px;
-          font-weight: 700;
-          color: var(--md-sys-color-on-surface-variant, #616161);
-          margin: 0 0 12px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-
-        .tracking-area input {
-          width: 100%;
-          padding: 10px 14px;
-          font-size: 15px;
-          font-family: 'Courier New', monospace;
-          border: 2px solid var(--md-sys-color-outline-variant, #E0E0E0);
-          border-radius: 6px;
-          box-sizing: border-box;
-          outline: none;
-        }
-
-        .tracking-area input:focus {
-          border-color: var(--md-sys-color-primary, #2196F3);
-          box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.15);
         }
 
         /* ===== 버튼 ===== */
@@ -869,14 +813,12 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
       boxType: String,
       boxCount: Number,
       boxWeight: Number,
-      trackingNo: String,
       feedbackMsg: String,
       feedbackType: String,
       startTime: Number,
       listPage: Number,
       orderDate: String,
       filterStationCd: String,
-      filterBizType: String,
       stationOptions: Array
     }
   }
@@ -898,7 +840,6 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     this.boxType = 'SMALL'
     this.boxCount = 1
     this.boxWeight = 0
-    this.trackingNo = ''
     this.feedbackMsg = ''
     this.feedbackType = ''
     this.startTime = 0
@@ -906,7 +847,6 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     this._listPageSize = 20
     this.orderDate = ValueUtil.todayFormatted()
     this.filterStationCd = ''
-    this.filterBizType = 'B2C_OUT'
     this.stationOptions = []
     this._keyHandler = null
   }
@@ -914,7 +854,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
   /** 페이지 컨텍스트 반환 - 브라우저 타이틀 등에 사용 */
   get context() {
     return {
-      title: TermsUtil.tMenu('FulfillmentPackingPc')
+      title: TermsUtil.tMenu('FulfillmentB2BPackingPc')
     }
   }
 
@@ -922,7 +862,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
    * 렌더링
    * ============================================================== */
 
-  /** 화면 렌더링 - 헤더, 좌우 패널, 상태바 출력 */
+  /** 화면 렌더링 - 좌우 패널, 상태바 출력 */
   render() {
     return html`
       <div class="main-content">
@@ -931,20 +871,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
       </div>
 
       <div class="status-bar">
-        <div class="stats">
-          <!--span>
-            <span class="stat-label">전체</span>
-            <span class="stat-value">${this.packingOrders.length}건</span>
-          </span>
-          <span>
-            <span class="stat-label">완료</span>
-            <span class="stat-value">${this.packingOrders.filter(o => o.status === 'COMPLETED').length}건</span>
-          </span>
-          <span>
-            <span class="stat-label">대기</span>
-            <span class="stat-value">${this.packingOrders.filter(o => o.status === 'CREATED' || o.status === 'IN_PROGRESS').length}건</span>
-          </span-->
-        </div>
+        <div class="stats"></div>
         <span>${new Date().toLocaleTimeString('ko-KR')}</span>
       </div>
 
@@ -969,7 +896,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
         <div class="search-area">
           <input
             type="text"
-            placeholder="포장번호 / 출고번호 / 송장번호 / 고객명"
+            placeholder="포장번호 / 출고번호 / 고객명"
             .value="${this.searchKeyword}"
             @input="${e => { this.searchKeyword = e.target.value; this.listPage = 1 }}"
             @keydown="${e => { if (e.key === 'Enter') this._onScanPackingOrder(e.target.value) }}"
@@ -992,28 +919,6 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
                 <option value="${opt.name}">${opt.description || opt.name}</option>
               `)}
             </select>
-          </div>
-          <div class="filter-row">
-            <div class="radio-group">
-              <label>
-                <input type="radio" name="biz_type_filter" value="B2C_OUT"
-                  .checked="${this.filterBizType === 'B2C_OUT'}"
-                  @change="${() => { this.filterBizType = 'B2C_OUT'; this.listPage = 1 }}" />
-                B2C
-              </label>
-              <label>
-                <input type="radio" name="biz_type_filter" value="B2B_OUT"
-                  .checked="${this.filterBizType === 'B2B_OUT'}"
-                  @change="${() => { this.filterBizType = 'B2B_OUT'; this.listPage = 1 }}" />
-                B2B
-              </label>
-              <label>
-                <input type="radio" name="biz_type_filter" value=""
-                  .checked="${this.filterBizType === ''}"
-                  @change="${() => { this.filterBizType = ''; this.listPage = 1 }}" />
-                전체
-              </label>
-            </div>
             <button class="btn-search" title="새로고침" @click="${this._refresh}">🔍</button>
           </div>
         </div>
@@ -1037,11 +942,10 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     `
   }
 
-  /** 포장 주문 카드 렌더링 - 포장번호, 고객명, 진행률 표시 */
+  /** 포장 주문 카드 렌더링 - 포장번호, 출고번호, 고객명, 진행률 표시 */
   _renderOrderCard(order) {
     const isSelected = this.selectedOrder && this.selectedOrder.id === order.id
     const isCompleted = order.status != 'CREATED' && order.status != 'IN_PROGRESS'
-    const isB2C = order.biz_type !== 'B2B_OUT'
     const customerNm = order.cust_nm || ''
     const itemCount = order.total_items || 0
     const totalQty = order.total_qty || 0
@@ -1054,11 +958,6 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
       >
         <div class="order-no">포장 번호 : ${order.pack_order_no || '-'}</div>
         <div class="order-no">출고 번호 : ${order.shipment_no || '-'}</div>
-        ${isB2C && order.invoice_no ? html`
-          <div class="order-no" style="color:var(--md-sys-color-secondary,#388E3C); font-size:12px;">
-            송장 번호 : ${order.invoice_no}
-          </div>
-        ` : ''}
         <div class="meta">${customerNm}${itemCount ? ` | ${itemCount}종 ${totalQty}EA` : ''}</div>
         ${progressPct > 0 && progressPct < 100 ? html`
           <div class="progress-mini">
@@ -1092,10 +991,10 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
         <div class="empty-panel">
           <span class="icon">📦</span>
           <span class="message">좌측 목록에서 포장 주문을 선택하세요</span>
-          <span class="sub">또는 포장번호 / 출고번호 / 송장번호를 스캔하세요</span>
+          <span class="sub">또는 포장번호 / 출고번호를 스캔하세요</span>
           <input
             type="text"
-            placeholder="포장번호 / 출고번호 / 송장번호 스캔"
+            placeholder="포장번호 / 출고번호 스캔"
             .value="${this.searchKeyword}"
             @input="${e => { this.searchKeyword = e.target.value; this.listPage = 1 }}"
             @keydown="${e => { if (e.key === 'Enter') this._onScanPackingOrder(e.target.value) }}"
@@ -1217,7 +1116,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
             </div>
           ` : ''}
 
-          <!-- 전체 검수 완료 → 포장 단계 이동 버튼 (재진입 시 포함) -->
+          <!-- 전체 검수 완료 → 포장 단계 이동 버튼 -->
           ${this.totalCount > 0 && this.completedCount >= this.totalCount ? html`
             <div class="current-item-panel" style="border-left-color: #4CAF50; text-align: center;">
               <div style="font-size: 15px; font-weight: 700; color: #2E7D32; margin-bottom: 12px;">
@@ -1234,16 +1133,14 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     `
   }
 
-  /* ===== 포장/운송장 화면 ===== */
+  /* ===== 포장 화면 (B2B: 운송장 없음, 거래명세서 출력) ===== */
 
-  /** 포장 패널 렌더링 - 포장 정보 입력, 운송장 등록, 출고 확정 */
+  /** 포장 패널 렌더링 - 포장 정보 입력, 출고 확정 + 거래명세서 출력 버튼 */
   _renderPackingPanel() {
     const order = this.selectedOrder
     if (!order) return this._renderEmptyPanel()
 
-    const isB2B = order.biz_type === 'B2B_OUT'
     const elapsed = this._formatElapsed(Date.now() - this.startTime)
-    const canRelease = isB2B || this.trackingNo.trim().length > 0
 
     return html`
       <div class="right-panel">
@@ -1261,7 +1158,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
         <div class="progress-text">${this.totalCount}/${this.totalCount} 검수 완료 (100%)</div>
 
         <div class="right-panel-content">
-          <!-- 요약 + 배송 정보 -->
+          <!-- 요약 + 주문 정보 -->
           <div class="packing-section">
             <div class="info-card">
               <h4>검수/포장 완료 요약</h4>
@@ -1303,43 +1200,20 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
             </div>
           </div>
 
-          <!-- 운송장 등록 - B2C만 표시 -->
-          ${!isB2B ? html`
-            <div class="tracking-area">
-              <h4>운송장 등록</h4>
-              <input
-                id="trackingInput"
-                type="text"
-                placeholder="운송장번호 스캔 또는 입력"
-                .value="${this.trackingNo}"
-                @input="${e => { this.trackingNo = e.target.value }}"
-                @keydown="${e => { if (e.key === 'Enter') this._confirmRelease() }}"
-              />
-            </div>
-          ` : ''}
-
-          <!-- 출고 확정 버튼 영역 -->
-          ${isB2B ? html`
-            <div style="display:flex; gap:12px; margin-bottom:16px;">
-              <button
-                class="btn-release"
-                style="flex:1; margin-bottom:0;"
-                ?disabled="${!canRelease}"
-                @click="${this._confirmRelease}"
-              >출고 확정</button>
-              <button
-                class="btn-release"
-                style="flex:1; margin-bottom:0; background: linear-gradient(135deg, #1565C0, #0D47A1); box-shadow: 0 2px 8px rgba(21,101,192,0.3);"
-                @click="${this._printDeliveryStatement}"
-              >거래명세서 출력</button>
-            </div>
-          ` : html`
+          <!-- 출고 확정 + 거래명세서 출력 (B2B 전용) -->
+          <div style="display:flex; gap:12px; margin-bottom:16px;">
             <button
               class="btn-release"
-              ?disabled="${!canRelease}"
+              id="releaseBtn"
+              style="flex:1; margin-bottom:0;"
               @click="${this._confirmRelease}"
             >출고 확정</button>
-          `}
+            <button
+              class="btn-release"
+              style="flex:1; margin-bottom:0; background: linear-gradient(135deg, #1565C0, #0D47A1); box-shadow: 0 2px 8px rgba(21,101,192,0.3);"
+              @click="${this._printDeliveryStatement}"
+            >거래명세서 출력</button>
+          </div>
         </div>
       </div>
     `
@@ -1347,7 +1221,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
 
   /* ===== 완료 화면 ===== */
 
-  /** 완료 패널 렌더링 - 출고 완료 통계, 라벨 출력, 다음 검수 시작 */
+  /** 완료 패널 렌더링 - 출고 완료 통계, 거래명세서 출력, 다음 검수 시작 */
   _renderCompletePanel() {
     const order = this.selectedOrder
     if (!order) return this._renderEmptyPanel()
@@ -1371,13 +1245,12 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
               <div class="stat-row"><span class="label">고객</span><span class="value">${order.cust_nm || '-'}</span></div>
               <div class="stat-row"><span class="label">총 품목 / 수량</span><span class="value">${this.totalCount}종 / ${this.packingItems.reduce((s, i) => s + (i.pack_qty || i.order_qty || 0), 0)} EA</span></div>
               <div class="stat-row"><span class="label">박스</span><span class="value">${this._boxTypeLabel(this.boxType)} × ${this.boxCount}개</span></div>
-              <div class="stat-row"><span class="label">운송장</span><span class="value">${this.trackingNo}</span></div>
               <div class="stat-row"><span class="label">소요 시간</span><span class="value">${elapsed}</span></div>
             </div>
 
             <div class="complete-actions">
               <button class="btn-action" @click="${this._popupPackingDetail}">상세</button>
-              <button class="btn-action" @click="${this._printPackingLabel}">배송 라벨 출력</button>
+              <button class="btn-action" @click="${this._printDeliveryStatement}">거래명세서 출력</button>
               <button class="btn-action primary" @click="${this._startNextInspection}">다음 검수 시작 →</button>
             </div>
           </div>
@@ -1436,14 +1309,13 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     }
   }
 
-  /** 포장 주문 목록 새로고침 - 모든 필터 조건을 서버에 전달하여 조회 */
+  /** 포장 주문 목록 새로고침 - B2B_OUT 고정, 모든 필터 조건을 서버에 전달하여 조회 */
   async _refresh() {
     try {
       this.loading = this.packingOrders.length === 0
 
       const orderDate = this.orderDate || ValueUtil.todayFormatted()
-      const params = new URLSearchParams({ order_date: orderDate })
-      if (this.filterBizType) params.append('biz_type', this.filterBizType)
+      const params = new URLSearchParams({ order_date: orderDate, biz_type: 'B2B_OUT' })
       if (this.filterStationCd) params.append('station_cd', this.filterStationCd)
       if (this.searchKeyword) params.append('keyword', this.searchKeyword)
 
@@ -1465,7 +1337,6 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
   async _loadPackingItems(packingOrderId) {
     try {
       const items = await ServiceUtil.restGet(`ful_trx/packing_order_items?packing_order_id=${packingOrderId}`)
-      // insp_qty >= pack_qty 인 항목은 서버 status와 무관하게 COMPLETED 로 정규화
       this.packingItems = (Array.isArray(items) ? items : []).map(item => {
         const orderQty = item.pack_qty || item.order_qty || 1
         const inspQty = item.insp_qty || 0
@@ -1496,14 +1367,12 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
   /** 포장 주문 선택 - 검수 작업 시작 또는 완료 건 조회 */
   async _onSelectOrder(order) {
     if (order.status === 'COMPLETED') {
-      // 완료 건은 읽기 전용으로 보기
       this.selectedOrder = order
       this.rightPanelMode = 'complete'
       await this._loadPackingItems(order.id)
       return
     }
 
-    // CREATED 상태인 경우 IN_PROGRESS로 전환
     if (order.status === 'CREATED') {
       try {
         await ServiceUtil.restPost(`ful_trx/packing_orders/${order.id}/start`, {})
@@ -1521,10 +1390,8 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     this.lastScannedItem = null
 
     await this._loadPackingItems(order.id)
-
     this._recommendBoxType()
 
-    // 바코드 입력에 포커스
     await this.updateComplete
     this.shadowRoot?.querySelector('sku-barcode-input')?.focus()
   }
@@ -1542,18 +1409,13 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     } else if (this.packingOrders.length === 0) {
       this._showFeedback('error', '해당 포장 주문을 찾을 수 없습니다')
     }
-    // 여러 건이면 목록에서 선택하도록 둠
   }
 
   /* ==============================================================
    * 우측 패널: 검수 작업
    * ============================================================== */
 
-  /** 상품 바코드 스캔 처리 - sku-barcode-input이 SKU 해석 후 발생시키는 sku-select 이벤트 핸들러 */
-  /**
-   * 검수 수량 직접 입력 처리 — 스캔 대신 수량을 타이핑하여 설정
-   * 0 이상 주문 수량 이하로 클램핑하며, 주문 수량과 같아지면 검수 완료 버튼이 활성화됨
-   */
+  /** 검수 수량 직접 입력 처리 */
   _onManualQtyInput(itemIndex, value) {
     const item = this.packingItems[itemIndex]
     if (!item) return
@@ -1573,7 +1435,6 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
   async _onSkuSelect(e) {
     const { sku_cd, sku_nm } = e.detail
 
-    // 미완료 항목 중 SKU 코드 매칭
     const matchIndex = this.packingItems.findIndex(
       item => item.status !== 'COMPLETED' && (item.sku_cd === sku_cd || item.product_cd === sku_cd)
     )
@@ -1583,7 +1444,6 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
       const orderQty = item.pack_qty || item.order_qty || 1
       const currentInspQty = item.insp_qty || 0
 
-      // 이미 검수 수량이 주문 수량 이상이면 추가 스캔 차단
       if (currentInspQty >= orderQty) {
         this.lastScannedItem = {
           success: false,
@@ -1596,11 +1456,8 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
       }
 
       this.currentItemIndex = matchIndex
-
-      // 검수 수량 1 증가
       const newInspQty = currentInspQty + 1
 
-      // 로컬 상태 업데이트
       this.packingItems = this.packingItems.map((it, idx) =>
         idx === matchIndex ? { ...it, insp_qty: newInspQty } : it
       )
@@ -1610,11 +1467,9 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
         message: `${item.sku_cd} (${item.sku_nm || sku_nm}) — ${newInspQty}/${orderQty} ✅`
       }
 
-      // 주문 수량에 도달하면 자동 검수 완료
       if (newInspQty >= orderQty) {
         this._confirmInspection()
       } else {
-        // 아직 남은 수량이 있으면 동일 바코드 재스캔을 위해 포커스 유지
         this._showFeedback('success', `${item.sku_cd} 스캔 완료 (${newInspQty}/${orderQty}) — ${orderQty - newInspQty}개 더 스캔하세요`)
         await this.updateComplete
         this.shadowRoot?.querySelector('sku-barcode-input')?.focus()
@@ -1648,7 +1503,6 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
         }
       )
 
-      // 로컬 상태 업데이트
       this.packingItems = this.packingItems.map((it, idx) =>
         idx === this.currentItemIndex ? { ...it, status: 'COMPLETED' } : it
       )
@@ -1656,12 +1510,10 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
 
       this._showFeedback('success', `검수 완료 (${this.completedCount}/${this.totalCount})`)
 
-      // 전체 완료 확인
       if (this.completedCount >= this.totalCount) {
         this._onInspectionComplete()
       } else {
         this._moveToNextItem()
-        // 바코드 입력에 포커스
         await this.updateComplete
         this.shadowRoot?.querySelector('sku-barcode-input')?.focus()
       }
@@ -1671,7 +1523,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     }
   }
 
-  /** 다음 미완료 항목으로 이동 - 현재 인덱스 이후 또는 처음부터 검색 */
+  /** 다음 미완료 항목으로 이동 */
   _moveToNextItem() {
     const nextIdx = this.packingItems.findIndex(
       (item, idx) => idx > this.currentItemIndex && item.status !== 'COMPLETED'
@@ -1680,28 +1532,25 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     if (nextIdx >= 0) {
       this.currentItemIndex = nextIdx
     } else {
-      // 앞쪽에서 미완료 항목 찾기
       const firstIdx = this.packingItems.findIndex(item => item.status !== 'COMPLETED')
       this.currentItemIndex = firstIdx >= 0 ? firstIdx : -1
     }
   }
 
-  /** 검수 완료 처리 - 포장 정보 입력 화면으로 전환 */
+  /** 검수 완료 처리 - 포장 정보 입력 화면으로 전환, 출고 확정 버튼에 포커스 */
   _onInspectionComplete() {
     this.rightPanelMode = 'packing'
-    this.trackingNo = this.selectedOrder?.invoice_no || ''
     this._recommendBoxType()
 
-    // 운송장 입력에 포커스
     setTimeout(async () => {
       await this.updateComplete
-      const input = this.shadowRoot?.getElementById('trackingInput')
-      if (input) input.focus()
+      const btn = this.shadowRoot?.getElementById('releaseBtn')
+      if (btn) btn.focus()
     }, 100)
   }
 
   /* ==============================================================
-   * 우측 패널: 포장/운송장/출고 확정
+   * 우측 패널: 포장/출고 확정
    * ============================================================== */
 
   /** 박스 유형 추천 - 총 수량에 따라 박스 크기 자동 선택 */
@@ -1713,14 +1562,8 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     else this.boxType = 'XLARGE'
   }
 
-  /** 출고 확정 - 포장/운송장 정보로 포장 주문 완료 처리 */
+  /** 출고 확정 - B2B는 운송장 불필요, 포장 정보만으로 완료 처리 */
   async _confirmRelease() {
-    const isB2B = this.selectedOrder?.biz_type === 'B2B_OUT'
-    if (!isB2B && !this.trackingNo.trim()) {
-      this._showFeedback('warning', '운송장번호를 입력해주세요')
-      return
-    }
-
     try {
       await ServiceUtil.restPost(
         `ful_trx/packing_orders/${this.selectedOrder.id}/complete`,
@@ -1728,14 +1571,13 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
           boxType: this.boxType,
           boxCount: this.boxCount,
           boxWeight: this.boxWeight,
-          trackingNo: this.trackingNo.trim()
+          trackingNo: ''
         }
       )
 
       this._showFeedback('success', '출고가 완료되었습니다')
       this.rightPanelMode = 'complete'
 
-      // 좌측 목록 갱신 후 검색 입력 박스에 포커스
       await this._refresh()
       await this.updateComplete
       this._focusSearchInput()
@@ -1764,23 +1606,10 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     )
   }
 
-  /** 배송 라벨 출력 요청 - 백엔드 API 호출 */
-  async _printPackingLabel() {
-    if (!this.selectedOrder) return
-    try {
-      await ServiceUtil.restPost(`ful_trx/packing_orders/${this.selectedOrder.id}/print_label`, {})
-      this._showFeedback('info', '배송 라벨 출력 요청 완료')
-    } catch (err) {
-      console.error('배송 라벨 출력 실패:', err)
-      this._showFeedback('error', '출력 요청 중 오류가 발생했습니다')
-    }
-  }
-
   /** 거래명세서 출력 - B2B 전용 */
   async _printDeliveryStatement() {
     if (!this.selectedOrder) return
 
-    // title, popupConfig, paramData, parentIdValue, popupCloseCallback
     MetaApi.openDynamicPopup('거래명세서 출력', {
       "module": "metapage",
       "import": "pages/basic-pdf-element.js",
@@ -1794,7 +1623,10 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
 
   /** 다음 검수 시작 - 대기 중인 다음 포장 주문 자동 선택 */
   _startNextInspection() {
-    const nextOrder = this.packingOrders.find(o => (o.status === 'IN_PROGRESS' || o.status === 'CREATED') && (!this.selectedOrder || o.id !== this.selectedOrder.id))
+    const nextOrder = this.packingOrders.find(o =>
+      (o.status === 'IN_PROGRESS' || o.status === 'CREATED') &&
+      (!this.selectedOrder || o.id !== this.selectedOrder.id)
+    )
     if (nextOrder) {
       this._onSelectOrder(nextOrder)
     } else {
@@ -1817,7 +1649,6 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     this.completedCount = 0
     this.totalCount = 0
     this.lastScannedItem = null
-    this.trackingNo = ''
   }
 
   /** 피드백 토스트 메시지 표시 - 2.5초 후 자동 숨김 */
@@ -1830,7 +1661,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     }, 2500)
   }
 
-  /** 키보드 단축키 설정 - F2/F5/F8/Esc 키 이벤트 리스너 등록 */
+  /** 키보드 단축키 설정 - F2/F5/F8/Esc */
   _setupKeyboardShortcuts() {
     this._removeKeyboardShortcuts()
     this._keyHandler = (e) => {
@@ -1850,7 +1681,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     document.addEventListener('keydown', this._keyHandler)
   }
 
-  /** 키보드 단축키 제거 - 이벤트 리스너 해제 */
+  /** 키보드 단축키 제거 */
   _removeKeyboardShortcuts() {
     if (this._keyHandler) {
       document.removeEventListener('keydown', this._keyHandler)
@@ -1858,7 +1689,7 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     }
   }
 
-  /** 경과 시간 포맷 - 밀리초를 "분 초" 형식으로 변환 */
+  /** 경과 시간 포맷 */
   _formatElapsed(ms) {
     const totalSec = Math.floor(ms / 1000)
     const min = Math.floor(totalSec / 60)
@@ -1866,11 +1697,11 @@ class FulfillmentPackingPc extends localize(i18next)(PageView) {
     return `${min}분 ${sec < 10 ? '0' : ''}${sec}초`
   }
 
-  /** 박스 유형 라벨 변환 - 코드값을 한글 표시명으로 변환 */
+  /** 박스 유형 라벨 변환 */
   _boxTypeLabel(type) {
     const map = { SMALL: '소형', MEDIUM: '중형', LARGE: '대형', XLARGE: '특대형' }
     return map[type] || type || '-'
   }
 }
 
-window.customElements.define('fulfillment-packing-pc', FulfillmentPackingPc)
+window.customElements.define('fulfillment-b2b-packing-pc', FulfillmentB2bPackingPc)

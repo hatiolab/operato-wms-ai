@@ -21,6 +21,8 @@ import './pages/fulfillment/packing-order-list'
 import './pages/fulfillment/packing-order-detail'  // 팝업으로 사용
 import './pages/fulfillment/fulfillment-picking-pc'
 import './pages/fulfillment/fulfillment-packing-pc'
+import './pages/fulfillment/fulfillment-b2c-packing-pc'
+import './pages/fulfillment/fulfillment-b2b-packing-pc'
 import './pages/fulfillment/shipment-tracking'
 
 import './pages/outbound/outbound-home'

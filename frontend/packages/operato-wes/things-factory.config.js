@@ -23,6 +23,8 @@ export default {
     { tagname: 'packing-order-detail', page: 'packing-order-detail' },
     { tagname: 'fulfillment-picking-pc', page: 'fulfillment-picking-pc' },
     { tagname: 'fulfillment-packing-pc', page: 'fulfillment-packing-pc' },
+    { tagname: 'fulfillment-b2c-packing-pc', page: 'fulfillment-b2c-packing-pc' },
+    { tagname: 'fulfillment-b2b-packing-pc', page: 'fulfillment-b2b-packing-pc' },
     { tagname: 'shipment-tracking', page: 'shipment-tracking' },
 
     { tagname: 'inbound-home', page: 'inbound-home' },

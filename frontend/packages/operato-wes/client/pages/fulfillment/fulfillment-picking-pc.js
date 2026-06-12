@@ -38,48 +38,6 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
           overflow: hidden;
         }
 
-        /* ===== 페이지 헤더 ===== */
-        .page-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 12px 24px;
-          border-bottom: 1px solid var(--md-sys-color-outline-variant, #E0E0E0);
-        }
-
-        .page-header h2 {
-          margin: 0;
-          font: var(--title-font);
-          color: var(--title-text-color);
-        }
-
-        .header-actions {
-          display: flex;
-          gap: 8px;
-          align-items: center;
-        }
-
-        .btn {
-          padding: 8px 16px;
-          border: none;
-          border-radius: 8px;
-          font-size: 14px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .btn-outline {
-          background: transparent;
-          color: var(--md-sys-color-primary);
-          border: 1px solid var(--md-sys-color-primary);
-        }
-
-        .btn-outline:hover {
-          background: var(--md-sys-color-primary);
-          color: var(--md-sys-color-on-primary);
-        }
-
         /* ===== 메인 컨텐츠 (2패널) ===== */
         .main-content {
           display: flex;
@@ -89,8 +47,8 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
 
         /* ===== 좌측 패널 ===== */
         .left-panel {
-          width: 350px;
-          min-width: 300px;
+          width: 280px;
+          min-width: 240px;
           background: var(--md-sys-color-surface, white);
           border-right: 1px solid var(--md-sys-color-outline-variant, #E0E0E0);
           display: flex;
@@ -101,21 +59,41 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
         .search-area {
           padding: 12px 16px;
           border-bottom: 1px solid #F0F0F0;
+          display: flex;
+          gap: 6px;
+          align-items: center;
         }
 
         .search-area input {
-          width: 100%;
+          flex: 1;
           padding: 8px 12px;
           border: 1px solid var(--md-sys-color-outline-variant, #E0E0E0);
           border-radius: 6px;
           font-size: 13px;
           box-sizing: border-box;
           outline: none;
+          min-width: 0;
         }
 
         .search-area input:focus {
           border-color: var(--md-sys-color-primary, #1976D2);
           box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.12);
+        }
+
+        .btn-search {
+          flex-shrink: 0;
+          padding: 7px 10px;
+          border: 1px solid var(--md-sys-color-outline-variant, #E0E0E0);
+          border-radius: 6px;
+          background: var(--md-sys-color-surface, white);
+          font-size: 15px;
+          cursor: pointer;
+          line-height: 1;
+          transition: background 0.15s;
+        }
+
+        .btn-search:hover {
+          background: var(--md-sys-color-surface-variant, #f5f5f5);
         }
 
         .filter-chips {
@@ -172,6 +150,36 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
           padding: 4px 8px 8px;
           font-size: 12px;
           color: var(--md-sys-color-on-surface-variant, #757575);
+        }
+
+        /* ===== 좌측 패널 페이지네이션 ===== */
+        .list-pagination {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 6px 12px;
+          border-top: 1px solid #F0F0F0;
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant, #757575);
+          flex-shrink: 0;
+        }
+
+        .list-pagination button {
+          padding: 3px 10px;
+          border: 1px solid var(--md-sys-color-outline-variant, #E0E0E0);
+          border-radius: 4px;
+          background: var(--md-sys-color-surface, white);
+          font-size: 12px;
+          cursor: pointer;
+        }
+
+        .list-pagination button:hover:not(:disabled) {
+          background: var(--md-sys-color-surface-variant, #f5f5f5);
+        }
+
+        .list-pagination button:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
         }
 
         /* ===== 피킹 지시 카드 ===== */
@@ -763,7 +771,8 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
       startTime: Number,
       statsEnd: Number,
       feedbackMsg: String,
-      feedbackType: String
+      feedbackType: String,
+      listPage: Number
     }
   }
 
@@ -788,6 +797,8 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     this.statsEnd = 0
     this.feedbackMsg = ''
     this.feedbackType = ''
+    this.listPage = 1
+    this._listPageSize = 20
     this._keyHandler = null
   }
 
@@ -808,13 +819,6 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     const runCount = this.pickingTasks.filter(t => t.status === 'IN_PROGRESS').length
 
     return html`
-      <div class="page-header">
-        <h2>${TermsUtil.tMenu('FulfillmentPickingPc')}</h2>
-        <div class="header-actions">
-          <button class="btn btn-outline" @click="${this._refresh}">🔍 ${TermsUtil.tButton('refresh')}</button>
-        </div>
-      </div>
-
       <div class="main-content">
         ${this._renderLeftPanel()}
         ${this._renderRightPanel()}
@@ -851,10 +855,14 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
   /* ===== 좌측 패널 ===== */
 
   /** 좌측 패널 렌더링 - 검색, 필터 칩, 피킹 지시 목록 표시 */
+  /** 좌측 패널 렌더링 - 검색, 필터, 피킹 지시 카드 목록 (페이지당 20건) */
   _renderLeftPanel() {
-    const filtered = this._getFilteredTasks()
+    const allFiltered = this._getFilteredTasks()
     const waitCount = this.pickingTasks.filter(t => t.status === 'CREATED').length
     const runCount = this.pickingTasks.filter(t => t.status === 'IN_PROGRESS').length
+    const totalPages = Math.max(1, Math.ceil(allFiltered.length / this._listPageSize))
+    const safePage = Math.min(this.listPage, totalPages)
+    const pageTasks = allFiltered.slice((safePage - 1) * this._listPageSize, safePage * this._listPageSize)
 
     return html`
       <div class="left-panel">
@@ -863,8 +871,9 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
             type="text"
             placeholder="피킹지시번호 검색"
             .value="${this.searchKeyword}"
-            @input="${e => { this.searchKeyword = e.target.value }}"
+            @input="${e => { this.searchKeyword = e.target.value; this.listPage = 1 }}"
           />
+          <button class="btn-search" title="새로고침" @click="${this._refresh}">🔍</button>
         </div>
 
         <div class="filter-chips">
@@ -874,14 +883,22 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
         </div>
 
         <div class="task-list">
-          <div class="task-list-header">피킹 지시: ${filtered.length}건</div>
+          <div class="task-list-header">피킹 지시: ${allFiltered.length}건</div>
           ${this.loading
         ? html`<div class="loading-text">조회 중...</div>`
-        : filtered.length === 0
+        : pageTasks.length === 0
           ? html`<div class="loading-text">피킹 지시가 없습니다</div>`
-          : filtered.map(task => this._renderPickingTaskCard(task))
+          : pageTasks.map(task => this._renderPickingTaskCard(task))
       }
         </div>
+
+        ${totalPages > 1 ? html`
+          <div class="list-pagination">
+            <button ?disabled="${safePage <= 1}" @click="${() => { this.listPage = safePage - 1 }}">◀</button>
+            <span>${safePage} / ${totalPages} (${allFiltered.length}건)</span>
+            <button ?disabled="${safePage >= totalPages}" @click="${() => { this.listPage = safePage + 1 }}">▶</button>
+          </div>
+        ` : ''}
       </div>
     `
   }
@@ -891,7 +908,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     return html`
       <div
         class="filter-chip ${this.filterStatus === status ? 'active' : ''}"
-        @click="${() => { this.filterStatus = status }}"
+        @click="${() => { this.filterStatus = status; this.listPage = 1 }}"
       >
         ${label}<span class="badge">${count}</span>
       </div>

@@ -304,109 +304,247 @@ public class FulfillmentPackingService extends AbstractQueryService {
 	}
 
 	/**
-	 * 대기중인 포장 주문 목록 조회
+	 * 포장 주문 건수 집계 (대기/완료/전체)
 	 *
+	 * 검색 조건에 맞는 포장 주문의 대기/완료/전체 건수를 반환한다.
+	 * 포장 주문 목록 조회와 별도로 가볍게 호출하기 위한 API.
+	 *
+	 * @param bizType   업무 유형 (B2C_OUT, B2B_OUT)
+	 * @param orderDate 주문 날짜 / 웨이브 일자 (YYYY-MM-DD)
+	 * @param stationCd 포장 작업장 코드
+	 * @param waveSeq   웨이브 차수
+	 * @return { total, waiting, completed }
+	 */
+	@SuppressWarnings("rawtypes")
+	public Map<String, Object> countPackingOrders(String bizType, String orderDate, String stationCd, String waveSeq) {
+		Long domainId = Domain.currentDomainId();
+		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+
+		StringBuilder sql = new StringBuilder();
+		sql.append("SELECT");
+		sql.append(" COUNT(*) AS total,");
+		sql.append(" COUNT(*) FILTER (WHERE po.status IN ('CREATED', 'IN_PROGRESS')) AS waiting,");
+		sql.append(" COUNT(*) FILTER (WHERE po.status NOT IN ('CREATED', 'IN_PROGRESS', 'CANCELLED')) AS completed");
+		sql.append(" FROM packing_orders po");
+		sql.append(" LEFT JOIN shipment_orders so ON so.domain_id = po.domain_id AND so.shipment_no = po.shipment_no");
+		sql.append(" WHERE po.domain_id = :domainId");
+
+		if (ValueUtil.isNotEmpty(bizType)) {
+			sql.append(" AND so.biz_type = :bizType");
+			params.put("bizType", bizType);
+		}
+
+		if (ValueUtil.isNotEmpty(orderDate)) {
+			if (ValueUtil.isNotEmpty(waveSeq)) {
+				sql.append(" AND po.wave_no = (SELECT wave_no FROM shipment_waves WHERE domain_id = :domainId AND wave_date = :orderDate AND wave_seq = :waveSeq)");
+				params.put("waveSeq", Integer.parseInt(waveSeq));
+			} else {
+				sql.append(" AND po.order_date = :orderDate");
+			}
+			params.put("orderDate", orderDate);
+		}
+
+		if (ValueUtil.isNotEmpty(stationCd)) {
+			sql.append(" AND po.station_cd = :stationCd");
+			params.put("stationCd", stationCd);
+		}
+
+		List<Map> rows = this.queryManager.selectListBySql(sql.toString(), params, Map.class, 0, 1);
+		if (rows.isEmpty()) {
+			return ValueUtil.newMap("total,waiting,completed", 0L, 0L, 0L);
+		}
+		Map row = rows.get(0);
+		long total = row.get("total") != null ? Long.parseLong(row.get("total").toString()) : 0L;
+		long waiting = row.get("waiting") != null ? Long.parseLong(row.get("waiting").toString()) : 0L;
+		long completed = row.get("completed") != null ? Long.parseLong(row.get("completed").toString()) : 0L;
+		return ValueUtil.newMap("total,waiting,completed", total, waiting, completed);
+	}
+
+	/**
+	 * 포장 주문 목록 조회 (상태/날짜/업무유형/작업장 필터)
+	 *
+	 * @param bizType   업무 유형 (B2C_OUT, B2B_OUT)
 	 * @param orderDate 주문 날짜 (YYYY-MM-DD)
+	 * @param status    주문 상태 (INSPECTED, PACKING, COMPLETED 등)
+	 * @param stationCd 포장 작업장 코드
 	 * @return 포장 주문 목록
 	 */
 	@SuppressWarnings("rawtypes")
-	public List<Map> searchTodoPackingOrders(String orderDate) {
+	public List<Map> searchPackingOrders(String bizType, String orderDate, String status, String stationCd) {
 		Long domainId = Domain.currentDomainId();
-
-		String cols = "po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.carrier_cd,"
-				+ " po.status, po.created_at, po.started_at, po.completed_at,"
-				+ " po.total_box, po.total_wt, po.invoice_no,"
-				+ " so.biz_type,"
-				+ " so.cust_nm,"
-				+ " (SELECT SUM(poi.order_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,"
-				+ " (SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,"
-				+ " (SELECT SUM(poi.pack_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty";
-
-		String join = " LEFT JOIN shipment_orders so ON so.domain_id = po.domain_id AND so.shipment_no = po.shipment_no";
-
-		// 대기: 오늘 날짜 order_date만 / 작업중: 날짜 무관 전체
-		// order_date는 varchar 타입이므로 TO_CHAR로 문자열 캐스팅
-		String sql = "SELECT " + cols + " FROM packing_orders po" + join
-				+ " WHERE po.domain_id = :domainId AND po.status = 'CREATED' AND po.order_date = TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD')"
-				+ " UNION ALL"
-				+ " SELECT " + cols + " FROM packing_orders po" + join
-				+ " WHERE po.domain_id = :domainId AND po.status = 'IN_PROGRESS'"
-				+ " ORDER BY created_at";
-
 		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
-		return this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+
+		StringBuilder sql = new StringBuilder();
+		sql.append("SELECT po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.carrier_cd,");
+		sql.append(" po.status, po.started_at, po.completed_at, po.total_box, po.total_wt, so.biz_type, so.cust_nm,");
+		sql.append(" (SELECT SUM(poi.order_qty) FROM packing_order_items poi");
+		sql.append(" WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,");
+		sql.append(" (SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi");
+		sql.append(" WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,");
+		sql.append(" (SELECT SUM(poi.pack_qty) FROM packing_order_items poi");
+		sql.append(" WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty");
+		sql.append(" FROM packing_orders po");
+		sql.append(" LEFT JOIN shipment_orders so ON so.domain_id = po.domain_id AND so.shipment_no = po.shipment_no");
+		sql.append(" WHERE po.domain_id = :domainId");
+
+		if (ValueUtil.isNotEmpty(bizType)) {
+			sql.append(" AND so.biz_type = :bizType");
+			params.put("bizType", bizType);
+		}
+
+		if (ValueUtil.isNotEmpty(orderDate)) {
+			sql.append(" AND po.order_date = :orderDate");
+			params.put("orderDate", orderDate);
+		}
+
+		if (ValueUtil.isNotEmpty(status)) {
+			sql.append(" AND po.status = :status");
+			params.put("status", status);
+		}
+
+		if (ValueUtil.isNotEmpty(stationCd)) {
+			sql.append(" AND po.station_cd = :stationCd");
+			params.put("stationCd", stationCd);
+		}
+
+		return this.queryManager.selectListBySql(sql.toString(), params, Map.class, 0, 0);
+	}
+
+	/**
+	 * 대기중인 포장 주문 목록 조회
+	 *
+	 * @param bizType   업무 유형 (B2C_OUT, B2B_OUT)
+	 * @param orderDate 주문 날짜 (YYYY-MM-DD)
+	 * @param stationCd 포장 작업장 코드
+	 * @param keyword   포장번호/출고번호/송장번호/고객명 검색어
+	 * @param waveSeq   웨이브 시퀀스
+	 * @return 포장 주문 목록
+	 */
+	@SuppressWarnings("rawtypes")
+	public List<Map> searchTodoPackingOrders(String bizType, String orderDate, String stationCd, String keyword,
+			String waveSeq) {
+		Long domainId = Domain.currentDomainId();
+		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+
+		StringBuilder sql = new StringBuilder();
+		sql.append("SELECT");
+		sql.append(" 	po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.invoice_no,");
+		sql.append(" 	so.biz_type, so.cust_nm, po.station_cd, po.status, po.started_at,");
+		sql.append(" 	(SELECT SUM(poi.order_qty) FROM packing_order_items poi");
+		sql.append(" 		WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,");
+		sql.append(" 	(SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi");
+		sql.append(" 		WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,");
+		sql.append(" 	(SELECT SUM(poi.pack_qty) FROM packing_order_items poi");
+		sql.append(" 		WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty");
+		sql.append(" FROM packing_orders po LEFT JOIN shipment_orders so ");
+		sql.append(" 		ON so.domain_id = po.domain_id AND so.shipment_no = po.shipment_no");
+		sql.append(" WHERE");
+		sql.append(" 	po.domain_id = :domainId");
+		sql.append(" AND po.status IN ('CREATED', 'IN_PROGRESS')");
+
+		if (ValueUtil.isNotEmpty(bizType)) {
+			sql.append(" 	AND so.biz_type = :bizType");
+			params.put("bizType", bizType);
+		}
+
+		if (ValueUtil.isNotEmpty(orderDate)) {
+			if (ValueUtil.isEmpty(bizType) || ValueUtil.isEqualIgnoreCase(bizType, "B2B_OUT")) {
+				sql.append(" 	AND po.order_date = :orderDate");
+			} else {
+				if (ValueUtil.isEmpty(waveSeq)) {
+					sql.append(" 	AND po.order_date = :orderDate");
+				} else {
+					sql.append(" 	AND po.wave_no = (");
+					sql.append("		select wave_no from shipment_waves where domain_id = :domainId and");
+					sql.append("		wave_date = :orderDate and wave_seq = :waveSeq)");
+					params.put("waveSeq", Integer.parseInt(waveSeq));
+				}
+			}
+
+			params.put("orderDate", orderDate);
+		}
+
+		if (ValueUtil.isNotEmpty(stationCd)) {
+			sql.append(" AND po.station_cd = :stationCd");
+			params.put("stationCd", stationCd);
+		}
+
+		if (ValueUtil.isNotEmpty(keyword)) {
+			sql.append(" AND (po.pack_order_no ILIKE :kw OR po.shipment_no ILIKE :kw");
+			sql.append(" OR po.invoice_no ILIKE :kw OR so.cust_nm ILIKE :kw)");
+			params.put("kw", "%" + keyword + "%");
+		}
+
+		sql.append(" ORDER BY po.created_at");
+		return this.queryManager.selectListBySql(sql.toString(), params, Map.class, 0, 0);
 	}
 
 	/**
 	 * 완료된 포장 주문 목록 조회
 	 *
+	 * @param bizType   업무 유형 (B2C_OUT, B2B_OUT)
 	 * @param orderDate 주문 날짜 (YYYY-MM-DD)
+	 * @param stationCd 포장 작업장 코드
+	 * @param keyword   포장번호/출고번호/송장번호/고객명 검색어
+	 * @param waveSeq   웨이브 시퀀스
 	 * @return 포장 주문 목록
 	 */
 	@SuppressWarnings("rawtypes")
-	public List<Map> searchDonePackingOrders(String orderDate) {
+	public List<Map> searchDonePackingOrders(String bizType, String orderDate, String stationCd, String keyword,
+			String waveSeq) {
 		Long domainId = Domain.currentDomainId();
-
-		// 완료: completed_at = 오늘인 것만 (상태는 CREATED/IN_PROGRESS/CANCELLED 제외 전부)
-		String sql = "SELECT po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.carrier_cd,"
-				+ " po.status, po.created_at, po.started_at, po.completed_at,"
-				+ " po.total_box, po.total_wt, po.invoice_no,"
-				+ " so.biz_type,"
-				+ " so.cust_nm,"
-				+ " (SELECT SUM(poi.order_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,"
-				+ " (SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,"
-				+ " (SELECT SUM(poi.pack_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty"
-				+ " FROM packing_orders po"
-				+ " LEFT JOIN shipment_orders so ON so.domain_id = po.domain_id AND so.shipment_no = po.shipment_no"
-				+ " WHERE po.domain_id = :domainId"
-				+ " AND po.status NOT IN ('CREATED', 'IN_PROGRESS', 'CANCELLED')"
-				+ " AND LEFT(po.completed_at, 8) = TO_CHAR(CURRENT_DATE, 'YYYYMMDD')"
-				+ " ORDER BY po.completed_at DESC";
-
 		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
-		return this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
-	}
-
-	/**
-	 * 포장 주문 목록 조회 (상태/날짜 필터)
-	 *
-	 * @param status    주문 상태 (INSPECTED, PACKING, COMPLETED 등)
-	 * @param orderDate 주문 날짜 (YYYY-MM-DD)
-	 * @return 포장 주문 목록
-	 */
-	@SuppressWarnings("rawtypes")
-	public List<Map> searchPackingOrders(String status, String orderDate) {
-		Long domainId = Domain.currentDomainId();
 
 		StringBuilder sql = new StringBuilder();
-		sql.append("SELECT po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.carrier_cd,");
-		sql.append(" po.status, po.created_at, po.started_at, po.completed_at,");
-		sql.append(" po.total_box, po.total_wt,");
-		sql.append(
-				" (SELECT SUM(poi.order_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,");
-		sql.append(
-				" (SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,");
-		sql.append(
-				" (SELECT SUM(poi.pack_qty) FROM packing_order_items poi WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty");
-		sql.append(" FROM packing_orders po");
-		sql.append(" WHERE po.domain_id = :domainId");
+		sql.append("SELECT");
+		sql.append(" 	po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.invoice_no,");
+		sql.append(" 	so.biz_type, so.cust_nm, po.station_cd, po.status, po.started_at, po.completed_at");
+		sql.append(" 	(SELECT SUM(poi.order_qty) FROM packing_order_items poi");
+		sql.append(" 		WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,");
+		sql.append(" 	(SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi");
+		sql.append(" 		WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,");
+		sql.append(" 	(SELECT SUM(poi.pack_qty) FROM packing_order_items poi");
+		sql.append(" 		WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty");
+		sql.append(" FROM packing_orders po LEFT JOIN shipment_orders so ");
+		sql.append(" 		ON so.domain_id = po.domain_id AND so.shipment_no = po.shipment_no");
+		sql.append(" WHERE");
+		sql.append(" 	po.domain_id = :domainId");
+		sql.append(" AND po.status NOT IN ('CREATED', 'IN_PROGRESS', 'CANCELLED')");
 
-		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
-
-		if (status != null && !status.isEmpty()) {
-			sql.append(" AND po.status = :status");
-			params.put("status", status);
+		if (ValueUtil.isNotEmpty(bizType)) {
+			sql.append(" 	AND so.biz_type = :bizType");
+			params.put("bizType", bizType);
 		}
 
-		if (orderDate != null && !orderDate.isEmpty()) {
-			sql.append(" AND po.order_date = :orderDate");
+		if (ValueUtil.isNotEmpty(orderDate)) {
+			if (ValueUtil.isEmpty(bizType) || ValueUtil.isEqualIgnoreCase(bizType, "B2B_OUT")) {
+				sql.append(" 	AND po.order_date = :orderDate");
+			} else {
+				if (ValueUtil.isEmpty(waveSeq)) {
+					sql.append(" 	AND po.order_date = :orderDate");
+				} else {
+					sql.append(" 	AND po.wave_no = (");
+					sql.append("		select wave_no from shipment_waves where domain_id = :domainId and");
+					sql.append("		wave_date = :orderDate and wave_seq = :waveSeq)");
+					params.put("waveSeq", Integer.parseInt(waveSeq));
+				}
+			}
+
 			params.put("orderDate", orderDate);
 		}
 
-		// sql.append(
-		// " ORDER BY CASE po.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN
-		// 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, po.created_at");
+		if (ValueUtil.isNotEmpty(stationCd)) {
+			sql.append(" AND po.station_cd = :stationCd");
+			params.put("stationCd", stationCd);
+		}
 
+		if (ValueUtil.isNotEmpty(keyword)) {
+			sql.append(" AND (po.pack_order_no ILIKE :kw OR po.shipment_no ILIKE :kw");
+			sql.append(" OR po.invoice_no ILIKE :kw OR so.cust_nm ILIKE :kw)");
+			params.put("kw", "%" + keyword + "%");
+		}
+
+		sql.append(" ORDER BY po.started_at DESC");
 		return this.queryManager.selectListBySql(sql.toString(), params, Map.class, 0, 0);
 	}
 
