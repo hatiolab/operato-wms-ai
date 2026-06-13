@@ -69,6 +69,8 @@ export default {
 
     { tagname: 'pda-fulfillment-shipping', page: 'pda-fulfillment-shipping' },
     { tagname: 'pda-fulfillment-packing', page: 'pda-fulfillment-packing' },
+    { tagname: 'pda-fulfillment-b2c-packing', page: 'pda-fulfillment-b2c-packing' },
+    { tagname: 'pda-fulfillment-b2b-packing', page: 'pda-fulfillment-b2b-packing' },
     { tagname: 'pda-fulfillment-picking', page: 'pda-fulfillment-picking' },
     { tagname: 'pda-inbound-receiving', page: 'pda-inbound-receiving' },
     { tagname: 'pda-inbound-putaway', page: 'pda-inbound-putaway' },

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -504,6 +505,38 @@ public class FulfillmentTransactionController {
 			@org.springframework.web.bind.annotation.RequestParam(name = "keyword", required = false) String keyword,
 			@org.springframework.web.bind.annotation.RequestParam(name = "wave_seq", required = false) String waveSeq) {
 		return this.packingService.searchDonePackingOrders(bizType, orderDate, stationCd, keyword, waveSeq);
+	}
+
+	/**
+	 * 포장 주문 목록 서버 페이지네이션 조회 (todo + done 통합)
+	 * GET /rest/ful_trx/packing_orders/list?biz_type=B2C_OUT&order_date=2024-01-01&wave_seq=1&station_cd=ST01&page=1&size=10
+	 */
+	@GetMapping(value = "packing_orders/list", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Page packing orders (todo + done) with server-side pagination")
+	public Map<String, Object> pagePackingOrders(
+			@RequestParam(name = "biz_type", required = false) String bizType,
+			@RequestParam(name = "order_date", required = false) String orderDate,
+			@RequestParam(name = "wave_seq", required = false) String waveSeq,
+			@RequestParam(name = "station_cd", required = false) String stationCd,
+			@RequestParam(name = "page", defaultValue = "1") int page,
+			@RequestParam(name = "size", defaultValue = "10") int size) {
+		return this.packingService.pagePackingOrders(bizType, orderDate, waveSeq, stationCd, page, size);
+	}
+
+	/**
+	 * 바코드 스캔으로 포장 주문 단건 조회
+	 * GET /rest/ful_trx/packing_orders/find?biz_type=B2C_OUT&order_date=2024-01-01&wave_seq=1&station_cd=ST01&barcode=PO-001
+	 */
+	@GetMapping(value = "packing_orders/find", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Find a single packing order by barcode (pack_order_no / shipment_no / invoice_no)")
+	@SuppressWarnings("rawtypes")
+	public Map findPackingOrderByBarcode(
+			@RequestParam(name = "biz_type", required = false) String bizType,
+			@RequestParam(name = "order_date", required = false) String orderDate,
+			@RequestParam(name = "wave_seq", required = false) String waveSeq,
+			@RequestParam(name = "station_cd", required = false) String stationCd,
+			@RequestParam(name = "barcode") String barcode) {
+		return this.packingService.findPackingOrderByBarcode(bizType, orderDate, waveSeq, stationCd, barcode);
 	}
 
 	/**

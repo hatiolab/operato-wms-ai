@@ -199,6 +199,40 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
           border-left-color: #F44336;
         }
 
+        .order-card .card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 4px;
+        }
+
+        .order-card .status-badge {
+          padding: 2px 8px;
+          border-radius: 10px;
+          font-size: 11px;
+          font-weight: 600;
+          flex-shrink: 0;
+          white-space: nowrap;
+        }
+
+        .order-card .status-badge.created {
+          background: #fff3e0;
+          color: #ff9800;
+        }
+
+        .order-card .status-badge.in_progress {
+          background: #e3f2fd;
+          color: #1976d2;
+        }
+
+        .order-card .status-badge.completed,
+        .order-card .status-badge.label_printed,
+        .order-card .status-badge.manifested,
+        .order-card .status-badge.shipped {
+          background: #e8f5e9;
+          color: #4CAF50;
+        }
+
         .order-card .order-no {
           font-size: 13px;
           font-weight: 700;
@@ -878,10 +912,9 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
       startTime: Number,
       listPage: Number,
       waveDate: String,
-      filterStationCd: String,
       filterWaveSeq: String,
-      stationOptions: Array,
-      orderSummary: Object
+      orderSummary: Object,
+      totalOrderCount: Number
     }
   }
 
@@ -907,12 +940,11 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
     this.feedbackType = ''
     this.startTime = 0
     this.listPage = 1
-    this._listPageSize = 20
+    this._listPageSize = 10
     this.waveDate = ValueUtil.todayFormatted()
-    this.filterStationCd = ''
     this.filterWaveSeq = ''
-    this.stationOptions = []
     this.orderSummary = { total: 0, waiting: 0, completed: 0 }
+    this.totalOrderCount = 0
     this._keyHandler = null
   }
 
@@ -948,16 +980,15 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
 
   /* ===== 좌측 패널 ===== */
 
-  /** 좌측 패널 렌더링 - 검색, 필터, 포장 주문 카드 목록 (페이지당 20건) */
+  /** 좌측 패널 렌더링 - 검색, 필터, 포장 주문 카드 목록 (페이지당 10건, 서버 페이지네이션) */
   _renderLeftPanel() {
-    const allFiltered = this._getFilteredOrders()
-    const totalPages = Math.max(1, Math.ceil(allFiltered.length / this._listPageSize))
+    const totalPages = Math.max(1, Math.ceil(this.totalOrderCount / this._listPageSize))
     const safePage = Math.min(this.listPage, totalPages)
-    const pageOrders = allFiltered.slice((safePage - 1) * this._listPageSize, safePage * this._listPageSize)
     const summaryTotal = this.orderSummary?.total || 0
     const summaryCompleted = this.orderSummary?.completed || 0
     const summaryWaiting = this.orderSummary?.waiting || 0
-    const progressPct = summaryTotal > 0 ? Math.round((summaryCompleted / summaryTotal) * 100) : 0
+    const progressPct = summaryTotal > 0 ? (summaryCompleted / summaryTotal) * 100 : 0
+    const progressPctDisplay = progressPct.toFixed(1)
 
     return html`
       <div class="left-panel">
@@ -990,17 +1021,6 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
               @input="${e => { this.filterWaveSeq = e.target.value; this.listPage = 1 }}"
               @keydown="${e => { if (e.key === 'Enter') this._refresh() }}"
             />
-          </div>
-          <div class="filter-row">
-            <select
-              .value="${this.filterStationCd}"
-              @change="${e => { this.filterStationCd = e.target.value; this.listPage = 1 }}"
-            >
-              <option value="">작업장 전체</option>
-              ${this.stationOptions.map(opt => html`
-                <option value="${opt.name}">${opt.description || opt.name}</option>
-              `)}
-            </select>
             <button class="btn-search" title="새로고침" @click="${this._refresh}">🔍</button>
           </div>
         </div>
@@ -1010,23 +1030,23 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
             <div class="list-progress-fill" style="width: ${progressPct}%"></div>
           </div>
           <div class="order-list-header">
-            <span>검수/포장</span>
+            <span>검수/포장 ${progressPctDisplay}%</span>
             <span>대기 <strong>${summaryWaiting}</strong> / 완료 <strong>${summaryCompleted}</strong> (총 ${summaryTotal}건)</span>
           </div>
         </div>
 
         <div class="order-list">
-          ${pageOrders.length === 0
+          ${this.packingOrders.length === 0
         ? html`<div class="loading-text">포장 주문이 없습니다</div>`
-        : pageOrders.map(order => this._renderOrderCard(order))
+        : this.packingOrders.map(order => this._renderOrderCard(order))
       }
         </div>
 
         ${totalPages > 1 ? html`
           <div class="list-pagination">
-            <button ?disabled="${safePage <= 1}" @click="${() => { this.listPage = safePage - 1 }}">◀</button>
-            <span>${safePage} / ${totalPages} (${allFiltered.length}건)</span>
-            <button ?disabled="${safePage >= totalPages}" @click="${() => { this.listPage = safePage + 1 }}">▶</button>
+            <button ?disabled="${safePage <= 1}" @click="${() => this._goToPage(safePage - 1)}">◀</button>
+            <span>${safePage} / ${totalPages} (${this.totalOrderCount}건)</span>
+            <button ?disabled="${safePage >= totalPages}" @click="${() => this._goToPage(safePage + 1)}">▶</button>
           </div>
         ` : ''}
       </div>
@@ -1041,19 +1061,24 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
     const itemCount = order.total_items || 0
     const totalQty = order.total_qty || 0
     const progressPct = order.total_items > 0 ? Math.round((order.packed_qty / order.total_items) * 100) : 0
+    const statusClass = (order.status || '').toLowerCase()
+    const statusLabel =
+      order.status === 'CREATED'
+        ? TermsUtil.tLabel('wait') || '대기'
+        : order.status === 'IN_PROGRESS'
+          ? TermsUtil.tLabel('in_progress') || '진행중'
+          : TermsUtil.tLabel('completed') || '완료'
 
     return html`
       <div
         class="order-card ${isSelected ? 'selected' : ''} ${isCompleted ? 'completed' : ''}"
         @click="${() => this._onSelectOrder(order)}"
       >
-        <div class="order-no">포장 번호 : ${order.pack_order_no || '-'}</div>
-        <div class="order-no">출고 번호 : ${order.shipment_no || '-'}</div>
-        ${order.invoice_no ? html`
-          <div class="order-no" style="color:var(--md-sys-color-secondary,#388E3C); font-size:12px;">
-            송장 번호 : ${order.invoice_no}
-          </div>
-        ` : ''}
+        <div class="card-header">
+          <div class="order-no">송장 번호 : ${order.invoice_no || '-'}</div>
+          <span class="status-badge ${statusClass}">${statusLabel}</span>
+        </div>
+        <div class="order-no">주문 번호 : ${order.shipment_no}</div>
         <div class="meta">${customerNm}${itemCount ? ` | ${itemCount}종 ${totalQty}EA` : ''}</div>
         ${progressPct > 0 && progressPct < 100 ? html`
           <div class="progress-mini">
@@ -1112,7 +1137,7 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
       <div class="right-panel">
         <div class="right-panel-header">
           <div class="order-info">
-            포장 번호 : ${order.pack_order_no} (주문번호 : ${order.shipment_no}, 송장번호 : ${order.invoice_no || '-'})
+            송장 번호 : ${order.invoice_no} (포장 번호 : ${order.pack_order_no} 주문 번호 : ${order.shipment_no})
             <span>${order.cust_nm || ''}</span>
           </div>
           <button class="btn-close" @click="${this._closeWork}">닫기</button>
@@ -1267,6 +1292,8 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
             <div class="info-card">
               <h4>주문 정보</h4>
               <div class="info-row"><span class="label">고객명</span><span class="value">${order.cust_nm || '-'}</span></div>
+              <div class="info-row"><span class="label">송장번호</span><span class="value">${order.invoice_no || '-'}</span></div>
+              <div class="info-row"><span class="label">웨이브번호</span><span class="value">${order.wave_no || '-'}</span></div>
               <div class="info-row"><span class="label">출고번호</span><span class="value">${order.shipment_no || '-'}</span></div>
               <div class="info-row"><span class="label">포장번호</span><span class="value">${order.pack_order_no || '-'}</span></div>
               <div class="info-row"><span class="label">주문일자</span><span class="value">${order.order_date || '-'}</span></div>
@@ -1343,7 +1370,10 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
             <h3>출고 완료!</h3>
 
             <div class="complete-stats">
-              <div class="stat-row"><span class="label">포장 주문</span><span class="value">${order.pack_order_no}</span></div>
+              <div class="stat-row"><span class="label">송장번호</span><span class="value">${order.invoice_no}</span></div>
+              <div class="stat-row"><span class="label">웨이브번호</span><span class="value">${order.wave_no}</span></div>
+              <div class="stat-row"><span class="label">출고번호</span><span class="value">${order.shipment_no}</span></div>
+              <div class="stat-row"><span class="label">포장번호</span><span class="value">${order.pack_order_no}</span></div>
               <div class="stat-row"><span class="label">고객</span><span class="value">${order.cust_nm || '-'}</span></div>
               <div class="stat-row"><span class="label">총 품목 / 수량</span><span class="value">${this.totalCount}종 / ${this.packingItems.reduce((s, i) => s + (i.pack_qty || i.order_qty || 0), 0)} EA</span></div>
               <div class="stat-row"><span class="label">박스</span><span class="value">${this._boxTypeLabel(this.boxType)} × ${this.boxCount}개</span></div>
@@ -1366,10 +1396,9 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
    * 생명주기
    * ============================================================== */
 
-  /** 페이지 활성화 시 작업장 옵션 조회 및 키보드 단축키 설정 (포장 주문은 사용자가 검색 버튼 클릭 시 조회) */
+  /** 페이지 활성화 시 키보드 단축키 설정 (포장 주문은 사용자가 검색 버튼 클릭 시 조회) */
   async pageUpdated(_changes, _lifecycle, _before) {
     if (this.active) {
-      await this._fetchStationOptions()
       this._setupKeyboardShortcuts()
       await this.updateComplete
       this._focusScanInput()
@@ -1400,53 +1429,46 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
    * 데이터 조회
    * ============================================================== */
 
-  /** PACKING_STATION 공통코드 목록 조회 */
-  async _fetchStationOptions() {
-    try {
-      const codeMaster = await ServiceUtil.codeItems('PACKING_STATION')
-      if (!codeMaster || !codeMaster.id) return
-      this.stationOptions = codeMaster.items || []
-    } catch (err) {
-      this.stationOptions = []
-    }
-  }
-
   /** 포장 주문 목록 새로고침 - waveDate+waveSeq로 웨이브 조회 후 해당 wave_no의 B2C 포장 주문 조회 */
-  async _refresh() {
+  async _refresh(page = 1) {
+    if (!page || typeof page !== 'number') page = 1
+
+    if (!this.waveDate) {
+      this._showFeedback('error', '주문일을 선택해주세요.')
+      return
+    }
+    if (!this.filterWaveSeq) {
+      this._showFeedback('error', '웨이브 차수를 입력해주세요.')
+      return
+    }
+
     try {
       this.loading = this.packingOrders.length === 0
-      const params = new URLSearchParams({ biz_type: 'B2C_OUT' })
-
-      if (!this.waveDate) {
-        this._showFeedback('error', '주문일을 선택해주세요.')
-        this.loading = false
-        return
-      }
-
-      if (!this.filterWaveSeq) {
-        this._showFeedback('error', '웨이브 차수를 입력해주세요.')
-        this.loading = false
-        return
-      }
-
-      params.append('order_date', this.waveDate)
-      params.append('wave_seq', this.filterWaveSeq)
-      if (this.filterStationCd) params.append('station_cd', this.filterStationCd)
-      if (this.searchKeyword) params.append('keyword', this.searchKeyword)
-
-      const allOrders = await ServiceUtil.restGet(`ful_trx/packing_orders/todo?${params}`).catch(() => [])
-
-      allOrders.forEach(order => {
-        order._progressPct = order.total_items > 0 ? Math.round((order.packed_qty / order.total_items) * 100) : 0
+      const params = new URLSearchParams({
+        biz_type: 'B2C_OUT',
+        order_date: this.waveDate,
+        wave_seq: this.filterWaveSeq,
+        page: page,
+        size: this._listPageSize
       })
 
-      this.packingOrders = allOrders
-      this.loading = false
+      const result = await ServiceUtil.restGet(`ful_trx/packing_orders/list?${params}`)
+      this.packingOrders = result?.items || []
+      this.totalOrderCount = result?.total || 0
+      this.listPage = page
       await this._fetchOrderSummary()
     } catch (err) {
       console.error('포장 주문 조회 실패:', err)
+      this.packingOrders = []
+      this.totalOrderCount = 0
+    } finally {
       this.loading = false
     }
+  }
+
+  /** 페이지 이동 */
+  async _goToPage(page) {
+    await this._refresh(page)
   }
 
   /** 포장 주문 건수 조회 - waveDate/waveSeq 기준 대기/완료/전체 건수 */
@@ -1461,7 +1483,6 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
         order_date: this.waveDate,
         wave_seq: this.filterWaveSeq
       })
-      if (this.filterStationCd) params.append('station_cd', this.filterStationCd)
       const result = await ServiceUtil.restGet(`ful_trx/packing_orders/count?${params}`).catch(() => null)
       this.orderSummary = result || { total: 0, waiting: 0, completed: 0 }
     } catch (err) {
@@ -1495,17 +1516,13 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
    * 좌측 패널: 필터/검색/선택
    * ============================================================== */
 
-  /** 서버에서 이미 필터링된 포장 주문 목록 반환 */
-  _getFilteredOrders() {
-    return this.packingOrders
-  }
-
   /** 포장 주문 선택 - 검수 작업 시작 또는 완료 건 조회 */
   async _onSelectOrder(order) {
-    if (order.status === 'COMPLETED') {
+    if (!['CREATED', 'IN_PROGRESS'].includes(order.status)) {
       this.selectedOrder = order
       this.rightPanelMode = 'complete'
       await this._loadPackingItems(order.id)
+      await this._loadPackingBoxes(order.id)
       return
     }
 
@@ -1524,6 +1541,7 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
     this.rightPanelMode = 'inspection'
     this.startTime = Date.now()
     this.lastScannedItem = null
+    this.trackingNo = order.invoice_no || ''
 
     await this._loadPackingItems(order.id)
     this._recommendBoxType()
@@ -1532,18 +1550,51 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
     this.shadowRoot?.querySelector('sku-barcode-input')?.focus()
   }
 
-  /** 포장번호 바코드 스캔 - 서버 조회 후 1건이면 자동 선택 */
+  /** 포장 박스 목록 조회 → 박스/운송장 상태 복원 (완료 건 조회 시 사용) */
+  async _loadPackingBoxes(orderId) {
+    try {
+      const boxes = await ServiceUtil.restGet(`ful_trx/packing_orders/${orderId}/boxes`)
+      if (boxes && boxes.length > 0) {
+        const firstBox = boxes[0]
+        this.boxType = firstBox.box_type_cd || '-'
+        this.boxCount = boxes.length
+        this.boxWeight = firstBox.box_wt || 0
+        this.trackingNo = firstBox.invoice_no || '-'
+      } else {
+        this.boxType = '-'
+        this.boxCount = 0
+        this.boxWeight = 0
+        this.trackingNo = '-'
+      }
+    } catch (error) {
+      console.error('포장 박스 조회 실패:', error)
+    }
+  }
+
+  /** 포장번호 바코드 스캔 - 전용 find API로 단건 조회 후 자동 선택 */
   async _onScanPackingOrder(barcode) {
     if (!barcode || !barcode.trim()) return
-    this.searchKeyword = barcode.trim()
-    this.listPage = 1
-    await this._refresh()
-    await this.updateComplete
+    if (!this.waveDate || !this.filterWaveSeq) {
+      this._showFeedback('error', '웨이브 일자와 차수를 먼저 입력해주세요')
+      return
+    }
 
-    if (this.packingOrders.length === 1) {
-      await this._onSelectOrder(this.packingOrders[0])
-    } else if (this.packingOrders.length === 0) {
-      this._showFeedback('error', '해당 포장 주문을 찾을 수 없습니다')
+    try {
+      const params = new URLSearchParams({
+        biz_type: 'B2C_OUT',
+        order_date: this.waveDate,
+        wave_seq: this.filterWaveSeq,
+        barcode: barcode.trim()
+      })
+      const order = await ServiceUtil.restGet(`ful_trx/packing_orders/find?${params}`)
+      if (order) {
+        await this._onSelectOrder(order)
+      } else {
+        this._showFeedback('error', '해당 포장 주문을 찾을 수 없습니다')
+      }
+    } catch (err) {
+      console.error('포장 주문 스캔 조회 실패:', err)
+      this._showFeedback('error', '조회 중 오류가 발생했습니다')
     }
   }
 
@@ -1551,8 +1602,8 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
    * 우측 패널: 검수 작업
    * ============================================================== */
 
-  /** 검수 수량 직접 입력 처리 */
-  _onManualQtyInput(itemIndex, value) {
+  /** 검수 수량 직접 입력 처리 — 수량 충족 시 자동으로 API 호출 */
+  async _onManualQtyInput(itemIndex, value) {
     const item = this.packingItems[itemIndex]
     if (!item) return
     const orderQty = item.pack_qty || item.order_qty || 1
@@ -1565,6 +1616,10 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
         success: qty >= orderQty,
         message: `${item.sku_cd} — 수량 입력: ${qty}/${orderQty}`
       }
+    }
+    if (qty >= orderQty) {
+      this.currentItemIndex = itemIndex
+      await this._confirmInspection()
     }
   }
 
@@ -1661,16 +1716,8 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
 
   /** 다음 미완료 항목으로 이동 */
   _moveToNextItem() {
-    const nextIdx = this.packingItems.findIndex(
-      (item, idx) => idx > this.currentItemIndex && item.status !== 'COMPLETED'
-    )
-
-    if (nextIdx >= 0) {
-      this.currentItemIndex = nextIdx
-    } else {
-      const firstIdx = this.packingItems.findIndex(item => item.status !== 'COMPLETED')
-      this.currentItemIndex = firstIdx >= 0 ? firstIdx : -1
-    }
+    const nextIdx = this.packingItems.findIndex(i => i.status !== 'COMPLETED')
+    this.currentItemIndex = nextIdx
   }
 
   /** 검수 완료 처리 - 포장 정보 입력 화면으로 전환 */
@@ -1719,10 +1766,7 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
 
       this._showFeedback('success', '출고가 완료되었습니다')
       this.rightPanelMode = 'complete'
-
-      await this._refresh()
-      await this.updateComplete
-      this._focusSearchInput()
+      this._fetchOrderSummary()
     } catch (err) {
       console.error('출고 확정 실패:', err)
       this._showFeedback('error', '출고 확정 중 오류가 발생했습니다')
@@ -1751,20 +1795,32 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
   /** 배송 라벨 출력 요청 */
   async _printPackingLabel() {
     if (!this.selectedOrder) return
-    try {
-      await ServiceUtil.restPost(`ful_trx/packing_orders/${this.selectedOrder.id}/print_label`, {})
-      this._showFeedback('info', '배송 라벨 출력 요청 완료')
-    } catch (err) {
-      console.error('배송 라벨 출력 실패:', err)
-      this._showFeedback('error', '출력 요청 중 오류가 발생했습니다')
+
+    if (window.innerWidth < 768) {
+      // PDA: 브라우저 기본 PDF 뷰어로 새 탭에서 열어 내장 인쇄 기능 사용
+      window.open(
+        `/rest/stream/packing_orders/${this.selectedOrder.id}/download_invoice_label`,
+        '_blank'
+      )
+    } else {
+      // PC: 팝업으로 출력
+      MetaApi.openDynamicPopup('송장 출력', {
+        "module": "metapage",
+        "import": "pages/basic-pdf-element.js",
+        "tagname": "basic-pdf-element",
+        "menu": "InvoiceByPacking",
+        "size": "large",
+        "title": "button.print-invoices",
+        "title_field": "name"
+      }, this.selectedOrder, this.selectedOrder.id, null)
     }
   }
 
-  /** 다음 검수 시작 - 대기 중인 다음 포장 주문 자동 선택 */
-  _startNextInspection() {
+  /** 다음 검수 시작 - 목록 재조회 후 대기 중인 다음 포장 주문 자동 선택 */
+  async _startNextInspection() {
+    await this._refresh(1)
     const nextOrder = this.packingOrders.find(o =>
-      (o.status === 'IN_PROGRESS' || o.status === 'CREATED') &&
-      (!this.selectedOrder || o.id !== this.selectedOrder.id)
+      o.status === 'IN_PROGRESS' || o.status === 'CREATED'
     )
     if (nextOrder) {
       this._onSelectOrder(nextOrder)

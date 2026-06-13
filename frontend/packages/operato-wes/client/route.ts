@@ -87,6 +87,8 @@ import './pages/pda/pda-stock-inquiry'
 import './pages/pda/pda-oms-replenish'
 import './pages/pda/pda-fulfillment-shipping'
 import './pages/pda/pda-fulfillment-packing'
+import './pages/pda/pda-fulfillment-b2c-packing'
+import './pages/pda/pda-fulfillment-b2b-packing'
 import './pages/pda/pda-fulfillment-picking'
 
 export default function route(page, module) {

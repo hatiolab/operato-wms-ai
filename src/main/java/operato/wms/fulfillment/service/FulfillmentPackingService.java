@@ -14,6 +14,7 @@ import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.entity.User;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
+import xyz.elidom.dbist.dml.Page;
 
 /**
  * 풀필먼트 패킹 서비스
@@ -336,7 +337,8 @@ public class FulfillmentPackingService extends AbstractQueryService {
 
 		if (ValueUtil.isNotEmpty(orderDate)) {
 			if (ValueUtil.isNotEmpty(waveSeq)) {
-				sql.append(" AND po.wave_no = (SELECT wave_no FROM shipment_waves WHERE domain_id = :domainId AND wave_date = :orderDate AND wave_seq = :waveSeq)");
+				sql.append(
+						" AND po.wave_no = (SELECT wave_no FROM shipment_waves WHERE domain_id = :domainId AND wave_date = :orderDate AND wave_seq = :waveSeq)");
 				params.put("waveSeq", Integer.parseInt(waveSeq));
 			} else {
 				sql.append(" AND po.order_date = :orderDate");
@@ -498,7 +500,7 @@ public class FulfillmentPackingService extends AbstractQueryService {
 		StringBuilder sql = new StringBuilder();
 		sql.append("SELECT");
 		sql.append(" 	po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.invoice_no,");
-		sql.append(" 	so.biz_type, so.cust_nm, po.station_cd, po.status, po.started_at, po.completed_at");
+		sql.append(" 	so.biz_type, so.cust_nm, po.station_cd, po.status, po.started_at, po.completed_at,");
 		sql.append(" 	(SELECT SUM(poi.order_qty) FROM packing_order_items poi");
 		sql.append(" 		WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,");
 		sql.append(" 	(SELECT COUNT(distinct(poi.sku_cd)) FROM packing_order_items poi");
@@ -546,6 +548,127 @@ public class FulfillmentPackingService extends AbstractQueryService {
 
 		sql.append(" ORDER BY po.started_at DESC");
 		return this.queryManager.selectListBySql(sql.toString(), params, Map.class, 0, 0);
+	}
+
+	/**
+	 * 포장 주문 목록 서버 페이지네이션 조회 (todo + done 통합, PDA용)
+	 *
+	 * @param bizType   업무 유형 (B2C_OUT, B2B_OUT)
+	 * @param orderDate 웨이브 일자 또는 출고 일자 (YYYY-MM-DD)
+	 * @param waveSeq   웨이브 차수 (B2C용, 없으면 order_date 기준)
+	 * @param stationCd 포장 작업장 코드 (선택)
+	 * @param page      페이지 번호 (1-based)
+	 * @param size      페이지당 건수
+	 * @return { items: [...], total: N }
+	 */
+	@SuppressWarnings({ "rawtypes" })
+	public Map<String, Object> pagePackingOrders(String bizType, String orderDate, String waveSeq, String stationCd,
+			int page, int size) {
+		Long domainId = Domain.currentDomainId();
+		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+
+		StringBuilder sql = new StringBuilder();
+		sql.append("SELECT");
+		sql.append(" po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.invoice_no,");
+		sql.append(" so.biz_type, so.cust_nm, po.station_cd, po.status, po.started_at, po.completed_at,");
+		sql.append(" (SELECT SUM(poi.order_qty) FROM packing_order_items poi");
+		sql.append("   WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,");
+		sql.append(" (SELECT COUNT(DISTINCT poi.sku_cd) FROM packing_order_items poi");
+		sql.append("   WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,");
+		sql.append(" (SELECT SUM(poi.pack_qty) FROM packing_order_items poi");
+		sql.append("   WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty");
+		sql.append(" FROM packing_orders po");
+		sql.append(" LEFT JOIN shipment_orders so ON so.domain_id = po.domain_id AND so.shipment_no = po.shipment_no");
+		sql.append(" WHERE po.domain_id = :domainId");
+		sql.append(" AND po.status <> 'CANCELLED'");
+
+		if (ValueUtil.isNotEmpty(bizType)) {
+			sql.append(" AND so.biz_type = :bizType");
+			params.put("bizType", bizType);
+		}
+
+		if (ValueUtil.isNotEmpty(orderDate)) {
+			if (ValueUtil.isNotEmpty(waveSeq)) {
+				sql.append(" AND po.wave_no = (SELECT wave_no FROM shipment_waves");
+				sql.append("   WHERE domain_id = :domainId AND wave_date = :orderDate AND wave_seq = :waveSeq)");
+				params.put("waveSeq", Integer.parseInt(waveSeq));
+			} else {
+				sql.append(" AND po.order_date = :orderDate");
+			}
+			params.put("orderDate", orderDate);
+		}
+
+		if (ValueUtil.isNotEmpty(stationCd)) {
+			sql.append(" AND po.station_cd = :stationCd");
+			params.put("stationCd", stationCd);
+		}
+
+		sql.append(
+				" ORDER BY CASE po.status WHEN 'IN_PROGRESS' THEN 0 WHEN 'CREATED' THEN 1 ELSE 2 END, po.created_at");
+
+		Page<Map> result = this.queryManager.selectPageBySql(sql.toString(), params, Map.class, page < 1 ? 1 : page,
+				size);
+		return ValueUtil.newMap("total,items", result.getTotalSize(), result.getList());
+	}
+
+	/**
+	 * 바코드 스캔으로 포장 주문 단건 조회 (포장번호/출고번호/송장번호)
+	 *
+	 * @param bizType   업무 유형 (B2C_OUT, B2B_OUT)
+	 * @param orderDate 웨이브 일자 또는 출고 일자 (YYYY-MM-DD)
+	 * @param waveSeq   웨이브 차수 (B2C용, 없으면 order_date 기준)
+	 * @param stationCd 포장 작업장 코드 (선택)
+	 * @param barcode   스캔된 바코드 (포장번호/출고번호/송장번호)
+	 * @return 포장 주문 단건 (없으면 null)
+	 */
+	@SuppressWarnings("rawtypes")
+	public Map findPackingOrderByBarcode(String bizType, String orderDate, String waveSeq, String stationCd,
+			String barcode) {
+		Long domainId = Domain.currentDomainId();
+		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+
+		StringBuilder sql = new StringBuilder();
+		sql.append("SELECT");
+		sql.append(" po.id, po.pack_order_no, po.wave_no, po.shipment_no, po.order_date, po.invoice_no,");
+		sql.append(" so.biz_type, so.cust_nm, po.station_cd, po.status, po.started_at, po.completed_at,");
+		sql.append(" (SELECT SUM(poi.order_qty) FROM packing_order_items poi");
+		sql.append("   WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_qty,");
+		sql.append(" (SELECT COUNT(DISTINCT poi.sku_cd) FROM packing_order_items poi");
+		sql.append("   WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS total_items,");
+		sql.append(" (SELECT SUM(poi.pack_qty) FROM packing_order_items poi");
+		sql.append("   WHERE poi.domain_id = po.domain_id AND poi.packing_order_id = po.id) AS packed_qty");
+		sql.append(" FROM packing_orders po");
+		sql.append(" LEFT JOIN shipment_orders so ON so.domain_id = po.domain_id AND so.shipment_no = po.shipment_no");
+		sql.append(" WHERE po.domain_id = :domainId");
+		sql.append(" AND po.status <> 'CANCELLED'");
+
+		if (ValueUtil.isNotEmpty(bizType)) {
+			sql.append(" AND so.biz_type = :bizType");
+			params.put("bizType", bizType);
+		}
+
+		if (ValueUtil.isNotEmpty(orderDate)) {
+			if (ValueUtil.isNotEmpty(waveSeq)) {
+				sql.append(" AND po.wave_no = (SELECT wave_no FROM shipment_waves");
+				sql.append("   WHERE domain_id = :domainId AND wave_date = :orderDate AND wave_seq = :waveSeq)");
+				params.put("waveSeq", Integer.parseInt(waveSeq));
+			} else {
+				sql.append(" AND po.order_date = :orderDate");
+			}
+			params.put("orderDate", orderDate);
+		}
+
+		if (ValueUtil.isNotEmpty(stationCd)) {
+			sql.append(" AND po.station_cd = :stationCd");
+			params.put("stationCd", stationCd);
+		}
+
+		sql.append(" AND (po.pack_order_no = :barcode OR po.shipment_no = :barcode OR po.invoice_no = :barcode)");
+		params.put("barcode", barcode);
+		sql.append(" ORDER BY po.created_at LIMIT 1");
+
+		List<Map> list = this.queryManager.selectListBySql(sql.toString(), params, Map.class, 0, 0);
+		return list.isEmpty() ? null : list.get(0);
 	}
 
 	/**
