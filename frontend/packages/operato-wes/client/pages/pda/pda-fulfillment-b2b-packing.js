@@ -1240,7 +1240,7 @@ export class PdaFulfillmentB2bPacking extends connect(store)(PageView) {
         order_date: this.orderDate
       })
       if (this.filterStationCd) params.append('station_cd', this.filterStationCd)
-      const result = await ServiceUtil.restGet(`ful_trx/packing_orders/count?${params}`).catch(() => null)
+      const result = await ServiceUtil.restGet(`ful_trx/packing_orders/summary/count?${params}`).catch(() => null)
       this.orderSummary = result || { total: 0, waiting: 0, completed: 0 }
     } catch (err) {
       console.error('포장 주문 건수 조회 실패:', err)

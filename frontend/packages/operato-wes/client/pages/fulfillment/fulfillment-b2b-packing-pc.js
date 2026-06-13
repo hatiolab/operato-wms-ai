@@ -48,8 +48,8 @@ class FulfillmentB2bPackingPc extends localize(i18next)(PageView) {
 
         /* ===== 좌측 패널 ===== */
         .left-panel {
-          width: 280px;
-          min-width: 240px;
+          width: 340px;
+          min-width: 265px;
           background: var(--md-sys-color-surface, white);
           border-right: 1px solid var(--md-sys-color-outline-variant, #E0E0E0);
           display: flex;
@@ -326,12 +326,29 @@ class FulfillmentB2bPackingPc extends localize(i18next)(PageView) {
         }
 
         /* 좌측 패널 진행률 바 */
+        .order-list-summary {
+          padding: 8px 12px 4px;
+          flex-shrink: 0;
+        }
+
         .list-progress-bar {
           height: 6px;
           background: #E0E0E0;
           border-radius: 3px;
           overflow: hidden;
-          margin: 0 12px;
+          margin-bottom: 6px;
+        }
+
+        .order-list-header {
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant, #757575);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .order-list-header strong {
+          color: var(--md-sys-color-on-surface, #333);
         }
 
         .list-progress-fill {
@@ -986,20 +1003,23 @@ class FulfillmentB2bPackingPc extends localize(i18next)(PageView) {
           </div>
         </div>
 
-        <div class="list-progress-bar">
-          <div class="list-progress-fill" style="width: ${progressPct}%"></div>
-        </div>
-        <div style="padding: 4px 16px 8px; font-size:12px; color:#757575;">
-          검수/포장 ${progressPctDisplay}% &nbsp;|&nbsp; 대기 <strong>${summaryWaiting}</strong> / 완료 <strong>${summaryCompleted}</strong> (총 ${summaryTotal}건)
+        <div class="order-list-summary">
+          <div class="list-progress-bar">
+            <div class="list-progress-fill" style="width: ${progressPct}%"></div>
+          </div>
+          <div class="order-list-header">
+            <span>검수/포장 ${progressPctDisplay}%</span>
+            <span>대기 <strong>${summaryWaiting}</strong> / 완료 <strong>${summaryCompleted}</strong> (총 ${summaryTotal}건)</span>
+          </div>
         </div>
 
         <div class="order-list">
           ${this.loading
-            ? html`<div class="loading-text">로딩 중...</div>`
-            : this.packingOrders.length === 0
-              ? html`<div class="loading-text">포장 주문이 없습니다</div>`
-              : this.packingOrders.map(order => this._renderOrderCard(order))
-          }
+        ? html`<div class="loading-text">로딩 중...</div>`
+        : this.packingOrders.length === 0
+          ? html`<div class="loading-text">포장 주문이 없습니다</div>`
+          : this.packingOrders.map(order => this._renderOrderCard(order))
+      }
         </div>
 
         ${totalPages > 1 ? html`
@@ -1039,8 +1059,10 @@ class FulfillmentB2bPackingPc extends localize(i18next)(PageView) {
           <span class="status-badge ${statusClass}">${statusLabel}</span>
         </div>
         <div class="sub-info">
-          ${order.shipment_no || '-'} · ${order.cust_nm || ''} · ${itemCount}종 ${totalQty}EA
-          ${order.station_cd ? html` · <strong>${this._stationLabel(order.station_cd)}</strong>` : ''}
+          <strong>${order.cust_nm || '-'}</strong> · ${order.station_cd ? html`<strong>${this._stationLabel(order.station_cd)}</strong>` : ``}
+        </div>
+        <div class="sub-info">
+          주문번호: ${order.shipment_no} · ${itemCount}종 ${totalQty}EA
         </div>
         ${isInProgress ? html`
           <div class="progress-mini">
@@ -1442,7 +1464,7 @@ class FulfillmentB2bPackingPc extends localize(i18next)(PageView) {
         order_date: this.orderDate
       })
       if (this.filterStationCd) params.append('station_cd', this.filterStationCd)
-      const result = await ServiceUtil.restGet(`ful_trx/packing_orders/count?${params}`).catch(() => null)
+      const result = await ServiceUtil.restGet(`ful_trx/packing_orders/summary/count?${params}`).catch(() => null)
       this.orderSummary = result || { total: 0, waiting: 0, completed: 0 }
     } catch (err) {
       console.error('포장 주문 건수 조회 실패:', err)

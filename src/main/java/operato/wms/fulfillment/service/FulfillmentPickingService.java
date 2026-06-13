@@ -3,6 +3,8 @@ package operato.wms.fulfillment.service;
 import java.util.List;
 import java.util.Map;
 
+import xyz.elidom.dbist.dml.Page;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -208,7 +210,6 @@ public class FulfillmentPickingService extends AbstractQueryService {
 	 */
 	public Map<String, Object> cancelPickingTask(String id) {
 		Long domainId = Domain.currentDomainId();
-
 		PickingTask task = this.findPickingTask(domainId, id);
 
 		String status = task.getStatus();
@@ -228,14 +229,15 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		this.queryManager.executeBySql(itemSql, itemParams);
 
 		// 피킹 지시 헤더 리셋 (CREATED 복귀, 작업자·시작일시·실적 초기화)
-		String sql = "UPDATE picking_tasks"
-				+ " SET status = :status, worker_id = null, started_at = null,"
-				+ " result_order = 0, result_item = 0, result_total = 0, short_total = 0,"
-				+ " updated_at = now()"
-				+ " WHERE domain_id = :domainId AND id = :id";
-		Map<String, Object> params = ValueUtil.newMap("status,domainId,id",
-				PickingTask.STATUS_CREATED, domainId, id);
-		this.queryManager.executeBySql(sql, params);
+		task.setStatus(PickingTask.STATUS_CREATED);
+		task.setWorkerId(null);
+		task.setStartedAt(null);
+		task.setResultOrder(0);
+		task.setResultItem(0);
+		task.setResultTotal(0.0);
+		task.setShortTotal(0.0);
+		this.queryManager.update(task, "status", "workerId", "startedAt", "resultOrder", "resultItem", "resultTotal",
+				"shortTotal", "updatedAt", "updaterId");
 
 		// 결과 리턴
 		return ValueUtil.newMap("success,pick_task_no", true, task.getPickTaskNo());
@@ -250,32 +252,160 @@ public class FulfillmentPickingService extends AbstractQueryService {
 	 * @return 피킹 지시 목록
 	 */
 	public List<Map> searchTodoPickingTasks() {
-		Long domainId = Domain.currentDomainId();
+		StringBuffer sql = new StringBuffer();
+		sql.append("SELECT");
+		sql.append("	pt.id, pt.pick_task_no, pt.wave_no, pt.shipment_no, pt.order_date,");
+		sql.append(" 	pt.pick_type, pt.pick_method, pt.zone_cd, pt.priority_cd, pt.worker_id,");
+		sql.append(" 	pt.plan_order, pt.plan_item, pt.plan_total,");
+		sql.append(" 	pt.result_order, pt.result_item, pt.result_total, pt.short_total,");
+		sql.append(" 	pt.status, pt.created_at, pt.started_at, pt.completed_at,");
+		sql.append(" 	(SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id");
+		sql.append("	AND pti.pick_task_id = pt.id) AS total_items,");
+		sql.append(" 	(SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id");
+		sql.append(" 	AND pti.pick_task_id = pt.id AND pti.status = 'PICKED') AS picked_items");
+		sql.append(" FROM picking_tasks pt");
+		sql.append(" WHERE pt.domain_id = :domainId AND pt.status IN ('CREATED', 'IN_PROGRESS')");
+		sql.append(" ORDER BY");
+		sql.append("  		CASE pt.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL'");
+		sql.append(" 		THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, pt.created_at");
+		Map<String, Object> params = ValueUtil.newMap("domainId", Domain.currentDomainId());
+		return this.queryManager.selectListBySql(sql.toString(), params, Map.class, 0, 0);
+	}
 
-		String cols = "pt.id, pt.pick_task_no, pt.wave_no, pt.shipment_no, pt.order_date,"
-				+ " pt.pick_type, pt.pick_method, pt.zone_cd, pt.priority_cd, pt.worker_id,"
-				+ " pt.plan_order, pt.plan_item, pt.plan_total,"
-				+ " pt.result_order, pt.result_item, pt.result_total, pt.short_total,"
-				+ " pt.status, pt.created_at, pt.started_at, pt.completed_at,"
-				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id) AS total_items,"
-				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id AND pti.status = 'PICKED') AS picked_items";
-		// UNION ALL 결과에는 테이블 별칭 사용 불가 — 컬럼명만 사용
-		String orderBy = " ORDER BY CASE priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, created_at";
+	/**
+	 * 피킹 지시 건수 요약 조회
+	 *
+	 * 지정 일자의 전체/대기/완료 건수를 반환한다.
+	 *
+	 * @param orderDate 피킹 일자 (YYYY-MM-DD)
+	 * @return { total, waiting, completed }
+	 */
+	@SuppressWarnings("rawtypes")
+	public Map<String, Object> countPickingTasks(String orderDate) {
+		StringBuilder sql = new StringBuilder();
+		sql.append("SELECT");
+		sql.append(" COUNT(*) AS total,");
+		sql.append(" COUNT(*) FILTER (WHERE pt.status = 'CREATED') AS created,");
+		sql.append(" COUNT(*) FILTER (WHERE pt.status = 'IN_PROGRESS') AS in_progress,");
+		sql.append(" COUNT(*) FILTER (WHERE pt.status = 'COMPLETED') AS completed");
+		sql.append(" FROM picking_tasks pt");
+		sql.append(" WHERE pt.domain_id = :domainId");
+		sql.append(" AND pt.status <> 'CANCELLED'");
 
-		// 대기: 오늘 날짜 order_date만 / 작업중: 날짜 무관 전체
-		// order_date는 varchar 타입이므로 TO_CHAR로 문자열 캐스팅
-		// PostgreSQL UNION ALL에서 ORDER BY에 CASE 표현식 불가 → 서브쿼리로 감싸서 외부 ORDER BY 적용
-		String sql = "SELECT * FROM ("
-				+ " SELECT " + cols + " FROM picking_tasks pt"
-				+ " WHERE pt.domain_id = :domainId AND pt.status = 'CREATED' AND pt.order_date = TO_CHAR(CURRENT_DATE, 'YYYY-MM-DD')"
-				+ " UNION ALL"
-				+ " SELECT " + cols + " FROM picking_tasks pt"
-				+ " WHERE pt.domain_id = :domainId AND pt.status = 'IN_PROGRESS'"
-				+ ") combined"
-				+ orderBy;
+		Map<String, Object> params = ValueUtil.newMap("domainId", Domain.currentDomainId());
+		if (ValueUtil.isNotEmpty(orderDate)) {
+			sql.append(" AND pt.order_date = :orderDate");
+			params.put("orderDate", orderDate);
+		}
 
-		Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
-		return this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+		List<Map> rows = this.queryManager.selectListBySql(sql.toString(), params, Map.class, 0, 1);
+		if (rows.isEmpty()) {
+			return ValueUtil.newMap("total,created,in_progress,completed", 0L, 0L, 0L, 0L);
+		}
+
+		Map row = rows.get(0);
+		long total = row.get("total") != null ? Long.parseLong(row.get("total").toString()) : 0L;
+		long created = row.get("created") != null ? Long.parseLong(row.get("created").toString()) : 0L;
+		long inProgress = row.get("in_progress") != null ? Long.parseLong(row.get("in_progress").toString()) : 0L;
+		long completed = row.get("completed") != null ? Long.parseLong(row.get("completed").toString()) : 0L;
+		return ValueUtil.newMap("total,created,in_progress,completed", total, created, inProgress, completed);
+	}
+
+	/**
+	 * 피킹 지시 목록 페이지네이션 조회
+	 *
+	 * 지정 일자의 CREATED + IN_PROGRESS + COMPLETED 피킹 지시 목록을 페이지네이션으로 반환한다.
+	 *
+	 * @param orderDate 피킹 일자 (YYYY-MM-DD)
+	 * @param page      페이지 번호 (1부터)
+	 * @param size      페이지 크기
+	 * @return { total: 전체 건수, items: 목록 }
+	 */
+	@SuppressWarnings("rawtypes")
+	public Map<String, Object> pagePickingTasks(String orderDate, String status, String keyword, int page, int size) {
+		StringBuilder sql = new StringBuilder();
+		sql.append("SELECT ");
+		sql.append("	pt.id, pt.pick_task_no, pt.wave_no, pt.shipment_no, pt.order_date,");
+		sql.append(" 	pt.pick_type, pt.pick_method, pt.zone_cd, pt.priority_cd, pt.worker_id,");
+		sql.append(" 	pt.plan_order, pt.plan_item, pt.plan_total,");
+		sql.append(" 	pt.result_order, pt.result_item, pt.result_total, pt.short_total,");
+		sql.append(" 	pt.status, pt.created_at, pt.started_at, pt.completed_at,");
+		sql.append(" 	(SELECT COUNT(*) FROM picking_task_items pti");
+		sql.append(" 	WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id) AS total_items,");
+		sql.append(" 	(SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND");
+		sql.append(" 	pti.pick_task_id = pt.id AND pti.status = 'PICKED') AS picked_items");
+		sql.append(" FROM picking_tasks pt");
+		sql.append(" WHERE pt.domain_id = :domainId");
+
+		Map<String, Object> params = ValueUtil.newMap("domainId", Domain.currentDomainId());
+		if (ValueUtil.isNotEmpty(status)) {
+			if ("DONE".equals(status)) {
+				sql.append(" AND pt.status NOT IN ('CREATED', 'IN_PROGRESS', 'CANCELLED')");
+			} else {
+				sql.append(" AND pt.status = :status");
+				params.put("status", status);
+			}
+		} else {
+			sql.append(" AND pt.status <> :cancelledStatus");
+			params.put("cancelledStatus", PickingTask.STATUS_CANCELLED);
+		}
+
+		if (ValueUtil.isNotEmpty(orderDate)) {
+			sql.append(" AND pt.order_date = :orderDate");
+			params.put("orderDate", orderDate);
+		}
+
+		if (ValueUtil.isNotEmpty(keyword)) {
+			sql.append(" AND (pt.pick_task_no ILIKE :kw OR pt.shipment_no ILIKE :kw OR pt.wave_no ILIKE :kw)");
+			params.put("kw", "%" + keyword + "%");
+		}
+
+		sql.append(" ORDER BY ");
+		sql.append(" 	CASE pt.status WHEN 'IN_PROGRESS' THEN 0 WHEN 'CREATED' THEN 1 ELSE 2 END,");
+		sql.append(" 	CASE pt.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' ");
+		sql.append("  	THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END,");
+		sql.append(" pt.created_at");
+
+		page = page < 1 ? 1 : page;
+		Page<Map> result = this.queryManager.selectPageBySql(sql.toString(), params, Map.class, page, size);
+		return ValueUtil.newMap("total,items", result.getTotalSize(), result.getList());
+	}
+
+	/**
+	 * 바코드로 피킹 지시 단건 조회
+	 *
+	 * 피킹지시번호·주문번호·웨이브번호 중 하나와 일치하는 CANCELLED 제외 피킹 지시를 반환한다.
+	 *
+	 * @param barcode   스캔 바코드 (pick_task_no / shipment_no / wave_no)
+	 * @param orderDate 피킹 일자 (선택, YYYY-MM-DD)
+	 * @return 피킹 지시 Map (없으면 null)
+	 */
+	@SuppressWarnings("rawtypes")
+	public Map findPickingTaskByBarcode(String barcode, String orderDate) {
+		StringBuilder sql = new StringBuilder();
+		sql.append("SELECT ");
+		sql.append("	pt.id, pt.pick_task_no, pt.wave_no, pt.shipment_no, pt.order_date,");
+		sql.append("	pt.pick_type, pt.pick_method, pt.zone_cd, pt.priority_cd, pt.worker_id,");
+		sql.append("	pt.plan_order, pt.plan_item, pt.plan_total,");
+		sql.append("	pt.result_order, pt.result_item, pt.result_total, pt.short_total,");
+		sql.append("	pt.status, pt.created_at, pt.started_at, pt.completed_at,");
+		sql.append("	(SELECT COUNT(*) FROM picking_task_items pti");
+		sql.append("	WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id) AS total_items,");
+		sql.append("	(SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id");
+		sql.append("	AND pti.pick_task_id = pt.id AND pti.status = 'PICKED') AS picked_items");
+		sql.append(" FROM picking_tasks pt");
+		sql.append(" WHERE pt.domain_id = :domainId");
+		sql.append(" AND pt.status <> 'CANCELLED'");
+		sql.append(" AND (pt.pick_task_no = :barcode OR pt.shipment_no = :barcode OR pt.wave_no = :barcode)");
+		Map<String, Object> params = ValueUtil.newMap("domainId,barcode", Domain.currentDomainId(), barcode);
+
+		if (ValueUtil.isNotEmpty(orderDate)) {
+			sql.append(" AND pt.order_date = :orderDate");
+			params.put("orderDate", orderDate);
+		}
+
+		sql.append(" ORDER BY CASE pt.status WHEN 'IN_PROGRESS' THEN 0 WHEN 'CREATED' THEN 1 ELSE 2 END LIMIT 1");
+		return this.queryManager.selectBySql(sql.toString(), params, Map.class);
 	}
 
 	/**
@@ -286,21 +416,25 @@ public class FulfillmentPickingService extends AbstractQueryService {
 	 * @return 피킹 지시 목록
 	 */
 	public List<Map> searchDonePickingTasks() {
-		Long domainId = Domain.currentDomainId();
-
-		String sql = "SELECT pt.id, pt.pick_task_no, pt.wave_no, pt.shipment_no, pt.order_date,"
-				+ " pt.pick_type, pt.pick_method, pt.zone_cd, pt.priority_cd, pt.worker_id,"
-				+ " pt.plan_order, pt.plan_item, pt.plan_total,"
-				+ " pt.result_order, pt.result_item, pt.result_total, pt.short_total,"
-				+ " pt.status, pt.created_at, pt.started_at, pt.completed_at,"
-				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id) AS total_items,"
-				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id AND pti.status = 'PICKED') AS picked_items"
-				+ " FROM picking_tasks pt"
-				+ " WHERE pt.domain_id = :domainId AND pt.status = :status AND pt.completed_at::date = CURRENT_DATE"
-				+ " ORDER BY CASE pt.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, pt.created_at";
+		StringBuffer sql = new StringBuffer();
+		sql.append("SELECT");
+		sql.append("	pt.id, pt.pick_task_no, pt.wave_no, pt.shipment_no, pt.order_date,");
+		sql.append(" 	pt.pick_type, pt.pick_method, pt.zone_cd, pt.priority_cd, pt.worker_id,");
+		sql.append(" 	pt.plan_order, pt.plan_item, pt.plan_total,");
+		sql.append(" 	pt.result_order, pt.result_item, pt.result_total, pt.short_total,");
+		sql.append(" 	pt.status, pt.created_at, pt.started_at, pt.completed_at,");
+		sql.append(" 	(SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id");
+		sql.append(" 	AND pti.pick_task_id = pt.id) AS total_items,");
+		sql.append(" 	(SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id");
+		sql.append(" 	AND pti.pick_task_id = pt.id AND pti.status = 'PICKED') AS picked_items");
+		sql.append(" FROM picking_tasks pt");
+		sql.append(" WHERE pt.domain_id = :domainId AND pt.status = :status");
+		sql.append(" ORDER BY");
+		sql.append(" 	CASE pt.priority_cd WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3");
+		sql.append(" 	WHEN 'LOW' THEN 4 ELSE 5 END, pt.created_at");
 		Map<String, Object> params = ValueUtil.newMap("domainId,status",
-				domainId, PickingTask.STATUS_COMPLETED);
-		return this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+				Domain.currentDomainId(), PickingTask.STATUS_COMPLETED);
+		return this.queryManager.selectListBySql(sql.toString(), params, Map.class, 0, 0);
 	}
 
 	/**
@@ -311,25 +445,27 @@ public class FulfillmentPickingService extends AbstractQueryService {
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public Map<String, Object> getPickingTask(String id) {
-		Long domainId = Domain.currentDomainId();
+		StringBuffer sql = new StringBuffer();
+		sql.append("SELECT");
+		sql.append("	pt.id, pt.pick_task_no, pt.wave_no, pt.shipment_no, pt.order_date,");
+		sql.append(" 	pt.pick_type, pt.pick_method, pt.zone_cd, pt.priority_cd, pt.worker_id,");
+		sql.append(" 	pt.plan_order, pt.plan_item, pt.plan_total,");
+		sql.append(" 	pt.result_order, pt.result_item, pt.result_total, pt.short_total,");
+		sql.append(" 	pt.status, pt.created_at, pt.started_at, pt.completed_at,");
+		sql.append(" 	(SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id");
+		sql.append("	AND pti.pick_task_id = pt.id) AS total_items,");
+		sql.append(" 	(SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id");
+		sql.append(" 	AND pti.pick_task_id = pt.id AND pti.status = 'PICKED') AS picked_items");
+		sql.append(" FROM picking_tasks pt");
+		sql.append(" WHERE pt.domain_id = :domainId AND pt.id = :id");
+		Map<String, Object> params = ValueUtil.newMap("domainId,id", Domain.currentDomainId(), id);
+		Map pickingTask = this.queryManager.selectByCondition(Map.class, params);
 
-		String sql = "SELECT pt.id, pt.pick_task_no, pt.wave_no, pt.shipment_no, pt.order_date,"
-				+ " pt.pick_type, pt.pick_method, pt.zone_cd, pt.priority_cd, pt.worker_id,"
-				+ " pt.plan_order, pt.plan_item, pt.plan_total,"
-				+ " pt.result_order, pt.result_item, pt.result_total, pt.short_total,"
-				+ " pt.status, pt.created_at, pt.started_at, pt.completed_at,"
-				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id) AS total_items,"
-				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id AND pti.status = 'PICKED') AS picked_items"
-				+ " FROM picking_tasks pt"
-				+ " WHERE pt.domain_id = :domainId AND pt.id = :id";
-		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
-		List<Map> list = this.queryManager.selectListBySql(sql, params, Map.class, 0, 1);
-
-		if (list.isEmpty()) {
+		if (pickingTask == null || pickingTask.isEmpty()) {
 			throw new ElidomValidationException("피킹 지시를 찾을 수 없습니다: " + id);
 		}
 
-		return (Map<String, Object>) list.get(0);
+		return pickingTask;
 	}
 
 	/**
@@ -371,10 +507,9 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		}
 
 		String sql = "SELECT pt.id, pt.pick_task_no, pt.wave_no, pt.shipment_no, pt.order_date,"
-				+ " pt.pick_type, pt.pick_method, pt.zone_cd, pt.priority_cd,"
-				+ " pt.plan_order, pt.plan_item, pt.plan_total,"
+				+ " pt.pick_type, pt.pick_method, pt.zone_cd, pt.priority_cd, pt.status, pt.started_at,"
+				+ " pt.worker_id, pt.plan_order, pt.plan_item, pt.plan_total,"
 				+ " pt.result_order, pt.result_item, pt.result_total, pt.short_total,"
-				+ " pt.status, pt.started_at,"
 				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id) AS total_items,"
 				+ " (SELECT COUNT(*) FROM picking_task_items pti WHERE pti.domain_id = pt.domain_id AND pti.pick_task_id = pt.id AND pti.status = 'PICKED') AS picked_items"
 				+ " FROM picking_tasks pt"

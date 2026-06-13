@@ -1,9 +1,8 @@
 import { css, html } from 'lit-element'
 
 import { i18next, localize } from '@operato/i18n'
-import { openPopup } from '@operato/layout'
 import { PageView } from '@operato/shell'
-import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 
 import './picking-task-detail'
 
@@ -47,8 +46,8 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
 
         /* ===== 좌측 패널 ===== */
         .left-panel {
-          width: 280px;
-          min-width: 240px;
+          width: 340px;
+          min-width: 265px;
           background: var(--md-sys-color-surface, white);
           border-right: 1px solid var(--md-sys-color-outline-variant, #E0E0E0);
           display: flex;
@@ -140,6 +139,34 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
           background: rgba(255,255,255,0.3);
         }
 
+        /* ===== 좌측 패널 진행률 ===== */
+        .list-progress-section {
+          padding: 8px 16px 4px;
+          border-bottom: 1px solid #F0F0F0;
+        }
+
+        .list-progress-bar {
+          height: 6px;
+          background: #E0E0E0;
+          border-radius: 3px;
+          overflow: hidden;
+          margin-bottom: 5px;
+        }
+
+        .list-progress-fill {
+          height: 100%;
+          background: linear-gradient(90deg, #FF9800, #4CAF50);
+          border-radius: 3px;
+          transition: width 0.3s ease;
+        }
+
+        .list-progress-header {
+          display: flex;
+          justify-content: space-between;
+          font-size: 11px;
+          color: var(--md-sys-color-on-surface-variant, #757575);
+        }
+
         .task-list {
           flex: 1;
           overflow-y: auto;
@@ -221,25 +248,60 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
           margin-top: 2px;
         }
 
-        .task-card .action-label {
+        .task-card .status-badge {
           float: right;
-          font-size: 12px;
+          padding: 2px 8px;
+          border-radius: 10px;
+          font-size: 11px;
           font-weight: 600;
-          color: var(--md-sys-color-primary, #1976D2);
         }
 
-        .task-card.in-progress .action-label {
-          color: #E65100;
+        .task-card .status-badge.created {
+          background: #fff3e0;
+          color: #ff9800;
         }
 
-        .task-card .wave-badge {
-          display: inline-block;
+        .task-card .status-badge.in_progress {
+          background: #e3f2fd;
+          color: #1976d2;
+        }
+
+        .task-card .status-badge.end,
+        .task-card .status-badge.completed {
+          background: #e8f5e9;
+          color: #4CAF50;
+        }
+
+        .task-card .wave-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-top: 4px;
+          margin-bottom: 2px;
+        }
+
+        .task-card .biz-badge {
+          font-size: 10px;
+          font-weight: 700;
+          padding: 1px 6px;
+          border-radius: 8px;
+          flex-shrink: 0;
+        }
+
+        .task-card .biz-badge.b2c {
+          background: #EDE7F6;
+          color: #6A1B9A;
+        }
+
+        .task-card .biz-badge.b2b {
           background: #E3F2FD;
           color: #1565C0;
-          padding: 1px 6px;
-          border-radius: 3px;
-          font-size: 11px;
-          margin-top: 4px;
+        }
+
+        .task-card .wave-no {
+          font-size: 12px;
+          font-weight: 700;
+          color: var(--md-sys-color-on-surface, #222);
         }
 
         .task-card .progress-mini {
@@ -769,7 +831,9 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
       completedCount: Number,
       totalCount: Number,
       startTime: Number,
-      statsEnd: Number,
+      orderDate: String,
+      totalTaskCount: Number,
+      taskSummary: Object,
       feedbackMsg: String,
       feedbackType: String,
       listPage: Number
@@ -794,7 +858,9 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     this.completedCount = 0
     this.totalCount = 0
     this.startTime = 0
-    this.statsEnd = 0
+    this.orderDate = this._todayStr()
+    this.totalTaskCount = 0
+    this.taskSummary = { total: 0, created: 0, in_progress: 0, completed: 0 }
     this.feedbackMsg = ''
     this.feedbackType = ''
     this.listPage = 1
@@ -815,8 +881,10 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
 
   /** 화면 렌더링 - 페이지 헤더, 좌우 패널, 상태바, 피드백 토스트 표시 */
   render() {
-    const waitCount = this.pickingTasks.filter(t => t.status === 'CREATED').length
-    const runCount = this.pickingTasks.filter(t => t.status === 'IN_PROGRESS').length
+    const waitCount = this.taskSummary?.created || 0
+    const runCount = this.taskSummary?.in_progress || 0
+    const doneCount = this.taskSummary?.completed || 0
+    const totalCount = this.taskSummary?.total || 0
 
     return html`
       <div class="main-content">
@@ -828,7 +896,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
         <div class="stats">
           <span>
             <span class="stat-label">완료</span>
-            <span class="stat-value">${this.statsEnd}건</span>
+            <span class="stat-value">${doneCount}건</span>
           </span>
           <span>
             <span class="stat-label">대기</span>
@@ -840,7 +908,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
           </span>
           <span>
             <span class="stat-label">총</span>
-            <span class="stat-value">${this.pickingTasks.length + this.statsEnd}건</span>
+            <span class="stat-value">${totalCount}건</span>
           </span>
         </div>
         <span>${new Date().toLocaleTimeString('ko-KR')}</span>
@@ -854,72 +922,98 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
 
   /* ===== 좌측 패널 ===== */
 
-  /** 좌측 패널 렌더링 - 검색, 필터 칩, 피킹 지시 목록 표시 */
-  /** 좌측 패널 렌더링 - 검색, 필터, 피킹 지시 카드 목록 (페이지당 20건) */
+  /** 좌측 패널 렌더링 - 날짜 필터, 검색, 상태 칩, 피킹 지시 카드 목록 (페이지당 20건) */
   _renderLeftPanel() {
-    const allFiltered = this._getFilteredTasks()
-    const waitCount = this.pickingTasks.filter(t => t.status === 'CREATED').length
-    const runCount = this.pickingTasks.filter(t => t.status === 'IN_PROGRESS').length
-    const totalPages = Math.max(1, Math.ceil(allFiltered.length / this._listPageSize))
+    const displayTasks = this.pickingTasks
+    const totalPages = Math.max(1, Math.ceil(this.totalTaskCount / this._listPageSize))
     const safePage = Math.min(this.listPage, totalPages)
-    const pageTasks = allFiltered.slice((safePage - 1) * this._listPageSize, safePage * this._listPageSize)
+
+    const summaryCreated = this.taskSummary?.created || 0
+    const summaryInProgress = this.taskSummary?.in_progress || 0
+    const summaryCompleted = this.taskSummary?.completed || 0
+    const summaryTotal = this.taskSummary?.total || 0
+    const progressPct = summaryTotal > 0 ? (summaryCompleted / summaryTotal) * 100 : 0
+    const progressPctDisplay = progressPct.toFixed(1)
 
     return html`
       <div class="left-panel">
         <div class="search-area">
           <input
-            type="text"
-            placeholder="피킹지시번호 검색"
-            .value="${this.searchKeyword}"
-            @input="${e => { this.searchKeyword = e.target.value; this.listPage = 1 }}"
+            type="date"
+            .value="${this.orderDate}"
+            @change="${e => { this.orderDate = e.target.value }}"
+            style="flex:1; min-width:0;"
           />
-          <button class="btn-search" title="새로고침" @click="${this._refresh}">🔍</button>
+          <button class="btn-search" title="검색" @click="${() => { this.filterStatus = 'ALL'; this._refresh(1); }}">🔍</button>
+        </div>
+
+        <div class="search-area" style="padding-top:0;">
+          <input
+            type="text"
+            placeholder="피킹지시·주문·웨이브번호 (Enter)"
+            .value="${this.searchKeyword}"
+            @input="${e => { this.searchKeyword = e.target.value }}"
+            @keydown="${e => { if (e.key === 'Enter') this._refresh(1) }}"
+          />
+        </div>
+
+        <div class="list-progress-section">
+          <div class="list-progress-bar">
+            <div class="list-progress-fill" style="width: ${progressPct}%"></div>
+          </div>
+          <div class="list-progress-header">
+            <span>피킹 ${progressPctDisplay}%</span>
+            <span>진행 <strong>${summaryCreated + summaryInProgress}</strong> / 완료 <strong>${summaryCompleted}</strong> (총 ${summaryTotal}건)</span>
+          </div>
         </div>
 
         <div class="filter-chips">
-          ${this._renderFilterChip('ALL', '전체', this.pickingTasks.length)}
-          ${this._renderFilterChip('CREATED', '대기', waitCount)}
-          ${this._renderFilterChip('IN_PROGRESS', '진행', runCount)}
+          ${this._renderFilterChip('CREATED', '대기', summaryCreated)}
+          ${this._renderFilterChip('IN_PROGRESS', '진행', summaryInProgress)}
+          ${this._renderFilterChip('DONE', '완료', summaryCompleted)}
+          ${this._renderFilterChip('ALL', '전체', summaryTotal)}
         </div>
 
         <div class="task-list">
-          <div class="task-list-header">피킹 지시: ${allFiltered.length}건</div>
           ${this.loading
         ? html`<div class="loading-text">조회 중...</div>`
-        : pageTasks.length === 0
+        : displayTasks.length === 0
           ? html`<div class="loading-text">피킹 지시가 없습니다</div>`
-          : pageTasks.map(task => this._renderPickingTaskCard(task))
+          : displayTasks.map(task => this._renderPickingTaskCard(task))
       }
         </div>
 
         ${totalPages > 1 ? html`
           <div class="list-pagination">
-            <button ?disabled="${safePage <= 1}" @click="${() => { this.listPage = safePage - 1 }}">◀</button>
-            <span>${safePage} / ${totalPages} (${allFiltered.length}건)</span>
-            <button ?disabled="${safePage >= totalPages}" @click="${() => { this.listPage = safePage + 1 }}">▶</button>
+            <button ?disabled="${safePage <= 1}" @click="${() => this._refresh(safePage - 1)}">◀</button>
+            <span>${safePage} / ${totalPages} (${this.totalTaskCount}건)</span>
+            <button ?disabled="${safePage >= totalPages}" @click="${() => this._refresh(safePage + 1)}">▶</button>
           </div>
         ` : ''}
       </div>
     `
   }
 
-  /** 필터 칩 렌더링 - 상태별 피킹 지시 필터링 */
+  /** 필터 칩 렌더링 - 상태별 서버 재조회 */
   _renderFilterChip(status, label, count) {
     return html`
       <div
         class="filter-chip ${this.filterStatus === status ? 'active' : ''}"
-        @click="${() => { this.filterStatus = status; this.listPage = 1 }}"
+        @click="${() => { this.filterStatus = status; this._refresh(1); }}"
       >
         ${label}<span class="badge">${count}</span>
       </div>
     `
   }
 
-  /** 피킹 지시 카드 렌더링 - 지시번호, 주문 정보, 진행률 표시 */
+  /** 피킹 지시 카드 렌더링 - 지시번호, B2C/B2B 배지, 주문 정보, 진행률 표시 */
   _renderPickingTaskCard(task) {
     const isSelected = this.selectedTaskId === task.id
-    const isRun = task.status === 'IN_PROGRESS'
-    const progressPct = task.progress_rate || 0
+    const isRun = task.status === 'IN_PROGRESS' || task.status === 'CREATED'
+    const isB2C = !!task.wave_no
+    const pickedItems = task.picked_items || 0
+    const totalItems = task.total_items || 0
+    const progressPct = totalItems > 0 ? Math.round((pickedItems / totalItems) * 100) : 0
 
     return html`
       <div
@@ -928,13 +1022,20 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
       >
         <div class="task-no">
           📋 ${task.pick_task_no || '-'}
-          <span class="action-label">${isRun ? '계속 →' : '시작 →'}</span>
+          <span class="status-badge ${(task.status || '').toLowerCase()}">
+            ${task.status === 'CREATED' ? (TermsUtil.tLabel('wait') || '대기')
+              : task.status === 'IN_PROGRESS' ? (TermsUtil.tLabel('in_progress') || '진행중')
+              : (TermsUtil.tLabel('completed') || '완료')}
+          </span>
+        </div>
+        <div class="wave-row">
+          <span class="biz-badge ${isB2C ? 'b2c' : 'b2b'}">${isB2C ? 'B2C' : 'B2B'}</span>
+          ${isB2C ? html`<span class="wave-no">웨이브 : ${task.wave_no}</span>` : html`<span class="wave-no">주문 : ${task.shipment_no}</span>`}
         </div>
         <div class="meta">
           주문: ${task.plan_order || 0}건 | 상품: ${task.plan_item || 0}종 | 수량: ${task.plan_total || 0}EA
         </div>
-        ${task.wave_no ? html`<span class="wave-badge">wave: ${task.wave_no}</span>` : ''}
-        ${isRun && progressPct > 0 ? html`
+        ${isRun ? html`
           <div class="progress-mini">
             <div class="progress-mini-fill" style="width: ${Math.min(progressPct, 100)}%"></div>
           </div>
@@ -967,7 +1068,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
           <span class="sub">또는 피킹 지시번호를 스캔하세요</span>
           <input
             type="text"
-            placeholder="피킹 지시번호 스캔"
+            placeholder="피킹지시번호 / 주문번호 / 웨이브번호 스캔"
             @keydown="${e => { if (e.key === 'Enter') { this._onScanPickingTask(e.target.value); e.target.value = '' } }}"
           />
         </div>
@@ -980,6 +1081,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     const task = this.pickingTask
     if (!task) return this._renderEmptyPanel()
 
+    const headerInfo = task.wave_no ? '(웨이브 : ' + task.wave_no + ')' : '(주문 : ' + task.shipment_no + ')'
     const completedCount = this.pickingItems.filter(i => i.status === 'PICKED').length
     const totalCount = this.pickingItems.length
     const progressPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
@@ -988,7 +1090,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
       <div class="right-panel">
         <div class="right-panel-header">
           <div class="task-info">
-            📋 ${task.pick_task_no || '-'}
+            📋 ${task.pick_task_no} ${headerInfo}
             <span>주문 ${task.plan_order || 0}건 | 상품 ${task.plan_item || 0}종</span>
           </div>
           <button class="btn-close" @click="${this._confirmBackToList}">닫기</button>
@@ -1173,9 +1275,10 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
    * ============================================================== */
 
   /** 페이지 활성화 시 데이터 조회 및 키보드 단축키 설정 */
-  async pageUpdated(changes, lifecycle, before) {
+  async pageUpdated() {
     if (this.active) {
-      await this._refresh()
+      this.orderDate = this._todayStr()
+      await this._refresh(1)
       this._setupKeyboardShortcuts()
     } else {
       this._removeKeyboardShortcuts()
@@ -1183,7 +1286,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
   }
 
   /** 페이지 해제 시 키보드 단축키 정리 */
-  pageDisposed(lifecycle) {
+  pageDisposed() {
     this._removeKeyboardShortcuts()
   }
 
@@ -1191,25 +1294,43 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
    * 데이터 로딩
    * ============================================================== */
 
-  /** 피킹 지시 목록 새로고침 - 진행 중 및 완료된 지시 조회 */
-  async _refresh() {
+  /** 피킹 지시 목록 조회 - 날짜·상태 기반 서버 페이지네이션 */
+  async _refresh(page = 1) {
+    this.loading = true
     try {
-      this.loading = true
-
-      const [activeData, endData] = await Promise.all([
-        ServiceUtil.restGet('ful_trx/picking_tasks/todo'),
-        ServiceUtil.restGet('ful_trx/picking_tasks/done')
-      ])
-
-      this.pickingTasks = activeData?.items || activeData || []
-      const endList = endData?.items || endData || []
-      this.statsEnd = endList.length
-
-      this.loading = false
+      const params = new URLSearchParams({
+        order_date: this.orderDate,
+        page: page,
+        size: this._listPageSize
+      })
+      if (this.filterStatus && this.filterStatus !== 'ALL') {
+        params.append('status', this.filterStatus)
+      }
+      if (this.searchKeyword) {
+        params.append('keyword', this.searchKeyword)
+      }
+      const result = await ServiceUtil.restGet(`ful_trx/picking_tasks/list?${params}`)
+      this.pickingTasks = result?.items || []
+      this.totalTaskCount = result?.total || 0
+      this.listPage = page
+      await this._fetchTaskSummary()
     } catch (err) {
       console.error('피킹 지시 조회 실패:', err)
       this.pickingTasks = []
+      this.totalTaskCount = 0
+    } finally {
       this.loading = false
+    }
+  }
+
+  /** 피킹 지시 건수 요약 조회 */
+  async _fetchTaskSummary() {
+    try {
+      const params = new URLSearchParams({ order_date: this.orderDate })
+      const result = await ServiceUtil.restGet(`ful_trx/picking_tasks/summary/count?${params}`).catch(() => null)
+      this.taskSummary = result || { total: 0, created: 0, in_progress: 0, completed: 0 }
+    } catch (err) {
+      console.error('피킹 지시 건수 조회 실패:', err)
     }
   }
 
@@ -1231,25 +1352,6 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
   /* ==============================================================
    * 좌측 패널 로직
    * ============================================================== */
-
-  /** 필터링된 피킹 지시 목록 반환 - 상태 및 검색어로 필터링 */
-  _getFilteredTasks() {
-    let list = [...this.pickingTasks]
-
-    if (this.filterStatus !== 'ALL' && this.filterStatus !== 'CANCELLED') {
-      list = list.filter(t => t.status === this.filterStatus)
-    }
-
-    if (this.searchKeyword) {
-      const kw = this.searchKeyword.toLowerCase()
-      list = list.filter(t =>
-        (t.pick_task_no || '').toLowerCase().includes(kw) ||
-        (t.wave_no || '').toLowerCase().includes(kw)
-      )
-    }
-
-    return list
-  }
 
   /** 피킹 지시 선택 - 작업 시작 API 호출 및 우측 패널에 작업 화면 표시 */
   async _onSelectTask(task) {
@@ -1282,18 +1384,21 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     }
   }
 
-  /** 피킹 지시 바코드 스캔 처리 - 지시번호로 피킹 지시 검색 및 선택 */
-  _onScanPickingTask(barcode) {
+  /** 피킹 지시 바코드 스캔 - 피킹지시번호·주문번호·웨이브번호 서버 조회 */
+  async _onScanPickingTask(barcode) {
     const value = (barcode || '').trim()
     if (!value) return
 
-    const found = this.pickingTasks.find(
-      t => t.pick_task_no === value || String(t.id) === value
-    )
-    if (found) {
-      this._onSelectTask(found)
-    } else {
-      this._showFeedback('피킹 지시를 찾을 수 없습니다', 'error')
+    try {
+      const params = new URLSearchParams({ barcode: value, order_date: this.orderDate })
+      const task = await ServiceUtil.restGet(`ful_trx/picking_tasks/find?${params}`)
+      if (task && task.id) {
+        this._onSelectTask(task)
+      } else {
+        this._showFeedback('피킹 지시를 찾을 수 없습니다', 'error')
+      }
+    } catch (err) {
+      this._showFeedback('조회 실패', 'error')
     }
   }
 
@@ -1523,10 +1628,11 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     }
   }
 
-  /** 다음 피킹 작업 시작 - 대기 중인 다음 피킹 지시 자동 선택 */
+  /** 다음 피킹 작업 시작 - 대기 중인 다음 피킹 지시 서버 조회 후 자동 선택 */
   async _startNextPicking() {
     this._closeWork()
-    await this._refresh()
+    this.filterStatus = 'ALL'
+    await this._refresh(1)
 
     const next = this.pickingTasks.find(t => t.status === 'CREATED')
     if (next) {
@@ -1562,7 +1668,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
       }
     }
     this._closeWork()
-    this._refresh()
+    this._refresh(1)
   }
 
   /* ==============================================================

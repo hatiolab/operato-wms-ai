@@ -1212,7 +1212,7 @@ export class PdaFulfillmentB2cPacking extends connect(store)(PageView) {
         order_date: this.waveDate,
         wave_seq: this.waveSeq
       })
-      const result = await ServiceUtil.restGet(`ful_trx/packing_orders/count?${params}`).catch(() => null)
+      const result = await ServiceUtil.restGet(`ful_trx/packing_orders/summary/count?${params}`).catch(() => null)
       this.orderSummary = result || { total: 0, waiting: 0, completed: 0 }
     } catch (err) {
       console.error('포장 주문 건수 조회 실패:', err)

@@ -83,6 +83,45 @@ public class FulfillmentTransactionController {
 	// ==================== 9.1 피킹 트랜잭션 API ====================
 
 	/**
+	 * 피킹 지시 건수 요약 조회
+	 * GET /rest/ful_trx/picking_tasks/summary/count
+	 */
+	@GetMapping(value = "picking_tasks/summary/count", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Count picking tasks by order_date")
+	public Map<String, Object> countPickingTasks(
+			@RequestParam(value = "order_date", required = false) String orderDate) {
+		return this.pickingService.countPickingTasks(orderDate);
+	}
+
+	/**
+	 * 피킹 지시 목록 페이지네이션 조회
+	 * GET /rest/ful_trx/picking_tasks/list
+	 */
+	@GetMapping(value = "picking_tasks/list", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Page picking tasks by order_date, status, keyword")
+	public Map<String, Object> pagePickingTasks(
+			@RequestParam(value = "order_date", required = false) String orderDate,
+			@RequestParam(value = "status", required = false) String status,
+			@RequestParam(value = "keyword", required = false) String keyword,
+			@RequestParam(value = "page", defaultValue = "1") int page,
+			@RequestParam(value = "size", defaultValue = "10") int size) {
+		return this.pickingService.pagePickingTasks(orderDate, status, keyword, page, size);
+	}
+
+	/**
+	 * 바코드로 피킹 지시 단건 조회
+	 * GET /rest/ful_trx/picking_tasks/find
+	 */
+	@GetMapping(value = "picking_tasks/find", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Find picking task by pick_task_no / shipment_no / wave_no")
+	@SuppressWarnings("rawtypes")
+	public Map findPickingTaskByBarcode(
+			@RequestParam(value = "barcode") String barcode,
+			@RequestParam(value = "order_date", required = false) String orderDate) {
+		return this.pickingService.findPickingTaskByBarcode(barcode, orderDate);
+	}
+
+	/**
 	 * 작업할 피킹 지시 목록 조회
 	 * GET /rest/ful_trx/picking_tasks/todo
 	 */
@@ -461,9 +500,10 @@ public class FulfillmentTransactionController {
 
 	/**
 	 * 포장 주문 건수 집계 (대기/완료/전체)
-	 * GET /rest/ful_trx/packing_orders/count?order_date=2024-01-01&biz_type=B2C_OUT&station_cd=ST01&wave_seq=1
+	 * GET
+	 * /rest/ful_trx/packing_orders/summary/count?order_date=2024-01-01&biz_type=B2C_OUT&station_cd=ST01&wave_seq=1
 	 */
-	@GetMapping(value = "packing_orders/count", produces = MediaType.APPLICATION_JSON_VALUE)
+	@GetMapping(value = "packing_orders/summary/count", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Count packing orders by status group (total/waiting/completed)")
 	public Map<String, Object> countPackingOrders(
 			@org.springframework.web.bind.annotation.RequestParam(name = "biz_type", required = false) String bizType,
@@ -509,7 +549,8 @@ public class FulfillmentTransactionController {
 
 	/**
 	 * 포장 주문 목록 서버 페이지네이션 조회 (todo + done 통합)
-	 * GET /rest/ful_trx/packing_orders/list?biz_type=B2C_OUT&order_date=2024-01-01&wave_seq=1&station_cd=ST01&page=1&size=10
+	 * GET
+	 * /rest/ful_trx/packing_orders/list?biz_type=B2C_OUT&order_date=2024-01-01&wave_seq=1&station_cd=ST01&page=1&size=10
 	 */
 	@GetMapping(value = "packing_orders/list", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Page packing orders (todo + done) with server-side pagination")
@@ -525,7 +566,8 @@ public class FulfillmentTransactionController {
 
 	/**
 	 * 바코드 스캔으로 포장 주문 단건 조회
-	 * GET /rest/ful_trx/packing_orders/find?biz_type=B2C_OUT&order_date=2024-01-01&wave_seq=1&station_cd=ST01&barcode=PO-001
+	 * GET
+	 * /rest/ful_trx/packing_orders/find?biz_type=B2C_OUT&order_date=2024-01-01&wave_seq=1&station_cd=ST01&barcode=PO-001
 	 */
 	@GetMapping(value = "packing_orders/find", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Find a single packing order by barcode (pack_order_no / shipment_no / invoice_no)")

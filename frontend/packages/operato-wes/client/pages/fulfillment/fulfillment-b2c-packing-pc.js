@@ -48,8 +48,8 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
 
         /* ===== 좌측 패널 ===== */
         .left-panel {
-          width: 280px;
-          min-width: 240px;
+          width: 340px;
+          min-width: 265px;
           background: var(--md-sys-color-surface, white);
           border-right: 1px solid var(--md-sys-color-outline-variant, #E0E0E0);
           display: flex;
@@ -1137,7 +1137,7 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
       <div class="right-panel">
         <div class="right-panel-header">
           <div class="order-info">
-            송장 번호 : ${order.invoice_no} (포장 번호 : ${order.pack_order_no} 주문 번호 : ${order.shipment_no})
+            송장 번호 : ${order.invoice_no} (웨이브 : ${order.wave_no}, 주문 : ${order.shipment_no}, 포장 번호 : ${order.pack_order_no})
             <span>${order.cust_nm || ''}</span>
           </div>
           <button class="btn-close" @click="${this._closeWork}">닫기</button>
@@ -1483,7 +1483,7 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
         order_date: this.waveDate,
         wave_seq: this.filterWaveSeq
       })
-      const result = await ServiceUtil.restGet(`ful_trx/packing_orders/count?${params}`).catch(() => null)
+      const result = await ServiceUtil.restGet(`ful_trx/packing_orders/summary/count?${params}`).catch(() => null)
       this.orderSummary = result || { total: 0, waiting: 0, completed: 0 }
     } catch (err) {
       console.error('포장 주문 건수 조회 실패:', err)
