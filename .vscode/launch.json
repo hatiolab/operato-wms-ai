@@ -2,13 +2,48 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "type": "node",
+      "name": "Frontend Dev Server (debug)",
+      "request": "launch",
+      "runtimeExecutable": "yarn",
+      "runtimeArgs": ["wms:dev"],
+      "cwd": "${workspaceFolder}/frontend",
+      "env": {
+        "NODE_OPTIONS": "--inspect"
+      },
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/frontend/packages/*/dist-server/**/*.js"
+      ],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/frontend/packages/**",
+        "!**/node_modules/**"
+      ]
+    },
+    {
+      "type": "node",
+      "name": "Frontend Dev Server (attach)",
+      "request": "attach",
+      "port": 9229,
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/frontend/packages/*/dist-server/**/*.js"
+      ],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/frontend/packages/**",
+        "!**/node_modules/**"
+      ]
+    },
+    {
       "type": "java",
       "name": "operato-wms-ai (debug-dev)",
       "request": "launch",
       "mainClass": "operato.wms.OperatoWmsApplication",
       "projectName": "operato-wms-ai",
       "args": "--spring.profiles.active=dev",
-      "vmArgs": "-Xmx512m",
+      "vmArgs": "-Xmx512m -Dlogging.config=classpath:WEB-INF/logback-spring.xml",
       "env": {
         "JAVA_HOME": "/Library/Java/JavaVirtualMachines/zulu-18.jdk/Contents/Home",
         "JASYPT_ENCRYPTOR_PASSWORD": "operato-wms-secret"
@@ -28,7 +63,7 @@
       "mainClass": "operato.wms.OperatoWmsApplication",
       "projectName": "operato-wms-ai",
       "args": "--spring.profiles.active=prod",
-      "vmArgs": "-Xmx512m",
+      "vmArgs": "-Xmx512m -Dlogging.config=classpath:WEB-INF/logback-spring.xml",
       "env": {
         "JAVA_HOME": "/Library/Java/JavaVirtualMachines/zulu-18.jdk/Contents/Home",
         "JASYPT_ENCRYPTOR_PASSWORD": "operato-wms-secret"
