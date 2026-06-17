@@ -185,9 +185,10 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
         }
 
         .order-card.selected {
-          border-left-color: var(--md-sys-color-primary, #2196F3);
+          border: 2px solid #2196F3;
+          border-left: 5px solid var(--md-sys-color-primary, #1565C0);
           background: #E3F2FD;
-          border-color: #90CAF9;
+          box-shadow: 0 2px 8px rgba(25, 118, 210, 0.2);
         }
 
         .order-card.completed {
@@ -1031,7 +1032,7 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
           </div>
           <div class="order-list-header">
             <span>검수/포장 ${progressPctDisplay}%</span>
-            <span>대기 <strong>${summaryWaiting}</strong> / 완료 <strong>${summaryCompleted}</strong> (총 ${summaryTotal}건)</span>
+            <span>진행 <strong>${summaryWaiting}</strong> / 완료 <strong>${summaryCompleted}</strong> (총 ${summaryTotal}건)</span>
           </div>
         </div>
 
