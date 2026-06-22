@@ -46,6 +46,10 @@ public class PackingOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	 */
 	public static final String STATUS_COMPLETED = "COMPLETED";
 	/**
+	 * 상태 - SHORT (부족 처리 — 부족 아이템이 있어 출하 차단)
+	 */
+	public static final String STATUS_SHORT = "SHORT";
+	/**
 	 * 상태 - LABEL_PRINTED (라벨 출력)
 	 */
 	public static final String STATUS_LABEL_PRINTED = "LABEL_PRINTED";
