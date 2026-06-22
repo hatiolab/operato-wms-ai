@@ -73,6 +73,12 @@ public class WmsFulfillmentConstants {
 	/** 커스텀 서비스 - 아이템 검수 후 처리 */
 	public static final String TRX_FUL_POST_INSPECT_ITEM = "diy-ful-post-inspect-item";
 
+	// === 아이템 부족 처리 ===
+	/** 커스텀 서비스 - 아이템 부족 처리 전 처리 */
+	public static final String TRX_FUL_PRE_SHORT_PACKING_ITEM = "diy-ful-pre-short-packing-item";
+	/** 커스텀 서비스 - 아이템 부족 처리 후 처리 */
+	public static final String TRX_FUL_POST_SHORT_PACKING_ITEM = "diy-ful-post-short-packing-item";
+
 	// === 아이템 포장 ===
 	/** 커스텀 서비스 - 아이템 포장 전 처리 */
 	public static final String TRX_FUL_PRE_PACK_ITEM = "diy-ful-pre-pack-item";

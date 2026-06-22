@@ -850,6 +850,120 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
           100% { opacity: 0; transform: translateX(100px); }
         }
 
+        /* ===== 부족 처리 ===== */
+        .row-short td {
+          background: #FFF3E0;
+          color: #BF360C;
+          text-decoration: line-through;
+          text-decoration-color: #E64A19;
+        }
+
+        .badge-short {
+          display: inline-block;
+          padding: 2px 8px;
+          background: #FF5722;
+          color: white;
+          border-radius: 10px;
+          font-size: 11px;
+          font-weight: 700;
+          text-decoration: none;
+        }
+
+        .btn-short {
+          padding: 8px 16px;
+          background: #FF9800;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          font-weight: 600;
+          font-size: 13px;
+          cursor: pointer;
+        }
+
+        .btn-short:hover { background: #E65100; }
+
+        .shortage-warning {
+          margin: 0 0 12px;
+          padding: 10px 14px;
+          background: #FFF3E0;
+          border-left: 4px solid #FF9800;
+          border-radius: 4px;
+          font-size: 13px;
+          color: #BF360C;
+          font-weight: 500;
+        }
+
+        /* ===== 부족 처리 다이얼로그 ===== */
+        .short-dialog-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.45);
+          z-index: 2000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .short-dialog {
+          background: white;
+          border-radius: 12px;
+          padding: 28px 32px;
+          width: 360px;
+          max-width: 90vw;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+
+        .short-dialog h3 {
+          margin: 0 0 16px;
+          font-size: 18px;
+          font-weight: 700;
+          color: #E65100;
+        }
+
+        .dialog-item-info {
+          background: #F5F5F5;
+          border-radius: 8px;
+          padding: 12px 16px;
+          margin-bottom: 16px;
+          font-size: 14px;
+        }
+
+        .dialog-warning {
+          margin: 0 0 20px;
+          font-size: 13px;
+          color: #D32F2F;
+          font-weight: 500;
+        }
+
+        .dialog-actions {
+          display: flex;
+          gap: 10px;
+          justify-content: flex-end;
+        }
+
+        .btn-dialog-cancel {
+          padding: 9px 20px;
+          border: 1px solid #E0E0E0;
+          border-radius: 6px;
+          background: white;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .btn-dialog-short {
+          padding: 9px 20px;
+          background: #FF5722;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .btn-dialog-short:hover { background: #BF360C; }
+
         /* ===== 로딩 ===== */
         .loading-text {
           text-align: center;
@@ -915,7 +1029,9 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
       waveDate: String,
       filterWaveSeq: String,
       orderSummary: Object,
-      totalOrderCount: Number
+      totalOrderCount: Number,
+      shortDialogOpen: Boolean,
+      shortDialogItem: Object
     }
   }
 
@@ -947,6 +1063,8 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
     this.orderSummary = { total: 0, waiting: 0, completed: 0 }
     this.totalOrderCount = 0
     this._keyHandler = null
+    this.shortDialogOpen = false
+    this.shortDialogItem = null
   }
 
   /** 페이지 컨텍스트 반환 - 브라우저 타이틀 등에 사용 */
@@ -975,6 +1093,30 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
 
       ${this.feedbackMsg ? html`
         <div class="feedback-toast ${this.feedbackType}">${this.feedbackMsg}</div>
+      ` : ''}
+
+      ${this.shortDialogOpen && this.shortDialogItem ? html`
+        <div class="short-dialog-overlay" @click="${this._closeShortDialog}">
+          <div class="short-dialog" @click="${e => e.stopPropagation()}">
+            <h3>부족 처리</h3>
+            <div class="dialog-item-info">
+              <div><strong>${this.shortDialogItem.sku_cd}</strong></div>
+              <div>${this.shortDialogItem.sku_nm || this.shortDialogItem.product_nm || ''}</div>
+              <div style="margin-top:8px; color:#757575; font-size:13px;">
+                주문 수량: ${this.shortDialogItem.pack_qty || this.shortDialogItem.order_qty || 0} EA
+                &nbsp;/&nbsp;
+                검수 수량: ${this.shortDialogItem.insp_qty || 0} EA
+                &nbsp;→&nbsp;
+                부족: ${(this.shortDialogItem.pack_qty || this.shortDialogItem.order_qty || 0) - (this.shortDialogItem.insp_qty || 0)} EA
+              </div>
+            </div>
+            <p class="dialog-warning">이 항목을 부족 처리하면 출하가 차단됩니다. 계속하시겠습니까?</p>
+            <div class="dialog-actions">
+              <button class="btn-dialog-cancel" @click="${this._closeShortDialog}">취소</button>
+              <button class="btn-dialog-short" @click="${this._confirmShortItem}">부족 처리 확인</button>
+            </div>
+          </div>
+        </div>
       ` : ''}
     `
   }
@@ -1168,6 +1310,13 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
             ` : ''}
           </div>
 
+          <!-- 부족 경고 배너 -->
+          ${this.packingItems.some(i => i.status === 'SHORT' || (i.short_qty && i.short_qty > 0)) ? html`
+            <div class="shortage-warning">
+              ⚠ 피킹 시 재고 부족이 발생했습니다. 부족 항목은 출하가 차단되며 후속 처리가 필요합니다.
+            </div>
+          ` : ''}
+
           <!-- 검수 항목 테이블 -->
           <div class="inspection-table-wrap">
             <table class="inspection-table">
@@ -1185,18 +1334,19 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
               <tbody>
                 ${this.packingItems.map((item, idx) => {
       const orderQty = item.pack_qty || item.order_qty || 1
-      const isCompleted = item.status === 'COMPLETED' || (item.insp_qty || 0) >= orderQty
-      const isCurrent = idx === this.currentItemIndex && !isCompleted
+      const isShort = item.status === 'SHORT'
+      const isCompleted = item.status === 'COMPLETED' || (!isShort && (item.insp_qty || 0) >= orderQty)
+      const isCurrent = idx === this.currentItemIndex && !isCompleted && !isShort
 
       return html`
-                    <tr class="${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''}">
+                    <tr class="${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''} ${isShort ? 'row-short' : ''}">
                       <td class="col-num">${idx + 1}</td>
                       <td class="col-sku">${item.sku_cd || item.product_cd || '-'}</td>
                       <td>${item.sku_nm || item.product_nm || '-'}</td>
                       <td class="col-lot">${item.lot_no || '-'}</td>
                       <td class="col-exp">${item.expired_date ? item.expired_date.substring(0, 10) : '-'}</td>
-                      <td class="col-qty">${item.insp_qty || 0} / ${item.pack_qty || item.order_qty || 0}</td>
-                      <td class="col-status">${isCompleted ? '✅' : isCurrent ? '→' : '☐'}</td>
+                      <td class="col-qty">${item.insp_qty || 0} / ${item.pack_qty || item.order_qty || 0}${isShort && item.short_qty ? html` <small style="color:#F44336;">(부족:${item.short_qty})</small>` : ''}</td>
+                      <td class="col-status">${isShort ? html`<span class="badge-short">부족</span>` : isCompleted ? '✅' : isCurrent ? '→' : '☐'}</td>
                     </tr>
                   `
     })}
@@ -1205,7 +1355,7 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
           </div>
 
           <!-- 현재 스캔 대상 패널 -->
-          ${currentItem && currentItem.status !== 'COMPLETED' && (currentItem.insp_qty || 0) < (currentItem.pack_qty || currentItem.order_qty || 1) ? html`
+          ${currentItem && currentItem.status !== 'COMPLETED' && currentItem.status !== 'SHORT' && (currentItem.insp_qty || 0) < (currentItem.pack_qty || currentItem.order_qty || 1) ? html`
             <div class="current-item-panel">
               <div class="item-header">
                 <span class="sku-code">상품 : ${currentItem.sku_cd || currentItem.product_cd || '-'}</span>
@@ -1233,6 +1383,7 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
                 <span class="unit">/ ${currentItem.pack_qty || currentItem.order_qty || 0} EA</span>
               </div>
               <div class="actions">
+                <button class="btn-short" @click="${() => this._onShortItem(currentItem)}">부족 처리</button>
                 <button class="btn-confirm" @click="${this._confirmInspection}">검수 완료</button>
               </div>
             </div>
@@ -1240,9 +1391,11 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
 
           <!-- 전체 검수 완료 → 포장 단계 이동 버튼 -->
           ${this.totalCount > 0 && this.completedCount >= this.totalCount ? html`
-            <div class="current-item-panel" style="border-left-color: #4CAF50; text-align: center;">
-              <div style="font-size: 15px; font-weight: 700; color: #2E7D32; margin-bottom: 12px;">
-                ✅ 모든 항목 검수 완료 (${this.completedCount}/${this.totalCount})
+            <div class="current-item-panel" style="border-left-color: ${this.packingItems.some(i => i.status === 'SHORT') ? '#FF9800' : '#4CAF50'}; text-align: center;">
+              <div style="font-size: 15px; font-weight: 700; color: ${this.packingItems.some(i => i.status === 'SHORT') ? '#E65100' : '#2E7D32'}; margin-bottom: 12px;">
+                ${this.packingItems.some(i => i.status === 'SHORT')
+                  ? `⚠ 검수 완료 — 부족 항목 ${this.packingItems.filter(i => i.status === 'SHORT').length}건 포함 (출하가 차단됩니다)`
+                  : `✅ 모든 항목 검수 완료 (${this.completedCount}/${this.totalCount})`}
               </div>
               <button class="btn-confirm" style="width: 100%; padding: 10px 0; font-size: 14px;"
                 @click="${this._onInspectionComplete}">
@@ -1288,7 +1441,15 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
               <div class="info-row"><span class="label">총 품목</span><span class="value">${this.totalCount}종</span></div>
               <div class="info-row"><span class="label">총 수량</span><span class="value">${this.packingItems.reduce((s, i) => s + (i.pack_qty || i.order_qty || 0), 0)} EA</span></div>
               <div class="info-row"><span class="label">검수 소요</span><span class="value">${elapsed}</span></div>
-              <div class="info-row"><span class="label">전체 일치</span><span class="value" style="color:#4CAF50">✅</span></div>
+              ${(() => {
+                const shortCount = this.packingItems.filter(i => i.status === 'SHORT').length
+                return html`<div class="info-row">
+                  <span class="label">전체 일치</span>
+                  <span class="value" style="color:${shortCount > 0 ? '#FF9800' : '#4CAF50'}">
+                    ${shortCount > 0 ? `⚠ 부족 ${shortCount}건 (출하 차단)` : '✅'}
+                  </span>
+                </div>`
+              })()}
             </div>
             <div class="info-card">
               <h4>주문 정보</h4>
@@ -1505,7 +1666,7 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
       })
       this.currentItemIndex = -1
       this.totalCount = this.packingItems.length
-      this.completedCount = this.packingItems.filter(i => i.status === 'COMPLETED').length
+      this.completedCount = this.packingItems.filter(i => i.status === 'COMPLETED' || i.status === 'SHORT').length
       this._moveToNextItem()
     } catch (err) {
       console.error('포장 항목 조회 실패:', err)
@@ -1628,7 +1789,7 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
     const { sku_cd, sku_nm } = e.detail
 
     const matchIndex = this.packingItems.findIndex(
-      item => item.status !== 'COMPLETED' && (item.sku_cd === sku_cd || item.product_cd === sku_cd)
+      item => item.status !== 'COMPLETED' && item.status !== 'SHORT' && (item.sku_cd === sku_cd || item.product_cd === sku_cd)
     )
 
     if (matchIndex >= 0) {
@@ -1698,7 +1859,7 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
       this.packingItems = this.packingItems.map((it, idx) =>
         idx === this.currentItemIndex ? { ...it, status: 'COMPLETED' } : it
       )
-      this.completedCount = this.packingItems.filter(i => i.status === 'COMPLETED').length
+      this.completedCount = this.packingItems.filter(i => i.status === 'COMPLETED' || i.status === 'SHORT').length
 
       this._showFeedback('success', `검수 완료 (${this.completedCount}/${this.totalCount})`)
 
@@ -1715,9 +1876,9 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
     }
   }
 
-  /** 다음 미완료 항목으로 이동 */
+  /** 다음 미완료 항목으로 이동 (SHORT 항목은 건너뜀) */
   _moveToNextItem() {
-    const nextIdx = this.packingItems.findIndex(i => i.status !== 'COMPLETED')
+    const nextIdx = this.packingItems.findIndex(i => i.status !== 'COMPLETED' && i.status !== 'SHORT')
     this.currentItemIndex = nextIdx
   }
 
@@ -1745,6 +1906,52 @@ class FulfillmentB2cPackingPc extends localize(i18next)(PageView) {
     else if (totalQty <= 10) this.boxType = 'MEDIUM'
     else if (totalQty <= 30) this.boxType = 'LARGE'
     else this.boxType = 'XLARGE'
+  }
+
+  /** 아이템 부족 처리 다이얼로그 열기 */
+  _onShortItem(item) {
+    this.shortDialogOpen = true
+    this.shortDialogItem = item
+  }
+
+  /** 부족 처리 다이얼로그 닫기 */
+  _closeShortDialog() {
+    this.shortDialogOpen = false
+    this.shortDialogItem = null
+  }
+
+  /** 부족 처리 확인 - API 호출 후 아이템 상태 갱신 */
+  async _confirmShortItem() {
+    const item = this.shortDialogItem
+    if (!item || !this.selectedOrder) return
+
+    const orderQty = item.pack_qty || item.order_qty || 0
+    const inspQty = item.insp_qty || 0
+    const shortQty = orderQty - inspQty
+
+    try {
+      await ServiceUtil.restPost(
+        `ful_trx/packing_orders/${this.selectedOrder.id}/items/${item.id}/short`,
+        { short_qty: shortQty }
+      )
+
+      this.packingItems = this.packingItems.map(it =>
+        it.id === item.id ? { ...it, status: 'SHORT', short_qty: shortQty } : it
+      )
+      this.completedCount = this.packingItems.filter(i => i.status === 'COMPLETED' || i.status === 'SHORT').length
+
+      this._closeShortDialog()
+      this._showFeedback('warning', `${item.sku_cd} 부족 처리 완료`)
+
+      if (this.completedCount >= this.totalCount) {
+        this._onInspectionComplete()
+      } else {
+        this._moveToNextItem()
+      }
+    } catch (err) {
+      console.error('부족 처리 실패:', err)
+      this._showFeedback('error', '부족 처리 중 오류가 발생했습니다')
+    }
   }
 
   /** 출고 확정 - 운송장번호 필수, 포장 주문 완료 처리 */

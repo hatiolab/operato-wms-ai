@@ -171,12 +171,7 @@ public class OmsWaveService extends AbstractQueryService {
 
 		for (Map<String, Object> so : orderList) {
 			// 출고 주문 조회
-			ShipmentOrder order = this.findOrder(domainId, so.get("id").toString());
-
-			// 출고 주문 존재 여부 체크
-			if (order == null) {
-				throw new ElidomRuntimeException("주문을 찾을 수 없습니다: " + so.get("id"));
-			}
+			ShipmentOrder order = this.findOrder(domainId, so.get("id").toString(), true);
 
 			// 출고 주문 웨이브 포함 여부 체크
 			if (ValueUtil.isNotEmpty(order.getWaveNo())) {
@@ -297,7 +292,7 @@ public class OmsWaveService extends AbstractQueryService {
 
 		for (ShipmentOrder so : list) {
 			// 출고 주문 조회
-			ShipmentOrder order = this.findOrder(domainId, so.getId());
+			ShipmentOrder order = this.findOrder(domainId, so.getId(), false);
 
 			// 출고 주문 존재 여부 체크
 			if (order == null) {
@@ -459,11 +454,10 @@ public class OmsWaveService extends AbstractQueryService {
 		Long domainId = Domain.currentDomainId();
 		String now = DateUtil.currentTimeStr();
 
-		ShipmentWave wave = this.findWave(domainId, id);
-		if (wave == null) {
-			throw new ElidomValidationException("웨이브를 찾을 수 없습니다: " + id);
-		}
+		// 웨이브 조회
+		ShipmentWave wave = this.findWave(domainId, id, true);
 
+		// 상태 체크
 		if (!ShipmentWave.STATUS_CREATED.equals(wave.getStatus())) {
 			throw new ElidomValidationException("웨이브 상태가 [" + wave.getStatus() + "]이므로 릴리스할 수 없습니다");
 		}
@@ -488,7 +482,7 @@ public class OmsWaveService extends AbstractQueryService {
 		// 웨이브 상태 변경
 		wave.setStatus(ShipmentWave.STATUS_RELEASED);
 		wave.setReleasedAt(now);
-		this.queryManager.update(wave, "status", "releasedAt", "updatedAt");
+		this.queryManager.update(wave, "status", "releasedAt", "updatedAt", "updaterId");
 
 		// 포함된 주문 상태 변경 (ALLOCATED / WAVED → RELEASED)
 		queryParams.put("status", ShipmentOrder.STATUS_RELEASED);
@@ -497,7 +491,7 @@ public class OmsWaveService extends AbstractQueryService {
 
 		// 변경된 주문 건수 조회
 		sql = "SELECT COUNT(*) FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status";
-		Integer changedOrderCount = this.queryManager.selectBySql(sql, queryParams, Integer.class);
+		int changedOrderCount = this.queryManager.selectBySql(sql, queryParams, Integer.class);
 
 		// ===== 이벤트 발행: Fulfillment 모듈에 피킹 지시 생성 트리거 =====
 		WaveReleasedEvent event = new WaveReleasedEvent(
@@ -507,12 +501,11 @@ public class OmsWaveService extends AbstractQueryService {
 				wave.getPickType(),
 				wave.getWcsFlag(),
 				wave.getInspFlag(),
-				changedOrderCount != null ? changedOrderCount : 0);
+				changedOrderCount);
 		this.eventPublisher.publishEvent(event);
 
 		// 결과 리턴
-		return ValueUtil.newMap("success,order_count,wave", true, changedOrderCount != null ? changedOrderCount : 0,
-				wave);
+		return ValueUtil.newMap("success,order_count,wave", true, changedOrderCount, wave);
 	}
 
 	/**
@@ -531,10 +524,7 @@ public class OmsWaveService extends AbstractQueryService {
 		Long domainId = Domain.currentDomainId();
 
 		// 1. 웨이브 조회
-		ShipmentWave wave = this.findWave(domainId, id);
-		if (wave == null) {
-			throw new ElidomValidationException("웨이브를 찾을 수 없습니다: " + id);
-		}
+		ShipmentWave wave = this.findWave(domainId, id, true);
 
 		// 2. 웨이브 상태 확인 (RELEASED만 취소 가능)
 		if (!ShipmentWave.STATUS_RELEASED.equals(wave.getStatus())) {
@@ -554,9 +544,8 @@ public class OmsWaveService extends AbstractQueryService {
 		}
 
 		// 4. 웨이브 상태 변경: RELEASED → CREATED
-		String updWaveSql = "UPDATE shipment_waves SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-		this.queryManager.executeBySql(updWaveSql, ValueUtil.newMap("status,domainId,id",
-				ShipmentWave.STATUS_CREATED, domainId, id));
+		wave.setStatus(ShipmentWave.STATUS_CREATED);
+		this.queryManager.update(wave, "status", "updatedAt", "updaterId");
 
 		// 5. 주문 상태 변경: RELEASED/PICKING → WAVED
 		String updOrdersSql = "UPDATE shipment_orders SET status = :newStatus, updated_at = now() " +
@@ -587,13 +576,9 @@ public class OmsWaveService extends AbstractQueryService {
 		Long domainId = Domain.currentDomainId();
 
 		// 1. 웨이브 조회
-		ShipmentWave wave = this.findWave(domainId, id);
+		ShipmentWave wave = this.findWave(domainId, id, true);
 
-		// 2. 웨이브 존재 여부 & 상태 체크
-		if (wave == null) {
-			throw new ElidomValidationException("웨이브를 찾을 수 없습니다: " + id);
-		}
-
+		// 2. 웨이브 상태 체크
 		if (!ShipmentWave.STATUS_CREATED.equals(wave.getStatus())) {
 			throw new ElidomValidationException("웨이브 상태가 [" + wave.getStatus() + "]이므로 취소할 수 없습니다");
 		}
@@ -604,7 +589,7 @@ public class OmsWaveService extends AbstractQueryService {
 				ShipmentOrder.STATUS_ALLOCATED, domainId, wave.getWaveNo(), ShipmentOrder.STATUS_WAVED);
 		this.queryManager.executeBySql(updOrdersSql, updOrdersParams);
 
-		// 4. wave_no null로 업데이트
+		// 4. 3번 조건에 포함되지 않은 웨이브 소속 주문 wave_no null로 업데이트
 		updOrdersSql = "UPDATE shipment_orders SET wave_no = null WHERE domain_id = :domainId AND wave_no = :waveNo";
 		this.queryManager.executeBySql(updOrdersSql, updOrdersParams);
 
@@ -622,20 +607,11 @@ public class OmsWaveService extends AbstractQueryService {
 	 * @param id 웨이브 ID
 	 * @return 주문 목록
 	 */
-	public List<Map> getWaveOrders(String id) {
+	public List<ShipmentOrder> getWaveOrders(String id) {
 		Long domainId = Domain.currentDomainId();
-
-		ShipmentWave wave = this.findWave(domainId, id);
-		if (wave == null) {
-			throw new ElidomValidationException("웨이브를 찾을 수 없습니다: " + id);
-		}
-
-		String sql = "SELECT id, shipment_no, ref_order_no AS ref_no, cust_cd, cust_nm, biz_type, ship_type, total_item, total_order, status"
-				+ " FROM shipment_orders"
-				+ " WHERE domain_id = :domainId AND wave_no = :waveNo"
-				+ " ORDER BY shipment_no";
-		Map<String, Object> params = ValueUtil.newMap("domainId,waveNo", domainId, wave.getWaveNo());
-		return this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+		ShipmentWave wave = this.findWave(domainId, id, true);
+		return this.queryManager.selectList(ShipmentOrder.class,
+				ValueUtil.newMap("domainId,waveNo", domainId, wave.getWaveNo()));
 	}
 
 	/**
@@ -649,30 +625,27 @@ public class OmsWaveService extends AbstractQueryService {
 	 */
 	public List<Map> getWaveSummary(String id) {
 		Long domainId = Domain.currentDomainId();
-
-		ShipmentWave wave = this.findWave(domainId, id);
-		if (wave == null) {
-			throw new ElidomValidationException("웨이브를 찾을 수 없습니다: " + id);
-		}
-
-		String sql = "SELECT soi.sku_cd, soi.sku_nm,"
-				+ " SUM(soi.order_qty) AS total_qty,"
-				+ " COUNT(DISTINCT soi.shipment_order_id) AS order_count,"
-				+ " MIN(sa.loc_cd) AS loc_cd,"
-				+ " COALESCE(("
-				+ "   SELECT SUM(i.inv_qty - COALESCE(i.reserved_qty, 0))"
-				+ "   FROM inventories i"
-				+ "   WHERE i.domain_id = :domainId AND i.sku_cd = soi.sku_cd"
-				+ "     AND i.status = 'STORED' AND (i.del_flag IS NULL OR i.del_flag = false)"
-				+ " ), 0) AS available_qty"
-				+ " FROM shipment_order_items soi"
-				+ " INNER JOIN shipment_orders so ON so.domain_id = soi.domain_id AND so.id = soi.shipment_order_id"
-				+ " LEFT JOIN stock_allocations sa ON sa.domain_id = soi.domain_id AND sa.shipment_order_item_id = soi.id AND sa.status IN ('SOFT','HARD')"
-				+ " WHERE soi.domain_id = :domainId AND so.wave_no = :waveNo"
-				+ " GROUP BY soi.sku_cd, soi.sku_nm"
-				+ " ORDER BY soi.sku_cd";
+		ShipmentWave wave = this.findWave(domainId, id, true);
+		StringBuffer sql = new StringBuffer();
+		sql.append("SELECT soi.sku_cd, soi.sku_nm,");
+		sql.append("	SUM(soi.order_qty) AS total_qty,");
+		sql.append("	COUNT(DISTINCT soi.shipment_order_id) AS order_count,");
+		sql.append("	MIN(sa.loc_cd) AS loc_cd,");
+		sql.append("	COALESCE((");
+		sql.append("		SELECT SUM(i.inv_qty - COALESCE(i.reserved_qty, 0))");
+		sql.append("		FROM inventories i");
+		sql.append("		WHERE i.domain_id = :domainId AND i.sku_cd = soi.sku_cd");
+		sql.append("		AND i.status = 'STORED' AND (i.del_flag IS NULL OR i.del_flag = false)");
+		sql.append("	), 0) AS available_qty");
+		sql.append(" FROM shipment_order_items soi");
+		sql.append(" INNER JOIN shipment_orders so ON so.domain_id = soi.domain_id AND so.id = soi.shipment_order_id");
+		sql.append(" LEFT JOIN stock_allocations sa ON sa.domain_id = soi.domain_id");
+		sql.append("   AND sa.shipment_order_item_id = soi.id AND sa.status IN ('SOFT','HARD')");
+		sql.append(" WHERE soi.domain_id = :domainId AND so.wave_no = :waveNo");
+		sql.append(" GROUP BY soi.sku_cd, soi.sku_nm");
+		sql.append(" ORDER BY soi.sku_cd");
 		Map<String, Object> params = ValueUtil.newMap("domainId,waveNo", domainId, wave.getWaveNo());
-		return this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+		return this.queryManager.selectListBySql(sql.toString(), params, Map.class, 0, 0);
 	}
 
 	/**
@@ -687,11 +660,10 @@ public class OmsWaveService extends AbstractQueryService {
 	 */
 	public Map<String, Object> addOrdersToWave(String waveId, List<String> orderIds) {
 		Long domainId = Domain.currentDomainId();
+		// 웨이브 조회
+		ShipmentWave wave = this.findWave(domainId, waveId, true);
 
-		ShipmentWave wave = this.findWave(domainId, waveId);
-		if (wave == null) {
-			throw new ElidomValidationException("웨이브를 찾을 수 없습니다: " + waveId);
-		}
+		// 상태 체크
 		if (!ShipmentWave.STATUS_CREATED.equals(wave.getStatus())) {
 			throw new ElidomValidationException(
 					"웨이브 상태가 [" + wave.getStatus() + "]이므로 주문을 추가할 수 없습니다 (CREATED 상태만 가능)");
@@ -699,21 +671,23 @@ public class OmsWaveService extends AbstractQueryService {
 
 		int addedCount = 0;
 		for (String orderId : orderIds) {
-			ShipmentOrder order = this.findOrder(domainId, orderId);
-			if (order == null)
-				continue;
-			if (!ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus()))
+			// 주문 조회
+			ShipmentOrder order = this.findOrder(domainId, orderId, false);
+
+			// 주문 없거나 상태가 할당이 아니면 continue
+			if (order == null || !ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus()))
 				continue;
 
-			String sql = "UPDATE shipment_orders SET wave_no = :waveNo, status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-			Map<String, Object> params = ValueUtil.newMap("waveNo,status,domainId,id",
-					wave.getWaveNo(), ShipmentOrder.STATUS_WAVED, domainId, orderId);
-			this.queryManager.executeBySql(sql, params);
+			// 웨이브에 추가 (wave_no 설정 + 상태 변경)
+			order.setWaveNo(wave.getWaveNo());
+			order.setStatus(ShipmentOrder.STATUS_WAVED);
+			this.queryManager.update(order, "waveNo", "status", "updatedAt", "updaterId");
+
 			addedCount++;
 		}
 
 		// 웨이브 헤더 계획 수량 재집계
-		this.recalcWavePlanStats(domainId, waveId, wave.getWaveNo());
+		this.recalcWavePlanStats(wave);
 
 		// 결과 리턴
 		return ValueUtil.newMap("added_count,wave_no", addedCount, wave.getWaveNo());
@@ -732,10 +706,10 @@ public class OmsWaveService extends AbstractQueryService {
 	public Map<String, Object> removeOrdersFromWave(String waveId, List<String> orderIds) {
 		Long domainId = Domain.currentDomainId();
 
-		ShipmentWave wave = this.findWave(domainId, waveId);
-		if (wave == null) {
-			throw new ElidomValidationException("웨이브를 찾을 수 없습니다: " + waveId);
-		}
+		// 웨이브 조회
+		ShipmentWave wave = this.findWave(domainId, waveId, true);
+
+		// 웨이브 상태 체크
 		if (!ShipmentWave.STATUS_CREATED.equals(wave.getStatus())) {
 			throw new ElidomValidationException(
 					"웨이브 상태가 [" + wave.getStatus() + "]이므로 주문을 제거할 수 없습니다 (CREATED 상태만 가능)");
@@ -743,32 +717,31 @@ public class OmsWaveService extends AbstractQueryService {
 
 		int removedCount = 0;
 		for (String orderId : orderIds) {
-			ShipmentOrder order = this.findOrder(domainId, orderId);
-			if (order == null)
-				continue;
-			if (!ShipmentOrder.STATUS_WAVED.equals(order.getStatus())
-					&& !ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus())
-					&& !ShipmentOrder.STATUS_BACK_ORDER.equals(order.getStatus()))
-				continue;
-			if (!wave.getWaveNo().equals(order.getWaveNo()))
+			// 주문 조회
+			ShipmentOrder order = this.findOrder(domainId, orderId, false);
+
+			// 주문 체크
+			if (order == null ||
+					!wave.getWaveNo().equals(order.getWaveNo()) ||
+					(!ShipmentOrder.STATUS_WAVED.equals(order.getStatus())
+							&& !ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus())
+							&& !ShipmentOrder.STATUS_BACK_ORDER.equals(order.getStatus())))
 				continue;
 
-			String sql = null;
+			// 웨이브 번호 클리어
+			order.setWaveNo(null);
 
-			if (ShipmentOrder.STATUS_BACK_ORDER.equals(order.getStatus())) {
-				sql = "UPDATE shipment_orders SET wave_no = null, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-			} else {
-				sql = "UPDATE shipment_orders SET wave_no = null, status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
+			// 재고 부족 상태가 아니면 할당 상태로 복원
+			if (!ShipmentOrder.STATUS_BACK_ORDER.equals(order.getStatus())) {
+				order.setStatus(ShipmentOrder.STATUS_ALLOCATED);
 			}
 
-			Map<String, Object> params = ValueUtil.newMap("status,domainId,id", ShipmentOrder.STATUS_ALLOCATED,
-					domainId, orderId);
-			this.queryManager.executeBySql(sql, params);
+			this.queryManager.update(order, "waveNo", "status", "updatedAt", "updaterId");
 			removedCount++;
 		}
 
 		// 웨이브 헤더 계획 수량 재집계
-		this.recalcWavePlanStats(domainId, waveId, wave.getWaveNo());
+		this.recalcWavePlanStats(wave);
 
 		// 결과 리턴
 		return ValueUtil.newMap("removed_count,wave_no", removedCount, wave.getWaveNo());
@@ -824,47 +797,68 @@ public class OmsWaveService extends AbstractQueryService {
 
 	/**
 	 * 웨이브 헤더 계획 수량 재집계
+	 * 
+	 * @param wave
 	 */
-	private void recalcWavePlanStats(Long domainId, String waveId, String waveNo) {
-		Map<String, Object> countParams = ValueUtil.newMap("domainId,waveNo", domainId, waveNo);
+	private void recalcWavePlanStats(ShipmentWave wave) {
+		Map<String, Object> countParams = ValueUtil.newMap("domainId,waveNo", wave.getDomainId(), wave.getWaveNo());
 
+		// 웨이브 계획 주문 수 조회
 		String countSql = "SELECT COUNT(*) FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo";
 		Integer planOrder = this.queryManager.selectBySql(countSql, countParams, Integer.class);
 
+		// 웨이브 계획 수량 조회
 		String qtySql = "SELECT COALESCE(SUM(total_order), 0) FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo";
 		Double planTotal = this.queryManager.selectBySql(qtySql, countParams, Double.class);
 
-		String skuSql = "SELECT COUNT(DISTINCT soi.sku_cd) FROM shipment_order_items soi"
-				+ " INNER JOIN shipment_orders so ON so.domain_id = soi.domain_id AND so.id = soi.shipment_order_id"
-				+ " WHERE soi.domain_id = :domainId AND so.wave_no = :waveNo";
-		Integer planItem = this.queryManager.selectBySql(skuSql, countParams, Integer.class);
+		// 웨이브 계획 SKU 수 조회
+		StringBuffer skuSql = new StringBuffer();
+		skuSql.append("SELECT COUNT(DISTINCT soi.sku_cd) FROM shipment_order_items soi");
+		skuSql.append(" INNER JOIN shipment_orders so ON so.domain_id = soi.domain_id");
+		skuSql.append(" AND so.id = soi.shipment_order_id");
+		skuSql.append(" WHERE soi.domain_id = :domainId AND so.wave_no = :waveNo");
+		Integer planItem = this.queryManager.selectBySql(skuSql.toString(), countParams, Integer.class);
 
-		String updSql = "UPDATE shipment_waves SET plan_order = :planOrder, plan_item = :planItem, plan_total = :planTotal, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-		Map<String, Object> updParams = ValueUtil.newMap("planOrder,planItem,planTotal,domainId,id",
-				planOrder != null ? planOrder : 0,
-				planItem != null ? planItem : 0,
-				planTotal != null ? planTotal : 0.0,
-				domainId, waveId);
-		this.queryManager.executeBySql(updSql, updParams);
+		// 계획 수량 집계
+		wave.setPlanOrder(planOrder != null ? planOrder : 0);
+		wave.setPlanItem(planItem != null ? planItem : 0);
+		wave.setPlanTotal(planTotal != null ? planTotal : 0.0);
+		this.queryManager.update(wave, "planOrder", "planItem", "planTotal", "updatedAt", "updaterId");
 	}
 
 	/**
 	 * 주문 단건 조회
+	 * 
+	 * @param domainId
+	 * @param id
+	 * @param exceptionWhenEmpty 존재하지 않은 경우 예외 발생
+	 * @return
 	 */
-	private ShipmentOrder findOrder(Long domainId, String id) {
-		String sql = "SELECT * FROM shipment_orders WHERE domain_id = :domainId AND id = :id";
-		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
-		List<ShipmentOrder> list = this.queryManager.selectListBySql(sql, params, ShipmentOrder.class, 0, 1);
-		return list.isEmpty() ? null : list.get(0);
+	private ShipmentOrder findOrder(Long domainId, String id, boolean exceptionWhenEmpty) {
+		ShipmentOrder order = this.queryManager.select(ShipmentOrder.class, id);
+
+		if (order == null && exceptionWhenEmpty) {
+			throw new ElidomRuntimeException("ID [" + id + "]로 출고 주문을 찾을 수 없습니다");
+		}
+
+		return order;
 	}
 
 	/**
 	 * 웨이브 단건 조회
+	 * 
+	 * @param domainId
+	 * @param id
+	 * @param exceptionWhenEmpty 존재하지 않은 경우 예외 발생
+	 * @return
 	 */
-	private ShipmentWave findWave(Long domainId, String id) {
-		String sql = "SELECT * FROM shipment_waves WHERE domain_id = :domainId AND id = :id";
-		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
-		List<ShipmentWave> list = this.queryManager.selectListBySql(sql, params, ShipmentWave.class, 0, 1);
-		return list.isEmpty() ? null : list.get(0);
+	private ShipmentWave findWave(Long domainId, String id, boolean exceptionWhenEmpty) {
+		ShipmentWave wave = this.queryManager.select(ShipmentWave.class, id);
+
+		if (wave == null && exceptionWhenEmpty) {
+			throw new ElidomRuntimeException("ID [" + id + "]로 웨이브를 찾을 수 없습니다");
+		}
+
+		return wave;
 	}
 }

@@ -12,6 +12,9 @@ import operato.wms.base.service.WmsBaseService;
 import operato.wms.oms.entity.ShipmentOrder;
 import operato.wms.oms.entity.ShipmentOrderItem;
 import operato.wms.oms.entity.StockAllocation;
+import operato.wms.parcel.entity.CourierContract;
+import operato.wms.parcel.service.CourierService;
+import operato.wms.parcel.service.CourierServiceDispatcher;
 import operato.wms.stock.entity.Inventory;
 import operato.wms.stock.service.StockTransactionService;
 import xyz.anythings.sys.service.AbstractQueryService;
@@ -35,6 +38,11 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 	 */
 	@Autowired
 	private WmsBaseService wmsBaseService;
+	/**
+	 * 택배 서비스 디스패쳐
+	 */
+	@Autowired
+	private CourierServiceDispatcher courierServiceDispatcher;
 	/**
 	 * OMS, Fulfillment용 재고 트랜잭션 서비스
 	 */
@@ -127,10 +135,29 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 				continue;
 			}
 
-			order.setStatus(ShipmentOrder.STATUS_CONFIRMED);
-			order.setConfirmedAt(now);
-			this.queryManager.update(order, "status", "confirmedAt", "updatedAt");
-			confirmedIds.add(id);
+			// B2C 출고인 경우 -> 송장 채번 및 주소 정제 처리 ...
+			if ("B2C_OUT".equalsIgnoreCase(order.getBizType())) {
+				if (ValueUtil.isNotEmpty(order.getCarrierCd())) {
+					CourierService cs = this.courierServiceDispatcher.get(order.getCarrierCd());
+					if (cs != null) {
+						CourierContract contract = cs.getDefaultCourierContract(domainId);
+						if (contract != null) {
+							if (cs.readyShipment(domainId, contract.getContractNo(), order)) {
+								order.setStatus(ShipmentOrder.STATUS_CONFIRMED);
+								order.setConfirmedAt(now);
+								this.queryManager.update(order, "status", "confirmedAt", "updatedAt");
+								confirmedIds.add(id);
+							}
+						}
+					}
+				}
+				// B2B 출고인 경우
+			} else {
+				order.setStatus(ShipmentOrder.STATUS_CONFIRMED);
+				order.setConfirmedAt(now);
+				this.queryManager.update(order, "status", "confirmedAt", "updatedAt");
+				confirmedIds.add(id);
+			}
 
 			successCount++;
 		}

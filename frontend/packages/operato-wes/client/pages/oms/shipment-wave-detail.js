@@ -1,7 +1,7 @@
 import { css, html, LitElement } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { openPopup } from '@operato/layout'
-import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import { operatoGet } from '@operato-app/operatofill'
 
 /**
@@ -69,10 +69,26 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
           color: white;
         }
 
+        /* 웨이브 상태 */
         .status-badge.CREATED { background-color: #7B1FA2; }
         .status-badge.RELEASED { background-color: #303F9F; }
         .status-badge.COMPLETED { background-color: #4CAF50; }
         .status-badge.CANCELLED { background-color: #D32F2F; }
+
+        /* 상태 배지 */
+        .if-status {
+          display: inline-block;
+          padding: 2px 8px;
+          border-radius: 10px;
+          font-size: 11px;
+          font-weight: 600;
+          white-space: nowrap;
+        }
+
+        /* IF 상태 */
+        .if-status.booked            { background: #E8F5E9; color: #1B5E20; }
+        .if-status.booking_cancelled { background: #FFF3E0; color: #BF360C; }
+        .if-status.if-none           { background: #ECEFF1; color: #607D8B; }
 
         .type-label {
           font-size: 13px;
@@ -481,7 +497,12 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
       selectedOrderIds: Array,
       showAddOrderPopup: Boolean,
       allocatedOrders: Array,
-      selectedAddOrderIds: Array
+      selectedAddOrderIds: Array,
+      statusOptions: Array,
+      orderStatusOptions: Array,
+      ifStatusOptions: Array,
+      replenishOptions: Array,
+      pickingTypeOptions: Array
     }
   }
 
@@ -501,11 +522,17 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     this.showAddOrderPopup = false
     this.allocatedOrders = []
     this.selectedAddOrderIds = []
+    this.statusOptions = []
+    this.orderStatusOptions = []
+    this.ifStatusOptions = []
+    this.replenishOptions = []
+    this.picqkingTypeOptions = []
   }
 
   /** 속성 변경 시 parent_id를 waveId로 매핑 */
   updated(changedProperties) {
     super.updated(changedProperties)
+
     // parent_id 파라미터가 전달되면 waveId로 복사 (외부 호환성)
     if (changedProperties.has('parent_id') && this.parent_id && !this.waveId) {
       this.waveId = this.parent_id
@@ -515,13 +542,25 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
   /** 컴포넌트 연결 시 웨이브 데이터 조회 */
   connectedCallback() {
     super.connectedCallback()
+
     // parent_id 파라미터 지원 (waveId와 동일하게 처리)
     if (!this.waveId && this.parent_id) {
       this.waveId = this.parent_id
     }
+
+    // 웨이브 ID가 있다면 웨이브 정보 조회
     if (this.waveId) {
       this._fetchWaveData()
     }
+
+    // 공통 코드 조회
+    Promise.all([
+      this._fetchStatusOptions(),
+      this._fetchOrderStatusOptions(),
+      this._fetchIfStatusOptions(),
+      this._fetchReplenishOptions(),
+      this._fetchPickingTypeOptions()
+    ])
   }
 
   /** 화면 렌더링 - 로딩 상태 또는 웨이브 상세 전체 출력 */
@@ -726,13 +765,16 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
         <thead>
           <tr>
             ${isCreated ? html`<th style="width:40px"><input type="checkbox" @change="${this._toggleAllOrders}" .checked="${this.selectedOrderIds.length > 0 && this.selectedOrderIds.length === this.orders.length}"></th>` : ''}
-            <th>${i18next.t('label.shipment_no', { defaultValue: '출하번호' })}</th>
-            <th>${i18next.t('label.ref_no', { defaultValue: '참조번호' })}</th>
-            <th>${i18next.t('label.customer', { defaultValue: '고객' })}</th>
-            <th>${i18next.t('label.biz_type', { defaultValue: '업무유형' })}</th>
-            <th>${i18next.t('label.dlv_type', { defaultValue: '배송유형' })}</th>
-            <th class="text-right">${i18next.t('label.order_qty', { defaultValue: '주문수량' })}</th>
-            <th>${i18next.t('label.status', { defaultValue: '상태' })}</th>
+              <th>${TermsUtil.tLabel('shipment_no') || '출고번호'}</th>
+              <th>${TermsUtil.tLabel('ref_order_no') || '원주문번호'}</th>
+              <th>${TermsUtil.tLabel('invoice_no') || '송장번호'}</th>
+              <th>${TermsUtil.tLabel('com_cd') || '화주사'}</th>
+              <th>${TermsUtil.tLabel('cust_cd') || '거래처'}</th>
+              <th>${TermsUtil.tLabel('orderer_nm') || '고객명'}</th>
+              <th>${TermsUtil.tLabel('order_date') || '주문일'}</th>
+              <th class="right">${TermsUtil.tLabel('order_qty') || '주문수량'}</th>
+              <th class="center">${TermsUtil.tLabel('status') || '출고상태'}</th>
+              <th class="center">${TermsUtil.tButton('pickup') || '집하상태'}</th>
           </tr>
         </thead>
         <tbody>
@@ -740,12 +782,15 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
             <tr>
               ${isCreated ? html`<td><input type="checkbox" .checked="${this.selectedOrderIds.includes(o.id)}" @change="${e => this._toggleOrderSelection(o.id, e)}"></td>` : ''}
               <td>${o.shipment_no || '-'}</td>
-              <td>${o.ref_no || '-'}</td>
-              <td>${o.cust_nm || o.cust_cd || '-'}</td>
-              <td>${this._bizTypeLabel(o.biz_type)}</td>
-              <td>${this._deliveryTypeLabel(o.dlv_type)}</td>
-              <td class="text-right">${o.total_order ?? 0}</td>
+              <td>${o.ref_order_no || '-'}</td>
+              <td>${o.invoice_no || '-'}</td>
+              <td>${o.com_cd || '-'}</td>
+              <td>${o.cust_cd || '-'}</td>
+              <td>${o.cust_nm || '-'}</td>
+              <td>${o.order_date || '-'}</td>
+              <td class="right">${o.total_order ?? 0}</td>
               <td><span class="item-status ${o.status}">${this._orderStatusLabel(o.status)}</span></td>
+              <td class="center">${this._renderIfStatusBadge(o.if_status)}</td>
             </tr>
           `)}
         </tbody>
@@ -868,6 +913,56 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
   /* ============================================================
    * 데이터 조회
    * ============================================================ */
+
+  /** SHIPMENT_WAVE_STATUS 공통코드 조회 */
+  async _fetchStatusOptions() {
+    try {
+      const code = await ServiceUtil.codeItems('SHIPMENT_WAVE_STATUS')
+      this.statusOptions = code?.items || []
+    } catch (e) {
+      console.error('SHIPMENT_WAVE_STATUS 공통코드 조회 실패:', e)
+    }
+  }
+
+  /** SHIPMENT_ORDER_STATUS 공통코드 조회 */
+  async _fetchOrderStatusOptions() {
+    try {
+      const code = await ServiceUtil.codeItems('SHIPMENT_ORDER_STATUS')
+      this.orderStatusOptions = code?.items || []
+    } catch (e) {
+      console.error('SHIPMENT_ORDER_STATUS 공통코드 조회 실패:', e)
+    }
+  }
+
+  /** SHIPMENT_IF_STATUS 공통코드 조회 */
+  async _fetchIfStatusOptions() {
+    try {
+      const code = await ServiceUtil.codeItems('SHIPMENT_IF_STATUS')
+      this.ifStatusOptions = code?.items || []
+    } catch (e) {
+      console.error('SHIPMENT_IF_STATUS 공통코드 조회 실패:', e)
+    }
+  }
+
+  /** REPLENISH_ORDER_STATUS 공통코드 조회 */
+  async _fetchReplenishOptions() {
+    try {
+      const code = await ServiceUtil.codeItems('REPLENISH_ORDER_STATUS')
+      this.replenishOptions = code?.items || []
+    } catch (e) {
+      console.error('REPLENISH_ORDER_STATUS 공통코드 조회 실패:', e)
+    }
+  }
+
+  /** PICKING_TASK_PICK_TYPE 공통코드 조회 */
+  async _fetchPickingTypeOptions() {
+    try {
+      const code = await ServiceUtil.codeItems('PICKING_TASK_PICK_TYPE')
+      this.pickingTypeOptions = code?.items || []
+    } catch (e) {
+      console.error('PICKING_TASK_PICK_TYPE 공통코드 조회 실패:', e)
+    }
+  }
 
   /** 웨이브 헤더, 주문 목록, SKU 합산 데이터 조회 */
   async _fetchWaveData() {
@@ -1183,22 +1278,38 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
                   <thead>
                     <tr>
                       <th style="width:40px"><input type="checkbox" @change="${this._toggleAllAddOrders}" .checked="${this.selectedAddOrderIds.length > 0 && this.selectedAddOrderIds.length === this.allocatedOrders.length}"></th>
-                      <th>${i18next.t('label.shipment_no', { defaultValue: '출하번호' })}</th>
-                      <th>${i18next.t('label.ref_no', { defaultValue: '참조번호' })}</th>
-                      <th>${i18next.t('label.customer', { defaultValue: '고객' })}</th>
-                      <th>${i18next.t('label.biz_type', { defaultValue: '업무유형' })}</th>
-                      <th class="text-right">${i18next.t('label.order_qty', { defaultValue: '주문수량' })}</th>
+                      <th>${TermsUtil.tLabel('shipment_no') || '출고번호'}</th>
+                      <th>${TermsUtil.tLabel('ref_order_no') || '원주문번호'}</th>
+                      <th>${TermsUtil.tLabel('invoice_no') || '송장번호'}</th>
+                      <th>${TermsUtil.tLabel('com_cd') || '화주사'}</th>
+                      <th>${TermsUtil.tLabel('cust_cd') || '거래처'}</th>
+                      <th>${TermsUtil.tLabel('orderer_nm') || '고객명'}</th>
+                      <th>${TermsUtil.tLabel('order_date') || '주문일'}</th>
+                      <th class="right">${TermsUtil.tLabel('order_qty') || '주문수량'}</th>
+                      <th class="center">${TermsUtil.tLabel('status') || '출고상태'}</th>
+                      <th class="center">${TermsUtil.tButton('pickup') || '집하상태'}</th>
                     </tr>
                   </thead>
                   <tbody>
                     ${this.allocatedOrders.map(o => html`
                       <tr>
                         <td><input type="checkbox" .checked="${this.selectedAddOrderIds.includes(o.id)}" @change="${e => this._toggleAddOrderSelection(o.id, e)}"></td>
-                        <td>${o.shipment_no || '-'}</td>
-                        <td>${o.ref_order_no || '-'}</td>
-                        <td>${o.cust_nm || o.cust_cd || '-'}</td>
-                        <td>${this._bizTypeLabel(o.biz_type)}</td>
-                        <td class="text-right">${o.total_order ?? 0}</td>
+                        <td>${order.shipment_no || '-'}</td>
+                        <td>${order.ref_order_no || '-'}</td>
+                        <td>${order.invoice_no || '-'}</td>
+                        <td>${order.com_cd || '-'}</td>
+                        <td>${order.cust_cd || '-'}</td>
+                        <td>${order.cust_nm || '-'}</td>
+                        <td>${order.order_date || '-'}</td>
+                        <td class="right">${order.total_order ?? 0}</td>
+                        <td class="center">
+                          <span class="badge ${(order.status || '').toLowerCase()}">
+                            ${this._orderStatusLabel(order.status)}
+                          </span>
+                        </td>
+                        <td class="center">
+                          ${this._renderIfStatusBadge(order.if_status)}
+                        </td>
                       </tr>
                     `)}
                   </tbody>
@@ -1236,77 +1347,93 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
    * 유틸리티
    * ============================================================ */
 
-  /** 웨이브 상태 코드를 한글 라벨로 변환 */
+  /** 
+   * 웨이브 상태 코드를 한글 라벨로 변환
+   * 
+   * CREATED : 생성
+   * RELEASED : 확정
+   * COMPLETED : 완료
+   * CANCELLED : 취소
+   */
   _statusLabel(status) {
-    const labels = {
-      CREATED: i18next.t('label.created', { defaultValue: '생성' }),
-      RELEASED: i18next.t('label.released', { defaultValue: '확정' }),
-      COMPLETED: i18next.t('label.completed', { defaultValue: '완료' }),
-      CANCELLED: i18next.t('label.cancelled', { defaultValue: '취소' })
-    }
-    return labels[status] || status
+    if (!status) return '-'
+    const opt = this.statusOptions.find(o => o.name === status)
+    return opt ? (opt.description || opt.name) : status
   }
 
-  /** 주문 상태 코드를 한글 라벨로 변환 */
+  /** 
+   * 주문 상태 코드를 한글 라벨로 변환
+   * 
+   * REGISTERED : 등록
+   * CONFIRMED : 확정
+   * ALLOCATED : 할당
+   * BACK_ORDER : 부족
+   * WAVED : 웨이브
+   * RELEASED : 인계
+   * PICKING : 피킹
+   * PACKING : 패킹
+   * SHIPPED : 출하
+   * CLOSED : 마감
+   * CANCELLED : 취소
+   */
   _orderStatusLabel(status) {
-    const labels = {
-      REGISTERED: '등록',
-      CONFIRMED: '확정',
-      ALLOCATED: '할당',
-      BACK_ORDER: '부족',
-      WAVED: '웨이브',
-      RELEASED: '인계',
-      PICKING: '피킹',
-      PACKING: '패킹',
-      SHIPPED: '출하',
-      CLOSED: '마감',
-      CANCELLED: '취소'
-    }
-    return labels[status] || status
+    if (!status) return '-'
+    const opt = this.orderStatusOptions.find(o => o.name === status)
+    return opt ? (opt.description || opt.name) : status
   }
 
-  /** 보충 지시 상태 코드를 한글 라벨로 변환 */
+  /**
+   * IF 상태 배지 렌더링
+   * 
+   * BOOKED : 예약
+   * BOOKING_CANCELLED : 예약취소
+   * 
+   * @param {string} ifStatus
+   */
+  _renderIfStatusBadge(ifStatus) {
+    if (!ifStatus) {
+      return html`<span class="if-status if-none">미예약</span>`
+    }
+    const opt = this.ifStatusOptions.find(o => o.name === ifStatus)
+    const label = opt ? (opt.description || opt.name) : ifStatus
+    const cls = ifStatus === 'BOOKED' ? 'booked'
+      : ifStatus === 'BOOKING_CANCELLED' ? 'booking_cancelled'
+        : 'if-none'
+    const icon = ifStatus === 'BOOKED' ? '🟢 '
+      : ifStatus === 'BOOKING_CANCELLED' ? '🟠 '
+        : ''
+    return html`<span class="if-status ${cls}">${icon}${label}</span>`
+  }
+
+  /** 
+   * 보충 지시 상태 코드를 한글 라벨로 변환
+   * 
+   * CREATED : 생성
+   * IN_PROGRESS : 진행중
+   * COMPLETED : 완료
+   * CANCELLED : 취소
+   * 
+   * @param {string} status
+   */
   _replenishStatusLabel(status) {
-    const labels = {
-      CREATED: i18next.t('label.created', { defaultValue: '생성' }),
-      IN_PROGRESS: i18next.t('label.in_progress', { defaultValue: '진행중' }),
-      COMPLETED: i18next.t('label.completed', { defaultValue: '완료' }),
-      CANCELLED: i18next.t('label.cancelled', { defaultValue: '취소' })
-    }
-    return labels[status] || status
+    if (!status) return '-'
+    const opt = this.replenishStatusOptions.find(o => o.name === status)
+    return opt ? (opt.description || opt.name) : status
   }
 
-  /** 피킹유형 코드를 한글 라벨로 변환 */
+  /** 
+   * 피킹유형 코드를 한글 라벨로 변환
+   * 
+   * TOTAL : 토털 피킹 
+   * INDIVIDUAL : 개별 피킹
+   * ZONE : 존 피킹
+   * 
+   * @param {string} type
+   */
   _pickTypeLabel(type) {
-    const labels = {
-      TOTAL: i18next.t('label.total_pick', { defaultValue: '토털 피킹' }),
-      INDIVIDUAL: i18next.t('label.individual_pick', { defaultValue: '개별 피킹' }),
-      ZONE: i18next.t('label.zone_pick', { defaultValue: '존 피킹' })
-    }
-    return labels[type] || type || '-'
-  }
-
-  /** 업무유형 코드를 한글 라벨로 변환 */
-  _bizTypeLabel(type) {
-    const labels = {
-      B2C_OUT: 'B2C',
-      B2B_OUT: 'B2B',
-      STORE_OUT: '매장출고',
-      RETURN_OUT: '반품출고'
-    }
-    return labels[type] || type || '-'
-  }
-
-  /** 배송유형 코드를 한글 라벨로 변환 */
-  _deliveryTypeLabel(type) {
-    const labels = {
-      PARCEL: '택배',
-      FREIGHT: '화물',
-      CHARTER: '용차',
-      DIRECT: '직접배송',
-      PICKUP: '매장픽업'
-    }
-    return labels[type] || type || '-'
+    if (!type) return '-'
+    const opt = this.pickingTypeOptions.find(o => o.name === type)
+    return opt ? (opt.description || opt.name) : type
   }
 
   /** 진행률 계산 - 계획 대비 실적 백분율 */
@@ -1315,18 +1442,6 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     const result = this.wave?.result_order || 0
     if (plan === 0) return 0
     return Math.min(100, Math.round((result / plan) * 100))
-  }
-
-  /** 날짜 시간 포맷팅 (YYYY-MM-DD HH:mm) */
-  _formatDateTime(dateValue) {
-    if (!dateValue) return '-'
-    try {
-      const d = new Date(dateValue)
-      if (isNaN(d.getTime())) return dateValue
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-    } catch {
-      return dateValue
-    }
   }
 }
 

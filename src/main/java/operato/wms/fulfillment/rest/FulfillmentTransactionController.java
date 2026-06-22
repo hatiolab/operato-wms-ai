@@ -690,6 +690,19 @@ public class FulfillmentTransactionController {
 	}
 
 	/**
+	 * 포장 아이템 부족 처리
+	 * POST /rest/ful_trx/packing_orders/{id}/items/{item_id}/short
+	 */
+	@PostMapping(value = "packing_orders/{id}/items/{item_id}/short", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Short packing order item")
+	public Map<String, Object> shortPackingOrderItem(
+			@PathVariable("id") String id,
+			@PathVariable("item_id") String itemId,
+			@RequestBody Map<String, Object> params) {
+		return this.packingService.shortPackingOrderItem(id, itemId, params);
+	}
+
+	/**
 	 * 아이템 검수 완료 (finish)
 	 * POST /rest/ful_trx/packing_order_items/{id}/finish
 	 */

@@ -22,7 +22,6 @@ import xyz.anythings.sys.service.ICustomService;
 import xyz.anythings.sys.util.AnyOrmUtil;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
-import xyz.elidom.sys.entity.User;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -317,36 +316,37 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 	 * @return { pack_order_no, item_count }
 	 */
 	public Map<String, Object> createPackingOrders(String pickTaskId) {
+		// 1. 피킹 지시 조회
 		Long domainId = Domain.currentDomainId();
-		String today = DateUtil.todayStr();
-
-		// 피킹 지시 조회
 		PickingTask task = this.findPickingTask(domainId, pickTaskId);
 
+		// 2. 피킹 지시 상태 체크
 		if (!PickingTask.STATUS_COMPLETED.equals(task.getStatus())) {
 			throw new ElidomValidationException(
 					"피킹 지시 상태가 [" + task.getStatus() + "]이므로 패킹 지시를 생성할 수 없습니다 (COMPLETED 상태만 가능)");
 		}
 
+		// 3. 피킹 유형 체크
 		if (!"INDIVIDUAL".equals(task.getPickType())) {
 			throw new ElidomValidationException(
 					"개별 피킹만 이 메서드로 패킹 지시를 생성할 수 있습니다. 총량 피킹은 createPackingOrdersFromBatch를 사용하세요");
 		}
 
-		// 출하 주문 조회
+		// 4. 출하 주문 조회
 		ShipmentOrder order = this.findShipmentOrder(domainId, task.getShipmentOrderId());
 
-		// 포장 지시 생성
+		// 5. 운송사 정보 기반으로 도크 코드 조회
 		String carrierCd = order != null ? order.getCarrierCd() : null;
 		String dockCd = this.findDockCdByCarrierCd(domainId, carrierCd);
 
+		// 6. 포장 지시 생성
 		PackingOrder packOrder = new PackingOrder();
 		packOrder.setDomainId(domainId);
 		packOrder.setPickTaskNo(task.getPickTaskNo());
 		packOrder.setShipmentOrderId(task.getShipmentOrderId());
 		packOrder.setShipmentNo(task.getShipmentNo());
 		packOrder.setWaveNo(task.getWaveNo());
-		packOrder.setOrderDate(today);
+		packOrder.setOrderDate(DateUtil.todayStr());
 		packOrder.setComCd(task.getComCd());
 		packOrder.setWhCd(task.getWhCd());
 		packOrder.setStationCd(order != null ? order.getStationCd() : null);
@@ -359,15 +359,22 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		packOrder.setStatus(PackingOrder.STATUS_CREATED);
 		this.queryManager.insert(packOrder);
 
-		// 피킹 실적에서 PackingOrderItem 생성
-		String pickItemSql = "SELECT * FROM picking_task_items WHERE domain_id = :domainId AND pick_task_id = :pickTaskId AND status = :status ORDER BY rank";
-		Map<String, Object> pickItemParams = ValueUtil.newMap("domainId,pickTaskId,status", domainId, pickTaskId,
-				PickingTaskItem.STATUS_PICKED);
+		// 7. 피킹 실적에서 PackingOrderItem 생성할 정보 조회 (PICKED + SHORT 전체 포함)
+		// PICKED: 정상 피킹 및 부분 부족 (B-1 수정 후)
+		// SHORT + pick_qty > 0: 부분 부족 (B-1 수정 전 구 데이터 호환)
+		// SHORT + pick_qty = 0: 전량 부족 → PackingOrderItem.status = SHORT로 생성
+		String pickItemSql = "SELECT * FROM picking_task_items WHERE domain_id = :domainId AND pick_task_id = :pickTaskId AND status IN (:picked, :short) ORDER BY rank";
+		Map<String, Object> pickItemParams = ValueUtil.newMap("domainId,pickTaskId,picked,short", domainId, pickTaskId,
+				PickingTaskItem.STATUS_PICKED, PickingTaskItem.STATUS_SHORT);
 		List<PickingTaskItem> pickedItems = this.queryManager.selectListBySql(pickItemSql, pickItemParams,
 				PickingTaskItem.class, 0, 0);
 
+		// 8. 피킹 실적에서 PackingOrderItem 생성
 		List<PackingOrderItem> packItems = new ArrayList<>();
 		for (PickingTaskItem pti : pickedItems) {
+			double pickQty = pti.getPickQty() != null ? pti.getPickQty() : 0.0;
+			double shortQty = pti.getShortQty() != null ? pti.getShortQty() : 0.0;
+
 			PackingOrderItem poi = new PackingOrderItem();
 			poi.setDomainId(domainId);
 			poi.setPackingOrderId(packOrder.getId());
@@ -377,25 +384,27 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			poi.setBarcode(pti.getBarcode());
 			poi.setLotNo(pti.getLotNo());
 			poi.setExpiredDate(pti.getExpiredDate());
-			poi.setOrderQty(pti.getPickQty());
+			poi.setOrderQty(pickQty);
 			poi.setInspQty(0.0);
 			poi.setPackQty(0.0);
-			poi.setShortQty(0.0);
-			poi.setStatus(PackingOrderItem.STATUS_WAIT);
+			poi.setShortQty(shortQty);
+			// 전량 부족(pick_qty=0)은 처음부터 SHORT — 포장 작업 없이 출하 차단 대상으로 표시
+			poi.setStatus(pickQty == 0 ? PackingOrderItem.STATUS_SHORT : PackingOrderItem.STATUS_WAIT);
 			packItems.add(poi);
 		}
 
-		// 패킹 지시 아이템 저장
+		// 9. 패킹 지시 아이템 저장
 		if (!packItems.isEmpty()) {
 			AnyOrmUtil.insertBatch(packItems, 100);
 		}
 
-		// 출하 주문 상태를 PACKING으로 변경
+		// 10. 출하 주문 상태를 PACKING으로 변경
 		if (order != null) {
 			order.setStatus(ShipmentOrder.STATUS_PACKING);
 			this.queryManager.update(order, "status", "updaterId", "updatedAt");
 		}
 
+		// 11. 결과 리턴
 		return ValueUtil.newMap("pack_order_no,item_count", packOrder.getPackOrderNo(), packItems.size());
 	}
 
@@ -408,50 +417,53 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 	 * @return { pack_order_count, total_item_count, pack_orders: [...] }
 	 */
 	public Map<String, Object> createPackingOrdersFromBatch(String pickTaskId) {
+		// 1. 피킹 지시 조회
 		Long domainId = Domain.currentDomainId();
-		String today = DateUtil.todayStr();
-
 		PickingTask task = this.findPickingTask(domainId, pickTaskId);
 
+		// 2. 피킹 지시 상태 체크
 		if (!PickingTask.STATUS_COMPLETED.equals(task.getStatus())) {
 			throw new ElidomValidationException(
 					"피킹 지시 상태가 [" + task.getStatus() + "]이므로 패킹 지시를 생성할 수 없습니다 (COMPLETED 상태만 가능)");
 		}
 
-		// 웨이브에 포함된 주문 목록 조회
+		// 3. 웨이브에 포함된 주문 목록 조회
 		String orderSql = "SELECT * FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status ORDER BY shipment_no";
 		Map<String, Object> orderParams = ValueUtil.newMap("domainId,waveNo,status", domainId, task.getWaveNo(),
 				ShipmentOrder.STATUS_PICKING);
 		List<ShipmentOrder> orders = this.queryManager.selectListBySql(orderSql, orderParams, ShipmentOrder.class, 0,
 				0);
 
+		// 4. 웨이브 소속 주문이 존재하는지 체크
 		if (orders.isEmpty()) {
 			throw new ElidomValidationException("웨이브 [" + task.getWaveNo() + "]에 PICKING 상태 주문이 없습니다");
 		}
 
-		// 패킹 지시 번호 시퀀스 조회
-		String seqSql = "SELECT COUNT(*) FROM packing_orders WHERE domain_id = :domainId AND order_date = :orderDate";
-		Map<String, Object> seqParams = ValueUtil.newMap("domainId,orderDate", domainId, today);
-		Integer existCount = this.queryManager.selectBySql(seqSql, seqParams, Integer.class);
-
+		String today = DateUtil.todayStr();
 		int packOrderCount = 0;
 		int totalItemCount = 0;
 		List<Map<String, Object>> packOrderResults = new ArrayList<>();
 
+		// 주문별 할당 정보 조회 쿼리
+		String allocSql = "SELECT sa.*, soi.sku_cd, soi.sku_nm, soi.id AS soi_id"
+				+ " FROM stock_allocations sa"
+				+ " INNER JOIN shipment_order_items soi ON soi.domain_id = sa.domain_id AND soi.id = sa.shipment_order_item_id"
+				+ " WHERE sa.domain_id = :domainId AND sa.shipment_order_id = :orderId AND sa.status IN ('SOFT','HARD')"
+				+ " ORDER BY soi.line_no";
+		Map<String, Object> allocParams = ValueUtil.newMap("domainId", domainId);
+
+		// 5. 주문별 포장 지시 정보 생성
 		for (ShipmentOrder order : orders) {
-			// 주문별 할당 정보 조회
-			String allocSql = "SELECT sa.*, soi.sku_cd, soi.sku_nm, soi.id AS soi_id"
-					+ " FROM stock_allocations sa"
-					+ " INNER JOIN shipment_order_items soi ON soi.domain_id = sa.domain_id AND soi.id = sa.shipment_order_item_id"
-					+ " WHERE sa.domain_id = :domainId AND sa.shipment_order_id = :orderId AND sa.status IN ('SOFT','HARD')"
-					+ " ORDER BY soi.line_no";
-			Map<String, Object> allocParams = ValueUtil.newMap("domainId,orderId", domainId, order.getId());
+			// 5.1 주문별 할당 정보 조회
+			allocParams.put("orderId", order.getId());
 			List<Map> allocations = this.queryManager.selectListBySql(allocSql, allocParams, Map.class, 0, 0);
 
-			// PackingOrder 생성
+			// 5.2 주문의 택배사 코드 조회
 			String batchCarrierCd = order.getCarrierCd();
+			// 택배사 별 도크 코드 조회
 			String batchDockCd = this.findDockCdByCarrierCd(domainId, batchCarrierCd);
 
+			// 5.3 PackingOrder 생성
 			PackingOrder packOrder = new PackingOrder();
 			packOrder.setDomainId(domainId);
 			packOrder.setPackOrderNo(order.getShipmentNo());
@@ -471,7 +483,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			packOrder.setStatus(PackingOrder.STATUS_CREATED);
 			this.queryManager.insert(packOrder);
 
-			// PackingOrderItem 생성
+			// 5.4 PackingOrderItem 생성
 			List<PackingOrderItem> packItems = new ArrayList<>();
 			for (Map alloc : allocations) {
 				PackingOrderItem poi = new PackingOrderItem();
@@ -494,23 +506,25 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				totalItemCount++;
 			}
 
+			// 5.5 포장 지시 아이템 100개씩 저장
 			if (!packItems.isEmpty()) {
 				AnyOrmUtil.insertBatch(packItems, 100);
 			}
 
-			// 주문 상태를 PACKING으로 변경
-			String updOrderSql = "UPDATE shipment_orders SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-			Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id", ShipmentOrder.STATUS_PACKING,
-					domainId, order.getId());
-			this.queryManager.executeBySql(updOrderSql, updOrderParams);
+			// 5.6 주문 상태를 PACKING으로 변경
+			order.setStatus(ShipmentOrder.STATUS_PACKING);
+			this.queryManager.update(order, "status", "updatedAt", "updaterId");
 
+			// 5.7 패킹 지시 정보 추가
 			Map<String, Object> packInfo = ValueUtil.newMap("pack_order_no,shipment_no,item_count",
 					packOrder.getPackOrderNo(), order.getShipmentNo(), packItems.size());
 			packOrderResults.add(packInfo);
 
+			// 5.8 패킹 지시 카운트
 			packOrderCount++;
 		}
 
+		// 6. 결과 리턴
 		return ValueUtil.newMap("pack_order_count,total_item_count,pack_orders", packOrderCount,
 				totalItemCount, packOrderResults);
 	}

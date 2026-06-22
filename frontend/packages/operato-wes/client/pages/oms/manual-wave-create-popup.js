@@ -330,12 +330,12 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
               <th>${TermsUtil.tLabel('wave_no') || '웨이브번호'}</th>
               <th>${TermsUtil.tLabel('shipment_no') || '출고번호'}</th>
               <th>${TermsUtil.tLabel('ref_order_no') || '원주문번호'}</th>
+              <th>${TermsUtil.tLabel('invoice_no') || '송장번호'}</th>
+              <th>${TermsUtil.tLabel('com_cd') || '화주사'}</th>
               <th>${TermsUtil.tLabel('cust_cd') || '거래처'}</th>
               <th>${TermsUtil.tLabel('orderer_nm') || '고객명'}</th>
-              <th>${TermsUtil.tLabel('com_cd') || '화주사'}</th>
-              <th class="right">${TermsUtil.tLabel('order_qty') || '주문수량'}</th>
               <th>${TermsUtil.tLabel('order_date') || '주문일'}</th>
-              <th>${TermsUtil.tLabel('invoice_no') || '송장번호'}</th>
+              <th class="right">${TermsUtil.tLabel('order_qty') || '주문수량'}</th>
               <th class="center">${TermsUtil.tLabel('status') || '상태'}</th>
               <th class="center">${TermsUtil.tLabel('ready_status') || '출고 준비 상태'}</th>
             </tr>
@@ -398,12 +398,12 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
         <td>${order.wave_no || '-'}</td>
         <td>${order.shipment_no || '-'}</td>
         <td>${order.ref_order_no || '-'}</td>
+        <td>${order.invoice_no || '-'}</td>
+        <td>${order.com_cd || '-'}</td>
         <td>${order.cust_cd || '-'}</td>
         <td>${order.cust_nm || '-'}</td>
-        <td>${order.com_cd || '-'}</td>
-        <td class="right">${this._sumOrderQty(order)}EA</td>
         <td>${order.order_date || '-'}</td>
-        <td>${order.invoice_no || '-'}</td>
+        <td class="right">${order.total_order}</td>
         <td class="center">
           <span class="status-badge ${(order.status || '').toLowerCase()}">
             ${this._statusLabel(order.status)}
@@ -463,7 +463,7 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
     try {
       const filters = [
         { name: 'biz_type', value: 'B2C_OUT' },
-        { name: 'wave_no', operator: 'is_null' },
+        { name: 'wave_no', operator: 'is_blank' },
         { name: 'status', operator: 'in', value: 'REGISTERED,CONFIRMED,ALLOCATED' }
       ]
       const query = encodeURIComponent(JSON.stringify(filters))
@@ -595,12 +595,6 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
   /** 팝업 닫기 */
   _close() {
     UiUtil.closePopupBy(this)
-  }
-
-  /** 주문 총 수량 합산 (item 합산이 없을 경우 order_qty 직접 사용) */
-  _sumOrderQty(order) {
-    if (order.total_order != null) return Number(order.total_order).toLocaleString()
-    return '-'
   }
 
   /** 주문 상태 한글 라벨 — SHIPMENT_ORDER_STATUS 공통코드 참조 */

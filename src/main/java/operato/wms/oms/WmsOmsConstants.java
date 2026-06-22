@@ -120,4 +120,16 @@ public class WmsOmsConstants {
 	/** 커스텀 서비스 - 보충 지시 취소 후 처리 */
 	public static final String TRX_OMS_POST_CANCEL_REPLENISH = "diy-oms-post-cancel-replenish-order";
 
+	// === 집하 예약 ===
+	/** 커스텀 서비스 - 집하 예약 전 처리 */
+	public static final String TRX_OMS_PRE_BOOK_COURIER = "diy-oms-pre-book-courier";
+	/** 커스텀 서비스 - 집하 예약 후 처리 */
+	public static final String TRX_OMS_POST_BOOK_COURIER = "diy-oms-post-book-courier";
+
+	// === 집하 예약 취소 ===
+	/** 커스텀 서비스 - 집하 예약 취소 전 처리 */
+	public static final String TRX_OMS_PRE_CANCEL_BOOK_COURIER = "diy-oms-pre-cancel-book-courier";
+	/** 커스텀 서비스 - 집하 예약 취소 후 처리 */
+	public static final String TRX_OMS_POST_CANCEL_BOOK_COURIER = "diy-oms-post-cancel-book-courier";
+
 }

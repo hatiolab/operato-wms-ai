@@ -600,6 +600,19 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
         .btn-confirm:hover { background: #388E3C; }
         .btn-confirm:disabled { background: #BDBDBD; cursor: default; }
 
+        .btn-short {
+          padding: 8px 16px;
+          background: #FFF3E0;
+          color: #E65100;
+          border: 1px solid #FFCC02;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 600;
+        }
+
+        .btn-short:hover { background: #FFE0B2; }
+
         /* ===== 피킹 항목 테이블 ===== */
         .picking-table-wrap {
           background: var(--md-sys-color-surface, white);
@@ -637,6 +650,14 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
 
         .picking-table tr.completed td {
           color: #9E9E9E;
+        }
+
+        .picking-table tr.short-done {
+          background: #FFF8E1;
+        }
+
+        .picking-table tr.short-done td {
+          color: #BF6000;
         }
 
         .picking-table tr.current {
@@ -809,6 +830,129 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface-variant, #999);
           font-size: 13px;
         }
+
+        /* ===== 부족 처리 다이얼로그 ===== */
+        .short-dialog-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          z-index: 900;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .short-dialog {
+          background: white;
+          border-radius: 12px;
+          padding: 28px 28px 20px;
+          width: 400px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+        }
+
+        .short-dialog h4 {
+          margin: 0 0 16px;
+          font-size: 16px;
+          color: #E65100;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .short-dialog .item-summary {
+          background: #FFF8E1;
+          border-radius: 6px;
+          padding: 10px 14px;
+          margin-bottom: 16px;
+          font-size: 13px;
+          color: #424242;
+          line-height: 1.6;
+        }
+
+        .short-dialog .field-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 12px;
+          font-size: 13px;
+        }
+
+        .short-dialog .field-row label {
+          width: 90px;
+          color: var(--md-sys-color-on-surface-variant, #757575);
+          font-weight: 500;
+          flex-shrink: 0;
+        }
+
+        .short-dialog .field-row input[type="number"] {
+          width: 90px;
+          padding: 6px 10px;
+          font-size: 15px;
+          border: 1px solid var(--md-sys-color-outline-variant, #E0E0E0);
+          border-radius: 6px;
+          text-align: center;
+          outline: none;
+        }
+
+        .short-dialog .field-row input[type="number"]:focus {
+          border-color: #E65100;
+        }
+
+        .short-dialog .computed-short {
+          font-size: 15px;
+          font-weight: 700;
+          color: #D32F2F;
+        }
+
+        .short-dialog .replenish-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 16px;
+          font-size: 13px;
+          color: var(--md-sys-color-on-surface, #424242);
+          cursor: pointer;
+        }
+
+        .short-dialog .replenish-row input[type="checkbox"] {
+          width: 16px;
+          height: 16px;
+          cursor: pointer;
+        }
+
+        .short-dialog .dialog-actions {
+          display: flex;
+          gap: 8px;
+          justify-content: flex-end;
+          border-top: 1px solid #F0F0F0;
+          padding-top: 16px;
+          margin-top: 4px;
+        }
+
+        .btn-dialog-cancel {
+          padding: 8px 18px;
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 6px;
+          background: white;
+          font-size: 13px;
+          cursor: pointer;
+          color: var(--md-sys-color-on-surface-variant, #666);
+        }
+
+        .btn-dialog-cancel:hover { background: #F5F5F5; }
+
+        .btn-dialog-confirm {
+          padding: 8px 22px;
+          border: none;
+          border-radius: 6px;
+          background: #E65100;
+          color: white;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .btn-dialog-confirm:hover { background: #BF360C; }
       `
     ]
   }
@@ -836,7 +980,10 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
       taskSummary: Object,
       feedbackMsg: String,
       feedbackType: String,
-      listPage: Number
+      listPage: Number,
+      shortDialogOpen: Boolean,
+      shortPickQty: Number,
+      autoReplenish: Boolean
     }
   }
 
@@ -866,6 +1013,9 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     this.listPage = 1
     this._listPageSize = 20
     this._keyHandler = null
+    this.shortDialogOpen = false
+    this.shortPickQty = 0
+    this.autoReplenish = false
   }
 
   /** 페이지 컨텍스트 반환 - 브라우저 타이틀 등에 사용 */
@@ -917,6 +1067,8 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
       ${this.feedbackMsg ? html`
         <div class="feedback-toast ${this.feedbackType}">${this.feedbackMsg}</div>
       ` : ''}
+
+      ${this.shortDialogOpen ? this._renderShortDialog() : ''}
     `
   }
 
@@ -1082,7 +1234,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     if (!task) return this._renderEmptyPanel()
 
     const headerInfo = task.wave_no ? '(웨이브 : ' + task.wave_no + ')' : '(주문 : ' + task.shipment_no + ')'
-    const completedCount = this.pickingItems.filter(i => i.status === 'PICKED').length
+    const completedCount = this.pickingItems.filter(i => this._isDone(i)).length
     const totalCount = this.pickingItems.length
     const progressPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
@@ -1171,6 +1323,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
 
         <div class="actions">
           <button class="btn-skip" @click="${this._skipCurrentItem}">건너뛰기</button>
+          <button class="btn-short" @click="${this._openShortDialog}">⚡ 부족 처리</button>
           <button
             class="btn-confirm"
             ?disabled="${!this.barcodeMatched}"
@@ -1201,10 +1354,14 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
           <tbody>
             ${this.pickingItems.map((item, idx) => {
       const isCompleted = item.status === 'PICKED'
+      const isShort = item.status === 'SHORT'
       const isCurrent = idx === this.currentItemIndex
+      const rowClass = isCompleted ? 'completed' : isShort ? 'short-done' : isCurrent ? 'current' : ''
+      const statusIcon = isCompleted ? '✅' : isShort ? '⚡' : isCurrent ? '→' : '☐'
+      const pickQtyDisplay = isCompleted ? (item.pick_qty || 0) : isShort ? (item.pick_qty ?? 0) : '-'
       return html`
                 <tr
-                  class="${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''}"
+                  class="${rowClass}"
                   @click="${() => this._focusItem(idx)}"
                 >
                   <td class="col-num">${idx + 1}</td>
@@ -1213,8 +1370,8 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
                   <td class="col-name">${item.sku_nm || '-'}</td>
                   <td class="col-barcode">${item.barcode || '-'}</td>
                   <td class="col-qty">${item.order_qty || 0}</td>
-                  <td class="col-pick-qty">${isCompleted ? (item.pick_qty || 0) : '-'}</td>
-                  <td class="col-status">${isCompleted ? '✅' : isCurrent ? '→' : '☐'}</td>
+                  <td class="col-pick-qty">${pickQtyDisplay}</td>
+                  <td class="col-status">${statusIcon}</td>
                 </tr>
               `
     })}
@@ -1340,7 +1497,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
       const data = await ServiceUtil.restGet(`ful_trx/picking_tasks/${pickingTaskId}/items`)
       this.pickingItems = (data?.items || data || []).sort((a, b) => (a.rank || 0) - (b.rank || 0))
       this.totalCount = this.pickingItems.length
-      this.completedCount = this.pickingItems.filter(i => i.status === 'PICKED').length
+      this.completedCount = this.pickingItems.filter(i => this._isDone(i)).length
     } catch (err) {
       console.error('피킹 항목 조회 실패:', err)
       this.pickingItems = []
@@ -1515,7 +1672,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
         pick_qty: qty
       }
       this.pickingItems = items
-      this.completedCount = items.filter(i => i.status === 'PICKED').length
+      this.completedCount = items.filter(i => this._isDone(i)).length
 
       const remaining = this.totalCount - this.completedCount
       this._showFeedback(`피킹 완료 (${this.completedCount}/${this.totalCount})`, 'success')
@@ -1541,16 +1698,21 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     this._focusBarcodeInput()
   }
 
+  /** 항목 처리 완료 여부 - PICKED 또는 SHORT 상태이면 완료로 간주 */
+  _isDone(item) {
+    return item.status === 'PICKED' || item.status === 'SHORT'
+  }
+
   /** 다음 항목으로 이동 - 미완료 항목 중 다음 항목 검색 및 포커스 */
   _moveToNextItem(initial = false) {
     const startIdx = initial ? 0 : this.currentItemIndex + 1
 
     let nextIdx = this.pickingItems.findIndex(
-      (item, idx) => idx >= startIdx && item.status !== 'PICKED'
+      (item, idx) => idx >= startIdx && !this._isDone(item)
     )
 
     if (nextIdx < 0 && !initial) {
-      nextIdx = this.pickingItems.findIndex(item => item.status !== 'PICKED')
+      nextIdx = this.pickingItems.findIndex(item => !this._isDone(item))
     }
 
     if (nextIdx >= 0) {
@@ -1566,8 +1728,8 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
   _focusItem(idx) {
     const item = this.pickingItems[idx]
     if (!item) return
-    if (item.status === 'PICKED') {
-      this._showFeedback('이미 피킹 완료된 항목입니다', 'info')
+    if (this._isDone(item)) {
+      this._showFeedback(item.status === 'SHORT' ? '⚡ 부족 처리된 항목입니다' : '이미 피킹 완료된 항목입니다', 'info')
       return
     }
     this.currentItemIndex = idx
@@ -1611,6 +1773,134 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
     } catch (err) {
       console.error('피킹 완료 처리 실패:', err)
       this._showFeedback(err.message || '피킹 완료 처리 실패', 'error')
+    }
+  }
+
+  /* ==============================================================
+   * 부족 처리
+   * ============================================================== */
+
+  /** 부족 처리 다이얼로그 열기 - 현재 항목의 지시 수량을 기준으로 초기화 */
+  _openShortDialog() {
+    const item = this.pickingItems[this.currentItemIndex]
+    if (!item) return
+    this.shortPickQty = 0
+    this.autoReplenish = false
+    this.shortDialogOpen = true
+  }
+
+  /** 부족 처리 다이얼로그 렌더링 */
+  _renderShortDialog() {
+    const item = this.pickingItems[this.currentItemIndex]
+    if (!item) return ''
+
+    const orderQty = item.order_qty || 0
+    const computedShortQty = Math.max(0, orderQty - (this.shortPickQty || 0))
+
+    return html`
+      <div class="short-dialog-overlay" @click="${e => { if (e.target === e.currentTarget) this.shortDialogOpen = false }}">
+        <div class="short-dialog">
+          <h4>⚡ 부족 처리</h4>
+
+          <div class="item-summary">
+            <div><strong>${item.sku_cd || '-'}</strong> ${item.sku_nm || ''}</div>
+            <div>로케이션: <strong>${item.from_loc_cd || '-'}</strong> / 지시 수량: <strong>${orderQty} EA</strong></div>
+          </div>
+
+          <div class="field-row">
+            <label>피킹 수량</label>
+            <input
+              type="number"
+              inputmode="numeric"
+              min="0"
+              max="${orderQty}"
+              .value="${String(this.shortPickQty ?? 0)}"
+              @input="${e => { this.shortPickQty = Math.min(Math.max(0, parseFloat(e.target.value) || 0), orderQty) }}"
+              @keydown="${e => { if (e.key === 'Enter') this._confirmShort() }}"
+            />
+            <span>/ ${orderQty} EA</span>
+          </div>
+
+          <div class="field-row">
+            <label>부족 수량</label>
+            <span class="computed-short">${computedShortQty} EA</span>
+          </div>
+
+          <label class="replenish-row">
+            <input
+              type="checkbox"
+              .checked="${this.autoReplenish}"
+              @change="${e => { this.autoReplenish = e.target.checked }}"
+            />
+            자동 보충 지시 생성
+          </label>
+
+          <div class="dialog-actions">
+            <button class="btn-dialog-cancel" @click="${() => { this.shortDialogOpen = false }}">취소</button>
+            <button class="btn-dialog-confirm" @click="${this._confirmShort}">부족 처리</button>
+          </div>
+        </div>
+      </div>
+    `
+  }
+
+  /** 부족 처리 확인 - API 호출 후 항목 상태를 SHORT로 갱신하고 다음 항목으로 이동 */
+  async _confirmShort() {
+    const item = this.pickingItems[this.currentItemIndex]
+    if (!item) return
+
+    const orderQty = item.order_qty || 0
+    const pickQty = this.shortPickQty || 0
+    const shortQty = Math.max(0, orderQty - pickQty)
+
+    if (shortQty <= 0) {
+      this._showFeedback('부족 수량이 0입니다. 피킹 확인 버튼을 사용하세요.', 'warning')
+      return
+    }
+
+    try {
+      const result = await ServiceUtil.restPost(
+        `ful_trx/picking_tasks/${this.selectedTaskId}/items/${item.id}/short`,
+        {
+          pick_qty: pickQty,
+          short_qty: shortQty,
+          auto_replenish: this.autoReplenish
+        }
+      )
+
+      this.shortDialogOpen = false
+
+      // 화면 데이터 즉시 갱신
+      const items = [...this.pickingItems]
+      items[this.currentItemIndex] = {
+        ...items[this.currentItemIndex],
+        status: 'SHORT',
+        pick_qty: pickQty,
+        short_qty: shortQty
+      }
+      this.pickingItems = items
+      this.completedCount = items.filter(i => this._isDone(i)).length
+
+      // 피드백 메시지
+      let msg = `⚡ 부족 처리 완료 (부족 ${shortQty} EA)`
+      if (result?.replenish_created) {
+        msg += ` / 보충 지시 ${result.replenish_no || '생성'}`
+      }
+      this._showFeedback(msg, 'warning')
+
+      // 다음 미완료 항목으로 이동하거나 전체 완료 처리
+      const remaining = this.totalCount - this.completedCount
+      setTimeout(() => {
+        if (remaining === 0) {
+          this._onPickingComplete()
+        } else {
+          this._moveToNextItem()
+          this._focusBarcodeInput()
+        }
+      }, 400)
+    } catch (err) {
+      console.error('부족 처리 실패:', err)
+      this._showFeedback(err.message || '부족 처리 실패', 'error')
     }
   }
 
@@ -1660,7 +1950,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
   /** 목록으로 돌아가기 확인 - 미완료 항목이 있으면 확인 후 목록으로 이동 */
   _confirmBackToList() {
     if (this.rightPanelMode === 'work') {
-      const incomplete = this.pickingItems.filter(i => i.status !== 'PICKED').length
+      const incomplete = this.pickingItems.filter(i => !this._isDone(i)).length
       if (incomplete > 0) {
         if (!confirm(`미완료 항목이 ${incomplete}건 있습니다. 목록으로 돌아가시겠습니까?`)) {
           return
@@ -1675,16 +1965,21 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
    * 키보드 단축키
    * ============================================================== */
 
-  /** 키보드 단축키 설정 - F2(확인), F3(건너뛰기), F5(새로고침), Esc(닫기), Enter(다음) */
+  /** 키보드 단축키 설정 - F2(확인), F3(건너뛰기), F4(부족처리), F5(새로고침), Esc(닫기), Enter(다음) */
   _setupKeyboardShortcuts() {
     if (this._keyHandler) return
     this._keyHandler = (e) => {
-      if (e.key === 'F2' && this.rightPanelMode === 'work') {
+      if (e.key === 'F2' && this.rightPanelMode === 'work' && !this.shortDialogOpen) {
         e.preventDefault()
         this._confirmPick()
-      } else if (e.key === 'F3' && this.rightPanelMode === 'work') {
+      } else if (e.key === 'F3' && this.rightPanelMode === 'work' && !this.shortDialogOpen) {
         e.preventDefault()
         this._skipCurrentItem()
+      } else if (e.key === 'F4' && this.rightPanelMode === 'work' && !this.shortDialogOpen) {
+        e.preventDefault()
+        this._openShortDialog()
+      } else if (e.key === 'Escape' && this.shortDialogOpen) {
+        this.shortDialogOpen = false
       } else if (e.key === 'F5') {
         e.preventDefault()
         this._refresh()

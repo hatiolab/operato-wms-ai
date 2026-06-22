@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import operato.wms.fulfillment.service.FulfillmentShippingService;
 import operato.wms.oms.WmsOmsConfigConstants;
 import operato.wms.oms.WmsOmsConstants;
 import operato.wms.oms.entity.ImportShipmentOrder;
@@ -67,6 +68,11 @@ public class OmsTransactionController extends AbstractRestService {
 	 */
 	@Autowired
 	private OmsReplenishOrderService replenishService;
+	/**
+	 * Fulfillment Shipping Service
+	 */
+	@Autowired
+	private FulfillmentShippingService shippingService;
 	/**
 	 * 커스텀 서비스
 	 */
@@ -784,7 +790,7 @@ public class OmsTransactionController extends AbstractRestService {
 	 */
 	@RequestMapping(value = "waves/{id}/orders", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Get orders in wave")
-	public List<Map> getWaveOrders(@PathVariable("id") String id) {
+	public List<ShipmentOrder> getWaveOrders(@PathVariable("id") String id) {
 		return this.waveService.getWaveOrders(id);
 	}
 
@@ -1016,6 +1022,74 @@ public class OmsTransactionController extends AbstractRestService {
 		// 3. 커스텀 서비스 - 후 처리
 		params.put("result", result);
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CANCEL_REPLENISH, params);
+
+		// 4. 결과 리턴
+		return result;
+	}
+
+	/*
+	 * ============================================================
+	 * 집하 예약 API
+	 * ============================================================
+	 */
+
+	/**
+	 * 출고 주문 집하 예약
+	 *
+	 * POST /rest/oms_trx/shipment_orders/{id}/book_courier
+	 *
+	 * ShipmentOrder.carrier_cd 로 택배사를 선택하고, 기본 계약 기준으로 집하 예약을 접수한다.
+	 * ShipmentDelivery 의 수신인/발송인 정보를 사용한다.
+	 *
+	 * @param id 출고 주문 ID
+	 * @return { success, invc_no, shipment_no }
+	 */
+	@RequestMapping(value = "shipment_orders/{id}/book_courier", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Book courier pickup for shipment order")
+	public Map<String, Object> bookCourier(@PathVariable("id") String id) {
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("id", id);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_BOOK_COURIER, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.shippingService.bookCourier(id);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_BOOK_COURIER, params);
+
+		// 4. 결과 리턴
+		return result;
+	}
+
+	/**
+	 * 출고 주문 집하 예약 취소
+	 *
+	 * POST /rest/oms_trx/shipment_orders/{id}/cancel_book_courier
+	 *
+	 * 이미 접수된 집하 예약을 취소한다.
+	 * 운송장 스캔 완료 이후에는 취소가 불가능할 수 있다.
+	 *
+	 * @param id 출고 주문 ID
+	 * @return { success, shipment_no }
+	 */
+	@RequestMapping(value = "shipment_orders/{id}/cancel_book_courier", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Cancel courier pickup booking for shipment order")
+	public Map<String, Object> cancelBookCourier(@PathVariable("id") String id) {
+		Long domainId = Domain.currentDomainId();
+
+		// 1. 커스텀 서비스 - 전 처리
+		Map<String, Object> params = ValueUtil.newMap("id", id);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CANCEL_BOOK_COURIER, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.shippingService.cancelCourier(id);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CANCEL_BOOK_COURIER, params);
 
 		// 4. 결과 리턴
 		return result;
