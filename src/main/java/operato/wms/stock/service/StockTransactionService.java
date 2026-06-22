@@ -459,6 +459,36 @@ public class StockTransactionService extends BaseStockService {
     }
 
     /**
+     * 재고 부분 할당 취소
+     * 
+     * @param stockAllocation 재고 할당
+     * @param deallocQty      할당 부분 취소 수량
+     * @return
+     */
+    public Inventory deallocatePartialInventory(StockAllocation stockAllocation, double deallocQty) {
+        // 1. 재고 체크
+        Inventory inventory = this.findAndCheckInventory(stockAllocation.getDomainId(),
+                stockAllocation.getInventoryId(), Inventory.TRANSACTION_DEALLOCATE);
+
+        // 2. 재고 할당 해제
+        InventoryTran invTran = new InventoryTran();
+        invTran.setTranQty(deallocQty);
+        invTran.setRefDocType(
+                ValueUtil.isEqualIgnoreCase(stockAllocation.getAllocType(), StockAllocation.ALLOC_TYPE_SHIPMENT)
+                        ? InventoryTran.REF_DOC_TYPE_SHIP
+                        : InventoryTran.REF_DOC_TYPE_VAS);
+        invTran.setRefDocNo(stockAllocation.getShipmentOrderId());
+        invTran.createDeallocateTransaction(inventory);
+
+        // 3. 재고 할당 업데이트
+        stockAllocation.setAllocQty(stockAllocation.getAllocQty() - deallocQty);
+        this.queryManager.update(stockAllocation, "allocQty", "updatedAt", "updaterId");
+
+        // 4. 재고 리턴
+        return inventory;
+    }
+
+    /**
      * 재고 최종 출고 마감 처리
      * 
      * @param inventory
