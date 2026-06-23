@@ -1027,27 +1027,52 @@ public class InboundTransactionService extends AbstractQueryService {
     }
 
     /**
-     * 적치 대기 입고 목록 조회 — 입고별 WAITING/STORED 건수 포함
-     * 적치 대기(WAITING) 건수가 1개 이상인 입고 주문만 반환한다.
+     * 적치 작업 입고 목록 조회 — 입고별 WAITING/STORED 건수 및 적치 진행 상태 포함
+     *
+     * 다음 입고 주문을 반환한다.
+     * <ul>
+     * <li>대기/작업중: 상태가 APPROVED·PUTAWAY 이고 적치 대기(WAITING) 1건 이상</li>
+     * <li>완료: 상태가 END 이고 당일(rcv_end_date) 적치 완료되어 전 항목 STORED</li>
+     * </ul>
+     * 각 입고 건마다 적치 진행 상태(putaway_status)를 재고 건수 기준으로 산출한다.
+     * <ul>
+     * <li>WAITING — 적치 시작 전(STORED 0건)</li>
+     * <li>PUTAWAY — 일부 적치됨(WAITING·STORED 혼재)</li>
+     * <li>DONE — 전부 적치됨(WAITING 0건)</li>
+     * </ul>
      *
      * @param domainId 도메인 ID
-     * @return 입고별 적치 현황 목록 (rcv_no, rcv_req_date, com_cd, vend_cd, waiting_count,
-     *         stored_count)
+     * @return 입고별 적치 현황 목록 (rcv_no, rcv_req_date, com_cd, vend_cd, status,
+     *         waiting_count, stored_count, putaway_status)
      */
     public List<Map> getPutawayReceivingList(Long domainId) {
-        String sql = "SELECT r.rcv_no, r.rcv_req_date, r.com_cd, r.vend_cd" +
+        String sql = "SELECT r.rcv_no, r.rcv_req_date, r.com_cd, r.vend_cd, r.status" +
                 ", COUNT(CASE WHEN i.status = 'WAITING' THEN 1 END) AS waiting_count" +
                 ", COUNT(CASE WHEN i.status = 'STORED' THEN 1 END) AS stored_count" +
+                ", CASE" +
+                "    WHEN COUNT(CASE WHEN i.status = 'STORED' THEN 1 END) > 0" +
+                "         AND COUNT(CASE WHEN i.status = 'WAITING' THEN 1 END) = 0 THEN 'DONE'" +
+                "    WHEN COUNT(CASE WHEN i.status = 'STORED' THEN 1 END) > 0" +
+                "         AND COUNT(CASE WHEN i.status = 'WAITING' THEN 1 END) > 0 THEN 'PUTAWAY'" +
+                "    ELSE 'WAITING'" +
+                "  END AS putaway_status" +
                 " FROM receivings r" +
                 " JOIN inventories i ON r.domain_id = i.domain_id AND r.rcv_no = i.rcv_no" +
                 " WHERE r.domain_id = :domainId" +
-                " AND r.status IN ('APPROVED', 'PUTAWAY')" +
                 " AND (i.del_flag IS NULL OR i.del_flag = false)" +
                 " AND i.status IN ('WAITING', 'STORED')" +
-                " GROUP BY r.rcv_no, r.rcv_req_date, r.com_cd, r.vend_cd" +
-                " HAVING COUNT(CASE WHEN i.status = 'WAITING' THEN 1 END) > 0" +
+                " AND r.status IN ('APPROVED', 'PUTAWAY', 'END')" +
+                " AND (r.status <> 'END' OR r.rcv_end_date = :today)" +
+                " GROUP BY r.rcv_no, r.rcv_req_date, r.com_cd, r.vend_cd, r.status" +
+                " HAVING (" +
+                "    (r.status IN ('APPROVED', 'PUTAWAY')" +
+                "     AND COUNT(CASE WHEN i.status = 'WAITING' THEN 1 END) > 0)" +
+                "    OR (r.status = 'END'" +
+                "        AND COUNT(CASE WHEN i.status = 'WAITING' THEN 1 END) = 0" +
+                "        AND COUNT(CASE WHEN i.status = 'STORED' THEN 1 END) > 0)" +
+                " )" +
                 " ORDER BY r.rcv_no DESC";
-        Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+        Map<String, Object> params = ValueUtil.newMap("domainId,today", domainId, DateUtil.todayStr());
         return (List<Map>) this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
     }
 
@@ -1294,5 +1319,42 @@ public class InboundTransactionService extends AbstractQueryService {
         inv.setDelFlag(false);
 
         this.queryManager.insert(inv);
+    }
+
+    /**
+     * 적치 작업 완료 처리 — 입고 주문 상태를 PUTAWAY → END로 변경
+     *
+     * 모든 재고 항목 적치 완료 또는 수동 작업완료 시 호출.
+     * 입고 주문의 상태가 PUTAWAY인 경우에만 처리하며, 이미 END이면 그대로 반환.
+     *
+     * @param domainId 도메인 ID
+     * @param rcvNo    입고번호
+     * @return 업데이트된 Receiving 객체
+     */
+    public Receiving completePutaway(Long domainId, String rcvNo) {
+        // 1. 입고 주문 조회
+        Receiving rcv = this.queryManager.selectByCondition(Receiving.class,
+                new Receiving(domainId, rcvNo));
+
+        if (rcv == null) {
+            throw new ElidomRuntimeException("입고 주문 번호 [" + rcvNo + "]로 입고 주문을 찾을 수 없습니다.");
+        }
+
+        // 2. 이미 완료 상태이면 그대로 반환
+        if (ValueUtil.isEqual(rcv.getStatus(), WmsInboundConstants.STATUS_END)) {
+            return rcv;
+        }
+
+        // 3. PUTAWAY 상태가 아니면 오류
+        if (ValueUtil.isNotEqual(rcv.getStatus(), WmsInboundConstants.STATUS_PUTAWAY)) {
+            throw new ElidomRuntimeException("적치 완료 처리가 가능한 상태가 아닙니다. 현재 상태: " + rcv.getStatus());
+        }
+
+        // 4. 입고 주문 상태를 END로 변경
+        rcv.setStatus(WmsInboundConstants.STATUS_END);
+        rcv.setRcvEndDate(DateUtil.todayStr());
+        this.queryManager.update(rcv, "status", "rcvEndDate", "updatedAt");
+
+        return rcv;
     }
 }

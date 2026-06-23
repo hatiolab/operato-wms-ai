@@ -2,7 +2,7 @@ import { css, html } from 'lit-element'
 
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
-import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import { OxInputBarcode } from '@operato/input'
 
 import { HardwareScannerService } from './hardware-scanner-service.js'
@@ -873,7 +873,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
     return html`
       <!-- 상태 요약 카드 -->
       <div class="summary-cards">
-        <div class="summary-card waiting"
+        <div class="summary-card"
           ?active="${this.filterStatus === 'ALL'}"
           @click="${() => this._toggleFilter('ALL')}">
           <div class="count">${this.orders.length}</div>
@@ -1249,6 +1249,19 @@ class VasPdaPick extends localize(i18next)(PageView) {
     }
   }
 
+  /** 업데이트 후 — 토스트 표시 시 fadeInOut 애니메이션 재생 보장 (동일 DOM 노드 재사용 대응) */
+  updated(changed) {
+    super.updated?.(changed)
+    if (changed.has('feedbackMsg') && this.feedbackMsg) {
+      const el = this.renderRoot?.querySelector('.feedback-toast')
+      if (el) {
+        el.style.animation = 'none'
+        void el.offsetWidth
+        el.style.animation = ''
+      }
+    }
+  }
+
   /* ============================================================
    * 필터 토글
    * ============================================================ */
@@ -1478,6 +1491,15 @@ class VasPdaPick extends localize(i18next)(PageView) {
 
     const reqQty = item.alloc_qty || item.req_qty || 0
 
+    // 멀티 로케이션 자재: 모든 할당 바코드를 스캔해야 확정 가능 (부분 스캔 후 수동 수량 입력 방지)
+    const barcodes = this._getAllocBarcodes(item)
+    const scanned = item._scannedBarcodes || []
+    if (barcodes.length > 0 && scanned.length < barcodes.length) {
+      this._showFeedback(`모든 재고 바코드를 스캔해주세요 (${scanned.length}/${barcodes.length})`, 'error')
+      voiceService.error('모든 재고 바코드를 스캔해주세요')
+      return
+    }
+
     if (!this.pickQty || this.pickQty <= 0) {
       this._showFeedback('수량을 입력해주세요', 'error')
       voiceService.error('수량을 입력해주세요')
@@ -1568,22 +1590,26 @@ class VasPdaPick extends localize(i18next)(PageView) {
     if (!item) return
 
     const scannedBarcodes = item._scannedBarcodes || []
-    if (scannedBarcodes.length > 0) {
-      // 기존 스캔 바코드들의 수량을 합산
-      const barcodes = this._getAllocBarcodes(item)
-      const qtys = (item.inv_alloc_qtys || '').split(',').filter(Boolean)
-      const totalQty = item.alloc_qty || item.req_qty || 0
-      const perQty = barcodes.length > 0 ? Math.floor(totalQty / barcodes.length) : totalQty
+    const barcodes = this._getAllocBarcodes(item)
+    const totalQty = item.alloc_qty || item.req_qty || 0
 
-      let total = 0
-      scannedBarcodes.forEach(bcd => {
-        const idx = barcodes.indexOf(bcd)
-        total += idx >= 0 && qtys[idx] ? parseInt(qtys[idx]) : perQty
-      })
-      this.pickQty = total
-    } else {
+    if (scannedBarcodes.length === 0) {
       this.pickQty = 0
+      return
     }
+
+    // 모든 바코드를 스캔하면 총 할당수량으로 확정 (균등분배 floor 누락 방지)
+    if (barcodes.length > 0 && scannedBarcodes.length >= barcodes.length) {
+      this.pickQty = totalQty
+      return
+    }
+
+    // 부분 스캔: 스캔된 바코드들의 할당수량만 합산
+    let total = 0
+    scannedBarcodes.forEach(bcd => {
+      total += this._getAllocQtyForBarcode(item, bcd)
+    })
+    this.pickQty = total
   }
 
   /** 특정 바코드에 해당하는 할당 수량 반환 */
@@ -1593,8 +1619,11 @@ class VasPdaPick extends localize(i18next)(PageView) {
     const totalQty = item.alloc_qty || item.req_qty || 0
     const idx = barcodes.indexOf(barcode)
     if (idx >= 0 && qtys[idx]) return parseInt(qtys[idx])
-    // inv_alloc_qtys 없으면 균등 분배
-    return barcodes.length > 0 ? Math.floor(totalQty / barcodes.length) : totalQty
+    if (barcodes.length === 0) return totalQty
+    // inv_alloc_qtys 없으면 균등 분배 — 나머지는 마지막 바코드에 배정해 합계 보존
+    const base = Math.floor(totalQty / barcodes.length)
+    const remainder = totalQty - base * barcodes.length
+    return idx === barcodes.length - 1 ? base + remainder : base
   }
 
   _completeAllPick() {

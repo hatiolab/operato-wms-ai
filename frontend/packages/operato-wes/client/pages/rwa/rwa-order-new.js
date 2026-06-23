@@ -2,6 +2,7 @@ import { css, html, LitElement } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import './rwa-sku-search-popup.js'
+import './rwa-shipment-import-popup.js'
 
 /**
  * 반품 요청 등록 팝업
@@ -439,6 +440,139 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
           color: var(--md-sys-color-on-surface-variant);
           text-align: center;
         }
+
+        /* 출고주문 연동 */
+        .shipment-order-wrap {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .shipment-order-wrap input {
+          flex: 1;
+        }
+
+        .shipment-order-add-btn {
+          flex-shrink: 0;
+          padding: 10px 16px;
+          border: 1px solid var(--md-sys-color-primary);
+          border-radius: 8px;
+          background: transparent;
+          color: var(--md-sys-color-primary);
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: background 0.2s;
+        }
+
+        .shipment-order-add-btn:hover {
+          background: var(--md-sys-color-primary-container);
+        }
+
+        .shipment-order-add-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .shipment-excel-btn {
+          flex-shrink: 0;
+          padding: 10px 14px;
+          border: 1px solid var(--md-sys-color-outline-variant);
+          border-radius: 8px;
+          background: var(--md-sys-color-surface-variant);
+          color: var(--md-sys-color-on-surface-variant);
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: background 0.2s;
+        }
+
+        .shipment-excel-btn:hover {
+          background: var(--md-sys-color-surface-container-highest);
+        }
+
+        .shipment-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 8px;
+        }
+
+        .shipment-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 8px 4px 12px;
+          background: var(--md-sys-color-primary-container, #e3f2fd);
+          color: var(--md-sys-color-on-primary-container, #0d47a1);
+          border-radius: 20px;
+          font-size: 13px;
+          font-weight: 500;
+        }
+
+        .shipment-chip .chip-remove {
+          width: 18px;
+          height: 18px;
+          border: none;
+          border-radius: 50%;
+          background: rgba(0, 0, 0, 0.12);
+          color: inherit;
+          font-size: 11px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          line-height: 1;
+          transition: background 0.15s;
+        }
+
+        .shipment-chip .chip-remove:hover {
+          background: rgba(0, 0, 0, 0.24);
+        }
+
+        /* 그룹 헤더 행 */
+        .group-header-row td {
+          background: var(--md-sys-color-surface-variant);
+          font-weight: 600;
+          font-size: 13px;
+          color: var(--md-sys-color-on-surface);
+          padding: 8px 12px;
+          border-bottom: 2px solid var(--md-sys-color-outline-variant);
+        }
+
+        .group-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .badge {
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.3px;
+        }
+
+        .badge.shipment {
+          background: var(--md-sys-color-primary-container, #e3f2fd);
+          color: var(--md-sys-color-on-primary-container, #0d47a1);
+        }
+
+        .badge.manual {
+          background: #fff3e0;
+          color: #e65100;
+        }
+
+        .cell-text {
+          font-size: 13px;
+          color: var(--md-sys-color-on-surface);
+          padding: 6px 2px;
+          display: block;
+        }
       `
     ]
   }
@@ -463,7 +597,11 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
       /** 자동완성 키보드 하이라이트 인덱스 (-1: 없음) */
       companyHighlight: Number,
       warehouseHighlight: Number,
-      customerHighlight: Number
+      customerHighlight: Number,
+      /** 출고주문 연동 */
+      shipmentOrderInput: String,
+      shipmentOrders: Array,
+      shipmentOrderLoading: Boolean
     }
   }
 
@@ -498,6 +636,9 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
     this.companyHighlight = -1
     this.warehouseHighlight = -1
     this.customerHighlight = -1
+    this.shipmentOrderInput = ''
+    this.shipmentOrders = []
+    this.shipmentOrderLoading = false
   }
 
   connectedCallback() {
@@ -694,6 +835,41 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
 
         <!-- 검수 필요 / 품질검사 필요 체크박스: 미사용으로 숨김 처리 (추후 활성화 예정) -->
 
+        <!-- 출고주문 연동 -->
+        <div class="form-field full-width">
+          <label>출고주문 연동</label>
+          <div class="shipment-order-wrap">
+            <input
+              type="text"
+              placeholder="출고주문번호 입력 후 Enter 또는 추가 버튼 클릭"
+              .value="${this.shipmentOrderInput}"
+              ?disabled="${this.shipmentOrderLoading}"
+              @input="${e => { this.shipmentOrderInput = e.target.value }}"
+              @keydown="${e => e.key === 'Enter' && this._addShipmentOrder()}"
+            />
+            <button
+              class="shipment-order-add-btn"
+              ?disabled="${!this.shipmentOrderInput || this.shipmentOrderLoading}"
+              @click="${this._addShipmentOrder}"
+            >${this.shipmentOrderLoading ? '조회 중...' : '+ 추가'}</button>
+            <button
+              class="shipment-excel-btn"
+              title="엑셀 파일로 출고주문을 일괄 등록합니다"
+              @click="${this._openShipmentImportPopup}"
+            >📊 엑셀 일괄 등록</button>
+          </div>
+          ${this.shipmentOrders.length > 0 ? html`
+            <div class="shipment-chips">
+              ${this.shipmentOrders.map(so => html`
+                <span class="shipment-chip">
+                  📦 ${so.shipment_no}
+                  <button class="chip-remove" title="제거" @click="${() => this._removeShipmentOrder(so.shipment_no)}">✕</button>
+                </span>
+              `)}
+            </div>
+          ` : ''}
+        </div>
+
         <div class="form-field full-width">
           <label>비고</label>
           <textarea placeholder="비고" .value="${this.rwaOrder.remarks}" @input="${e => this._updateOrder('remarks', e.target.value)}"></textarea>
@@ -703,20 +879,24 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
   }
 
   /**
-   * 2단계: 반품 항목 테이블
+   * 2단계: 반품 항목 테이블 (출고주문 그룹 + 수동 등록 그룹 구분 표시)
    */
   _renderStep2() {
+    const groups = this._groupedItems
+    const totalItems = this.items.length
+    const totalQty = this.items.reduce((sum, i) => sum + (i.rwaReqQty || 0), 0)
+
     return html`
       <div class="items-header">
-        <h3>반품 상품 목록 (${this.items.length}건)</h3>
-        <button class="add-item-btn" @click="${this._addItem}">+ 항목 추가</button>
+        <h3>반품 상품 목록 (${totalItems}건)</h3>
+        <button class="add-item-btn" @click="${this._addItem}">+ 수동 추가</button>
       </div>
 
-      ${this.items.length === 0
+      ${totalItems === 0
         ? html`
             <div class="empty-items">
               <div class="icon">📦</div>
-              <div class="text">반품 항목을 추가해주세요</div>
+              <div class="text">출고주문을 연동하거나 항목을 직접 추가해주세요</div>
             </div>
           `
         : html`
@@ -731,46 +911,69 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
                   <th style="width:50px"></th>
                 </tr>
               </thead>
-              <tbody>
-                ${this.items.map(
-          (item, idx) => html`
+              ${groups.map(group => html`
+                <tbody>
+                  <tr class="group-header-row">
+                    <td colspan="6">
+                      <span class="group-badge">
+                        ${group.type === 'SHIPMENT'
+                          ? html`<span class="badge shipment">출고주문</span> ${group.no}`
+                          : html`<span class="badge manual">수동 등록</span>`}
+                      </span>
+                    </td>
+                  </tr>
+                  ${group.entries.length === 0 ? html`
                     <tr>
-                      <td style="text-align:center">${idx + 1}</td>
+                      <td colspan="6" style="text-align:center;color:var(--md-sys-color-on-surface-variant);font-size:13px;padding:16px">
+                        항목이 없습니다
+                      </td>
+                    </tr>
+                  ` : group.entries.map(({ item, globalIdx }) => html`
+                    <tr>
+                      <td style="text-align:center">${globalIdx + 1}</td>
                       <td>
-                        <div class="sku-input-wrap">
-                          <input
-                            type="text"
-                            placeholder="SKU"
-                            .value="${item.skuCd}"
-                            @input="${e => this._updateItem(idx, 'skuCd', e.target.value)}"
-                            @keydown="${e => e.key === 'Enter' && e.target.blur()}"
-                            @blur="${e => this._lookupSkuByCode(idx, e.target.value)}"
-                          />
-                          <button
-                            class="sku-search-btn"
-                            title="${i18next.t('button.sku_search', { defaultValue: 'SKU 검색' })}"
-                            @click="${() => this._openSkuSearch(idx)}"
-                          >🔍</button>
-                        </div>
+                        ${item.sourceType === 'SHIPMENT' ? html`
+                          <span class="cell-text">${item.skuCd}</span>
+                        ` : html`
+                          <div class="sku-input-wrap">
+                            <input
+                              type="text"
+                              placeholder="SKU"
+                              .value="${item.skuCd}"
+                              @input="${e => this._updateItem(globalIdx, 'skuCd', e.target.value)}"
+                              @keydown="${e => e.key === 'Enter' && e.target.blur()}"
+                              @blur="${e => this._lookupSkuByCode(globalIdx, e.target.value)}"
+                            />
+                            <button
+                              class="sku-search-btn"
+                              title="${i18next.t('button.sku_search', { defaultValue: 'SKU 검색' })}"
+                              @click="${() => this._openSkuSearch(globalIdx)}"
+                            >🔍</button>
+                          </div>
+                        `}
                       </td>
                       <td>
-                        <input
-                          type="text"
-                          placeholder="상품명"
-                          .value="${item.skuNm}"
-                          @input="${e => this._updateItem(idx, 'skuNm', e.target.value)}"
-                        />
+                        ${item.sourceType === 'SHIPMENT' ? html`
+                          <span class="cell-text">${item.skuNm}</span>
+                        ` : html`
+                          <input
+                            type="text"
+                            placeholder="상품명"
+                            .value="${item.skuNm}"
+                            @input="${e => this._updateItem(globalIdx, 'skuNm', e.target.value)}"
+                          />
+                        `}
                       </td>
                       <td>
                         <input
                           type="number"
                           min="1"
                           .value="${String(item.rwaReqQty)}"
-                          @input="${e => this._updateItem(idx, 'rwaReqQty', Number(e.target.value))}"
+                          @input="${e => this._updateItem(globalIdx, 'rwaReqQty', Number(e.target.value))}"
                         />
                       </td>
                       <td>
-                        <select .value="${item.returnReason}" @change="${e => this._updateItem(idx, 'returnReason', e.target.value)}">
+                        <select .value="${item.returnReason}" @change="${e => this._updateItem(globalIdx, 'returnReason', e.target.value)}">
                           <option value="">선택</option>
                           <option value="DEFECT">상품 하자</option>
                           <option value="WRONG_ITEM">오배송</option>
@@ -781,27 +984,52 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
                         </select>
                       </td>
                       <td>
-                        <button class="delete-btn" @click="${() => this._removeItem(idx)}">✕</button>
+                        <button class="delete-btn" @click="${() => this._removeItem(globalIdx)}">✕</button>
                       </td>
                     </tr>
-                  `
-        )}
-              </tbody>
+                  `)}
+                </tbody>
+              `)}
             </table>
 
             <div class="summary-row">
               <div class="summary-item">
                 <span class="label">총 항목:</span>
-                <span class="value">${this.items.length}건</span>
+                <span class="value">${totalItems}건</span>
               </div>
               <div class="summary-item">
                 <span class="label">총 수량:</span>
-                <span class="value">${this.items.reduce((sum, i) => sum + (i.rwaReqQty || 0), 0)} EA</span>
+                <span class="value">${totalQty} EA</span>
               </div>
-              <!-- 총 박스: 미사용으로 숨김 처리 -->
             </div>
           `}
     `
+  }
+
+  /**
+   * 항목을 출고주문 그룹 / 수동 등록 그룹으로 분류하여 반환
+   * 각 entry에 items 배열 내 전역 인덱스(globalIdx)를 포함
+   */
+  get _groupedItems() {
+    const groups = []
+
+    for (const so of this.shipmentOrders) {
+      const entries = []
+      this.items.forEach((item, globalIdx) => {
+        if (item.sourceNo === so.shipment_no) entries.push({ item, globalIdx })
+      })
+      groups.push({ type: 'SHIPMENT', no: so.shipment_no, entries })
+    }
+
+    const manualEntries = []
+    this.items.forEach((item, globalIdx) => {
+      if (item.sourceType === 'MANUAL') manualEntries.push({ item, globalIdx })
+    })
+    if (manualEntries.length > 0 || groups.length === 0) {
+      groups.push({ type: 'MANUAL', no: null, entries: manualEntries })
+    }
+
+    return groups
   }
 
   /**
@@ -1021,7 +1249,7 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
   }
 
   /**
-   * 항목 추가
+   * 수동 항목 추가
    */
   _addItem() {
     this.items = [
@@ -1031,9 +1259,110 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
         skuNm: '',
         rwaReqQty: 1,
         returnReason: '',
-        boxQty: 0
+        boxQty: 0,
+        sourceType: 'MANUAL',
+        sourceNo: null
       }
     ]
+  }
+
+  /**
+   * 출고주문 추가 버튼 / Enter 핸들러
+   */
+  _addShipmentOrder() {
+    const no = (this.shipmentOrderInput || '').trim()
+    if (!no) return
+    this._lookupAndAddShipmentOrder(no)
+  }
+
+  /**
+   * 출고주문번호로 API 조회 후 아이템 자동 등록
+   * - shipment_orders에서 주문 존재 확인 (shipment_no 컬럼)
+   * - shipment_order_items에서 주문 상품 목록 조회
+   */
+  async _lookupAndAddShipmentOrder(no) {
+    if (this.shipmentOrders.find(so => so.shipment_no === no)) {
+      UiUtil.showToast('warning', `출고주문 [${no}]은 이미 추가되어 있습니다`)
+      return
+    }
+
+    this.shipmentOrderLoading = true
+    try {
+      const orderData = await ServiceUtil.searchByPagination(
+        'shipment_orders',
+        [{ name: 'shipment_no', value: no }],
+        null, 1, 1
+      )
+      const order = orderData?.items?.[0]
+      if (!order) {
+        UiUtil.showToast('warning', `출고주문 [${no}]을 찾을 수 없습니다`)
+        return
+      }
+      if (order.status !== 'SHIPPED') {
+        UiUtil.showToast('warning', `출고주문 [${no}]은 출하완료 상태가 아닙니다 (현재: ${order.status})`)
+        return
+      }
+
+      const itemData = await ServiceUtil.restGet(`shipment_orders/${order.id}/items`)
+      const orderItems = itemData?.items || itemData || []
+
+      this.shipmentOrders = [...this.shipmentOrders, { id: order.id, shipment_no: order.shipment_no }]
+
+      const newItems = orderItems.map(oi => ({
+        skuCd: oi.sku_cd || '',
+        skuNm: oi.sku_nm || '',
+        rwaReqQty: oi.order_qty || 1,
+        returnReason: '',
+        boxQty: 0,
+        sourceType: 'SHIPMENT',
+        sourceNo: order.shipment_no
+      }))
+      this.items = [...this.items, ...newItems]
+      this.shipmentOrderInput = ''
+
+      UiUtil.showToast('success', `출고주문 [${no}] 연동 완료 (${orderItems.length}건)`)
+    } catch (err) {
+      console.error('출고주문 조회 실패:', err)
+      UiUtil.showToast('error', err.message || '출고주문 조회에 실패했습니다')
+    } finally {
+      this.shipmentOrderLoading = false
+    }
+  }
+
+  /**
+   * 출고주문 칩 제거 — 해당 출고주문의 모든 항목도 함께 제거
+   */
+  _removeShipmentOrder(no) {
+    this.shipmentOrders = this.shipmentOrders.filter(so => so.shipment_no !== no)
+    this.items = this.items.filter(item => item.sourceNo !== no)
+  }
+
+  /**
+   * 출고주문 엑셀 일괄 등록 팝업 열기
+   * 팝업에서 'shipment-orders-imported' 이벤트를 수신하면 주문/상품을 일괄 반영
+   */
+  _openShipmentImportPopup() {
+    const popup = document.createElement('rwa-shipment-import-popup')
+
+    popup.addEventListener('shipment-orders-imported', e => {
+      const { orders, items } = e.detail
+
+      // 이미 추가된 주문 제외하고 신규만 병합
+      const existingNos = new Set(this.shipmentOrders.map(so => so.shipment_no))
+      const newOrders = orders.filter(o => !existingNos.has(o.shipment_no))
+      const newItems = items.filter(item => !existingNos.has(item.sourceNo))
+
+      if (newOrders.length === 0) {
+        UiUtil.showToast('warning', '새로 추가된 출고주문이 없습니다 (이미 등록된 주문 제외)')
+        return
+      }
+
+      this.shipmentOrders = [...this.shipmentOrders, ...newOrders]
+      this.items = [...this.items, ...newItems]
+      UiUtil.showToast('success', `출고주문 ${newOrders.length}건 일괄 등록 완료`)
+    })
+
+    UiUtil.openPopupByElement('출고주문 엑셀 일괄 등록', 'large', popup, true)
   }
 
   /**

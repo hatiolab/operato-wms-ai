@@ -231,8 +231,24 @@ class ReceivingOrderImportPopup extends LitElement {
           font-size: 11px;
         }
 
+        /* 미등록 SKU 셀 표시 */
+        .preview-table td.cell-sku-unknown {
+          background: #fce4ec;
+          color: #b71c1c;
+          font-weight: 600;
+        }
+
+        .preview-table td.cell-sku-unknown::after {
+          content: ' ✕';
+          font-size: 11px;
+        }
+
         .preview-table tr.row-error {
           background: #fff8f8;
+        }
+
+        .preview-table tr.row-sku-unknown {
+          background: #fdf0f3;
         }
 
         /* 필수항목 누락 경고 배너 */
@@ -253,6 +269,48 @@ class ReceivingOrderImportPopup extends LitElement {
           margin-top: 4px;
           font-size: 12px;
           color: #bf360c;
+        }
+
+        /* 미등록 SKU 오류 배너 */
+        .validation-error {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          background: #fce4ec;
+          border: 1px solid #ef9a9a;
+          border-radius: 6px;
+          padding: 10px 14px;
+          margin-bottom: 10px;
+          font-size: 13px;
+          color: #b71c1c;
+        }
+
+        .validation-error .error-detail {
+          margin-top: 4px;
+          font-size: 12px;
+          color: #7f0000;
+          word-break: break-all;
+        }
+
+        /* SKU 조회 중 로딩 표시 */
+        .sku-lookup-loading {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+          color: #757575;
+          margin-bottom: 10px;
+          padding: 6px 0;
+        }
+
+        .sku-lookup-loading .mini-spinner {
+          width: 14px;
+          height: 14px;
+          border: 2px solid #e0e0e0;
+          border-top-color: #1976d2;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+          flex-shrink: 0;
         }
 
         /* 결과 */
@@ -391,7 +449,11 @@ class ReceivingOrderImportPopup extends LitElement {
       selectedFile: { type: Object },
       parsedData: { type: Array },
       importResult: { type: Object },
-      processing: { type: Boolean }
+      processing: { type: Boolean },
+      /** SKU 마스터에 존재하지 않는 sku_cd 목록 */
+      unknownSkuCds: { type: Array },
+      /** SKU명 자동 조회 진행 중 여부 */
+      skuLookupLoading: { type: Boolean }
     }
   }
 
@@ -404,6 +466,8 @@ class ReceivingOrderImportPopup extends LitElement {
     this.importResult = null
     this.processing = false
     this._dragover = false
+    this.unknownSkuCds = []
+    this.skuLookupLoading = false
   }
 
   /** 화면 렌더링 - 2단계 위자드 (파일 업로드/미리보기 → 결과) */
@@ -443,7 +507,7 @@ class ReceivingOrderImportPopup extends LitElement {
               <button class="btn btn-default" @click="${this._close}">취소</button>
               <button
                 class="btn btn-primary"
-                ?disabled="${!this.selectedFile || this.parsedData.length === 0}"
+                ?disabled="${!this.selectedFile || this.parsedData.length === 0 || this.skuLookupLoading || this.unknownSkuCds.length > 0}"
                 @click="${this._executeImport}"
               >
                 📥 임포트 실행
@@ -510,6 +574,7 @@ class ReceivingOrderImportPopup extends LitElement {
     const invalidRows = this.parsedData
       ? this.parsedData.filter(row => this._getMissingFields(row).length > 0 || this._isQtyInvalid(row))
       : []
+    const unknownSet = new Set(this.unknownSkuCds)
 
     return html`
       <!-- 템플릿 다운로드 -->
@@ -537,6 +602,29 @@ class ReceivingOrderImportPopup extends LitElement {
       ${this.parsedData && this.parsedData.length > 0
         ? html`
             <div class="preview-header">📋 미리보기 (${this.parsedData.length}건)</div>
+
+            <!-- SKU 조회 중 -->
+            ${this.skuLookupLoading
+              ? html`
+                  <div class="sku-lookup-loading">
+                    <div class="mini-spinner"></div>
+                    <span>상품 마스터 확인 중...</span>
+                  </div>
+                `
+              : ''}
+
+            <!-- 미등록 SKU 오류 배너 (임포트 차단) -->
+            ${this.unknownSkuCds.length > 0
+              ? html`
+                  <div class="validation-error">
+                    <span>🚫</span>
+                    <div>
+                      상품 마스터에 등록되지 않은 SKU 코드가 <strong>${this.unknownSkuCds.length}건</strong> 있습니다. 임포트를 진행할 수 없습니다.
+                      <div class="error-detail">미등록 코드: ${this.unknownSkuCds.join(', ')}</div>
+                    </div>
+                  </div>
+                `
+              : ''}
 
             <!-- 필수항목 누락 경고 배너 -->
             ${invalidRows.length > 0
@@ -580,8 +668,10 @@ class ReceivingOrderImportPopup extends LitElement {
                     (row, idx) => {
                       const missing = this._getMissingFields(row)
                       const hasError = missing.length > 0 || this._isQtyInvalid(row)
+                      const skuCd = row.sku_cd || row.skuCd || ''
+                      const isUnknownSku = skuCd && unknownSet.has(skuCd)
                       return html`
-                        <tr class="${hasError ? 'row-error' : ''}">
+                        <tr class="${isUnknownSku ? 'row-sku-unknown' : hasError ? 'row-error' : ''}">
                           <td class="center">${idx + 1}</td>
                           <td class="${this._isFieldMissing(row, ['rcv_no', 'rcvNo', 'rcv_req_no', 'rcvReqNo']) ? 'cell-error' : ''}">${row.rcv_no || row.rcvNo || ''}</td>
                           <td class="${this._isFieldMissing(row, ['rcv_no', 'rcvNo', 'rcv_req_no', 'rcvReqNo']) ? 'cell-error' : ''}">${row.rcv_req_no || row.rcvReqNo || ''}</td>
@@ -590,7 +680,7 @@ class ReceivingOrderImportPopup extends LitElement {
                           <td>${row.wh_cd || row.whCd || ''}</td>
                           <td>${row.com_cd || row.comCd || ''}</td>
                           <td>${row.vend_cd || row.vendCd || ''}</td>
-                          <td class="${this._isFieldMissing(row, ['sku_cd', 'skuCd']) ? 'cell-error' : ''}">${row.sku_cd || row.skuCd || ''}</td>
+                          <td class="${isUnknownSku ? 'cell-sku-unknown' : this._isFieldMissing(row, ['sku_cd', 'skuCd']) ? 'cell-error' : ''}">${skuCd}</td>
                           <td>${row.sku_nm || row.skuNm || ''}</td>
                           <td>${row.rcv_exp_date || row.rcvExpDate || ''}</td>
                           <td class="right ${this._isQtyMissing(row) || this._isQtyInvalid(row) ? 'cell-error' : ''}">${row.rcv_exp_qty ?? row.rcvExpQty ?? ''}</td>
@@ -733,7 +823,7 @@ class ReceivingOrderImportPopup extends LitElement {
   }
 
   /** Excel 파싱 완료 콜백 - 미리보기 데이터 세팅 (빈 행 제거 포함) */
-  _onExcelParsed(records) {
+  async _onExcelParsed(records) {
     const importData = records.header ? records.data : records
     if (importData && importData.length > 0) {
       // 빈 행 제거: sku_cd / com_cd / wh_cd 중 하나라도 값이 있는 행만 유지
@@ -757,8 +847,63 @@ class ReceivingOrderImportPopup extends LitElement {
         return normalized
       })
       this.requestUpdate()
+
+      // sku_nm이 비어 있는 행에 대해 SKU 마스터에서 자동 조회
+      await this._fillSkuNames()
     } else {
       UiUtil.showToast('warning', '파일에서 데이터를 읽을 수 없습니다.')
+    }
+  }
+
+  /**
+   * 모든 sku_cd에 대해 SKU 마스터 조회를 수행한다.
+   * - sku_nm이 비어 있으면 조회 결과로 자동 채움
+   * - 마스터에 없는 코드는 unknownSkuCds에 추가하여 임포트를 차단한다
+   */
+  async _fillSkuNames() {
+    // 유효한 sku_cd 목록 수집 (중복 제거)
+    const allCds = [
+      ...new Set(
+        this.parsedData
+          .map(row => row.sku_cd || row.skuCd || '')
+          .filter(cd => cd)
+      )
+    ]
+
+    if (allCds.length === 0) return
+
+    this.skuLookupLoading = true
+    this.unknownSkuCds = []
+
+    try {
+      const skuMap = {}
+      const unknowns = []
+
+      for (const cd of allCds) {
+        const data = await ServiceUtil.searchByPagination('sku', [{ name: 'sku_cd', value: cd }], null, 1, 1)
+        const sku = data?.items?.[0]
+        if (sku) {
+          skuMap[cd] = sku.sku_nm || ''
+        } else {
+          unknowns.push(cd)
+        }
+      }
+
+      // sku_nm 자동 채우기
+      this.parsedData = this.parsedData.map(row => {
+        const cd = row.sku_cd || row.skuCd || ''
+        if (cd && skuMap[cd] !== undefined) {
+          return { ...row, sku_nm: skuMap[cd] }
+        }
+        return row
+      })
+
+      // 미등록 SKU 목록 세팅 (있으면 임포트 버튼 비활성화됨)
+      this.unknownSkuCds = unknowns
+    } catch (err) {
+      console.warn('SKU 마스터 조회 실패:', err)
+    } finally {
+      this.skuLookupLoading = false
     }
   }
 
@@ -813,6 +958,8 @@ class ReceivingOrderImportPopup extends LitElement {
     this.importResult = null
     this.processing = false
     this._dragover = false
+    this.unknownSkuCds = []
+    this.skuLookupLoading = false
   }
 
   /** 팝업 닫기 */

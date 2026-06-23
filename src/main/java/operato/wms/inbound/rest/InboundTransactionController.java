@@ -818,6 +818,22 @@ public class InboundTransactionController extends AbstractRestService {
      * @param limit 최대 반환 수 (기본 5)
      * @return 추천 로케이션 목록
      */
+    /**
+     * 적치 작업 완료 처리 — 입고 주문 상태를 PUTAWAY → END로 변경
+     *
+     * PDA 적치 화면에서 모든 항목 적치 완료 또는 수동 작업완료 시 호출.
+     *
+     * POST /rest/inbound_trx/putaway/complete?rcv_no={rcvNo}
+     *
+     * @param rcvNo 입고번호
+     * @return 업데이트된 Receiving 객체
+     */
+    @RequestMapping(value = "/putaway/complete", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Complete putaway - update receiving order status from PUTAWAY to END")
+    public Receiving completePutaway(@RequestParam(name = "rcv_no") String rcvNo) {
+        return this.inbTrxService.completePutaway(Domain.currentDomainId(), rcvNo);
+    }
+
     @RequestMapping(value = "/putaway/recommend_locations", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiDesc(description = "Recommend putaway locations by StoragePolicy strategy")
     public List<Location> recommendPutawayLocations(

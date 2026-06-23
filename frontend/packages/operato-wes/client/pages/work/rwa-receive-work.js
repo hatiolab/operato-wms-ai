@@ -726,13 +726,26 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
    * 생명주기
    * ============================================================ */
 
-  /** 페이지 활성화 시 주문 목록 + RETURN 로케이션 조회 */
+  /** 페이지 활성화 시 주문 목록 + RETURN 로케이션 조회 (작업/완료 화면에서는 재조회 안 함) */
   async pageUpdated(changes, lifecycle) {
-    if (this.active) {
+    if (this.active && this.screen === 'order-select') {
       await Promise.all([
         this._fetchOrders(),
         this._fetchReturnLocation()
       ])
+    }
+  }
+
+  /** 업데이트 후 — 토스트 표시 시 fadeOut 애니메이션 재생 보장 (동일 DOM 노드 재사용 대응) */
+  updated(changed) {
+    super.updated?.(changed)
+    if (changed.has('feedbackMsg') && this.feedbackMsg) {
+      const el = this.renderRoot?.querySelector('.feedback-toast')
+      if (el) {
+        el.style.animation = 'none'
+        void el.offsetWidth // 강제 reflow
+        el.style.animation = ''
+      }
     }
   }
 
@@ -759,7 +772,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   /** 주문 선택 화면 — 상태 카드 + 주문 목록 + 하단 바코드 스캔 */
   _renderOrderSelect() {
     const WAITING_STATUS = ['APPROVED']
-    const WORKING_STATUS = ['RECEIVING', 'RECEIVED', 'INSPECTING']
+    const WORKING_STATUS = ['RECEIVING', 'RECEIVED', 'INSPECTING', 'INSPECTED', 'DISPOSING', 'DISPOSED']
     const DONE_STATUS    = ['COMPLETED', 'CANCELLED', 'REJECTED']
 
     const sortOrders = list => [...list].sort((a, b) => {
@@ -770,7 +783,8 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     })
 
     const today = new Date().toISOString().slice(0, 10)
-    const waiting = sortOrders(this.orders.filter(o => WAITING_STATUS.includes(o.status) && (o.rwa_req_date || '').slice(0, 10) === today))
+    // 대기/작업중: 날짜 무관 (과거 승인 반품주문도 노출), 완료: 당일만
+    const waiting = sortOrders(this.orders.filter(o => WAITING_STATUS.includes(o.status)))
     const working = sortOrders(this.orders.filter(o => WORKING_STATUS.includes(o.status)))
     const done    = sortOrders(this.orders.filter(o => DONE_STATUS.includes(o.status) && (o.updated_at || '').slice(0, 10) === today))
 
@@ -820,7 +834,9 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
                     <span class="order-badge ${order.status}">${this._statusLabel(order.status)}</span>
                   </div>
                   <div class="sub-info">
-                    ${this._rwaTypeLabel(order.rwa_type)} | ${order.com_cd || '-'}
+                    ${this._rwaTypeLabel(order.rwa_type)} |
+                    <entity-label table="companies" key-col="com_cd" display-col="com_nm"
+                      .value="${order.com_cd || ''}" .fallback="${order.com_cd || '-'}"></entity-label>
                     ${order.cust_nm ? ` · ${order.cust_nm}` : ''}
                   </div>
                   <div class="sub-info" style="margin-top:3px; font-size:12px; color:var(--md-sys-color-on-surface-variant,#999)">
@@ -946,45 +962,51 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
       ? this.orderItems.find(i => i.id === this.selectedOrderItemId)
       : this._getCurrentStepItems()[0]
 
-    const isEdit = currentItem &&
-      ['RECEIVED', 'INSPECTING', 'INSPECTED', 'DISPOSED', 'COMPLETED'].includes(currentItem.status)
-    const itemNo = currentItem ? this.orderItems.indexOf(currentItem) + 1 : '-'
+    const doneStatuses = ['RECEIVED', 'INSPECTING', 'INSPECTED', 'DISPOSED', 'COMPLETED']
+    const receivedCount = this.orderItems.filter(i => doneStatuses.includes(i.status)).length
 
     return html`
-      <p class="section-title">입고 작업 (${itemNo} / ${this.orderItems.length})</p>
+      <p class="section-title">입고 작업 (완료 ${receivedCount} / 전체 ${this.orderItems.length})</p>
 
-      <div class="item-card">
-        <div class="sku-info">${currentItem.sku_cd} · ${currentItem.sku_nm || '-'}</div>
-        <div class="qty-info">반품 요청 수량: ${currentItem.rwa_req_qty || currentItem.rwa_qty || 0} EA</div>
-      </div>
-
-      <div class="qty-confirm-row">
-        <div class="form-group">
-          <label>입고 수량</label>
-          <input
-            type="number"
-            inputmode="numeric"
-            min="0"
-            placeholder="0"
-            .value="${this.rcvQty || ''}"
-            @input="${e => { this.rcvQty = Number(e.target.value) }}"
-          />
+      ${currentItem ? html`
+        <div class="item-card">
+          <div class="sku-info">${currentItem.sku_cd} · ${currentItem.sku_nm || '-'}</div>
+          <div class="qty-info">반품 요청 수량: ${currentItem.rwa_req_qty || currentItem.rwa_qty || 0} EA</div>
         </div>
-        <button class="btn-confirm-inline"
-          ?disabled="${this.actionLoading}"
-          @click="${this._doReceive}">
-          ${this.actionLoading ? '...' : '확인'}
-        </button>
-      </div>
 
-      <div class="form-group">
-        <label>보관 로케이션</label>
-        <ox-input-barcode
-          placeholder="${this.returnLocCd || 'RWA-01-01'}"
-          .value="${this.locCd}"
-          @change="${e => { this.locCd = e.target.value }}"
-        ></ox-input-barcode>
-      </div>
+        <div class="qty-confirm-row">
+          <div class="form-group">
+            <label>입고 수량</label>
+            <input
+              type="number"
+              inputmode="numeric"
+              min="0"
+              placeholder="0"
+              .value="${this.rcvQty || ''}"
+              @input="${e => { this.rcvQty = Number(e.target.value) }}"
+            />
+          </div>
+          <button class="btn-confirm-inline"
+            ?disabled="${this.actionLoading}"
+            @click="${this._doReceive}">
+            ${this.actionLoading ? '...' : '확인'}
+          </button>
+        </div>
+
+        <div class="form-group">
+          <label>보관 로케이션</label>
+          <ox-input-barcode
+            placeholder="${this.returnLocCd || 'RWA-01-01'}"
+            .value="${this.locCd}"
+            @change="${e => { this.locCd = e.target.value }}"
+          ></ox-input-barcode>
+        </div>
+      ` : html`
+        <div class="empty-state">
+          <span class="empty-icon">📦</span>
+          <span class="empty-text">입고할 항목이 없습니다</span>
+        </div>
+      `}
 
       ${this._renderItemsProgressStep1()}
     `
@@ -1000,11 +1022,11 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
       ? this.orderItems.find(i => i.id === this.selectedInspItemId)
       : this._getCurrentStepItems()[0]
 
-    const itemNo = currentItem ? this.orderItems.indexOf(currentItem) + 1 : '-'
+    const completedCount = this.orderItems.filter(i => i.status === 'COMPLETED').length
     const totalQty = currentItem ? (currentItem.rwa_qty || 0) : 0
 
     return html`
-      <p class="section-title">검수 작업 (${itemNo} / ${this.orderItems.length})</p>
+      <p class="section-title">검수 작업 (완료 ${completedCount} / 전체 ${this.orderItems.length})</p>
 
       ${currentItem ? html`
         <div class="item-card">
@@ -1013,27 +1035,17 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
         </div>
       ` : ''}
 
-      <!-- 양품 수량 + 확인 버튼 인라인 -->
+      <!-- 불량 수량 입력 → 양품 자동 계산 (양품 = 입고수량 − 불량) -->
       <div class="qty-confirm-row">
         <div class="qty-row" style="flex:1">
           <div class="form-group">
-            <label>양품 수량</label>
+            <label>양품 수량 (자동)</label>
             <input
               type="number"
-              inputmode="numeric"
-              min="0"
-              .value="${this.goodQty || ''}"
-              placeholder="0"
-              @input="${e => {
-                const v = e.target.value
-                if (v === '' || v === null) {
-                  this.goodQty = null
-                  this.defectQty = null
-                } else {
-                  this.goodQty = Number(v)
-                  this.defectQty = Math.max(0, totalQty - this.goodQty)
-                }
-              }}"
+              readonly
+              tabindex="-1"
+              .value="${this.goodQty != null ? this.goodQty : ''}"
+              style="background:var(--md-sys-color-surface-variant,#eee);"
             />
           </div>
           <div class="form-group">
@@ -1042,17 +1054,14 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
               type="number"
               inputmode="numeric"
               min="0"
-              .value="${this.defectQty || ''}"
+              max="${totalQty}"
+              .value="${this.defectQty != null ? this.defectQty : ''}"
               placeholder="0"
               @input="${e => {
                 const v = e.target.value
-                if (v === '' || v === null) {
-                  this.defectQty = null
-                  this.goodQty = null
-                } else {
-                  this.defectQty = Number(v)
-                  this.goodQty = Math.max(0, totalQty - this.defectQty)
-                }
+                const d = v === '' ? 0 : Math.max(0, Math.min(totalQty, Number(v)))
+                this.defectQty = d
+                this.goodQty = Math.max(0, totalQty - d)
               }}"
             />
           </div>
@@ -1111,16 +1120,19 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   async _fetchOrders() {
     this.loading = true
     try {
-      const [approved, receiving, received, inspecting, completed, cancelled, rejected] = await Promise.all([
+      const [approved, receiving, received, inspecting, inspected, disposing, disposed, completed, cancelled, rejected] = await Promise.all([
         ServiceUtil.restGet('rwa_trx/rwa_orders?status=APPROVED').catch(() => []),
         ServiceUtil.restGet('rwa_trx/rwa_orders?status=RECEIVING').catch(() => []),
         ServiceUtil.restGet('rwa_trx/rwa_orders?status=RECEIVED').catch(() => []),
         ServiceUtil.restGet('rwa_trx/rwa_orders?status=INSPECTING').catch(() => []),
+        ServiceUtil.restGet('rwa_trx/rwa_orders?status=INSPECTED').catch(() => []),
+        ServiceUtil.restGet('rwa_trx/rwa_orders?status=DISPOSING').catch(() => []),
+        ServiceUtil.restGet('rwa_trx/rwa_orders?status=DISPOSED').catch(() => []),
         ServiceUtil.restGet('rwa_trx/rwa_orders?status=COMPLETED').catch(() => []),
         ServiceUtil.restGet('rwa_trx/rwa_orders?status=CANCELLED').catch(() => []),
         ServiceUtil.restGet('rwa_trx/rwa_orders?status=REJECTED').catch(() => [])
       ])
-      this.orders = [...approved, ...receiving, ...received, ...inspecting, ...completed, ...cancelled, ...rejected]
+      this.orders = [...approved, ...receiving, ...received, ...inspecting, ...inspected, ...disposing, ...disposed, ...completed, ...cancelled, ...rejected]
     } catch (err) {
       console.error('반품 주문 조회 실패:', err)
       this.orders = []
@@ -1221,18 +1233,13 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     if (this.step === 2) this._initStep2Selection()
   }
 
-  /** 단계별 액션 실행 */
-  async _handleStepAction() {
-    if (this.step === 1) await this._doReceive()
-    else if (this.step === 2) await this._doInspect()
-  }
-
   /* ============================================================
    * 각 단계별 처리 로직
    * ============================================================ */
 
   /** Step 1: 입고 처리 (신규 입고 및 완료 항목 수정 모두 처리) */
   async _doReceive() {
+    if (!this.selectedOrder) return
     const item = this.selectedOrderItemId
       ? this.orderItems.find(i => i.id === this.selectedOrderItemId)
       : this._getCurrentStepItems()[0]
@@ -1286,6 +1293,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
 
   /** Step 2: 검수 처리 (신규 및 완료 항목 수정 모두 처리) */
   async _doInspect() {
+    if (!this.selectedOrder) return
     const item = this.selectedInspItemId
       ? this.orderItems.find(i => i.id === this.selectedInspItemId)
       : this._getCurrentStepItems()[0]
@@ -1313,6 +1321,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     }
 
     this.actionLoading = true
+    let inspected = false
     try {
       await ServiceUtil.restPost(
         `rwa_trx/rwa_orders/${this.selectedOrder.id}/items/${item.id}/inspect`,
@@ -1327,6 +1336,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
           remarks: this.inspRemarks || null
         }
       )
+      inspected = true
       await ServiceUtil.restPost(
         `rwa_trx/rwa_orders/${this.selectedOrder.id}/items/${item.id}/complete_inspection`, {}
       )
@@ -1341,7 +1351,14 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
       await this._refreshOrder()
       this._advanceItemStep2(isAlreadyInspected)
     } catch (err) {
-      this._showFeedback(err.message || '검수 처리 실패', 'error')
+      // 검수 기록은 저장됐으나 완료 처리가 실패한 경우와 일반 실패를 구분
+      await this._refreshOrder()
+      this._showFeedback(
+        inspected
+          ? '검수는 저장됐으나 완료 처리에 실패했습니다. 다시 시도하세요.'
+          : (err.message || '검수 처리 실패'),
+        'error'
+      )
       voiceService.error('검수 실패')
     } finally {
       this.actionLoading = false
@@ -1351,8 +1368,9 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   /**
    * 검수 완료 후 반품 완료 요약 화면으로 전환
    */
-  _finishWork() {
+  async _finishWork() {
     voiceService.success('반품 완료 처리되었습니다')
+    await this._refreshOrder()
     this.screen = 'complete'
   }
 
@@ -1361,7 +1379,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
    */
   _renderCompleteScreen() {
     const order = this.selectedOrder
-    const completedAt = new Date().toLocaleString('ko-KR', { hour12: false })
+    const completedAt = order?.updated_at || new Date().toLocaleString('ko-KR', { hour12: false })
 
     return html`
       <div class="complete-screen">
@@ -1423,6 +1441,8 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     this.defectType = ''
     this.defectDesc = ''
     this.inspRemarks = ''
+    this.selectedOrderItemId = ''
+    this.selectedInspItemId = ''
   }
 
   /**
@@ -1487,28 +1507,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   }
 
   /**
-   * 현재 항목 처리 후 다음 항목으로 이동
-   * - 남은 항목 있으면 첫 번째 미처리 항목(index 0)으로 이동
-   * - Step 1 완료 시 자동으로 Step 2 진입
-   */
-  _advanceItem(phase) {
-    const items = this._getCurrentStepItems()
-    if (items.length === 0) {
-      if (this.step < 2) {
-        // 입고 스텝 완료 → 자동으로 다음 단계 이동
-        this._nextStep()
-      } else {
-        this.currentItemIndex = 0
-        this.requestUpdate()
-      }
-      return
-    }
-    // 남은 항목이 있으면 첫 번째 미처리 항목으로 이동
-    this.currentItemIndex = 0
-    this.requestUpdate()
-  }
-
-  /**
    * 주문 상태 → 시작 step 결정
    *   APPROVED, RECEIVING                          → Step 1 (입고)
    *   RECEIVED, INSPECTING, COMPLETED 등           → Step 2 (검수)
@@ -1516,13 +1514,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   _getStartStep(status) {
     if (['RECEIVED', 'INSPECTING', 'COMPLETED', 'CANCELLED', 'REJECTED'].includes(status)) return 2
     return 1
-  }
-
-  /** 현재 step 액션 버튼 라벨 */
-  _actionLabel() {
-    if (this.step === 1) return '확인'
-    if (this.step === 2) return '검수 완료'
-    return '반품 완료'
   }
 
   /** 상태 코드 → 한국어 */
@@ -1549,20 +1540,19 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
    * - 미검수 항목이 있으면 첫 번째 선택, 전체 완료면 첫 번째 항목 선택
    */
   _initStep2Selection() {
-    const inspDoneStatuses = ['INSPECTED', 'DISPOSED', 'COMPLETED']
     const stepItems = this.orderItems.filter(i =>
       ['RECEIVED', 'INSPECTING'].includes(i.status)
     )
     if (stepItems.length > 0) {
       const first = stepItems[0]
       this.selectedInspItemId = first.id
-      this.goodQty = 0
       this.defectQty = 0
+      this.goodQty = first.rwa_qty || 0
     } else if (this.orderItems.length > 0) {
       const first = this.orderItems[0]
       this.selectedInspItemId = first.id
-      this.goodQty = first.good_qty || 0
       this.defectQty = first.defect_qty || 0
+      this.goodQty = (first.good_qty != null) ? first.good_qty : Math.max(0, (first.rwa_qty || 0) - (first.defect_qty || 0))
     }
   }
 
@@ -1573,12 +1563,13 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   _selectInspItem(item) {
     this.selectedInspItemId = item.id
     const inspDoneStatuses = ['INSPECTED', 'DISPOSED', 'COMPLETED']
+    const total = item.rwa_qty || 0
     if (inspDoneStatuses.includes(item.status)) {
-      this.goodQty = item.good_qty || 0
       this.defectQty = item.defect_qty || 0
+      this.goodQty = (item.good_qty != null) ? item.good_qty : Math.max(0, total - this.defectQty)
     } else {
-      this.goodQty = 0
       this.defectQty = 0
+      this.goodQty = total
     }
     this.defectType = ''
     this.defectDesc = ''
@@ -1600,8 +1591,8 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     if (stepItems.length > 0) {
       const next = stepItems[0]
       this.selectedInspItemId = next.id
-      this.goodQty = 0
       this.defectQty = 0
+      this.goodQty = next.rwa_qty || 0
     }
     this.requestUpdate()
   }

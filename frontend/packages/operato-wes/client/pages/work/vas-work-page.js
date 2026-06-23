@@ -3,7 +3,7 @@ import { css, html } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { PageView } from '@operato/shell'
 import { OxInputBarcode } from '@operato/input'
-import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
+import { ServiceUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 
 import { HardwareScannerService } from './hardware-scanner-service.js'
 import { voiceService } from './voice-service.js'
@@ -940,7 +940,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
 
     return html`
       <div class="order-info-card">
-        <div class="title">${order.vas_no} | (${this.bomMap[order.vas_bom_id].set_sku_cd} / ${this.bomMap[order.vas_bom_id].set_sku_nm})</div>
+        <div class="title">${order.vas_no} | (${this.bomMap[order.vas_bom_id]?.set_sku_cd || '-'} / ${this.bomMap[order.vas_bom_id]?.set_sku_nm || '-'})</div>
         <div class="detail-row">
           <span>유형</span>
           <span class="value">${this._vasTypeLabel(order.vas_type)}</span>
@@ -1166,7 +1166,10 @@ class VasWorkPage extends localize(i18next)(PageView) {
       }
       this._scannerService.start()
 
-      await this._fetchOrders()
+      // 작업 화면 진행 중에는 재조회하지 않음 (목록 화면에서만 갱신)
+      if (this.screen === 'order-select') {
+        await this._fetchOrders()
+      }
     } else {
       this._scannerService?.stop()
     }
@@ -1177,6 +1180,19 @@ class VasWorkPage extends localize(i18next)(PageView) {
     if (this._scannerService) {
       this._scannerService.stop()
       this._scannerService = null
+    }
+  }
+
+  /** 업데이트 후 — 토스트 표시 시 fadeInOut 애니메이션 재생 보장 (동일 DOM 노드 재사용 대응) */
+  updated(changed) {
+    super.updated?.(changed)
+    if (changed.has('feedbackMsg') && this.feedbackMsg) {
+      const el = this.renderRoot?.querySelector('.feedback-toast')
+      if (el) {
+        el.style.animation = 'none'
+        void el.offsetWidth
+        el.style.animation = ''
+      }
     }
   }
 
@@ -1358,6 +1374,12 @@ class VasWorkPage extends localize(i18next)(PageView) {
     try {
       const order = await ServiceUtil.restGet('vas_trx/vas_orders/find_by_no', { vas_no: value })
       if (order) {
+        // find_by_no는 vas_type 무관 조회 — 세트구성 작업 화면은 SET_ASSEMBLY만 허용
+        if (order.vas_type !== 'SET_ASSEMBLY') {
+          this._showFeedback('세트구성(SET_ASSEMBLY) 주문이 아닙니다', 'error')
+          voiceService.error('세트구성 주문이 아닙니다')
+          return
+        }
         await this._fetchBomMap([order])
         this._selectOrder(order)
         this.scanValue = ''
@@ -1402,10 +1424,11 @@ class VasWorkPage extends localize(i18next)(PageView) {
     const totalLossQty = losses.reduce((sum, qty) => sum + qty, 0)
 
     if (planQty > 0 && totalReqQty > 0) {
-      return totalLossQty / (totalReqQty / planQty)
+      // 정수 반올림 — 2단계 검증(완성+불량 === 계획수량, 계획수량은 정수)이 소수로 막히지 않도록
+      return Math.round(totalLossQty / (totalReqQty / planQty))
     }
 
-    return Math.max(...losses)
+    return Math.round(Math.max(...losses))
   }
 
   /** 입력된 불량 수량을 디테일 손실 수량으로 반영 */
