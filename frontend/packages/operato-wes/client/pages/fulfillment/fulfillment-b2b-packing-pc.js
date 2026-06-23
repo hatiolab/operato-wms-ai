@@ -1586,12 +1586,17 @@ class FulfillmentB2bPackingPc extends localize(i18next)(PageView) {
   /** 포장 주문 목록 새로고침 - B2B_OUT 고정, 서버 페이지네이션 */
   async _refresh(page = 1) {
     if (!page || typeof page !== 'number') page = 1
+
+    if (!this.orderDate) {
+      this._showFeedback('error', '주문일을 선택해주세요.')
+      return
+    }
+
     this.loading = true
     try {
-      const orderDate = this.orderDate || ValueUtil.todayFormatted()
       const params = new URLSearchParams({
         biz_type: 'B2B_OUT',
-        order_date: orderDate,
+        order_date: this.orderDate,
         page: page,
         size: this._listPageSize
       })

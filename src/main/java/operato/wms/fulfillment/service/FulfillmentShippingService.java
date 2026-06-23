@@ -5,8 +5,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -158,7 +156,7 @@ public class FulfillmentShippingService extends AbstractQueryService {
 
 				// 5.2 포장 주문의 아이템 기준으로 포장 수량 집계하여 출고 수량 업데이트
 				String packQtySql = "SELECT sku_cd, SUM(pack_qty) AS shipped_qty FROM packing_order_items WHERE packing_order_id = :packingOrderId group by sku_cd";
-				Map<String, Object> params = ValueUtil.newMap("domainId,orderId", domainId, packingOrderId);
+				Map<String, Object> params = ValueUtil.newMap("domainId,packingOrderId", domainId, packingOrderId);
 				List<Map> packItemQtys = this.queryManager.selectListBySql(packQtySql, params, Map.class, 0, 0);
 
 				for (Map row : packItemQtys) {
@@ -174,10 +172,10 @@ public class FulfillmentShippingService extends AbstractQueryService {
 			// 5.3 집하 예약 자동 처리 — if_status = BOOKED 가 아닌 경우에만 시도
 			if (!WmsParcelConstants.SHIPMENT_IF_STATUS_BOOKED.equals(shipmentOrder.getIfStatus())) {
 				try {
-					this.bookCourier(order.getShipmentOrderId());
+					this.bookCourier(shipmentOrder);
 				} catch (Exception e) {
 					// 집하 예약 실패는 출하 확정을 막지 않음
-					this.logger.warn("출하 확정 중 집하 예약 실패: shipmentOrderId={}, error={}", order.getShipmentOrderId(),
+					this.logger.warn("출하 확정 중 집하 예약 실패: shipmentOrderId={}, error={}", shipmentOrder.getId(),
 							e.getMessage());
 				}
 			}
@@ -499,44 +497,49 @@ public class FulfillmentShippingService extends AbstractQueryService {
 	 * @param shipmentOrderId 출고 주문 ID
 	 * @return { success, invc_no, shipment_no }
 	 */
-	public Map<String, Object> bookCourier(String shipmentOrderId) {
+	public Map<String, Object> bookCourier(ShipmentOrder order) {
 		// 1. 출고 주문 조회
-		Long domainId = Domain.currentDomainId();
-		ShipmentOrder order = this.findShipmentOrder(domainId, shipmentOrderId);
+		Long domainId = order.getDomainId();
 
-		// 2. 택배사 코드 존재 여부 체크
+		// 2. B2B 여부 체크 - TODO 추후 테스트 ...
+		if (ValueUtil.isEqualIgnoreCase(order.getBizType(), "B2B_OUT")
+				|| ValueUtil.isEqualIgnoreCase(order.getBizType(), "B2C_OUT")) {
+			return null;
+		}
+
+		// 3. 택배사 코드 존재 여부 체크
 		if (ValueUtil.isEmpty(order.getCarrierCd())) {
 			throw new ElidomValidationException("출고 주문 [" + order.getShipmentNo() + "]에 택배사 코드(carrier_cd)가 없습니다.");
 		}
 
-		// 3. 송장 번호 존재 여부 체크
+		// 4. 송장 번호 존재 여부 체크
 		if (ValueUtil.isEmpty(order.getInvoiceNo())) {
 			throw new ElidomValidationException("출고 주문 [" + order.getShipmentNo() + "]에 송장번호가 없습니다.");
 		}
 
-		// 4. 배송 정보 조회
-		ShipmentDelivery delivery = this.findShipmentDelivery(domainId, shipmentOrderId);
+		// 5. 배송 정보 조회
+		ShipmentDelivery delivery = this.findShipmentDelivery(domainId, order.getId());
 
-		// 5. 택배사 서비스 조회
+		// 6. 택배사 서비스 조회
 		CourierService courierSvc = this.courierServiceDispatcher.get(order.getCarrierCd());
 
-		// 6. 기본 계약 조회
+		// 7. 기본 계약 조회
 		CourierContract contract = courierSvc.getDefaultCourierContract(domainId);
 		if (contract == null) {
 			throw new ElidomValidationException("택배사 [" + order.getCarrierCd() + "]의 기본 계약이 없습니다.");
 		}
 
-		// 7. 예약 요청 VO 빌드 (수신인/발송인 정보)
+		// 8. 예약 요청 VO 빌드 (수신인/발송인 정보)
 		CourierBookingRequest request = this.buildBookingRequest(delivery);
 
-		// 8. 집하 예약 접수
+		// 9. 집하 예약 접수
 		CourierBookingResult result = courierSvc.book(domainId, contract.getContractNo(), order.getShipmentNo(),
 				request);
 
-		// 9. 출고 주문 if_status 업데이트 (BOOKED)
-		this.updateShipmentIfStatus(domainId, shipmentOrderId, WmsParcelConstants.SHIPMENT_IF_STATUS_BOOKED);
+		// 10. 출고 주문 if_status 업데이트 (BOOKED)
+		this.updateShipmentIfStatus(domainId, order.getId(), WmsParcelConstants.SHIPMENT_IF_STATUS_BOOKED);
 
-		// 10. 결과 리턴
+		// 11. 결과 리턴
 		return ValueUtil.newMap("success,invc_no,shipment_no", true, result.getInvcNo(), result.getShipmentNo());
 	}
 

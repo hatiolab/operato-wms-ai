@@ -267,7 +267,8 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
       statusOptions: Array,
       stationOptions: Array,
       stationCd: String,
-      waveNo: String
+      waveNo: String,
+      inputPickers: Number
     }
   }
 
@@ -282,6 +283,7 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
     this.stationOptions = []
     this.stationCd = ''
     this.waveNo = ''
+    this.inputPickers = 1
   }
 
   /** 화면 렌더링 */
@@ -312,6 +314,14 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
             </option>
           `)}
         </select>
+        <span style="color:var(--md-sys-color-outline-variant,#ccc)">|</span>
+        <label style="flex-shrink:0; font-size:12px; font-weight:700; color:var(--md-sys-color-on-surface-variant,#555); white-space:nowrap;">
+          👷 작업자 수
+        </label>
+        <input type="number" min="1"
+          style="width:60px; padding:3px 8px; border:1px solid var(--md-sys-color-primary,#1976D2); border-radius:6px; font-size:12px; font-weight:600; color:var(--md-sys-color-on-surface,#333); background:var(--md-sys-color-surface,#fff); outline:none; text-align:center;"
+          .value="${this.inputPickers}"
+          @change="${e => { this.inputPickers = Math.max(1, parseInt(e.target.value) || 1) }}" />
         <!-- 웨이브 최대 500건 안내 (우측) -->
         <span style="margin-left:auto; font-size:12px; color:var(--md-sys-color-on-surface-variant,#888); background:var(--md-sys-color-surface,#fff); border:1px solid var(--md-sys-color-outline-variant,#ddd); border-radius:4px; padding:2px 8px; flex-shrink:0;">
           웨이브 당 최대 500건
@@ -560,7 +570,7 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
 
     // 6. 웨이브 생성 — 전체 대상 주문 ID + 작업장 전달
     try {
-      const payload = { stationCd: this.stationCd, orders: allocatedOrders };
+      const payload = { stationCd: this.stationCd, inputPickers: this.inputPickers, orders: allocatedOrders };
       await ServiceUtil.restPost('oms_trx/waves/config_wave', payload, null, null,
         (result) => {
           this.waveNo = result?.wave?.wave_no || ''

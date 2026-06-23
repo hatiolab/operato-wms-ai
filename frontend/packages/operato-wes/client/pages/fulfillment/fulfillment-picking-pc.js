@@ -227,9 +227,10 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
         }
 
         .task-card.selected {
-          border-left-color: var(--md-sys-color-primary, #2196F3);
+          border: 2px solid #2196F3;
+          border-left: 5px solid var(--md-sys-color-primary, #1565C0);
           background: #E3F2FD;
-          border-color: #90CAF9;
+          box-shadow: 0 2px 8px rgba(25, 118, 210, 0.2);
         }
 
         .task-card.in-progress {
@@ -1176,8 +1177,8 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
           📋 ${task.pick_task_no || '-'}
           <span class="status-badge ${(task.status || '').toLowerCase()}">
             ${task.status === 'CREATED' ? (TermsUtil.tLabel('wait') || '대기')
-              : task.status === 'IN_PROGRESS' ? (TermsUtil.tLabel('in_progress') || '진행중')
-              : (TermsUtil.tLabel('completed') || '완료')}
+        : task.status === 'IN_PROGRESS' ? (TermsUtil.tLabel('in_progress') || '진행중')
+          : (TermsUtil.tLabel('completed') || '완료')}
           </span>
         </div>
         <div class="wave-row">
@@ -1453,6 +1454,11 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
 
   /** 피킹 지시 목록 조회 - 날짜·상태 기반 서버 페이지네이션 */
   async _refresh(page = 1) {
+    if (!this.orderDate) {
+      this._showFeedback('주문일을 선택해주세요.', 'error')
+      return
+    }
+
     this.loading = true
     try {
       const params = new URLSearchParams({
@@ -1516,6 +1522,8 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
       this.loading = true
       this.selectedTaskId = task.id
 
+      const isCompleted = ['END', 'COMPLETED'].includes(task.status)
+
       if (task.status === 'CREATED') {
         await ServiceUtil.restPost(`ful_trx/picking_tasks/${task.id}/start`)
         // 서버 상태 변경 후 로컬 목록의 task 상태도 IN_PROGRESS로 갱신하여 카드 재렌더링 트리거
@@ -1531,7 +1539,7 @@ class FulfillmentPickingPc extends localize(i18next)(PageView) {
       this.loading = false
 
       this._moveToNextItem(true)
-      this._showFeedback('피킹 작업을 시작합니다', 'info')
+      this._showFeedback(isCompleted ? '완료된 피킹지시입니다.' : '피킹 작업을 시작합니다', 'info')
 
       setTimeout(() => this._focusBarcodeInput(), 200)
     } catch (err) {

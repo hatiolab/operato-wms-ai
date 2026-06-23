@@ -25,6 +25,12 @@ public class WmsFulfillmentConstants {
 	/** 커스텀 서비스 - 피킹 시작 후 처리 */
 	public static final String TRX_FUL_POST_START_PICKING = "diy-ful-post-start-picking-task";
 
+	// === 피킹 시작 취소 ===
+	/** 커스텀 서비스 - 피킹 시작 취소 전 처리 */
+	public static final String TRX_FUL_PRE_CANCEL_START_PICKING = "diy-ful-pre-cancel-start-picking-task";
+	/** 커스텀 서비스 - 피킹 시작 취소 후 처리 */
+	public static final String TRX_FUL_POST_CANCEL_START_PICKING = "diy-ful-post-cancel-start-picking-task";
+
 	// === 아이템 피킹 확인 ===
 	/** 커스텀 서비스 - 아이템 피킹 확인 전 처리 */
 	public static final String TRX_FUL_PRE_PICK_ITEM = "diy-ful-pre-pick-item";

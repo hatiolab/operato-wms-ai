@@ -199,6 +199,29 @@ public class FulfillmentTransactionController {
 	}
 
 	/**
+	 * 피킹 시작 취소 (IN_PROGRESS → CREATED)
+	 * POST /rest/ful_trx/picking_tasks/{id}/start_cancel
+	 */
+	@PostMapping(value = "picking_tasks/{id}/start_cancel", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Cancel start picking task")
+	public Map<String, Object> cancelStartPickingTask(@PathVariable("id") String id) {
+		// 1. 커스텀 서비스 - 전 처리
+		Long domainId = Domain.currentDomainId();
+		Map<String, Object> params = ValueUtil.newMap("id", id);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CANCEL_START_PICKING, params);
+
+		// 2. 본 로직 실행
+		Map<String, Object> result = this.pickingService.cancelPickingTask(id);
+
+		// 3. 커스텀 서비스 - 후 처리
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CANCEL_START_PICKING, params);
+
+		// 4. 결과 리턴
+		return result;
+	}
+
+	/**
 	 * 개별 아이템 피킹 확인 (스캔)
 	 * POST /rest/ful_trx/picking_tasks/{id}/items/{item_id}/pick
 	 */
@@ -308,7 +331,7 @@ public class FulfillmentTransactionController {
 	}
 
 	/**
-	 * 피킹 취소 (CREATED/IN_PROGRESS → CANCELLED / COMPLETED → CREATED) (N건)
+	 * 피킹 완료 취소 (CREATED/IN_PROGRESS → CANCELLED / COMPLETED → CREATED) (N건)
 	 * POST /rest/ful_trx/picking_tasks/cancel
 	 */
 	@PostMapping(value = "picking_tasks/cancel", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -338,7 +361,7 @@ public class FulfillmentTransactionController {
 	}
 
 	/**
-	 * 피킹 취소 (CREATED/IN_PROGRESS → CANCELLED / COMPLETED → CREATED)
+	 * 피킹 완료 취소 (CREATED/IN_PROGRESS → CANCELLED / COMPLETED → CREATED)
 	 * POST /rest/ful_trx/picking_tasks/{id}/cancel
 	 *
 	 * CREATED/IN_PROGRESS: 즉시 취소
@@ -429,24 +452,24 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "direct_picking/create", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Create picking task directly from allocated shipment order without wave (single)")
 	public Map<String, Object> createDirectPickingTask(@RequestBody ShipmentOrder order) {
-		Long domainId = Domain.currentDomainId();
-		String shipmentOrderId = order.getId();
-
-		if (ValueUtil.isEmpty(shipmentOrderId)) {
+		// 1. 파라미터 체크
+		if (ValueUtil.isEmpty(order.getId())) {
 			throw new ElidomValidationException("shipment_order_id는 필수 파라미터입니다");
 		}
 
-		// 1. 커스텀 서비스 - 전 처리
+		// 2. 커스텀 서비스 - 전 처리
+		Long domainId = Domain.currentDomainId();
 		Map<String, Object> params = ValueUtil.newMap("order", order);
 		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_DIRECT_PICKING, params);
 
-		// 2. 본 로직 실행
-		Map<String, Object> result = this.fulTrxService.createDirectPickingTasks(List.of(shipmentOrderId));
+		// 3. 본 로직 실행
+		Map<String, Object> result = this.fulTrxService.createDirectPickingTask(order);
 
-		// 3. 커스텀 서비스 - 후 처리
+		// 4. 커스텀 서비스 - 후 처리
 		params.put("result", result);
 		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_DIRECT_PICKING, params);
 
+		// 5. 리턴
 		return result;
 	}
 
@@ -459,24 +482,25 @@ public class FulfillmentTransactionController {
 	@PostMapping(value = "direct_picking/create_list", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Create picking tasks directly from allocated shipment orders without wave (batch)")
 	public Map<String, Object> createDirectPickingTaskList(@RequestBody List<ShipmentOrder> orders) {
-		Long domainId = Domain.currentDomainId();
-
+		// 1. 파라미터 체크
 		if (ValueUtil.isEmpty(orders)) {
 			throw new ElidomValidationException("orders는 필수 파라미터입니다");
 		}
 
-		// 1. 커스텀 서비스 - 전 처리
+		// 2. 커스텀 서비스 - 전 처리
 		Map<String, Object> params = ValueUtil.newMap("orders", orders);
+		Long domainId = Domain.currentDomainId();
 		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_PRE_CREATE_DIRECT_PICKING, params);
 
-		// 2. 본 로직 실행
+		// 3. 본 로직 실행
 		List<String> ids = orders.stream().map(ShipmentOrder::getId).collect(Collectors.toList());
 		Map<String, Object> result = this.fulTrxService.createDirectPickingTasks(ids);
 
-		// 3. 커스텀 서비스 - 후 처리
+		// 4. 커스텀 서비스 - 후 처리
 		params.put("result", result);
 		this.customSvc.doCustomService(domainId, WmsFulfillmentConstants.TRX_FUL_POST_CREATE_DIRECT_PICKING, params);
 
+		// 5. 결과 리턴
 		return result;
 	}
 

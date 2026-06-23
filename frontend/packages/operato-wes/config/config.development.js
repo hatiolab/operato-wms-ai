@@ -44,6 +44,10 @@ module.exports = {
         username: 'postgres',
         password: 'hatioLAB1008',
         synchronize: false,
-        logging: ['debug', 'query']
+        logging: ['debug', 'query'],
+        extra: {
+            keepAlive: true,
+            keepAliveInitialDelayMillis: 30000
+        }
     }
 }

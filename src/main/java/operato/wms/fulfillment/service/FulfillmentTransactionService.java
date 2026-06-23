@@ -51,18 +51,18 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 	/**
 	 * Packing Transaction Service
 	 */
-	@Autowired
-	private FulfillmentPackingService packingService;
+	// @Autowired
+	// private FulfillmentPackingService packingService;
 	/**
 	 * Shipping Transaction Service
 	 */
-	@Autowired
-	private FulfillmentShippingService shippingService;
+	// @Autowired
+	// private FulfillmentShippingService shippingService;
 	/**
 	 * Dashboard Service
 	 */
-	@Autowired
-	private FulfillmentDashboardService dashboardService;
+	// @Autowired
+	// private FulfillmentDashboardService dashboardService;
 	/**
 	 * 환경설정 서비스 (창고-화주사 별 설정 조회)
 	 */
@@ -79,232 +79,243 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 	 * @return { pick_task_count, item_count, pick_tasks: [...] }
 	 */
 	public Map<String, Object> createPickingTasks(Map<String, Object> params) {
+		// 1. 파라미터 체크
 		Long domainId = Domain.currentDomainId();
-		String waveNo = params.get("wave_no") != null ? params.get("wave_no").toString() : null;
-		String pickType = params.get("pick_type") != null ? params.get("pick_type").toString() : "INDIVIDUAL";
+		String waveNo = ValueUtil.toString(params.get("wave_no"), null);
+		String pickType = ValueUtil.toString(params.get("pick_type"), "INDIVIDUAL");
 
+		// 2. 필수 파라미터 체크
 		if (ValueUtil.isEmpty(waveNo)) {
 			throw new ElidomValidationException("wave_no는 필수 파라미터입니다");
 		}
 
-		// 웨이브에 포함된 RELEASED 상태의 주문 조회
+		// 3. 웨이브 조회
+		ShipmentWave wave = this.queryManager.selectByCondition(ShipmentWave.class,
+				ValueUtil.newMap("domainId,waveNo", domainId, waveNo));
+
+		// 4. 웨이브 존재 여부 체크
+		if (wave == null) {
+			throw new ElidomValidationException("웨이브 번호 [" + waveNo + "]로 웨이브를 찾을 수 없습니다.");
+		}
+
+		// 5. 웨이브의 택배사 코드로 주문 carrier_cd 일괄 업데이트
+		if (ValueUtil.isNotEmpty(wave.getCarrierCd())) {
+			String updCarrierSql = "UPDATE shipment_orders SET carrier_cd = :carrierCd, updated_at = now()"
+					+ " WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status"
+					+ " AND (carrier_cd IS NULL OR carrier_cd != :carrierCd)";
+			Map<String, Object> updCarrierParams = ValueUtil.newMap("carrierCd,domainId,waveNo,status",
+					wave.getCarrierCd(), domainId, waveNo, ShipmentOrder.STATUS_RELEASED);
+			this.queryManager.executeBySql(updCarrierSql, updCarrierParams);
+		}
+
+		// 6. 웨이브에 포함된 RELEASED 상태의 주문 조회
 		String orderSql = "SELECT * FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status ORDER BY priority_cd, shipment_no";
 		Map<String, Object> orderParams = ValueUtil.newMap("domainId,waveNo,status", domainId, waveNo,
 				ShipmentOrder.STATUS_RELEASED);
 		List<ShipmentOrder> orders = this.queryManager.selectListBySql(orderSql, orderParams, ShipmentOrder.class, 0,
 				0);
 
+		// 7. 주문 존재 체크
 		if (orders.isEmpty()) {
 			throw new ElidomValidationException("웨이브 [" + waveNo + "]에 릴리스된 주문이 없습니다");
 		}
 
-		// 웨이브의 택배사 코드로 주문 carrier_cd 일괄 업데이트
-		ShipmentWave wave = this.queryManager.selectByCondition(ShipmentWave.class,
-				ValueUtil.newMap("domainId,waveNo", domainId, waveNo));
-		String waveCarrierCd = wave.getCarrierCd();
-		String waveDate = wave.getWaveDate();
-
-		if (ValueUtil.isNotEmpty(waveCarrierCd)) {
-			String updCarrierSql = "UPDATE shipment_orders SET carrier_cd = :carrierCd, updated_at = now()"
-					+ " WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status"
-					+ " AND (carrier_cd IS NULL OR carrier_cd != :carrierCd)";
-			Map<String, Object> updCarrierParams = ValueUtil.newMap("carrierCd,domainId,waveNo,status",
-					waveCarrierCd, domainId, waveNo, ShipmentOrder.STATUS_RELEASED);
-			this.queryManager.executeBySql(updCarrierSql, updCarrierParams);
-
-			// 메모리의 주문 객체에도 carrier_cd 반영
-			for (ShipmentOrder order : orders) {
-				if (ValueUtil.isEmpty(order.getCarrierCd()) || !waveCarrierCd.equals(order.getCarrierCd())) {
-					order.setCarrierCd(waveCarrierCd);
-				}
-			}
-		}
-
-		// 당일 최대 pick_task_no 시퀀스 조회
-		String seqSql = "SELECT COUNT(*) FROM picking_tasks WHERE domain_id = :domainId AND order_date = :orderDate";
-		Map<String, Object> seqParams = ValueUtil.newMap("domainId,orderDate", domainId, waveDate);
-		Integer existCount = this.queryManager.selectBySql(seqSql, seqParams, Integer.class);
-		int nextSeq = (existCount != null ? existCount : 0) + 1;
-
-		int pickTaskCount = 0;
 		int totalItemCount = 0;
-		List<Map<String, Object>> pickTaskResults = new ArrayList<>();
+		List<Map<String, Object>> pickTaskResults = new ArrayList<Map<String, Object>>();
 
+		// 8. 피킹 유형에 따른 피킹 지시 생성
 		if ("INDIVIDUAL".equals(pickType)) {
 			// 개별 피킹: 주문 1건 = 피킹 지시 1건
 			for (ShipmentOrder order : orders) {
-				// 주문별 할당 정보 조회
-				String allocSql = "SELECT sa.*, soi.sku_cd, soi.sku_nm FROM stock_allocations sa"
-						+ " INNER JOIN shipment_order_items soi ON soi.domain_id = sa.domain_id AND soi.id = sa.shipment_order_item_id"
-						+ " LEFT JOIN locations l ON l.domain_id = sa.domain_id AND l.loc_cd = sa.loc_cd"
-						+ " WHERE sa.domain_id = :domainId AND sa.shipment_order_id = :orderId AND sa.status IN ('SOFT','HARD')"
-						+ " ORDER BY COALESCE(l.sort_no, 9999), soi.line_no";
-				Map<String, Object> allocParams = ValueUtil.newMap("domainId,orderId", domainId, order.getId());
-				List<Map> allocations = this.queryManager.selectListBySql(allocSql, allocParams, Map.class, 0, 0);
-
-				// PickingTask 헤더 생성
-				PickingTask task = new PickingTask();
-				task.setDomainId(domainId);
-				task.setWaveNo(waveNo);
-				task.setShipmentOrderId(order.getId());
-				task.setShipmentNo(order.getShipmentNo());
-				task.setOrderDate(waveDate);
-				task.setComCd(order.getComCd());
-				task.setWhCd(ValueUtil.isNotEmpty(order.getWhCd()) ? order.getWhCd() : "DEFAULT");
-				task.setPickType(pickType);
-				task.setPriorityCd(order.getPriorityCd());
-				task.setPlanOrder(1);
-				task.setPlanItem(allocations.size());
-
-				double planTotal = 0;
-				for (Map alloc : allocations) {
-					Object allocQty = alloc.get("alloc_qty");
-					planTotal += allocQty != null ? Double.parseDouble(allocQty.toString()) : 0;
-				}
-				task.setPlanTotal(planTotal);
-				task.setResultOrder(0);
-				task.setResultItem(0);
-				task.setResultTotal(0.0);
-				task.setShortTotal(0.0);
-				task.setStatus(PickingTask.STATUS_CREATED);
-				this.queryManager.insert(task);
-
-				// PickingTaskItem 상세 생성
-				int rank = 1;
-				List<PickingTaskItem> items = new ArrayList<>();
-				for (Map alloc : allocations) {
-					PickingTaskItem item = new PickingTaskItem();
-					item.setDomainId(domainId);
-					item.setPickTaskId(task.getId());
-					item.setShipmentOrderId(order.getId());
-					item.setShipmentOrderItemId(
-							alloc.get("shipment_order_item_id") != null ? alloc.get("shipment_order_item_id").toString()
-									: null);
-					item.setStockAllocationId(alloc.get("id") != null ? alloc.get("id").toString() : null);
-					item.setInventoryId(
-							alloc.get("inventory_id") != null ? alloc.get("inventory_id").toString() : null);
-					item.setRank(rank);
-					item.setSkuCd(alloc.get("sku_cd") != null ? alloc.get("sku_cd").toString() : null);
-					item.setSkuNm(alloc.get("sku_nm") != null ? alloc.get("sku_nm").toString() : null);
-					item.setBarcode(alloc.get("barcode") != null ? alloc.get("barcode").toString() : null);
-					item.setFromLocCd(alloc.get("loc_cd") != null ? alloc.get("loc_cd").toString() : "UNKNOWN");
-					item.setLotNo(alloc.get("lot_no") != null ? alloc.get("lot_no").toString() : null);
-					item.setExpiredDate(
-							alloc.get("expired_date") != null ? alloc.get("expired_date").toString() : null);
-
-					Object allocQty = alloc.get("alloc_qty");
-					item.setOrderQty(allocQty != null ? Double.parseDouble(allocQty.toString()) : 0);
-					item.setPickQty(0.0);
-					item.setShortQty(0.0);
-					item.setStatus(PickingTaskItem.STATUS_WAIT);
-					items.add(item);
-					rank++;
-					totalItemCount++;
-				}
-
-				if (!items.isEmpty()) {
-					AnyOrmUtil.insertBatch(items, 100);
-				}
-
-				// 주문 상태를 PICKING으로 변경
-				String updOrderSql = "UPDATE shipment_orders SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-				Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id",
-						ShipmentOrder.STATUS_PICKING, domainId, order.getId());
-				this.queryManager.executeBySql(updOrderSql, updOrderParams);
-
-				Map<String, Object> taskInfo = ValueUtil.newMap("pick_task_no,shipment_no,item_count,plan_total",
-						task.getPickTaskNo(), order.getShipmentNo(), items.size(), planTotal);
-				pickTaskResults.add(taskInfo);
-
-				pickTaskCount++;
-				nextSeq++;
+				Map<String, Object> po = this.createIndividualPickingOrdersByWave(wave, order);
+				pickTaskResults.add(po);
+				totalItemCount += ValueUtil.toInteger(po.get("item_count"), 0);
 			}
 		} else {
-			// 총량 피킹(TOTAL): 웨이브 전체를 하나의 피킹 지시로 생성
-			// 웨이브 내 전체 할당 정보를 SKU+로케이션 기준으로 합산 조회
-			String allocSql = "SELECT sa.inventory_id, sa.loc_cd, sa.lot_no, sa.expired_date, sa.barcode,"
-					+ " soi.sku_cd, soi.sku_nm, SUM(sa.alloc_qty) AS alloc_qty"
-					+ " FROM stock_allocations sa"
-					+ " INNER JOIN shipment_order_items soi ON soi.domain_id = sa.domain_id AND soi.id = sa.shipment_order_item_id"
-					+ " INNER JOIN shipment_orders so ON so.domain_id = sa.domain_id AND so.id = sa.shipment_order_id"
-					+ " LEFT JOIN locations l ON l.domain_id = sa.domain_id AND l.loc_cd = sa.loc_cd"
-					+ " WHERE sa.domain_id = :domainId AND so.wave_no = :waveNo AND sa.status IN ('SOFT','HARD')"
-					+ " GROUP BY sa.inventory_id, sa.loc_cd, sa.lot_no, sa.expired_date, sa.barcode, soi.sku_cd, soi.sku_nm, l.sort_no"
-					+ " ORDER BY COALESCE(l.sort_no, 9999), soi.sku_cd";
-			Map<String, Object> allocParams = ValueUtil.newMap("domainId,waveNo", domainId, waveNo);
-			List<Map> allocations = this.queryManager.selectListBySql(allocSql, allocParams, Map.class, 0, 0);
-
-			// PickingTask 헤더 생성
-			PickingTask task = new PickingTask();
-			task.setDomainId(domainId);
-			task.setWaveNo(waveNo);
-			task.setOrderDate(waveDate);
-			task.setComCd(orders.get(0).getComCd());
-			task.setWhCd(ValueUtil.isNotEmpty(orders.get(0).getWhCd()) ? orders.get(0).getWhCd() : "DEFAULT");
-			task.setPickType(pickType);
-			task.setPlanOrder(orders.size());
-			task.setPlanItem(allocations.size());
-
-			double planTotal = 0;
-			for (Map alloc : allocations) {
-				Object allocQty = alloc.get("alloc_qty");
-				planTotal += allocQty != null ? Double.parseDouble(allocQty.toString()) : 0;
-			}
-			task.setPlanTotal(planTotal);
-			task.setResultOrder(0);
-			task.setResultItem(0);
-			task.setResultTotal(0.0);
-			task.setShortTotal(0.0);
-			task.setStatus(PickingTask.STATUS_CREATED);
-			this.queryManager.insert(task);
-
-			// PickingTaskItem 상세 생성
-			int rank = 1;
-			List<PickingTaskItem> items = new ArrayList<>();
-			for (Map alloc : allocations) {
-				PickingTaskItem item = new PickingTaskItem();
-				item.setDomainId(domainId);
-				item.setPickTaskId(task.getId());
-				item.setInventoryId(alloc.get("inventory_id") != null ? alloc.get("inventory_id").toString() : null);
-				item.setRank(rank);
-				item.setSkuCd(alloc.get("sku_cd") != null ? alloc.get("sku_cd").toString() : null);
-				item.setSkuNm(alloc.get("sku_nm") != null ? alloc.get("sku_nm").toString() : null);
-				item.setBarcode(alloc.get("barcode") != null ? alloc.get("barcode").toString() : null);
-				item.setFromLocCd(alloc.get("loc_cd") != null ? alloc.get("loc_cd").toString() : "UNKNOWN");
-				item.setLotNo(alloc.get("lot_no") != null ? alloc.get("lot_no").toString() : null);
-				item.setExpiredDate(alloc.get("expired_date") != null ? alloc.get("expired_date").toString() : null);
-
-				Object allocQty = alloc.get("alloc_qty");
-				item.setOrderQty(allocQty != null ? Double.parseDouble(allocQty.toString()) : 0);
-				item.setPickQty(0.0);
-				item.setShortQty(0.0);
-				item.setStatus(PickingTaskItem.STATUS_WAIT);
-				items.add(item);
-				rank++;
-				totalItemCount++;
-			}
-
-			if (!items.isEmpty()) {
-				AnyOrmUtil.insertBatch(items, 100);
-			}
-
-			// 모든 주문 상태를 PICKING으로 변경
-			for (ShipmentOrder order : orders) {
-				String updOrderSql = "UPDATE shipment_orders SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-				Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id",
-						ShipmentOrder.STATUS_PICKING, domainId, order.getId());
-				this.queryManager.executeBySql(updOrderSql, updOrderParams);
-			}
-
-			Map<String, Object> taskInfo = ValueUtil.newMap("pick_task_no,order_count,item_count,plan_total",
-					task.getPickTaskNo(), orders.size(), items.size(), planTotal);
-			pickTaskResults.add(taskInfo);
-
-			pickTaskCount = 1;
+			// 토털 피킹: 웨이브 별 1건
+			Map<String, Object> po = this.createTotalPickingOrdersByWave(wave, orders);
+			pickTaskResults.add(po);
+			totalItemCount = ValueUtil.toInteger(po.get("item_count"), 0);
 		}
 
-		return ValueUtil.newMap("pick_task_count,item_count,pick_tasks", pickTaskCount, totalItemCount,
+		// 9. 결과 리턴
+		return ValueUtil.newMap("pick_task_count,item_count,pick_tasks", pickTaskResults.size(), totalItemCount,
 				pickTaskResults);
+	}
+
+	/**
+	 * 웨이브 주문의 개별 피킹 지시 생성
+	 * 
+	 * @param wave
+	 * @param order
+	 * @return
+	 */
+	private Map<String, Object> createIndividualPickingOrdersByWave(ShipmentWave wave, ShipmentOrder order) {
+		// 1. 주문별 할당 정보 조회 쿼리
+		String allocSql = "SELECT sa.*, soi.sku_cd, soi.sku_nm FROM stock_allocations sa"
+				+ " INNER JOIN shipment_order_items soi ON soi.domain_id = sa.domain_id AND soi.id = sa.shipment_order_item_id"
+				+ " LEFT JOIN locations l ON l.domain_id = sa.domain_id AND l.loc_cd = sa.loc_cd"
+				+ " WHERE sa.domain_id = :domainId AND sa.shipment_order_id = :orderId AND sa.status IN ('SOFT','HARD')"
+				+ " ORDER BY COALESCE(l.sort_no, 9999), soi.line_no";
+		Long domainId = wave.getDomainId();
+		Map<String, Object> allocParams = ValueUtil.newMap("domainId,orderId", domainId, order.getId());
+		List<Map> allocations = this.queryManager.selectListBySql(allocSql, allocParams, Map.class, 0, 0);
+
+		// 2. PickingTask 헤더 생성
+		PickingTask task = new PickingTask();
+		task.setDomainId(domainId);
+		task.setWaveNo(wave.getWaveNo());
+		task.setShipmentOrderId(order.getId());
+		task.setShipmentNo(order.getShipmentNo());
+		task.setOrderDate(wave.getWaveDate());
+		task.setComCd(order.getComCd());
+		task.setWhCd(ValueUtil.isNotEmpty(order.getWhCd()) ? order.getWhCd() : "DEFAULT");
+		task.setPickType(wave.getPickType());
+		task.setPriorityCd(order.getPriorityCd());
+		task.setPlanOrder(1);
+		task.setPlanItem(allocations.size());
+
+		double planTotal = 0;
+		for (Map alloc : allocations) {
+			planTotal += ValueUtil.toDouble(alloc.get("alloc_qty"), 0.0);
+		}
+
+		task.setPlanTotal(planTotal);
+		task.setResultOrder(0);
+		task.setResultItem(0);
+		task.setResultTotal(0.0);
+		task.setShortTotal(0.0);
+		task.setStatus(PickingTask.STATUS_CREATED);
+		this.queryManager.insert(task);
+
+		// 3. PickingTaskItem 상세 생성
+		int rank = 1;
+		List<PickingTaskItem> items = new ArrayList<PickingTaskItem>();
+
+		for (Map alloc : allocations) {
+			PickingTaskItem item = new PickingTaskItem();
+			item.setDomainId(domainId);
+			item.setPickTaskId(task.getId());
+			item.setShipmentOrderId(order.getId());
+			item.setShipmentOrderItemId(ValueUtil.toString(alloc.get("shipment_order_item_id"), null));
+			item.setStockAllocationId(ValueUtil.toString(alloc.get("id"), null));
+			item.setInventoryId(ValueUtil.toString(alloc.get("inventory_id"), null));
+			item.setRank(rank);
+			item.setSkuCd(ValueUtil.toString(alloc.get("sku_cd"), null));
+			item.setSkuNm(ValueUtil.toString(alloc.get("sku_nm"), null));
+			item.setBarcode(ValueUtil.toString(alloc.get("barcode"), null));
+			item.setFromLocCd(ValueUtil.toString(alloc.get("inventory_id"), "UNKNOWN"));
+			item.setLotNo(ValueUtil.toString(alloc.get("lot_no"), null));
+			item.setExpiredDate(ValueUtil.toString(alloc.get("expired_date"), null));
+			item.setOrderQty(ValueUtil.toDouble(alloc.get("alloc_qty"), 0.0));
+			item.setPickQty(0.0);
+			item.setShortQty(0.0);
+			item.setStatus(PickingTaskItem.STATUS_WAIT);
+			items.add(item);
+			rank++;
+		}
+
+		if (!items.isEmpty()) {
+			AnyOrmUtil.insertBatch(items, 100);
+		}
+
+		// 4. 주문 상태를 PICKING으로 변경
+		order.setStatus(ShipmentOrder.STATUS_PICKING);
+		this.queryManager.update(order, "status", "updatedAt", "updaterId");
+
+		// 5. 결과 리턴
+		return ValueUtil.newMap("pick_task_no,shipment_no,item_count,plan_total",
+				task.getPickTaskNo(), order.getShipmentNo(), items.size(), planTotal);
+	}
+
+	/**
+	 * 웨이브 별 토털 피킹 지시 생성
+	 * 
+	 * @param wave
+	 * @param orders
+	 * @return
+	 */
+	private Map<String, Object> createTotalPickingOrdersByWave(ShipmentWave wave, List<ShipmentOrder> orders) {
+		// 1. 웨이브 내 전체 할당 정보를 SKU+로케이션 기준으로 합산 조회
+		String allocSql = "SELECT sa.inventory_id, sa.loc_cd, sa.lot_no, sa.expired_date, sa.barcode,"
+				+ " soi.sku_cd, soi.sku_nm, SUM(sa.alloc_qty) AS alloc_qty"
+				+ " FROM stock_allocations sa"
+				+ " INNER JOIN shipment_order_items soi ON soi.domain_id = sa.domain_id AND soi.id = sa.shipment_order_item_id"
+				+ " INNER JOIN shipment_orders so ON so.domain_id = sa.domain_id AND so.id = sa.shipment_order_id"
+				+ " LEFT JOIN locations l ON l.domain_id = sa.domain_id AND l.loc_cd = sa.loc_cd"
+				+ " WHERE sa.domain_id = :domainId AND so.wave_no = :waveNo AND sa.status IN ('SOFT','HARD')"
+				+ " GROUP BY sa.inventory_id, sa.loc_cd, sa.lot_no, sa.expired_date, sa.barcode, soi.sku_cd, soi.sku_nm, l.sort_no"
+				+ " ORDER BY COALESCE(l.sort_no, 9999), soi.sku_cd";
+		Long domainId = wave.getDomainId();
+		Map<String, Object> allocParams = ValueUtil.newMap("domainId,waveNo", domainId, wave.getWaveNo());
+		List<Map> allocations = this.queryManager.selectListBySql(allocSql, allocParams, Map.class, 0, 0);
+
+		// 2. PickingTask 헤더 생성
+		PickingTask task = new PickingTask();
+		task.setDomainId(domainId);
+		task.setWaveNo(wave.getWaveNo());
+		task.setOrderDate(wave.getWaveDate());
+		task.setComCd(orders.get(0).getComCd());
+		task.setWhCd(ValueUtil.isNotEmpty(orders.get(0).getWhCd()) ? orders.get(0).getWhCd() : "DEFAULT");
+		task.setPickType(wave.getPickType());
+		task.setPlanOrder(orders.size());
+		task.setPlanItem(allocations.size());
+
+		double planTotal = 0;
+		for (Map alloc : allocations) {
+			planTotal += ValueUtil.toDouble(alloc.get("alloc_qty"), 0.0);
+		}
+
+		task.setPlanTotal(planTotal);
+		task.setResultOrder(0);
+		task.setResultItem(0);
+		task.setResultTotal(0.0);
+		task.setShortTotal(0.0);
+		task.setStatus(PickingTask.STATUS_CREATED);
+		this.queryManager.insert(task);
+
+		// 3. PickingTaskItem 상세 생성
+		int rank = 1;
+		List<PickingTaskItem> items = new ArrayList<PickingTaskItem>();
+
+		for (Map alloc : allocations) {
+			PickingTaskItem item = new PickingTaskItem();
+			item.setDomainId(domainId);
+			item.setPickTaskId(task.getId());
+			item.setInventoryId(alloc.get("inventory_id") != null ? alloc.get("inventory_id").toString() : null);
+			item.setRank(rank);
+			item.setSkuCd(alloc.get("sku_cd") != null ? alloc.get("sku_cd").toString() : null);
+			item.setSkuNm(alloc.get("sku_nm") != null ? alloc.get("sku_nm").toString() : null);
+			item.setBarcode(alloc.get("barcode") != null ? alloc.get("barcode").toString() : null);
+			item.setFromLocCd(alloc.get("loc_cd") != null ? alloc.get("loc_cd").toString() : "UNKNOWN");
+			item.setLotNo(alloc.get("lot_no") != null ? alloc.get("lot_no").toString() : null);
+			item.setExpiredDate(alloc.get("expired_date") != null ? alloc.get("expired_date").toString() : null);
+
+			Object allocQty = alloc.get("alloc_qty");
+			item.setOrderQty(allocQty != null ? Double.parseDouble(allocQty.toString()) : 0);
+			item.setPickQty(0.0);
+			item.setShortQty(0.0);
+			item.setStatus(PickingTaskItem.STATUS_WAIT);
+			items.add(item);
+			rank++;
+		}
+
+		if (!items.isEmpty()) {
+			AnyOrmUtil.insertBatch(items, 100);
+		}
+
+		// 4. 모든 주문 상태를 PICKING으로 변경
+		for (ShipmentOrder order : orders) {
+			order.setStatus(ShipmentOrder.STATUS_PICKING);
+		}
+
+		if (!items.isEmpty()) {
+			AnyOrmUtil.updateBatch(items, 100, "status", "updatedAt", "updaterId");
+		}
+
+		// 5. 결과 리턴
+		return ValueUtil.newMap("pick_task_no,order_count,item_count,plan_total",
+				task.getPickTaskNo(), orders.size(), items.size(), planTotal);
 	}
 
 	/**
@@ -489,15 +500,13 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				PackingOrderItem poi = new PackingOrderItem();
 				poi.setDomainId(domainId);
 				poi.setPackingOrderId(packOrder.getId());
-				poi.setShipmentOrderItemId(alloc.get("soi_id") != null ? alloc.get("soi_id").toString() : null);
-				poi.setSkuCd(alloc.get("sku_cd") != null ? alloc.get("sku_cd").toString() : null);
-				poi.setSkuNm(alloc.get("sku_nm") != null ? alloc.get("sku_nm").toString() : null);
-				poi.setBarcode(alloc.get("barcode") != null ? alloc.get("barcode").toString() : null);
-				poi.setLotNo(alloc.get("lot_no") != null ? alloc.get("lot_no").toString() : null);
-				poi.setExpiredDate(alloc.get("expired_date") != null ? alloc.get("expired_date").toString() : null);
-
-				Object allocQty = alloc.get("alloc_qty");
-				poi.setOrderQty(allocQty != null ? Double.parseDouble(allocQty.toString()) : 0);
+				poi.setShipmentOrderItemId(ValueUtil.toString(alloc.get("soi_id"), null));
+				poi.setSkuCd(ValueUtil.toString(alloc.get("sku_cd"), null));
+				poi.setSkuNm(ValueUtil.toString(alloc.get("sku_nm"), null));
+				poi.setBarcode(ValueUtil.toString(alloc.get("barcode"), null));
+				poi.setLotNo(ValueUtil.toString(alloc.get("lot_no"), null));
+				poi.setExpiredDate(ValueUtil.toString(alloc.get("expired_date"), null));
+				poi.setOrderQty(ValueUtil.toDouble(alloc.get("alloc_qty"), 0.0));
 				poi.setInspQty(0.0);
 				poi.setPackQty(0.0);
 				poi.setShortQty(0.0);
@@ -539,122 +548,139 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 	 * @param shipmentOrderIds 출하 주문 ID 목록
 	 * @return { pick_task_count, item_count, pick_tasks: [...] }
 	 */
-	@SuppressWarnings("rawtypes")
 	public Map<String, Object> createDirectPickingTasks(List<String> shipmentOrderIds) {
-		Long domainId = Domain.currentDomainId();
-		String today = DateUtil.todayStr();
-
+		// 1. 필수 파라미터 체크
 		if (ValueUtil.isEmpty(shipmentOrderIds)) {
 			throw new ElidomValidationException("출하 주문 ID 목록이 없습니다");
 		}
 
-		int pickTaskCount = 0;
+		Long domainId = Domain.currentDomainId();
 		int totalItemCount = 0;
-		List<Map<String, Object>> pickTaskResults = new ArrayList<>();
+		List<Map<String, Object>> pickTaskResults = new ArrayList<Map<String, Object>>();
 
+		// 2. 주문별로 피킹 지시 생성
 		for (String orderId : shipmentOrderIds) {
+			// 2-1. 출하 주문 조회
 			ShipmentOrder order = this.findShipmentOrder(domainId, orderId);
-			if (order == null) {
-				throw new ElidomValidationException("출하 주문을 찾을 수 없습니다: " + orderId);
-			}
-
-			if (!ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus())) {
-				throw new ElidomValidationException(
-						"주문 [" + order.getShipmentNo() + "]의 상태가 ALLOCATED가 아닙니다 (현재: " + order.getStatus() + ")");
-			}
-
-			// 주문별 할당 정보 조회
-			String allocSql = "SELECT sa.*, soi.sku_cd, soi.sku_nm FROM stock_allocations sa"
-					+ " INNER JOIN shipment_order_items soi ON soi.domain_id = sa.domain_id AND soi.id = sa.shipment_order_item_id"
-					+ " WHERE sa.domain_id = :domainId AND sa.shipment_order_id = :orderId AND sa.status IN ('SOFT','HARD')"
-					+ " ORDER BY soi.line_no";
-			Map<String, Object> allocParams = ValueUtil.newMap("domainId,orderId", domainId, orderId);
-			List<Map> allocations = this.queryManager.selectListBySql(allocSql, allocParams, Map.class, 0, 0);
-
-			if (allocations.isEmpty()) {
-				throw new ElidomValidationException(
-						"주문 [" + order.getShipmentNo() + "]에 할당된 재고가 없습니다");
-			}
-
-			// PickingTask 헤더 생성 (wave_no = null)
-			PickingTask task = new PickingTask();
-			task.setDomainId(domainId);
-			task.setWaveNo(null);
-			task.setShipmentOrderId(orderId);
-			task.setShipmentNo(order.getShipmentNo());
-			task.setOrderDate(today);
-			task.setComCd(order.getComCd());
-			task.setWhCd(ValueUtil.isNotEmpty(order.getWhCd()) ? order.getWhCd() : "DEFAULT");
-			task.setPickType("INDIVIDUAL");
-			task.setPriorityCd(order.getPriorityCd());
-			task.setPlanOrder(1);
-			task.setPlanItem(allocations.size());
-
-			double planTotal = 0;
-			for (Map alloc : allocations) {
-				Object allocQty = alloc.get("alloc_qty");
-				planTotal += allocQty != null ? Double.parseDouble(allocQty.toString()) : 0;
-			}
-			task.setPlanTotal(planTotal);
-			task.setResultOrder(0);
-			task.setResultItem(0);
-			task.setResultTotal(0.0);
-			task.setShortTotal(0.0);
-			task.setStatus(PickingTask.STATUS_CREATED);
-			this.queryManager.insert(task);
-
-			// PickingTaskItem 생성
-			int rank = 1;
-			List<PickingTaskItem> items = new ArrayList<>();
-			for (Map alloc : allocations) {
-				PickingTaskItem item = new PickingTaskItem();
-				item.setDomainId(domainId);
-				item.setPickTaskId(task.getId());
-				item.setShipmentOrderId(orderId);
-				item.setShipmentOrderItemId(
-						alloc.get("shipment_order_item_id") != null ? alloc.get("shipment_order_item_id").toString()
-								: null);
-				item.setStockAllocationId(alloc.get("id") != null ? alloc.get("id").toString() : null);
-				item.setInventoryId(
-						alloc.get("inventory_id") != null ? alloc.get("inventory_id").toString() : null);
-				item.setRank(rank);
-				item.setSkuCd(alloc.get("sku_cd") != null ? alloc.get("sku_cd").toString() : null);
-				item.setSkuNm(alloc.get("sku_nm") != null ? alloc.get("sku_nm").toString() : null);
-				item.setBarcode(alloc.get("barcode") != null ? alloc.get("barcode").toString() : null);
-				item.setFromLocCd(alloc.get("loc_cd") != null ? alloc.get("loc_cd").toString() : "UNKNOWN");
-				item.setLotNo(alloc.get("lot_no") != null ? alloc.get("lot_no").toString() : null);
-				item.setExpiredDate(
-						alloc.get("expired_date") != null ? alloc.get("expired_date").toString() : null);
-
-				Object allocQty = alloc.get("alloc_qty");
-				item.setOrderQty(allocQty != null ? Double.parseDouble(allocQty.toString()) : 0);
-				item.setPickQty(0.0);
-				item.setShortQty(0.0);
-				item.setStatus(PickingTaskItem.STATUS_WAIT);
-				items.add(item);
-				rank++;
-				totalItemCount++;
-			}
-
-			if (!items.isEmpty()) {
-				AnyOrmUtil.insertBatch(items, 100);
-			}
-
-			// 주문 상태 ALLOCATED → PICKING
-			String updOrderSql = "UPDATE shipment_orders SET status = :status, updated_at = now() WHERE domain_id = :domainId AND id = :id";
-			Map<String, Object> updOrderParams = ValueUtil.newMap("status,domainId,id",
-					ShipmentOrder.STATUS_PICKING, domainId, orderId);
-			this.queryManager.executeBySql(updOrderSql, updOrderParams);
-
-			Map<String, Object> taskInfo = ValueUtil.newMap("pick_task_no,shipment_no,item_count,plan_total",
-					task.getPickTaskNo(), order.getShipmentNo(), items.size(), planTotal);
+			// 2-2. 피킹 지시 생성
+			Map<String, Object> taskInfo = this.createDirectPickingTask(order);
+			// 2-3. 결과 추가
+			totalItemCount += (Integer) taskInfo.get("item_count");
 			pickTaskResults.add(taskInfo);
-
-			pickTaskCount++;
 		}
 
-		return ValueUtil.newMap("pick_task_count,item_count,pick_tasks", pickTaskCount, totalItemCount,
+		// 3. 결과 리턴
+		return ValueUtil.newMap("pick_task_count,item_count,pick_tasks", pickTaskResults.size(), totalItemCount,
 				pickTaskResults);
+	}
+
+	/**
+	 * 주문 직접 피킹 지시 생성 (웨이브 없이 주문 직접 피킹)
+	 *
+	 * ALLOCATED 상태의 주문을 웨이브 없이 직접 피킹 지시로 변환한다.
+	 * wave_no는 null, pick_type은 INDIVIDUAL 고정.
+	 * 완료 후 포장 지시는 수동으로 생성한다 (insp_flag 자동 판단 없음).
+	 *
+	 * @param order 출하 주문
+	 * @return { pick_task_count, item_count, pick_tasks: [...] }
+	 */
+	public Map<String, Object> createDirectPickingTask(ShipmentOrder order) {
+		// 1. 상태 추출
+		Long domainId = order.getDomainId() != null ? order.getDomainId() : Domain.currentDomainId();
+
+		// 2. order가 출고 주문 조회를 한 것인지 체크해서 그렇지 않으면 id 정보로 조회
+		if (order.getStatus() == null && order.getCreatedAt() == null) {
+			String stationCd = order.getStationCd();
+			order = this.findShipmentOrder(domainId, order.getId());
+			order.setStationCd(stationCd);
+		}
+
+		// 3. 상태 체크
+		if (!ShipmentOrder.STATUS_ALLOCATED.equals(order.getStatus())) {
+			throw new ElidomValidationException(
+					"주문 [" + order.getShipmentNo() + "]의 상태가 '할당 완료'가 아닙니다 (현재: " + order.getStatus() + ")");
+		}
+
+		// 4. 주문별 할당 정보 조회
+		StringBuffer allocSql = new StringBuffer("SELECT sa.*, soi.sku_cd, soi.sku_nm");
+		allocSql.append(" FROM stock_allocations sa");
+		allocSql.append(" INNER JOIN shipment_order_items soi ON soi.domain_id = sa.domain_id");
+		allocSql.append(" AND soi.id = sa.shipment_order_item_id");
+		allocSql.append(" WHERE sa.domain_id = :domainId AND sa.shipment_order_id = :orderId ");
+		allocSql.append(" AND sa.status IN ('SOFT','HARD') ORDER BY soi.line_no");
+		Map<String, Object> allocParams = ValueUtil.newMap("domainId,orderId", domainId, order.getId());
+		List<Map> allocations = this.queryManager.selectListBySql(allocSql.toString(), allocParams, Map.class, 0, 0);
+
+		// 5. 할당 정보 존재 여부 체크
+		if (allocations.isEmpty()) {
+			throw new ElidomValidationException("주문 [" + order.getShipmentNo() + "]에 할당된 재고가 없습니다");
+		}
+
+		// 6. PickingTask 헤더 생성 (wave_no = null)
+		PickingTask task = new PickingTask();
+		task.setDomainId(domainId);
+		task.setWaveNo(null);
+		task.setShipmentOrderId(order.getId());
+		task.setShipmentNo(order.getShipmentNo());
+		task.setOrderDate(DateUtil.todayStr());
+		task.setComCd(order.getComCd());
+		task.setWhCd(ValueUtil.isNotEmpty(order.getWhCd()) ? order.getWhCd() : "DEFAULT");
+		task.setPickType("INDIVIDUAL");
+		task.setPriorityCd(order.getPriorityCd());
+		task.setPlanOrder(1);
+		task.setPlanItem(allocations.size());
+
+		double planTotal = 0;
+		for (Map alloc : allocations) {
+			planTotal += ValueUtil.toDouble(alloc.get("alloc_qty"), 0.0);
+		}
+
+		task.setPlanTotal(planTotal);
+		task.setResultOrder(0);
+		task.setResultItem(0);
+		task.setResultTotal(0.0);
+		task.setShortTotal(0.0);
+		task.setStatus(PickingTask.STATUS_CREATED);
+		this.queryManager.insert(task);
+
+		// 5. PickingTaskItem 생성
+		int rank = 1;
+		List<PickingTaskItem> items = new ArrayList<PickingTaskItem>();
+
+		for (Map alloc : allocations) {
+			PickingTaskItem item = new PickingTaskItem();
+			item.setDomainId(domainId);
+			item.setPickTaskId(task.getId());
+			item.setShipmentOrderId(order.getId());
+			item.setShipmentOrderItemId(ValueUtil.toString(alloc.get("shipment_order_item_id"), null));
+			item.setStockAllocationId(ValueUtil.toString(alloc.get("id"), null));
+			item.setInventoryId(ValueUtil.toString(alloc.get("inventory_id"), null));
+			item.setRank(rank);
+			item.setSkuCd(ValueUtil.toString(alloc.get("sku_cd"), null));
+			item.setSkuNm(ValueUtil.toString(alloc.get("sku_nm"), null));
+			item.setBarcode(ValueUtil.toString(alloc.get("barcode"), null));
+			item.setFromLocCd(ValueUtil.toString(alloc.get("loc_cd"), "UNKNOWN"));
+			item.setLotNo(ValueUtil.toString(alloc.get("lot_no"), null));
+			item.setExpiredDate(ValueUtil.toString(alloc.get("expired_date"), null));
+			item.setOrderQty(ValueUtil.toDouble(alloc.get("alloc_qty"), 0.0));
+			item.setPickQty(0.0);
+			item.setShortQty(0.0);
+			item.setStatus(PickingTaskItem.STATUS_WAIT);
+			items.add(item);
+			rank++;
+		}
+
+		if (!items.isEmpty()) {
+			AnyOrmUtil.insertBatch(items, 100);
+		}
+
+		// 6. 주문 상태 ALLOCATED → PICKING
+		order.setStatus(ShipmentOrder.STATUS_PICKING);
+		this.queryManager.update(order, "status", "stationCd", "updatedAt", "updaterId");
+
+		// 7. 결과 정보 저장
+		return ValueUtil.newMap("pick_task_no,shipment_no,item_count,plan_total",
+				task.getPickTaskNo(), order.getShipmentNo(), items.size(), planTotal);
 	}
 
 	/**
@@ -937,33 +963,34 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 	 *         reverted_order_count }
 	 */
 	public Map<String, Object> cancelCompletedPickingTask(String pickTaskId) {
-		Long domainId = Domain.currentDomainId();
-
 		// 1. 피킹 지시 조회 및 상태 확인
+		Long domainId = Domain.currentDomainId();
 		PickingTask task = this.findPickingTask(domainId, pickTaskId);
 
+		// 2. 피킹 지시 상태 확인 (COMPLETED이 아니면 취소 불가)
 		if (!PickingTask.STATUS_COMPLETED.equals(task.getStatus())) {
 			throw new ElidomValidationException(
 					"피킹 지시 상태가 [" + task.getStatus() + "]이므로 완료 후 취소할 수 없습니다 (COMPLETED 상태만 가능)");
 		}
 
-		// 2. 웨이브 상태 확인 (COMPLETED이면 취소 불가)
+		// 3. 웨이브 상태 확인 (COMPLETED이면 취소 불가)
 		if (ValueUtil.isNotEmpty(task.getWaveNo())) {
 			String waveSql = "SELECT status FROM shipment_waves WHERE domain_id = :domainId AND wave_no = :waveNo";
 			Map<String, Object> waveParams = ValueUtil.newMap("domainId,waveNo", domainId, task.getWaveNo());
 			String waveStatus = this.queryManager.selectBySql(waveSql, waveParams, String.class);
 
-			if ("COMPLETED".equals(waveStatus)) {
+			if (ShipmentWave.STATUS_COMPLETED.equals(waveStatus)) {
 				throw new ElidomValidationException("웨이브 [" + task.getWaveNo() + "]가 이미 완료되어 피킹을 취소할 수 없습니다");
 			}
 		}
 
-		// 3. 관련 포장 지시 조회 및 상태 확인
+		// 4. 관련 포장 지시 조회 및 상태 확인
 		String packSql = "SELECT * FROM packing_orders WHERE domain_id = :domainId AND pick_task_no = :pickTaskNo";
 		Map<String, Object> packParams = ValueUtil.newMap("domainId,pickTaskNo", domainId, task.getPickTaskNo());
 		List<PackingOrder> packOrders = this.queryManager.selectListBySql(packSql, packParams, PackingOrder.class, 0,
 				0);
 
+		// 5. 포장 지시 상태 체크 - 포장 처리를 하나라도 했다면 취소 불가
 		for (PackingOrder po : packOrders) {
 			if (!PackingOrder.STATUS_CREATED.equals(po.getStatus())) {
 				throw new ElidomValidationException(
@@ -972,7 +999,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			}
 		}
 
-		// 4. 포장 지시 아이템 및 포장 지시 삭제
+		// 6. 포장 지시 아이템 및 포장 지시 삭제
 		int cancelledPackOrderCount = 0;
 		int cancelledPackItemCount = 0;
 
@@ -992,7 +1019,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			cancelledPackOrderCount++;
 		}
 
-		// 5. 피킹 지시 아이템 상태 변경 (PICKED/SHORT → CANCEL, 실적 초기화)
+		// 7. 피킹 지시 아이템 상태 변경 (PICKED/SHORT → CANCEL, 실적 초기화)
 		String updItemsSql = "UPDATE picking_task_items SET status = :newStatus, pick_qty = 0, short_qty = 0, picked_at = NULL, updated_at = now()"
 				+ " WHERE domain_id = :domainId AND pick_task_id = :pickTaskId AND status IN (:s1, :s2)";
 		Map<String, Object> updItemsParams = ValueUtil.newMap("newStatus,domainId,pickTaskId,s1,s2",
@@ -1000,7 +1027,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				PickingTaskItem.STATUS_PICKED, PickingTaskItem.STATUS_SHORT);
 		this.queryManager.executeBySql(updItemsSql, updItemsParams);
 
-		// 6. 피킹 지시 상태 변경 (COMPLETED → CANCELLED, 실적 초기화)
+		// 8. 피킹 지시 상태 변경 (COMPLETED → CANCELLED, 실적 초기화)
 		String updTaskSql = "UPDATE picking_tasks SET status = :status,"
 				+ " result_order = 0, result_item = 0, result_total = 0, short_total = 0,"
 				+ " completed_at = NULL, updated_at = now()"
@@ -1009,9 +1036,11 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				PickingTask.STATUS_CANCELLED, domainId, pickTaskId);
 		this.queryManager.executeBySql(updTaskSql, updTaskParams);
 
-		// 7. 출하 주문 상태 원복 (PACKING/PICKING → RELEASED)
+		// 9. 출하 주문 상태 원복 (PACKING/PICKING → RELEASED)
 		int revertedOrderCount = 0;
+
 		if ("INDIVIDUAL".equals(task.getPickType())) {
+			// 10. 개별 피킹인 경우 출하 주문 상태 원복
 			if (ValueUtil.isNotEmpty(task.getShipmentOrderId())) {
 				String updOrderSql = "UPDATE shipment_orders SET status = :newStatus, updated_at = now()"
 						+ " WHERE domain_id = :domainId AND id = :orderId AND status IN (:s1, :s2)";
@@ -1022,6 +1051,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				revertedOrderCount = 1;
 			}
 		} else {
+			// 11. 토탈 피킹인 경우 웨이브내 출하 주문 상태 원복
 			String updOrdersSql = "UPDATE shipment_orders SET status = :newStatus, updated_at = now()"
 					+ " WHERE domain_id = :domainId AND wave_no = :waveNo AND status IN (:s1, :s2)";
 			Map<String, Object> updOrdersParams = ValueUtil.newMap("newStatus,domainId,waveNo,s1,s2",
@@ -1029,6 +1059,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 					ShipmentOrder.STATUS_PICKING, ShipmentOrder.STATUS_PACKING);
 			this.queryManager.executeBySql(updOrdersSql, updOrdersParams);
 
+			// 원복된 출하 주문 수량 계산
 			String countOrdersSql = "SELECT COUNT(*) FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status";
 			Map<String, Object> countOrdersParams = ValueUtil.newMap("domainId,waveNo,status",
 					domainId, task.getWaveNo(), ShipmentOrder.STATUS_RELEASED);
@@ -1040,6 +1071,7 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				"[Fulfillment] 피킹 완료 후 취소 - pick_task_no: %s, cancelled_pack_orders: %d, reverted_orders: %d",
 				task.getPickTaskNo(), cancelledPackOrderCount, revertedOrderCount));
 
+		// 12. 결과 리턴
 		Map<String, Object> result = ValueUtil.newMap("success", true);
 		result.put("pick_task_no", task.getPickTaskNo());
 		result.put("cancelled_pack_order_count", cancelledPackOrderCount);
@@ -1058,26 +1090,24 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 	 * 피킹 지시 단건 조회
 	 */
 	private PickingTask findPickingTask(Long domainId, String id) {
-		String sql = "SELECT * FROM picking_tasks WHERE domain_id = :domainId AND id = :id";
-		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
-		List<PickingTask> list = this.queryManager.selectListBySql(sql, params, PickingTask.class, 0, 1);
-		if (list.isEmpty()) {
+		PickingTask picking = this.queryManager.select(PickingTask.class, id);
+		if (picking == null) {
 			throw new ElidomValidationException("피킹 지시를 찾을 수 없습니다: " + id);
 		}
-		return list.get(0);
+
+		return picking;
 	}
 
 	/**
 	 * 출하 주문 단건 조회
 	 */
 	private ShipmentOrder findShipmentOrder(Long domainId, String id) {
-		if (ValueUtil.isEmpty(id)) {
-			return null;
+		ShipmentOrder order = this.queryManager.select(ShipmentOrder.class, id);
+		if (order == null) {
+			throw new ElidomValidationException("출하 주문을 찾을 수 없습니다: " + id);
 		}
-		String sql = "SELECT * FROM shipment_orders WHERE domain_id = :domainId AND id = :id";
-		Map<String, Object> params = ValueUtil.newMap("domainId,id", domainId, id);
-		List<ShipmentOrder> list = this.queryManager.selectListBySql(sql, params, ShipmentOrder.class, 0, 1);
-		return list.isEmpty() ? null : list.get(0);
+
+		return order;
 	}
 
 	/**

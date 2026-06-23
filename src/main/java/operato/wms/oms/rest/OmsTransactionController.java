@@ -1054,7 +1054,8 @@ public class OmsTransactionController extends AbstractRestService {
 		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_BOOK_COURIER, params);
 
 		// 2. 본 로직 실행
-		Map<String, Object> result = this.shippingService.bookCourier(id);
+		ShipmentOrder order = this.queryManager.select(ShipmentOrder.class, id);
+		Map<String, Object> result = this.shippingService.bookCourier(order);
 
 		// 3. 커스텀 서비스 - 후 처리
 		params.put("result", result);

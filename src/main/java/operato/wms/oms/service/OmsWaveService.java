@@ -217,6 +217,7 @@ public class OmsWaveService extends AbstractQueryService {
 		wave.setCarrierCd(waveConfig.containsKey("carrierCd") ? (String) waveConfig.get("carrierCd") : "CJ");
 		wave.setInspFlag(waveConfig.containsKey("inspFlag") ? (Boolean) waveConfig.get("inspFlag") : true);
 		wave.setStationCd((String) waveConfig.get("stationCd"));
+		wave.setInputPickers(ValueUtil.toInteger(waveConfig.get("inputPickers"), 1));
 		this.queryManager.insert(wave);
 
 		// 주문에 wave_no 업데이트 및 상태 변경

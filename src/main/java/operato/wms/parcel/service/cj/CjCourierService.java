@@ -137,14 +137,16 @@ public class CjCourierService implements CourierService {
 
     @Override
     public CourierAddressResult refineAddress(Long domainId, String contractNo, String address) {
+        // TODO 추후 테스트
         // CjAddressResult cjResult = this.cjAddressService.refineAddress(domainId,
         // contractNo, address);
         // return toCourierAddressResult(cjResult);
-        return null;
+        return new CourierAddressResult();
     }
 
     @Override
     public String issueWaybillNo(Long domainId, String contractNo) {
+        // TODO 추후 테스트
         // return cjWaybillService.issueWaybillNo(domainId, contractNo);
         return null;
     }
@@ -152,12 +154,9 @@ public class CjCourierService implements CourierService {
     @Override
     public CourierBookingResult book(Long domainId, String contractNo, String shipmentNo,
             CourierBookingRequest request) {
-        // CjBookingRequest cjRequest = toCjBookingRequest(request);
-        // CjBookingResult cjResult = cjBookingService.book(domainId, contractNo,
-        // shipmentNo, cjRequest);
-        // return new CourierBookingResult(cjResult.getShipmentNo(),
-        // cjResult.getInvcNo());
-        return null;
+        CjBookingRequest cjRequest = toCjBookingRequest(request);
+        CjBookingResult cjResult = cjBookingService.book(domainId, contractNo, shipmentNo, cjRequest);
+        return new CourierBookingResult(cjResult.getShipmentNo(), cjResult.getInvcNo());
     }
 
     @Override
@@ -244,59 +243,56 @@ public class CjCourierService implements CourierService {
 
     @Override
     public boolean readyShipment(Long domainId, String contractNo, ShipmentOrder order) {
-        /*
-         * ShipmentDelivery delivery =
-         * this.queryManager.selectByCondition(ShipmentDelivery.class,
-         * ValueUtil.newMap("domainId,shipmentNo", domainId, order.getShipmentNo()));
-         * boolean isSuccess = true;
-         * 
-         * if (delivery != null && ValueUtil.isNotEmpty(delivery.getReceiverAddr())) {
-         * try {
-         * CourierAddressResult addrResult = this.refineAddress(domainId, contractNo,
-         * delivery.getReceiverAddr() + " " + delivery.getReceiverAddr2());
-         * if (addrResult != null) {
-         * // 1. 도착지 코드
-         * delivery.setDlvRegionCd(addrResult.getClassificationCd());
-         * // 2. 도착지 서브 코드
-         * delivery.setDlvRegionSubCd(addrResult.getSubClassificationCd());
-         * // 3. 배송지점명
-         * delivery.setDlvStoreNm(addrResult.getDeliveryBranchNm());
-         * // 4. 배송기사명
-         * delivery.setDlvEmpCd(addrResult.getDeliverySmNm());
-         * // 5. 배송기사 직급
-         * delivery.setDlvEmpNm(addrResult.getDeliveryClassNm());
-         * // 6. 도착지 약칭주소
-         * delivery.setRemarks(addrResult.getClassificationAddr());
-         * // 7. 권역 구분
-         * delivery.setAttr01(addrResult.getRspsDivision());
-         * // 8. P2P 코드
-         * delivery.setAttr02(addrResult.getP2pCd());
-         * 
-         * // 송장 번호 채번
-         * String invcNo = this.issueWaybillNo(domainId, contractNo);
-         * order.setInvoiceNo(invcNo);
-         * delivery.setAttr05(invcNo);
-         * 
-         * // 출고 주문, 출고 배송 정보 업데이트
-         * this.queryManager.update(order, "invoiceNo");
-         * this.queryManager.update(delivery, "dlvRegionCd", "dlvRegionSubCd",
-         * "dlvStoreNm", "dlvEmpCd",
-         * "dlvEmpNm", "remarks", "attr01", "attr02", "attr05", "updatedAt",
-         * "updaterId");
-         * isSuccess = true;
-         * } else {
-         * isSuccess = false;
-         * }
-         * } catch (Throwable t) {
-         * isSuccess = false;
-         * // TODO 실패 원인을 기록 ...
-         * throw t;
-         * }
-         * }
-         * 
-         * return isSuccess;
-         */
+        // 1. 배송 정보 조회
+        ShipmentDelivery delivery = this.queryManager.selectByCondition(ShipmentDelivery.class,
+                ValueUtil.newMap("domainId,shipmentNo", domainId, order.getShipmentNo()));
+        boolean isSuccess = true;
 
-        return true;
+        // 2. 배송지 주소로 도착지 코드, 배송지점명, 배송기사명 등 조회
+        if (delivery != null && ValueUtil.isNotEmpty(delivery.getReceiverAddr())) {
+            try {
+                CourierAddressResult addrResult = this.refineAddress(domainId, contractNo,
+                        delivery.getReceiverAddr() + " " + delivery.getReceiverAddr2());
+                if (addrResult != null) {
+                    // 1. 도착지 코드
+                    delivery.setDlvRegionCd(addrResult.getClassificationCd());
+                    // 2. 도착지 서브 코드
+                    delivery.setDlvRegionSubCd(addrResult.getSubClassificationCd());
+                    // 3. 배송지점명
+                    delivery.setDlvStoreNm(addrResult.getDeliveryBranchNm());
+                    // 4. 배송기사명
+                    delivery.setDlvEmpCd(addrResult.getDeliverySmNm());
+                    // 5. 배송기사 직급
+                    delivery.setDlvEmpNm(addrResult.getDeliveryClassNm());
+                    // 6. 도착지 약칭주소
+                    delivery.setRemarks(addrResult.getClassificationAddr());
+                    // 7. 권역 구분
+                    delivery.setAttr01(addrResult.getRspsDivision());
+                    // 8. P2P 코드
+                    delivery.setAttr02(addrResult.getP2pCd());
+
+                    // 송장 번호 채번
+                    String invcNo = this.issueWaybillNo(domainId, contractNo);
+                    order.setInvoiceNo(invcNo);
+                    delivery.setAttr05(invcNo);
+
+                    // 출고 주문, 출고 배송 정보 업데이트
+                    this.queryManager.update(order, "invoiceNo");
+                    this.queryManager.update(delivery, "dlvRegionCd", "dlvRegionSubCd",
+                            "dlvStoreNm", "dlvEmpCd",
+                            "dlvEmpNm", "remarks", "attr01", "attr02", "attr05", "updatedAt",
+                            "updaterId");
+                    isSuccess = true;
+                } else {
+                    isSuccess = false;
+                }
+            } catch (Throwable t) {
+                isSuccess = false;
+                // TODO 실패 원인을 기록 ...
+                throw t;
+            }
+        }
+
+        return isSuccess;
     }
 }

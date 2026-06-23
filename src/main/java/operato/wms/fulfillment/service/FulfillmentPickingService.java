@@ -309,22 +309,31 @@ public class FulfillmentPickingService extends AbstractQueryService {
 
 		// 2. 피킹 상태 체크
 		String status = task.getStatus();
-		if (PickingTask.STATUS_COMPLETED.equals(status)) {
-			throw new ElidomValidationException("피킹 지시 상태가 [COMPLETED]이므로 리셋할 수 없습니다");
-		}
+
+		// 3. 생성 상태이면 그냥 스킵
 		if (PickingTask.STATUS_CREATED.equals(status)) {
-			throw new ElidomValidationException("피킹 지시 상태가 이미 [CREATED]입니다");
+			return ValueUtil.newMap("success,pick_task_no,msg", false, task.getPickTaskNo(),
+					"피킹 지시가 생성 상태라 취소할 수 없습니다.");
 		}
 
-		// 3. 상세 아이템 전체 리셋 (WAIT 복귀, 실적 수량 초기화)
-		String itemSql = "UPDATE picking_task_items"
-				+ " SET status = :status, pick_qty = 0, short_qty = 0, picked_at = null, updated_at = now()"
-				+ " WHERE domain_id = :domainId AND pick_task_id = :pickTaskId";
-		Map<String, Object> itemParams = ValueUtil.newMap("status,domainId,pickTaskId",
-				PickingTaskItem.STATUS_WAIT, domainId, id);
-		this.queryManager.executeBySql(itemSql, itemParams);
+		// 4. 완료 상태면 에러
+		if (PickingTask.STATUS_COMPLETED.equals(status)) {
+			throw new ElidomValidationException("피킹이 이미 완료되었으므로 취소할 수 없습니다");
+		}
 
-		// 4. 피킹 지시 헤더 리셋 (CREATED 복귀, 작업자·시작일시·실적 초기화)
+		// 5. 진행 상태가 아니면 에러
+		if (!PickingTask.STATUS_IN_PROGRESS.equals(status)) {
+			throw new ElidomValidationException("진행 중인 피킹 지시만 시작 취소할 수 있습니다.");
+		}
+
+		// 6. 상세 아이템 전체 리셋 (WAIT 복귀, 실적 수량 초기화)
+		StringBuffer itemSql = new StringBuffer("UPDATE picking_task_items");
+		itemSql.append(" SET status = :status, pick_qty = 0, short_qty = 0, picked_at = null, updated_at = now()");
+		itemSql.append(" WHERE domain_id = :domainId AND pick_task_id = :pickTaskId");
+		this.queryManager.executeBySql(itemSql.toString(),
+				ValueUtil.newMap("status,domainId,pickTaskId", PickingTaskItem.STATUS_WAIT, domainId, id));
+
+		// 7. 피킹 지시 헤더 리셋 (CREATED 복귀, 작업자·시작일시·실적 초기화)
 		task.setStatus(PickingTask.STATUS_CREATED);
 		task.setWorkerId(null);
 		task.setStartedAt(null);
@@ -335,7 +344,7 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		this.queryManager.update(task, "status", "workerId", "startedAt", "resultOrder", "resultItem", "resultTotal",
 				"shortTotal", "updatedAt", "updaterId");
 
-		// 5. 결과 리턴
+		// 8. 결과 리턴
 		return ValueUtil.newMap("success,pick_task_no", true, task.getPickTaskNo());
 	}
 
