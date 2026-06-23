@@ -1,7 +1,7 @@
 # 출고 재고 부족 대응 프로세스 설계
 
-> 작성일: 2026-06-22  
-> 대상 모듈: `oms` (주문/할당) + `fulfillment` (피킹/포장/출하)
+> 작성일: 2026-06-22 | 최종 업데이트: 2026-06-23  
+> 대상 모듈: `oms` (주문/알당) + `fulfillment` (피킹/포장/출하)
 
 ---
 
@@ -430,7 +430,7 @@ WAIT → INSPECTED → PACKED   (정상)
 | 피킹 부족 처리 API | `FulfillmentPickingService.shortItem()` | pick_qty / short_qty 기록, STATUS_SHORT 설정 |
 | INDIVIDUAL 재고 해제 | `FulfillmentPickingService.deallocateShortQty()` | short_qty만큼 stock_allocations 해제, reserved_qty 환원 |
 | 피킹 완료 후 주문 상태 갱신 | `FulfillmentPickingService.updateShipmentOrdersAfterPicking()` | PACKING / BACK_ORDER 분기, ShipmentOrderItem.short_qty 갱신 |
-| PC 피킹 화면 부족 처리 버튼 | `fulfillment-picking-pc.js` | F4 / [부족 처리] 버튼, 수량 입력 다이얼로그 |
+| PC 피킹 화면 부족 처리 버튼 | `fulfillment-picking-pc.js` | F4 / [부족 처리] 버튼, 수량 입력 다이얼로그, 완료 상태(SHORT/END) 선택 시 "완료된 피킹지시입니다." 안내 메시지 |
 | PDA 피킹 화면 부족 처리 | `pda-fulfillment-picking.js` | 전량 부족 고정 처리 (pick_qty = 0) |
 | 피킹 부족 처리 상태 분기 **(B-1)** | `FulfillmentPickingService.shortItem()` | pick_qty > 0 → STATUS_PICKED, pick_qty = 0 → STATUS_SHORT |
 | 포장 지시 생성 (INDIVIDUAL) **(B-2, B-3)** | `FulfillmentTransactionService.createPackingOrders()` | PICKED + SHORT 전체 포함, 전량 부족은 STATUS_SHORT로 생성, short_qty 저장 |
@@ -441,8 +441,8 @@ WAIT → INSPECTED → PACKED   (정상)
 | 포장 완료 SHORT 분기 **(N-2)** | `FulfillmentPackingService.completePackingOrder()` | SHORT 아이템 존재 시 `STATUS_SHORT` 로 완료, 아니면 `STATUS_COMPLETED` |
 | 포장 아이템 부족 처리 서비스 **(N-3)** | `FulfillmentPackingService.shortPackingOrderItem()` | WAIT/INSPECTED → SHORT, short_qty 저장 |
 | 포장 아이템 부족 처리 API **(N-3)** | `FulfillmentTransactionController` | `POST /rest/ful_trx/packing_orders/{id}/items/{item_id}/short` |
-| B2C 포장 화면 부족 처리 UI **(N-4)** | `fulfillment-b2c-packing-pc.js` | 부족 경고 배너, SHORT 행 표시, [부족 처리] 버튼, 다이얼로그, 완료 경고 |
-| B2B 포장 화면 부족 처리 UI **(N-4)** | `fulfillment-b2b-packing-pc.js` | 동일 (B2B: 운송장 없음, 거래명세서 출력 흐름 유지) |
+| B2C 포장 화면 부족 처리 UI **(N-5)** | `fulfillment-b2c-packing-pc.js` | 부족 경고 배너, SHORT 행 표시, [부족 처리] 버튼, 다이얼로그, 완료 경고 |
+| B2B 포장 화면 부족 처리 UI **(N-6)** | `fulfillment-b2b-packing-pc.js` | 동일 (B2B: 운송장 없음, 거래명세서 출력 흐름 유지), 주문 선택 강조 스타일 개선, 날짜 미입력 시 조회 차단 |
 
 ### ⚠ 버그 — 수정 완료
 
@@ -543,10 +543,10 @@ POST /rest/ful_trx/packing_orders/{id}/items/{itemId}/short
   body: { short_qty: 4 }
 ```
 
-### 9-6. [N-4 ✅ 완료] 포장 PC 화면 부족 처리 UI 추가
+### 9-6. [N-5, N-6 ✅ 완료] 포장 PC 화면 부족 처리 UI 추가
 
-**파일**: `frontend/packages/operato-wes/client/pages/fulfillment/fulfillment-b2c-packing-pc.js`  
-**파일**: `frontend/packages/operato-wes/client/pages/fulfillment/fulfillment-b2b-packing-pc.js`
+**파일**: `frontend/packages/operato-wes/client/pages/fulfillment/fulfillment-b2c-packing-pc.js` **(N-5)**  
+**파일**: `frontend/packages/operato-wes/client/pages/fulfillment/fulfillment-b2b-packing-pc.js` **(N-6)**
 
 | 추가 항목 | 구현 내용 |
 |-----------|-----------|
@@ -559,6 +559,8 @@ POST /rest/ful_trx/packing_orders/{id}/items/{itemId}/short
 | 바코드 스캔 | `SHORT` 아이템은 SKU 매칭에서 제외 |
 | 완료 단계 진입 경고 | SHORT 아이템 존재 시 완료 버튼 주황색 + "N건 포함 (출하가 차단됩니다)" 표시 |
 | 포장 패널 요약 | "전체 일치" 행에 부족 건수 및 출하 차단 표시 |
+| 주문 목록 선택 강조 (B2B) | 선택된 주문 카드에 파란 테두리·배경 스타일 적용 |
+| 날짜 미입력 조회 차단 (B2B) | 조회 버튼 클릭 시 날짜 없으면 toast 경고 후 중단 |
 
 ### 9-7. [F-1~F-4 ❌ 미구현] 부족분 토털 피킹 지시 생성
 
@@ -604,17 +606,18 @@ fulfillment/shortage-packing-list.js
 
 ## 10. 구현 현황 요약
 
-### ✅ 완료된 항목 (2026-06-22 기준)
+### ✅ 완료된 항목 (2026-06-23 기준)
 
-| 순서 | 항목 | 상태 |
-|------|------|------|
-| B-1 | `shortItem()` 상태 분기 버그 수정 | ✅ 완료 |
-| B-2 | `createPackingOrders()` PICKED+SHORT 포함 | ✅ 완료 |
-| B-3 | `PackingOrderItem.short_qty` 저장 | ✅ 완료 |
-| N-1 | `PackingOrder.STATUS_SHORT` 상수 추가 | ✅ 완료 |
-| N-2 | `completePackingOrder()` SHORT 분기 | ✅ 완료 |
-| N-3 | 포장 아이템 부족 처리 서비스 + API | ✅ 완료 |
-| N-4 | B2C/B2B 포장 PC 화면 부족 처리 UI | ✅ 완료 |
+| 순서 | 항목 | 완료일 | 상태 |
+|------|------|--------|------|
+| B-1 | `shortItem()` 상태 분기 버그 수정 | 2026-06-22 | ✅ 완료 |
+| B-2 | `createPackingOrders()` PICKED+SHORT 포함 | 2026-06-22 | ✅ 완료 |
+| B-3 | `PackingOrderItem.short_qty` 저장 | 2026-06-22 | ✅ 완료 |
+| N-1 | `PackingOrder.STATUS_SHORT` 상수 추가 | 2026-06-22 | ✅ 완료 |
+| N-2 | `completePackingOrder()` SHORT 분기 | 2026-06-22 | ✅ 완료 |
+| N-3 | 포장 아이템 부족 처리 서비스 + API | 2026-06-22 | ✅ 완료 |
+| N-5 | B2C 포장 PC 화면 부족 처리 UI | 2026-06-23 | ✅ 완료 |
+| N-6 | B2B 포장 PC 화면 부족 처리 UI | 2026-06-23 | ✅ 완료 |
 
 ### ❌ 미구현 항목 (후속 처리 — 별도 설계 필요)
 
