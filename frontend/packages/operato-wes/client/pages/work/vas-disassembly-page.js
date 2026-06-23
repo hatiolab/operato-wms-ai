@@ -1107,7 +1107,10 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
       }
       this._scannerService.start()
 
-      await this._fetchOrders()
+      // 작업 화면 진행 중에는 재조회하지 않음 (목록 화면에서만 갱신)
+      if (this.screen === 'order-select') {
+        await this._fetchOrders()
+      }
     } else {
       this._scannerService?.stop()
     }
@@ -1118,6 +1121,19 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
     if (this._scannerService) {
       this._scannerService.stop()
       this._scannerService = null
+    }
+  }
+
+  /** 업데이트 후 — 토스트 표시 시 fadeInOut 애니메이션 재생 보장 (동일 DOM 노드 재사용 대응) */
+  updated(changed) {
+    super.updated?.(changed)
+    if (changed.has('feedbackMsg') && this.feedbackMsg) {
+      const el = this.renderRoot?.querySelector('.feedback-toast')
+      if (el) {
+        el.style.animation = 'none'
+        void el.offsetWidth
+        el.style.animation = ''
+      }
     }
   }
 
@@ -1261,6 +1277,12 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
     try {
       const order = await ServiceUtil.restGet('vas_trx/vas_orders/find_by_no', { vas_no: value })
       if (order) {
+        // find_by_no는 vas_type 무관 조회 — 해체 작업 화면은 DISASSEMBLY만 허용
+        if (order.vas_type !== 'DISASSEMBLY') {
+          this._showFeedback('세트해체(DISASSEMBLY) 주문이 아닙니다', 'error')
+          voiceService.error('세트해체 주문이 아닙니다')
+          return
+        }
         await this._fetchBomMap([order])
         this._selectOrder(order)
         this.scanValue = ''
@@ -1361,6 +1383,15 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
 
   /** 완료 버튼 - 확정 행 검증 후 해체 완료 API 호출 */
   async _nextStep() {
+    const planQty = Number(this.selectedOrder?.plan_qty || 0)
+
+    // 0. 입력하지 않은 빈 미확정 행(수량 비어있음) 자동 제거 — 실수로 추가된 빈 행이 완료를 막지 않도록
+    const cleaned = this.bomItems.map(item => ({
+      ...item,
+      _rows: (item._rows || []).filter(r => r.confirmed || (r.qty !== '' && Number(r.qty) > 0))
+    }))
+    this.bomItems = cleaned
+
     // 1. 모든 품목에 확정 행이 최소 1개 이상 있는지 검증
     const noRows = this.bomItems.find(item => !(item._rows || []).some(r => r.confirmed))
     if (noRows) {
@@ -1368,19 +1399,35 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
       return
     }
 
-    // 2. 미확정 행(입력 중인 행)이 남아있으면 경고
+    // 2. 미확정 행(입력 중인 행)이 남아있으면 경고 (빈 행은 0단계에서 제거됨)
     const pendingRows = this.bomItems.some(item =>
       (item._rows || []).some(r => !r.confirmed)
     )
     if (pendingRows) {
-      this._showFeedback('확정되지 않은 행이 있습니다. 확정 후 완료해주세요', 'error')
+      this._showFeedback('확정되지 않은 행이 있습니다. 확정하거나 삭제 후 완료해주세요', 'error')
       return
     }
 
-    // 3. 산출 행 목록 구성 [{skuCd, skuNm, qty, expiryDate}]
+    // 2.5 산출 수량 미달 품목 확인 — 백엔드는 합계를 강제하지 않으므로 작업자에게 한번 더 확인
+    const shortItems = this.bomItems.filter(item => {
+      const totalQty = (item.component_qty || 0) * planQty
+      const confirmedSum = (item._rows || []).reduce((s, r) => s + (Number(r.qty) || 0), 0)
+      return confirmedSum < totalQty
+    })
+    if (shortItems.length > 0) {
+      const confirmed = await UiUtil.showAlertPopup(
+        'label.confirm',
+        `산출 수량에 미달한 품목이 ${shortItems.length}건 있습니다.\n그래도 해체 작업을 완료하시겠습니까?`,
+        'question', 'confirm', 'cancel'
+      )
+      if (!confirmed) return
+    }
+
+    // 3. 산출 행 목록 구성 [{skuCd, skuNm, qty, expiryDate}] — 확정 행만
     const outputs = []
     for (const item of this.bomItems) {
       for (const row of item._rows) {
+        if (!row.confirmed) continue
         outputs.push({
           skuCd: item.sku_cd,
           skuNm: item.sku_nm,
