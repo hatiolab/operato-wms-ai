@@ -131,7 +131,8 @@ public class StockTransactionService extends BaseStockService {
             inventory = invs[0];
         }
 
-        // 4. 재고 적치 처리
+        // 4. 재고 적치 처리 — 목적지 로케이션을 inventory에 먼저 반영 후 트랜잭션 생성
+        inventory.setLocCd(toLocCd);
         InventoryTran tran = new InventoryTran();
         tran.setTranQty(inventory.getInvQty());
         tran.setToLocCd(toLocCd);
