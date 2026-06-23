@@ -25,6 +25,8 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
   @state() loading = false
   /** API 처리 중 */
   @state() processing = false
+  /** 입고 목록 필터: ALL / WAITING / STORED */
+  @state() listFilter = 'ALL'
 
   /** 현재 작업 중인 입고번호 */
   @state() currentRcvNo = ''
@@ -54,10 +56,6 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
   /** 입력한 적치 수량 */
   @state() putawayQty = 0
 
-  /** 적치 대기 건수 (전체) */
-  @state() waitingCount = 0
-  /** 오늘 적치 완료 건수 (전체) */
-  @state() storedCount = 0
   /** 적치 대기 입고 목록 (list 모드 중단 표시) */
   @state() receivingList = []
   /** 추천 로케이션 목록 (work 모드 스텝 2 진입 시 조회) */
@@ -813,25 +811,41 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
       return html`<div class="loading-overlay">${TermsUtil.tLabel('loading') || '로딩 중...'}</div>`
     }
 
+    // 입고주문 단위 분류 (재고 건수가 아닌 입고주문 개수 기준)
+    const waitingList = this.receivingList.filter(r => r.putaway_status === 'WAITING')
+    const putawayList = this.receivingList.filter(r => r.putaway_status === 'PUTAWAY')
+    const doneList = this.receivingList.filter(r => r.putaway_status === 'DONE')
+    const filteredList =
+      this.listFilter === 'WAITING' ? waitingList
+        : this.listFilter === 'PUTAWAY' ? putawayList
+          : this.listFilter === 'DONE' ? doneList
+            : this.receivingList
+
     return html`
       <div class="summary-cards">
-        <div class="summary-card waiting">
-          <div class="count">${this.waitingCount}</div>
+        <div class="summary-card waiting"
+          ?active=${this.listFilter === 'WAITING'}
+          @click=${() => this._toggleListFilter('WAITING')}>
+          <div class="count">${waitingList.length}</div>
           <div class="card-label">${TermsUtil.tLabel('wait') || '대기'}</div>
         </div>
-        <div class="summary-card done">
-          <div class="count">${this.storedCount}</div>
-          <div class="card-label">${TermsUtil.tLabel('completed') || '완료'}</div>
+        <div class="summary-card"
+          ?active=${this.listFilter === 'PUTAWAY'}
+          @click=${() => this._toggleListFilter('PUTAWAY')}>
+          <div class="count">${putawayList.length}</div>
+          <div class="card-label">${TermsUtil.tLabel('in_progress') || '작업중'}</div>
         </div>
-        <div class="summary-card">
-          <div class="count">${this.waitingCount + this.storedCount}</div>
-          <div class="card-label">${TermsUtil.tLabel('total') || '전체'}</div>
+        <div class="summary-card done"
+          ?active=${this.listFilter === 'DONE'}
+          @click=${() => this._toggleListFilter('DONE')}>
+          <div class="count">${doneList.length}</div>
+          <div class="card-label">${TermsUtil.tLabel('completed') || '완료'}</div>
         </div>
       </div>
 
       <div class="rcv-list">
-        ${this.receivingList.length > 0
-        ? this.receivingList.map(rcv => this._renderReceivingCard(rcv))
+        ${filteredList.length > 0
+        ? filteredList.map(rcv => this._renderReceivingCard(rcv))
         : html`
             <div class="empty-guide">
               <div class="guide-icon">📦</div>
@@ -1129,7 +1143,6 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
   pageInitialized() {
     this.workItems = []
     this.currentRcvNo = ''
-    this._loadPutawaySummary()
     this._loadReceivingList()
   }
 
@@ -1138,14 +1151,14 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
    * @param {string} rcvNo
    */
   async _onScanRcvNo(rcvNo) {
-    if (!rcvNo || this.loading) return
+    if (!rcvNo || this.processing) return
 
-    this.loading = true
+    // list 전체 로딩 오버레이(loading) 대신 processing 사용 — 화면 깜빡임 방지
+    this.processing = true
     try {
       await this._loadWorkItems(rcvNo)
 
       if (!this.workItems.length && !this.doneItems.length) {
-        this._showFeedback(`적치 대기 재고가 없습니다: ${rcvNo}`, 'warning')
         document.dispatchEvent(new CustomEvent('notify', {
           detail: { level: 'warn', message: `적치 대기 재고가 없습니다: ${rcvNo}` }
         }))
@@ -1167,7 +1180,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
         detail: { level: 'error', message: error.message || '재고 조회에 실패했습니다' }
       }))
     } finally {
-      this.loading = false
+      this.processing = false
       if (this._rcvNoInput) this._rcvNoInput.value = ''
     }
   }
@@ -1209,10 +1222,8 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
       return
     }
 
-    // 3. 이미 완료된 항목인지 확인
-    const doneItem = this.workItems.find(
-      item => item.status === 'STORED' && item.barcode === barcode
-    )
+    // 3. 이미 완료된 항목인지 확인 (doneItems는 STORED 항목만 보유)
+    const doneItem = this.doneItems.find(item => item.barcode === barcode)
 
     if (doneItem) {
       this._showFeedback(`이미 적치 완료된 항목입니다: ${doneItem.sku_cd} → ${doneItem.loc_cd} `, 'warning')
@@ -1256,13 +1267,21 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
 
     this.processing = true
     try {
+      // 콜백 패턴 대신 성공 여부를 플래그로 받아 await 흐름을 콜백 밖에서 유지
+      let success = false
+      let errMsg = null
       await ServiceUtil.restPut(`inventory_trx/put_away/${item.id}`, {
         barcode: item.barcode,
         loc_cd: this.locCd,
         inv_qty: this.putawayQty,
         to_qty: item.inv_qty
-      }, null, null, async (_res) => {
-        // 서버에서 최신 항목 목록 재조 회 
+      }, null, null,
+        () => { success = true },
+        (err) => { errMsg = err?.msg || '적치 처리에 실패했습니다' }
+      )
+
+      if (success) {
+        // 서버에서 최신 항목 목록 재조회
         await this._loadWorkItems(this.currentRcvNo)
 
         const completedCount = this.doneItems.length
@@ -1276,11 +1295,10 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
           this._moveToNextItem()
           setTimeout(() => this._focusBarcodeInput(), 200)
         }
-
-      }, (err) => {
-        this._showFeedback(err?.msg || '적치 처리에 실패했습니다', 'error')
+      } else if (errMsg) {
+        this._showFeedback(errMsg, 'error')
         navigator.vibrate?.(200)
-      })
+      }
 
     } catch (error) {
       this._showFeedback(error.message || '적치 처리에 실패했습니다', 'error')
@@ -1293,51 +1311,83 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
 
   /**
    * 적치 작업 완료 처리 — 미완료 항목이 있으면 확인 후 complete 모드 전환
+   * 입고 주문 상태를 PUTAWAY → END로 업데이트
    */
   async _closeWork() {
     const remaining = this.workItems.filter(i => i.status === 'WAITING')
     if (remaining.length > 0) {
       const confirmed = await UiUtil.showAlertPopup(
         'label.confirm',
-        `미완료 항목 ${remaining.length}건이 있습니다.작업을 완료하시겠습니까 ? `,
+        `미완료 항목 ${remaining.length}건이 있습니다. 작업을 완료하시겠습니까?`,
         'question', 'confirm', 'cancel'
       )
       if (!confirmed) return
     }
 
+    await this._completePutaway()
     this.mode = 'complete'
   }
 
   /**
    * 모든 항목 완료 시 자동 complete 모드 전환
+   * 입고 주문 상태를 PUTAWAY → END로 업데이트
    */
   async _onAllItemsCompleted() {
-    document.dispatchEvent(new CustomEvent('notify', {
-      detail: { level: 'info', message: '모든 항목 적치 완료!' }
-    }))
+    const confirmed = await UiUtil.showAlertPopup(
+      'label.confirm',
+      `모든 항목(${this.doneItems.length}건) 적치 완료.\n마감 처리하시겠습니까?`,
+      'question', 'confirm', 'cancel'
+    )
+    if (!confirmed) return
+    await this._completePutaway()
     this.mode = 'complete'
   }
 
   /**
-   * 새 작업 시작 — list 모드로 복귀하고 입고번호 스캔 대기
+   * 입고 주문 적치 완료 처리 API 호출
+   * POST /rest/inbound_trx/putaway/complete?rcv_no={rcvNo}
    */
-  _startNewWork() {
-    this._goBack()
+  async _completePutaway() {
+    if (!this.currentRcvNo) return
+    try {
+      await ServiceUtil.restPost(
+        `inbound_trx/putaway/complete?rcv_no=${encodeURIComponent(this.currentRcvNo)}`,
+        {}
+      )
+    } catch (err) {
+      console.warn('적치 완료 상태 업데이트 실패:', err)
+    }
   }
 
   /**
-   * list 모드로 복귀
+   * 새 작업 시작 — 목록 갱신 후 적치 대기(waiting_count > 0) 입고를 자동 선택
    */
-  _goBack() {
+  async _startNewWork() {
+    await this._goBack()
+    const next = this.receivingList.find(r => (r.waiting_count || 0) > 0)
+    if (next) {
+      this._onScanRcvNo(next.rcv_no)
+    } else {
+      document.dispatchEvent(new CustomEvent('notify', {
+        detail: { level: 'info', message: '적치 대기 중인 입고가 없습니다' }
+      }))
+    }
+  }
+
+  /**
+   * list 모드로 복귀 — 작업 상태 전체 초기화 후 요약·목록 재조회
+   */
+  async _goBack() {
     this.mode = 'list'
     this.currentRcvNo = ''
     this.workItems = []
     this.doneItems = []
     this.currentItemIndex = -1
     this.lastFeedback = null
+    this.startedAt = null
+    this.listFilter = 'ALL'
     this._resetScanStep()
-    this._loadPutawaySummary()
-    this._loadReceivingList()
+    await this._loadReceivingList()
   }
 
   /**
@@ -1364,21 +1414,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
    * 새로고침 — 요약 건수 + 입고 목록 재조회 (list 모드 전용)
    */
   async _refresh() {
-    await Promise.all([this._loadPutawaySummary(), this._loadReceivingList()])
-  }
-
-  /**
-   * 적치 대기/완료 요약 건수 조회
-   * GET /rest/inbound_dashboard/putaway-summary
-   */
-  async _loadPutawaySummary() {
-    try {
-      const data = await ServiceUtil.restGet('inbound_dashboard/putaway-summary')
-      this.waitingCount = data?.waiting_count ?? 0
-      this.storedCount = data?.stored_count ?? 0
-    } catch (error) {
-      console.error('적치 요약 조회 실패:', error)
-    }
+    await this._loadReceivingList()
   }
 
   /**
@@ -1404,20 +1440,11 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
   }
 
   /**
-   * 목록 카드 클릭으로 특정 항목 선택 (list 모드)
-   * @param {object} item
+   * 입고 목록 필터 토글 — 동일 카드 재클릭 시 전체(ALL)로 복귀
+   * @param {string} filter — 'WAITING'(대기) | 'PUTAWAY'(작업중) | 'DONE'(완료)
    */
-  _selectItem(item) {
-    const idx = this.workItems.indexOf(item)
-    if (idx < 0) return
-    this.currentItemIndex = idx
-    this.currentRcvNo = item.rcv_no || this.currentRcvNo
-    this.startedAt = this.startedAt || Date.now()
-    this.currentTabKey = 'todo'
-    this.lastFeedback = null
-    this._resetScanStep()
-    this.mode = 'work'
-    setTimeout(() => this._focusBarcodeInput(), 200)
+  _toggleListFilter(filter) {
+    this.listFilter = this.listFilter === filter ? 'ALL' : filter
   }
 
   /**

@@ -49,6 +49,8 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   @state() startedAt = null
   /** 현재 항목 바코드 스캔 완료 여부 */
   @state() barcodeScanned = false
+  /** 항목 목록 로딩 중 (work 화면 진입 초기 깜빡임 방지) */
+  @state() itemsLoading = false
 
   /** SKU 바코드 스캔 입력 컴포넌트 */
   @query('sku-barcode-input') _skuBarcodeInput
@@ -265,6 +267,21 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         .task-card .status-badge.end {
           background: #e8f5e9;
           color: #4CAF50;
+        }
+
+        .task-card .status-badge.approved {
+          background: #e8f5e9;
+          color: #2e7d32;
+        }
+
+        .task-card .status-badge.putaway {
+          background: #ede7f6;
+          color: #6a1b9a;
+        }
+
+        .task-card .status-badge.stored {
+          background: #e0f2f1;
+          color: #00695c;
         }
 
         .task-card .sub-info {
@@ -706,14 +723,21 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
       return html`<div class="loading-overlay">${TermsUtil.tLabel('loading') || '로딩 중...'}</div>`
     }
 
+    const DONE_STATUSES = new Set(['END', 'APPROVED', 'PUTAWAY', 'STORED'])
     const ready = this.taskList.filter(t => t.status === 'READY')
     const start = this.taskList.filter(t => t.status === 'START')
-    const end = this.taskList.filter(t => t.status === 'END')
+    const end = this.taskList.filter(t => DONE_STATUSES.has(t.status))
     const filtered =
       this.filterStatus === 'READY' ? ready
         : this.filterStatus === 'START' ? start
           : this.filterStatus === 'END' ? end
-            : [...ready, ...start]
+            : [...ready, ...start, ...end]
+
+    const emptyMessage =
+      this.filterStatus === 'READY' ? '대기 중인 입고 주문이 없습니다' :
+      this.filterStatus === 'START' ? '작업 중인 입고 주문이 없습니다' :
+      this.filterStatus === 'END' ? '오늘 완료된 입고 주문이 없습니다' :
+      '조회된 입고 주문이 없습니다'
 
     return html`
       <div class="summary-cards">
@@ -739,7 +763,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
       <div class="task-list">
         ${filtered.length === 0
-        ? html`<div class="empty-message">${TermsUtil.tText('No Data') || '입고 대기 주문이 없습니다'}</div>`
+        ? html`<div class="empty-message">${emptyMessage}</div>`
         : filtered.map(r => this._renderTaskCard(r))}
       </div>
 
@@ -770,9 +794,14 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         <div class="card-header">
           <span class="task-no">입고번호 : ${r.rcv_no}</span>
           <span class="status-badge ${(r.status || '').toLowerCase()}">
-            ${r.status === 'READY' ? (TermsUtil.tLabel('wait') || '대기')
-        : r.status === 'START' ? (TermsUtil.tLabel('in_progress') || '진행중')
-          : (TermsUtil.tLabel('completed') || '완료')}
+            ${{
+              READY:    TermsUtil.tLabel('wait') || '대기',
+              START:    TermsUtil.tLabel('in_progress') || '진행중',
+              END:      TermsUtil.tLabel('completed') || '입고완료',
+              APPROVED: TermsUtil.tLabel('approved') || '검수승인',
+              PUTAWAY:  TermsUtil.tLabel('putaway') || '적치중',
+              STORED:   TermsUtil.tLabel('stored') || '적치완료'
+            }[r.status] || r.status}
           </span>
         </div>
         <div class="sub-info">
@@ -820,7 +849,13 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         <span>🚚 ${TermsUtil.tLabel('vend_cd') || '공급사'}: <strong>${rcv?.vend_cd || '-'}</strong></span>
       </div>
 
-      ${currentItem ? html`
+      ${this.itemsLoading ? html`
+        <div class="current-item-section">
+          <div class="item-info" style="text-align:center; padding: 12px 0; opacity:0.6;">
+            항목 로딩 중...
+          </div>
+        </div>
+      ` : currentItem ? html`
         <div class="current-item-section">
           ${currentItem.loc_cd
           ? html`<div class="location-display">${currentItem.loc_cd}</div>`
@@ -1004,16 +1039,36 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     this._loadTaskList()
   }
 
-  /** 입고 주문 목록 조회 (READY + START 상태) */
+  /**
+   * 입고 주문 목록 조회
+   * - 대기(READY): 오늘 입고 예정일 기준
+   * - 작업중(START): 날짜 무관 (현재 진행 중인 모든 주문)
+   * - 완료: 오늘 완료일(rcv_end_date) 기준, END 이후 상태(APPROVED/PUTAWAY/STORED) 포함
+   */
   async _loadTaskList() {
     this.loading = true
     try {
-      const query = JSON.stringify([
-        { name: 'status', operator: 'in', value: 'READY,START,END' },
-        { name: 'rcv_req_date', operator: 'eq', value: ValueUtil.todayFormatted() }
+      const today = ValueUtil.todayFormatted()
+
+      const [readyResult, startResult, endResult] = await Promise.all([
+        ServiceUtil.restGet(`receivings?query=${encodeURIComponent(JSON.stringify([
+          { name: 'status', operator: 'eq', value: 'READY' },
+          { name: 'rcv_req_date', operator: 'eq', value: today }
+        ]))}&limit=100`),
+        ServiceUtil.restGet(`receivings?query=${encodeURIComponent(JSON.stringify([
+          { name: 'status', operator: 'eq', value: 'START' }
+        ]))}&limit=100`),
+        ServiceUtil.restGet(`receivings?query=${encodeURIComponent(JSON.stringify([
+          { name: 'status', operator: 'in', value: 'END,APPROVED,PUTAWAY,STORED' },
+          { name: 'rcv_end_date', operator: 'eq', value: today }
+        ]))}&limit=100`)
       ])
-      const result = await ServiceUtil.restGet(`receivings?query=${encodeURIComponent(query)}&limit=100`)
-      this.taskList = result?.items || result || []
+
+      this.taskList = [
+        ...(readyResult?.items || readyResult || []),
+        ...(startResult?.items || startResult || []),
+        ...(endResult?.items || endResult || [])
+      ]
     } catch (error) {
       console.error('입고 주문 목록 조회 실패:', error)
       this.taskList = []
@@ -1024,6 +1079,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
   /** 입고 항목 목록 조회 + 현재 항목 설정 */
   async _loadReceivingItems(receivingId) {
+    this.itemsLoading = true
     try {
       const result = await ServiceUtil.restGet(`receivings/${receivingId}/items`)
       this.receivingItems = result?.items || result || []
@@ -1033,52 +1089,94 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     } catch (error) {
       console.error('입고 항목 조회 실패:', error)
       this.receivingItems = []
+    } finally {
+      this.itemsLoading = false
     }
   }
 
-  /** 입고번호 바코드 스캔으로 빠른 선택 */
-  _onScanReceivingNo(barcode) {
+  /** 입고번호 바코드 스캔으로 빠른 선택 — 오늘자 목록에 없으면 API로 직접 조회 */
+  async _onScanReceivingNo(barcode) {
     if (!barcode) return
-    const r = this.taskList.find(t => t.rcv_no === barcode)
-    if (r) {
-      this._selectReceiving(r)
-    } else {
-      document.dispatchEvent(new CustomEvent('notify', {
-        detail: { level: 'error', message: `입고번호를 찾을 수 없습니다: ${barcode}` }
-      }))
-      navigator.vibrate?.(200)
-    }
+
     if (this._rcvScanInput) {
       this._rcvScanInput.value = ''
+    }
+
+    // 1. 오늘자 목록에서 먼저 찾기
+    const cached = this.taskList.find(t => t.rcv_no === barcode)
+    if (cached) {
+      this._selectReceiving(cached)
+      return
+    }
+
+    // 2. 날짜 제한 없이 API 직접 조회 (이전 날짜 입고주문 처리용)
+    this.processing = true
+    try {
+      const query = JSON.stringify([
+        { name: 'rcv_no', operator: 'eq', value: barcode },
+        { name: 'status', operator: 'in', value: 'READY,START' }
+      ])
+      const result = await ServiceUtil.restGet(`receivings?query=${encodeURIComponent(query)}&limit=1`)
+      const found = (result?.items || result || [])[0]
+
+      if (found) {
+        this.processing = false
+        await this._selectReceiving(found)
+      } else {
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: { level: 'error', message: `처리 가능한 입고주문을 찾을 수 없습니다: ${barcode}` }
+        }))
+        navigator.vibrate?.(200)
+      }
+    } catch (err) {
+      document.dispatchEvent(new CustomEvent('notify', {
+        detail: { level: 'error', message: `입고번호 조회 실패: ${barcode}` }
+      }))
+    } finally {
+      this.processing = false
     }
   }
 
   /** 입고 주문 선택 → 작업 시작 → 항목 로드 → work 모드 전환 */
   async _selectReceiving(r) {
+    // 완료 이후 상태는 재작업 불가 — 피드백만 표시
+    const DONE_STATUSES = new Set(['END', 'APPROVED', 'PUTAWAY', 'STORED'])
+    if (DONE_STATUSES.has(r.status)) {
+      document.dispatchEvent(new CustomEvent('notify', {
+        detail: { level: 'warn', message: `이미 입고 완료된 주문입니다 (${r.rcv_no})` }
+      }))
+      return
+    }
+
     if (this.processing) return
     this.processing = true
 
     try {
       if (r.status === 'READY') {
-        await ServiceUtil.restPost(`inbound_trx/receiving_orders/${r.id}/start`, {}, null, null, (res) => {
+        // start API 호출 — 콜백 밖에서 await하기 위해 성공 여부만 수집
+        let startSuccess = false
+        await ServiceUtil.restPost(
+          `inbound_trx/receiving_orders/${r.id}/start`, {}, null, null,
+          () => { startSuccess = true },
+          (err) => {
+            document.dispatchEvent(new CustomEvent('notify', {
+              detail: { level: 'error', message: err?.msg || '입고 작업을 시작할 수 없습니다' }
+            }))
+          }
+        )
+        if (startSuccess) {
           r.status = 'START'
           this.currentReceiving = r
           this.startedAt = Date.now()
           this.lastFeedback = null
           this.currentTabKey = 'todo'
           this.rcvQty = 0
-
-          this._loadReceivingItems(r.id)
+          await this._loadReceivingItems(r.id)  // Fix 1: await 추가
           this._setInitialRcvQty()
           this.mode = 'work'
-
           setTimeout(() => this._focusBarcodeInput(), 200)
+        }
 
-        }, (err) => {
-          document.dispatchEvent(new CustomEvent('notify', {
-            detail: { level: 'error', message: err?.msg || '입고 작업을 시작할 수 없습니다' }
-          }))
-        })
       } else if (r.status === 'START') {
         this.currentReceiving = r
         this.startedAt = Date.now()
@@ -1165,23 +1263,29 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
     this.processing = true
     try {
-      await ServiceUtil.restPost(`inbound_trx/receiving_orders/line/${item.id}/finish`, {
-        ...item, rcv_qty: qty
-      }, null, null, async (res) => {
-        // 서버에서 최신 항목 목록 재조회 (미완료/완료 탭 갱신)
-        await this._loadReceivingItems(this.currentReceiving.id)
-        // 메시지 표시
-        this._showFeedback(`입고 완료 (${this.completedCount}/${this.totalCount})`, 'success')
+      // Fix 2: 콜백 패턴 대신 성공 여부를 플래그로 받아 await 흐름을 콜백 밖에서 유지
+      let success = false
+      let errMsg = null
+      await ServiceUtil.restPost(
+        `inbound_trx/receiving_orders/line/${item.id}/finish`,
+        { ...item, rcv_qty: qty },
+        null, null,
+        () => { success = true },
+        (err) => { errMsg = err?.msg || '입고 확인 실패' }
+      )
 
+      if (success) {
+        await this._loadReceivingItems(this.currentReceiving.id)
+        this._showFeedback(`입고 완료 (${this.completedCount}/${this.totalCount})`, 'success')
         if (this.completedCount >= this.totalCount) {
           await this._onAllItemsCompleted()
         } else {
           this._setInitialRcvQty()
           setTimeout(() => this._focusBarcodeInput(), 200)
         }
-      }, (err) => {
-        this._showFeedback(err?.msg || '입고 확인 실패', 'error')
-      })
+      } else if (errMsg) {
+        this._showFeedback(errMsg, 'error')
+      }
 
     } catch (error) {
       this._showFeedback(error.message || '입고 확인 실패', 'error')
@@ -1229,11 +1333,15 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     }
   }
 
-  /** 모든 항목 완료 시 자동 마감 처리 */
+  /** 모든 항목 완료 시 마감 처리 — 최종 확인 후 마감 */
   async _onAllItemsCompleted() {
-    document.dispatchEvent(new CustomEvent('notify', {
-      detail: { level: 'info', message: '모든 항목 입고 완료 — 마감 처리 중...' }
-    }))
+    const totalRcvQty = this.receivingItems.reduce((s, i) => s + (i.rcv_qty || 0), 0)
+    const confirmed = await UiUtil.showAlertPopup(
+      'label.confirm',
+      `모든 항목(${this.totalCount}건, 총 ${totalRcvQty}개) 입고 완료.\n마감 처리하시겠습니까?`,
+      'question', 'confirm', 'cancel'
+    )
+    if (!confirmed) return
     await this._closeReceiving()
   }
 
@@ -1254,6 +1362,9 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     this.receivingItems = []
     this.currentItemIndex = -1
     this.lastFeedback = null
+    this.barcodeScanned = false
+    this.rcvQty = 0
+    this.itemsLoading = false
     await this._loadTaskList()
   }
 
