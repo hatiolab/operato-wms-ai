@@ -839,14 +839,6 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	}
 
 	@Override
-	public void afterCreate() {
-		super.afterCreate();
-
-		// 재고 생성 시 이력 저장
-		this.createInventoryHistory();
-	}
-
-	@Override
 	public void beforeUpdate() {
 		super.beforeUpdate();
 
@@ -870,19 +862,33 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		}
 	}
 
-	@Override
-	public void afterUpdate() {
-		super.afterUpdate();
+	/*
+	 * @Override
+	 * public void afterCreate() {
+	 * super.afterCreate();
+	 * 
+	 * // 재고 생성 시 이력 저장
+	 * this.createInventoryHistory();
+	 * }
+	 */
 
-		// 재고 업데이트 시 이력 저장
-		this.createInventoryHistory();
-	}
+	/*
+	 * @Override
+	 * public void afterUpdate() {
+	 * super.afterUpdate();
+	 * 
+	 * // 재고 업데이트 시 이력 저장
+	 * this.createInventoryHistory();
+	 * }
+	 */
 
 	/**
 	 * 재고 이력 생성 - 재고 트랜잭션은 반드시 개별 재고 정보 조회 후 처리해야 이력에 남는다. (insert, update 쿼리로 처리하면
 	 * 이력에 남지 않는다.)
 	 */
-	private void createInventoryHistory() {
-		new InventoryHist().create(true, this);
-	}
+	/*
+	 * private void createInventoryHistory() {
+	 * new InventoryHist().create(true, this);
+	 * }
+	 */
 }
