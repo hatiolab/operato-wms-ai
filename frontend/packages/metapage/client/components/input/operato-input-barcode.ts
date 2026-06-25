@@ -133,6 +133,7 @@ export class OperatoInputBarcode extends OxFormField {
 
     private popup: OxPopup | null = null
     private video: HTMLVideoElement | null = null
+    private _isMobile: boolean = 'ontouchstart' in window
 
     connectedCallback() {
         super.connectedCallback()
@@ -169,6 +170,8 @@ export class OperatoInputBarcode extends OxFormField {
         .value=${this.value || ''}
         @change=${(e: Event) => this.onInputChange(e)}
         @keydown=${(e: KeyboardEvent) => this.onInputKeyDown(e)}
+        @pointerdown=${() => this._onInputPointerDown()}
+        @blur=${() => this._onInputBlur()}
         ?disabled=${this.disabled}
       />
       <button
@@ -224,6 +227,18 @@ export class OperatoInputBarcode extends OxFormField {
 
             this.input.value = [value.substring(0, start), key, value.substring(end)].join('')
             this.input.setSelectionRange(start + 1, start + 1)
+        }
+    }
+
+    private _onInputPointerDown() {
+        if (this._isMobile) {
+            this.input.setAttribute('inputmode', 'text')
+        }
+    }
+
+    private _onInputBlur() {
+        if (this._isMobile) {
+            this.input.setAttribute('inputmode', 'none')
         }
     }
 
