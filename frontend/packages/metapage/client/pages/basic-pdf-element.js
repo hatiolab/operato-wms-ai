@@ -39,6 +39,25 @@ export class BasicPdfElement extends MetaSetMixin(p13n(localize(i18next)(LitElem
           display: none;
           overflow: visible;
         }
+
+        .mobile-print-bar {
+          display: flex;
+          justify-content: flex-end;
+          padding: 8px 12px;
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
+        }
+
+        .mobile-print-btn {
+          padding: 8px 24px;
+          background: var(--md-sys-color-primary, #1976d2);
+          color: var(--md-sys-color-on-primary, #fff);
+          border: none;
+          border-radius: 6px;
+          font-size: 1rem;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
       `
     ]
     return styles
@@ -142,6 +161,19 @@ export class BasicPdfElement extends MetaSetMixin(p13n(localize(i18next)(LitElem
    **********************
    * @returns {Object}
    */
+  /** 모바일에서 PDF blob을 새 탭으로 열어 Chrome PDF 뷰어의 인쇄 기능 사용 */
+  _onMobilePrint() {
+    if (!this._pdfDataForPrint) return
+    // 매번 새 blob URL을 생성 — 재사용 시 Chrome이 다운로드 팝업으로 전환하는 문제 방지
+    const blobUrl = URL.createObjectURL(new Blob([this._pdfDataForPrint], { type: this.mediaType }))
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.target = '_blank'
+    a.rel = 'noopener'
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000)
+  }
+
   render() {
     if(MetaApi.isMobileEnv()) {
       return html`
@@ -150,6 +182,11 @@ export class BasicPdfElement extends MetaSetMixin(p13n(localize(i18next)(LitElem
           .fields=${this.search_form_fields}
           @submit=${e => this.fetchHandler(e)}
         ></ox-search-form>
+        <div class="mobile-print-bar">
+          <button class="mobile-print-btn" @click=${this._onMobilePrint}>
+            ${i18next.t('button.print') || '인쇄'}
+          </button>
+        </div>
         <div id='canvas-container'>Loading ...</div>
       `
     } else {
@@ -210,6 +247,9 @@ export class BasicPdfElement extends MetaSetMixin(p13n(localize(i18next)(LitElem
     let data = await res.arrayBuffer()
     
     if(MetaApi.isMobileEnv()) {
+      // pdfjsLib.getDocument()가 ArrayBuffer를 Worker로 transfer하면 원본이 비워지므로
+      // 인쇄용 복사본을 미리 보관
+      this._pdfDataForPrint = data.slice(0)
       this.pdfUrl = data
       await this.loadPdf()
 
