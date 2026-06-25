@@ -4,6 +4,7 @@ import { html, css } from 'lit'
 import { customElement, query, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
 import { ServiceUtil, TermsUtil, UiUtil, ValueUtil } from '@operato-app/metapage/dist-client'
+import '@operato-app/metapage/dist-client/components/input/operato-input-barcode'
 import { store, PageView } from '@operato/shell'
 import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
 
@@ -194,7 +195,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           gap: 8px;
         }
 
-        .scan-task-order .scan-row ox-input-barcode {
+        .scan-task-order .scan-row operato-input-barcode {
           flex: 1;
         }
 
@@ -735,9 +736,9 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
     const emptyMessage =
       this.filterStatus === 'READY' ? '대기 중인 입고 주문이 없습니다' :
-      this.filterStatus === 'START' ? '작업 중인 입고 주문이 없습니다' :
-      this.filterStatus === 'END' ? '오늘 완료된 입고 주문이 없습니다' :
-      '조회된 입고 주문이 없습니다'
+        this.filterStatus === 'START' ? '작업 중인 입고 주문이 없습니다' :
+          this.filterStatus === 'END' ? '오늘 완료된 입고 주문이 없습니다' :
+            '조회된 입고 주문이 없습니다'
 
     return html`
       <div class="summary-cards">
@@ -770,10 +771,10 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
       <div class="scan-task-order">
         <label>${TermsUtil.tLabel('rcv_no') || '입고번호 스캔'}</label>
         <div class="scan-row">
-          <ox-input-barcode id="rcvScanInput"
+          <operato-input-barcode id="rcvScanInput"
             placeholder="입고번호 스캔"
             @change=${e => this._onScanReceivingNo(e.target.value)}>
-          </ox-input-barcode>
+          </operato-input-barcode>
           <button class="btn-refresh" @click=${this._refresh}>
             ${TermsUtil.tButton('refresh') || '새로고침'}
           </button>
@@ -795,13 +796,13 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           <span class="task-no">입고번호 : ${r.rcv_no}</span>
           <span class="status-badge ${(r.status || '').toLowerCase()}">
             ${{
-              READY:    TermsUtil.tLabel('wait') || '대기',
-              START:    TermsUtil.tLabel('in_progress') || '진행중',
-              END:      TermsUtil.tLabel('completed') || '입고완료',
-              APPROVED: TermsUtil.tLabel('approved') || '검수승인',
-              PUTAWAY:  TermsUtil.tLabel('putaway') || '적치중',
-              STORED:   TermsUtil.tLabel('stored') || '적치완료'
-            }[r.status] || r.status}
+        READY: TermsUtil.tLabel('wait') || '대기',
+        START: TermsUtil.tLabel('in_progress') || '진행중',
+        END: TermsUtil.tLabel('completed') || '입고완료',
+        APPROVED: TermsUtil.tLabel('approved') || '검수승인',
+        PUTAWAY: TermsUtil.tLabel('putaway') || '적치중',
+        STORED: TermsUtil.tLabel('stored') || '적치완료'
+      }[r.status] || r.status}
           </span>
         </div>
         <div class="sub-info">

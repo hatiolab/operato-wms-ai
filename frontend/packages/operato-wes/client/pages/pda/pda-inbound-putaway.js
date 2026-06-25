@@ -2,9 +2,11 @@ import '@things-factory/barcode-ui'
 import { html, css } from 'lit'
 import { customElement, query, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
-import { ServiceUtil, TermsUtil, UiUtil } from '@operato-app/metapage/dist-client'
+import { MetaApi, ServiceUtil, TermsUtil, UiUtil, PrintUtil } from '@operato-app/metapage/dist-client'
+import '@operato-app/metapage/dist-client/components/input/operato-input-barcode'
 import { store, PageView } from '@operato/shell'
 import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
+import { operatoGet } from '@operato-app/operatofill'
 
 /**
  * PDA 입고 적치 작업 화면
@@ -201,7 +203,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
           white-space: nowrap;
         }
 
-        .scan-rcv-no .scan-row ox-input-barcode {
+        .scan-rcv-no .scan-row operato-input-barcode {
           flex: 1;
         }
 
@@ -398,7 +400,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
           white-space: nowrap;
         }
 
-        .scan-step ox-input-barcode {
+        .scan-step operato-input-barcode {
           flex: 1;
           min-width: 0;
           --input-height: 24px;
@@ -857,10 +859,10 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
       <div class="scan-rcv-no">
         <div class="scan-row">
           <label>${TermsUtil.tLabel('rcv_no') || '입고번호'}</label>
-          <ox-input-barcode id="rcvNoInput"
+          <operato-input-barcode id="rcvNoInput"
             placeholder="입고번호 스캔"
             @change=${e => this._onScanRcvNo(e.target.value)}>
-          </ox-input-barcode>
+          </operato-input-barcode>
           <button class="btn-refresh" @click=${this._refresh}>
             ${TermsUtil.tButton('refresh') || '새로고침'}
           </button>
@@ -955,11 +957,11 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
         <span class="step-badge ${step1Done ? 'done-badge' : ''}">${step1Done ? '✓' : '1'}</span>
         <span class="step-label-text">${TermsUtil.tLabel('scan_barcode') || '바코드 스캔'}</span>
         ${this.scanStep === 'barcode' ? html`
-          <ox-input-barcode id="barcodeInput"
+          <operato-input-barcode id="barcodeInput"
             placeholder="바코드 스캔"
             ?disabled=${this.processing}
             @change=${e => this._onScanBarcode(e.target.value)}>
-          </ox-input-barcode>
+          </operato-input-barcode>
         ` : html`
           <span style="flex:1;font-size:12px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
             ${this.scannedBarcode || ''}
@@ -974,11 +976,11 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
         <span class="step-badge ${step2Done ? 'done-badge' : ''}">${step2Done ? '✓' : '2'}</span>
         <span class="step-label-text">${TermsUtil.tLabel('loc_cd') || '로케이션'}</span>
         ${this.scanStep === 'location' ? html`
-          <ox-input-barcode id="locationInput"
+          <operato-input-barcode id="locationInput"
             placeholder="로케이션 스캔"
             ?disabled=${this.processing}
             @change=${e => this._onScanLocation(e.target.value)}>
-          </ox-input-barcode>
+          </operato-input-barcode>
         ` : html`
           <span class="location-confirmed">${this.locCd || ''}</span>
         `}
@@ -1471,10 +1473,36 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
    * GET /rest/inventories/{barcode}/{loc_cd}/download_barcode
    * @param {object} item - 완료된 재고 항목 (barcode, loc_cd 사용)
    */
-  _printBarcode(item) {
+  async _printBarcode(item) {
     const barcode = encodeURIComponent(item.barcode)
     const locCd = encodeURIComponent(item.loc_cd)
-    window.open(`/rest/inventories/${barcode}/${locCd}/download_barcode`, '_blank')
+    const isMobile = 'ontouchstart' in window
+
+    if (isMobile) {
+      let res = await operatoGet(`inventories/${barcode}/${locCd}/download_barcode`, {}, false)
+      let data = await res.arrayBuffer()
+      let fileObj = new Blob([data], { type: 'application/pdf' })
+      let file = URL.createObjectURL(fileObj)
+      PrintUtil.openPdfInNewTab(file)
+
+      // 모바일: HTML 엔드포인트를 새 탭에서 열면 페이지 내부에서 window.print() 자동 실행
+      // Android Chrome PDF 뷰어 탭에서는 외부 print() 호출이 무시되므로 HTML 방식 사용
+      // const htmlUrl = `/rest/inventories/${barcode}/${locCd}/print_barcode_html`
+      // window.open(htmlUrl, '_blank')
+
+    } else {
+      const inventory = await ServiceUtil.restGet(`inventories/find_by?barcode=${barcode}&locCd=${locCd}`)
+      if (inventory && inventory.id) {
+        MetaApi.openDynamicPopup(TermsUtil.tMenu('InventoryBarcode'), {
+          "module": "metapage",
+          "import": "pages/basic-pdf-element.js",
+          "tagname": "basic-pdf-element",
+          "menu": "InventoryBarcode",
+          "size": "large",
+          "title_field": "name"
+        }, inventory, inventory.id, null)
+      }
+    }
   }
 
   /**

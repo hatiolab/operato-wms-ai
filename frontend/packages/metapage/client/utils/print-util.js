@@ -21,40 +21,40 @@ export class PrintUtil {
    * @description 바코드 인쇄 처리
    ***********************************
    * @param {String} zpl ZPL Command
-	 * @param {Number} printCount 인쇄 횟수
+   * @param {Number} printCount 인쇄 횟수
    */
   static async printBarcode(zpl, printCount) {
-    if(browserPrinter == null) {
-			browserPrinter = new BrowserPrinter()
-		}
+    if (browserPrinter == null) {
+      browserPrinter = new BrowserPrinter()
+    }
 
-		if(ValueUtil.isEmpty(zpl)) {
-			await UiUtil.showAlertPopup('title.error', 'ZPL is empty', 'error', 'confirm')
-		} else {
-			printCount || 1
-			PrintUtil.printBarcodeLabels(printCount, 0, zpl)
-		}
+    if (ValueUtil.isEmpty(zpl)) {
+      await UiUtil.showAlertPopup('title.error', 'ZPL is empty', 'error', 'confirm')
+    } else {
+      printCount || 1
+      PrintUtil.printBarcodeLabels(printCount, 0, zpl)
+    }
   }
 
   /**
    * @description 바코드 인쇄 횟수에 따라 바코드 인쇄
    *******************************************
-	 * @param {Number} printCount 인쇄할 횟수
-	 * @param {Number} doneCount 인쇄한 횟수
+   * @param {Number} printCount 인쇄할 횟수
+   * @param {Number} doneCount 인쇄한 횟수
    * @param {String} zpl ZPL Command
    */
-	static async printBarcodeLabels(printCount, doneCount, zpl) {
-		if(doneCount < printCount) {
-			doneCount++
-			try {
-				await browserPrinter.print(zpl)
-				setTimeout(() => PrintUtil.printBarcodeLabels(printCount, doneCount, zpl), 1000)
-			} catch(error) {
-				let msg = error && error.message ? error.message : 'unkown error'
-				UiUtil.showAlertPopup('title.error', msg, 'error', 'confirm')
-			}
-		}
-	}
+  static async printBarcodeLabels(printCount, doneCount, zpl) {
+    if (doneCount < printCount) {
+      doneCount++
+      try {
+        await browserPrinter.print(zpl)
+        setTimeout(() => PrintUtil.printBarcodeLabels(printCount, doneCount, zpl), 1000)
+      } catch (error) {
+        let msg = error && error.message ? error.message : 'unkown error'
+        UiUtil.showAlertPopup('title.error', msg, 'error', 'confirm')
+      }
+    }
+  }
 
   /**
    * @override POST 서비스 호출을 통한 바코드 라벨 출력
@@ -64,23 +64,31 @@ export class PrintUtil {
    * @param {Number} printCount 인쇄 매수
    */
   static async printLabelByService(labelTemplateUrl, variables, printCount) {
-		let template = await ServiceUtil.restPost(labelTemplateUrl, variables)
-		if(template && template.template) {
+    let template = await ServiceUtil.restPost(labelTemplateUrl, variables)
+    if (template && template.template) {
       printCount = template.printCount ? template.printCount : (printCount ? printCount : 1)
-			await PrintUtil.printBarcode(template.template, printCount)
-		} else {
-			let msg = template && template.error ? template.error : 'Failed to build ZPL template'
-			UiUtil.showAlertPopup('Template Error', msg, 'error', 'confirm')
-		}
-	}
+      await PrintUtil.printBarcode(template.template, printCount)
+    } else {
+      let msg = template && template.error ? template.error : 'Failed to build ZPL template'
+      UiUtil.showAlertPopup('Template Error', msg, 'error', 'confirm')
+    }
+  }
 
+  /**
+   * @override Android 여부 체크
+   ****************************
+   */
   static isAndroid() {
     return /Android/i.test(navigator.userAgent)
   }
-  
+
+  /**
+   * @override IOS 여부 체크
+   ****************************
+   */
   static isIOS() {
     return /iPhone|iPad|iPod/i.test(navigator.userAgent)
-  }  
+  }
 
   /**
    * @override PDF 출력
@@ -100,12 +108,17 @@ export class PrintUtil {
         onfinish: () => {
           history.back()
         }
-      })  
+      })
     }
   }
 
+  /**
+   * @override 새 탭에서 PDF 다운로드 후 PDF 인쇄 - 모바일에서 필요 
+   ***********************************************************
+   * @param {String} file PDF를 추출할 서비스 URL
+   */
   static async openPdfInNewTab(file) {
-    const newTab = window.open(file, '_pdf_print')  
+    const newTab = window.open(file, '_pdf_print')
     if (newTab) {
       // 새 탭이 성공적으로 열렸다면 프린트 다이얼로그 표시
       newTab.addEventListener('load', () => {

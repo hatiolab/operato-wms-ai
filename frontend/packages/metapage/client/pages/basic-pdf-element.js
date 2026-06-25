@@ -72,7 +72,8 @@ export class BasicPdfElement extends MetaSetMixin(p13n(localize(i18next)(LitElem
       mediaType: String,
       height: String,
       width: String,
-      file: Object
+      file: Object,
+      _pdfDataForPrint: Object
     }
   }
 
@@ -85,7 +86,7 @@ export class BasicPdfElement extends MetaSetMixin(p13n(localize(i18next)(LitElem
     this.notSupportedMessage = 'It appears your Web browser is not configured to display files. No worries, just'
     this.notSupportedLinkMessage = 'click here to download the file.'
 
-    if(MetaApi.isMobileEnv()) {
+    if (MetaApi.isMobileEnv()) {
       pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
     }
   }
@@ -104,11 +105,11 @@ export class BasicPdfElement extends MetaSetMixin(p13n(localize(i18next)(LitElem
   /**
    * 안드로이드에서의 동작을 위해 pdfjsLib 라이브러리로 PDF 로딩
    */
-  async loadPdf() {
+  async loadPdf(data) {
     const canvasContainer = this.shadowRoot.getElementById('canvas-container')
 
     try {
-      const loadingTask = pdfjsLib.getDocument(this.pdfUrl)
+      const loadingTask = pdfjsLib.getDocument(data)
       const pdfDoc = await loadingTask.promise
       clearInterval(this.intervalId)
       canvasContainer.innerHTML = '';
@@ -118,7 +119,7 @@ export class BasicPdfElement extends MetaSetMixin(p13n(localize(i18next)(LitElem
         await this.renderPdfPage(canvasContainer, pdfDoc, pageNum);
       }
 
-    } catch (error) {
+    } catch (err) {
       clearTimeout(this.intervalId)
       let errTitle = 'Failed to load PDF! - '
       canvasContainer.innerHTML = errTitle + err;
@@ -140,19 +141,19 @@ export class BasicPdfElement extends MetaSetMixin(p13n(localize(i18next)(LitElem
     canvasContainer.appendChild(canvas);
 
     // Using promise to fetch the page
-    pdfDoc.getPage(pageNo).then(function(page) {
-        var viewport = page.getViewport({scale: 1});
-        canvas.height = viewport.height; // Set canvas height for each page
-        canvas.width = viewport.width; // Set canvas width for each page
+    pdfDoc.getPage(pageNo).then(function (page) {
+      var viewport = page.getViewport({ scale: 1 });
+      canvas.height = viewport.height; // Set canvas height for each page
+      canvas.width = viewport.width; // Set canvas width for each page
 
-        // Render PDF page into canvas context
-        var ctx = canvas.getContext('2d');
-        var renderContext = {
-            canvasContext: ctx,
-            viewport: viewport,
-            intent: 'print'
-        };
-        page.render(renderContext).promise
+      // Render PDF page into canvas context
+      var ctx = canvas.getContext('2d');
+      var renderContext = {
+        canvasContext: ctx,
+        viewport: viewport,
+        intent: 'print'
+      };
+      page.render(renderContext).promise
     });
   }
 
@@ -164,6 +165,7 @@ export class BasicPdfElement extends MetaSetMixin(p13n(localize(i18next)(LitElem
   /** 모바일에서 PDF blob을 새 탭으로 열어 Chrome PDF 뷰어의 인쇄 기능 사용 */
   _onMobilePrint() {
     if (!this._pdfDataForPrint) return
+
     // 매번 새 blob URL을 생성 — 재사용 시 Chrome이 다운로드 팝업으로 전환하는 문제 방지
     const blobUrl = URL.createObjectURL(new Blob([this._pdfDataForPrint], { type: this.mediaType }))
     const a = document.createElement('a')
@@ -175,7 +177,7 @@ export class BasicPdfElement extends MetaSetMixin(p13n(localize(i18next)(LitElem
   }
 
   render() {
-    if(MetaApi.isMobileEnv()) {
+    if (MetaApi.isMobileEnv()) {
       return html`
         <ox-search-form
           id="search-form"
@@ -223,12 +225,12 @@ export class BasicPdfElement extends MetaSetMixin(p13n(localize(i18next)(LitElem
     }
 
     this.intervalId = setInterval(() => {
-      if(this.shadowRoot.getElementById('canvas-container')){
+      if (this.shadowRoot.getElementById('canvas-container')) {
         let msg = this.shadowRoot.getElementById('canvas-container').innerHTML
         this.shadowRoot.getElementById('canvas-container').innerHTML = msg + '.'
       }
     }, 300)
-  
+
     this.fetchHandler()
   }
 
@@ -245,19 +247,17 @@ export class BasicPdfElement extends MetaSetMixin(p13n(localize(i18next)(LitElem
 
     let res = await operatoGet(url, params, false)
     let data = await res.arrayBuffer()
-    
-    if(MetaApi.isMobileEnv()) {
-      // pdfjsLib.getDocument()가 ArrayBuffer를 Worker로 transfer하면 원본이 비워지므로
-      // 인쇄용 복사본을 미리 보관
+
+    if (MetaApi.isMobileEnv()) {
+      // pdfjsLib.getDocument()가 ArrayBuffer를 Worker로 transfer하면 원본이 비워지므로 인쇄용 복사본을 미리 보관
       this._pdfDataForPrint = data.slice(0)
-      this.pdfUrl = data
-      await this.loadPdf()
+      await this.loadPdf(data)
 
     } else {
       var fileObj = new Blob([data], { type: this.mediaType })
       this.file = URL.createObjectURL(fileObj)
     }
-    
+
     return {}
   }
 
