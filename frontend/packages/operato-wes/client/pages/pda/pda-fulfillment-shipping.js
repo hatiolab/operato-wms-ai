@@ -3,6 +3,7 @@ import { html, css } from 'lit'
 import { customElement, query, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
 import { ServiceUtil, ValueUtil, TermsUtil, UiUtil } from '@operato-app/metapage/dist-client'
+import '@operato-app/metapage/dist-client/components/input/operato-input-barcode'
 import { store, PageView } from '@operato/shell'
 import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
 
@@ -156,7 +157,7 @@ export class PdaFulfillmentShipping extends connect(store)(PageView) {
           flex-shrink: 0;
         }
 
-        .scan-section ox-input-barcode {
+        .scan-section operato-input-barcode {
           flex: 1;
           min-width: 0;
         }
@@ -389,11 +390,11 @@ export class PdaFulfillmentShipping extends connect(store)(PageView) {
     return html`
       <div class="scan-section">
         <label>${TermsUtil.tLabel('invoice_no') || '송장 스캔'}</label>
-        <ox-input-barcode id="oxScanBarcode"
+        <operato-input-barcode id="oxScanBarcode"
           placeholder="송장번호 스캔"
           ?disabled=${!this.dockCd || this.processing}
           @change=${e => this._onScanInvoice(e.target.value)}>
-        </ox-input-barcode>
+        </operato-input-barcode>
       </div>
     `
   }

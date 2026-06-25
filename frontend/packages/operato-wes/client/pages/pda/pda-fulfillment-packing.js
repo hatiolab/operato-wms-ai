@@ -3,6 +3,7 @@ import { html, css } from 'lit'
 import { customElement, query, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
 import { MetaApi, ServiceUtil, TermsUtil } from '@operato-app/metapage/dist-client'
+import '@operato-app/metapage/dist-client/components/input/operato-input-barcode'
 import { store, PageView } from '@operato/shell'
 import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
 import '../../component/sku-barcode-input.js'
@@ -268,7 +269,7 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
           color: var(--md-sys-color-on-surface, #333);
         }
 
-        .scan-pack-order ox-input-barcode {
+        .scan-pack-order operato-input-barcode {
           flex: 1;
           min-width: 0;
         }
@@ -820,10 +821,10 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
 
       <div class="scan-pack-order">
         <label>${TermsUtil.tLabel('pack_order_no') || '포장지시번호'}</label>
-        <ox-input-barcode id="packOrderScanInput"
+        <operato-input-barcode id="packOrderScanInput"
           placeholder="포장번호 스캔"
           @change=${e => this._onScanPackingOrder(e.target.value)}>
-        </ox-input-barcode>
+        </operato-input-barcode>
         <button class="btn-refresh" @click=${this._refresh}>${TermsUtil.tButton('refresh') || '새로고침'}</button>
       </div>
     `
@@ -1009,11 +1010,11 @@ export class PdaFulfillmentPacking extends connect(store)(PageView) {
         ${!isB2B ? html`
           <div class="form-group">
             <label>${TermsUtil.tLabel('invoice_no') || '운송장번호'}</label>
-            <ox-input-barcode id="trackingInput"
+            <operato-input-barcode id="trackingInput"
               .value=${this.trackingNo}
               placeholder="운송장번호 스캔 또는 입력"
               @change=${e => (this.trackingNo = e.target.value)}>
-            </ox-input-barcode>
+            </operato-input-barcode>
           </div>
         ` : ''}
       </div>

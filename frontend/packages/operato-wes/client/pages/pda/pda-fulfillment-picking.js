@@ -3,6 +3,7 @@ import { html, css } from 'lit'
 import { customElement, query, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
 import { ServiceUtil, TermsUtil, UiUtil, ValueUtil } from '@operato-app/metapage/dist-client'
+import '@operato-app/metapage/dist-client/components/input/operato-input-barcode'
 import { store, PageView } from '@operato/shell'
 import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
 
@@ -249,7 +250,7 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
           color: var(--md-sys-color-on-surface, #333);
         }
 
-        .scan-task-order ox-input-barcode {
+        .scan-task-order operato-input-barcode {
           flex: 1;
           min-width: 0;
         }
@@ -523,7 +524,7 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
           margin-bottom: 4px;
         }
 
-        .current-item-section ox-input-barcode {
+        .current-item-section operato-input-barcode {
           width: 100%;
         }
 
@@ -947,10 +948,10 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
 
       <div class="scan-task-order">
         <label>${TermsUtil.tLabel('pick_task_no') || '피킹지시'}</label>
-        <ox-input-barcode id="taskScanInput"
+        <operato-input-barcode id="taskScanInput"
           placeholder="피킹지시번호 스캔"
           @change=${e => this._onScanPickingTask(e.target.value)}>
-        </ox-input-barcode>
+        </operato-input-barcode>
       </div>
     `
   }
@@ -1028,11 +1029,11 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
             ${currentItem.lot_no ? html`<div class="lot">LOT: ${currentItem.lot_no} ${currentItem.expired_date ? `· ${currentItem.expired_date}` : ''}</div>` : ''}
           </div>
           <div class="barcode-input">
-            <ox-input-barcode id="barcodeInput"
+            <operato-input-barcode id="barcodeInput"
               placeholder="재고 바코드 스캔"
               ?disabled=${this.processing}
               @change=${e => this._onScanBarcode(e.target.value)}>
-            </ox-input-barcode>
+            </operato-input-barcode>
           </div>
           <div class="qty-input-row">
             <label>피킹수량</label>

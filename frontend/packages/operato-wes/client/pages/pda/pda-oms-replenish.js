@@ -3,6 +3,7 @@ import { html, css } from 'lit'
 import { customElement, query, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
 import { ServiceUtil, TermsUtil, ValueUtil } from '@operato-app/metapage/dist-client'
+import '@operato-app/metapage/dist-client/components/input/operato-input-barcode'
 import { store, PageView } from '@operato/shell'
 import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
 
@@ -151,7 +152,7 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
           gap: 8px;
         }
 
-        .scan-task-order .scan-row-outer ox-input-barcode {
+        .scan-task-order .scan-row-outer operato-input-barcode {
           flex: 1;
         }
 
@@ -448,7 +449,7 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
           cursor: pointer;
         }
 
-        .scan-row ox-input-barcode {
+        .scan-row operato-input-barcode {
           flex: 1;
           --input-height: 28px;
           --input-font-size: 13px;
@@ -678,17 +679,17 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
 
       <div class="task-list">
         ${filtered.length === 0
-          ? html`<div class="empty-message">${TermsUtil.tText('No Data') || '보충 지시가 없습니다'}</div>`
-          : filtered.map(r => this._renderTaskCard(r))}
+        ? html`<div class="empty-message">${TermsUtil.tText('No Data') || '보충 지시가 없습니다'}</div>`
+        : filtered.map(r => this._renderTaskCard(r))}
       </div>
 
       <div class="scan-task-order">
         <label>${TermsUtil.tLabel('replenish_no') || '보충 지시 번호 스캔'}</label>
         <div class="scan-row-outer">
-          <ox-input-barcode id="replenishScanInput"
+          <operato-input-barcode id="replenishScanInput"
             placeholder="${TermsUtil.tLabel('replenish_no') || '보충 지시 번호'}"
             @change=${e => this._onScanReplenishNo(e.target.value)}>
-          </ox-input-barcode>
+          </operato-input-barcode>
           <button class="btn-refresh" @click=${this._refresh}>
             ${TermsUtil.tButton('refresh') || '새로고침'}
           </button>
@@ -810,11 +811,11 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
                 <span class="confirmed-value">${this.scannedToLocCd}</span>
                 <button class="btn-clear" @click=${this._clearToLoc}>변경</button>
               ` : html`
-                <ox-input-barcode id="toLocInput"
+                <operato-input-barcode id="toLocInput"
                   placeholder="${TermsUtil.tLabel('scan_to_loc') || '도착 로케이션 스캔'}"
                   ?disabled=${this.processing}
                   @change=${e => this._onScanToLoc(e.target.value)}>
-                </ox-input-barcode>
+                </operato-input-barcode>
               `}
             </div>
           ` : ''}
@@ -822,13 +823,14 @@ export class PdaOmsReplenish extends connect(store)(PageView) {
           <!-- Step 2: 재고 바코드 스캔 -->
           <div class="scan-row ${!currentItem.to_loc_cd && !this.scannedToLocCd ? '' : 'active'}">
             <span class="row-label">${TermsUtil.tLabel('barcode') || '바코드'}</span>
-            <ox-input-barcode id="barcodeInput"
+            <operato-input-barcode 
+              id="barcodeInput"
               placeholder="${!currentItem.to_loc_cd && !this.scannedToLocCd
-                ? (TermsUtil.tLabel('scan_to_loc_first') || '도착 로케이션 스캔 후 입력 가능')
-                : (TermsUtil.tLabel('scan_barcode') || '출발지 재고 바코드 스캔')}"
+          ? (TermsUtil.tLabel('scan_to_loc_first') || '도착 로케이션 스캔 후 입력 가능')
+          : (TermsUtil.tLabel('scan_barcode') || '출발지 재고 바코드 스캔')}"
               ?disabled=${this.processing || (!currentItem.to_loc_cd && !this.scannedToLocCd)}
               @change=${e => this._onScanBarcode(e.target.value)}>
-            </ox-input-barcode>
+            </operato-input-barcode>
           </div>
 
           <!-- 이동 경로 안내 -->

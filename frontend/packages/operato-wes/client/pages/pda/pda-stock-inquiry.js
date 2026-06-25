@@ -6,6 +6,7 @@ import '../../component/entity-label.js'
 import { customElement, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
 import { ServiceUtil, TermsUtil } from '@operato-app/metapage/dist-client'
+import '@operato-app/metapage/dist-client/components/input/operato-input-barcode'
 import { store, PageView } from '@operato/shell'
 import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
 
@@ -171,7 +172,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           white-space: nowrap;
         }
 
-        .search-row ox-input-barcode {
+        .search-row operato-input-barcode {
           flex: 1;
           --input-height: 30px;
           --input-font-size: 13px;
@@ -181,14 +182,14 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           flex: 1;
         }
 
-        /* ox-input-barcode는 placeholder를 지원하지 않으므로
+        /* operato-input-barcode는 placeholder를 지원하지 않으므로
            wrapper + 절대위치 오버레이로 placeholder 효과를 구현 */
         .ox-input-wrapper {
           flex: 1;
           position: relative;
         }
 
-        .ox-input-wrapper ox-input-barcode {
+        .ox-input-wrapper operato-input-barcode {
           width: 100%;
         }
 
@@ -559,7 +560,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           margin-left: 2px;
         }
 
-        .form-field ox-input-barcode {
+        .form-field operato-input-barcode {
           flex: 1;
         }
 
@@ -633,10 +634,10 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         <div class="search-row">
           <span class="s-label">${TermsUtil.tLabel('barcode') || '바코드'}</span>
           <div class="ox-input-wrapper">
-            <ox-input-barcode
+            <operato-input-barcode
               id="barcodeInput"
               @change=${e => this._onBarcodeChange(e.target.value)}>
-            </ox-input-barcode>
+            </operato-input-barcode>
             ${!this._hasBarcodeValue ? html`
               <span class="ox-placeholder">${TermsUtil.tLabel('scan_barcode') || '재고 바코드 스캔/입력'}</span>
             ` : ''}
@@ -645,10 +646,10 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         <div class="search-row">
           <span class="s-label">${TermsUtil.tLabel('loc_cd') || '로케이션'}</span>
           <div class="ox-input-wrapper">
-            <ox-input-barcode
+            <operato-input-barcode
               id="locCdInput"
               @change=${e => this._onLocCdChange(e.target.value)}>
-            </ox-input-barcode>
+            </operato-input-barcode>
             ${!this._hasLocCdValue ? html`
               <span class="ox-placeholder">${TermsUtil.tLabel('loc_cd') || '로케이션 코드 스캔/입력'}</span>
             ` : ''}
@@ -1130,11 +1131,11 @@ export class PdaStockInquiry extends connect(store)(PageView) {
             ${TermsUtil.tLabel('to_loc_cd') || 'To 로케이션'}
             <span class="required">*</span>
           </label>
-          <ox-input-barcode
+          <operato-input-barcode
             id="moveToLocInput"
             placeholder="${TermsUtil.tLabel('to_loc_cd') || 'To 로케이션 스캔/입력'}"
             @change=${e => this._onMoveToLocCdChange(e.target.value)}>
-          </ox-input-barcode>
+          </operato-input-barcode>
         </div>
         <div class="form-field">
           <label>
@@ -1221,22 +1222,22 @@ export class PdaStockInquiry extends connect(store)(PageView) {
             ${TermsUtil.tLabel('merge_barcode') || '병합 바코드'}
             <span class="required">*</span>
           </label>
-          <ox-input-barcode
+          <operato-input-barcode
             id="mergeBarcodeInput"
             placeholder="${TermsUtil.tLabel('merge_barcode') || '병합 바코드 스캔/입력'}"
             @change=${e => this._onMergeBarcodeChange(e.target.value)}>
-          </ox-input-barcode>
+          </operato-input-barcode>
         </div>
         <div class="form-field">
           <label>
             ${TermsUtil.tLabel('loc_cd') || '로케이션'}
             <span class="required">*</span>
           </label>
-          <ox-input-barcode
+          <operato-input-barcode
             id="mergeLocCdInput"
             placeholder="${TermsUtil.tLabel('loc_cd') || '로케이션 스캔/입력'}"
             @change=${e => this._onMergeLocCdChange(e.target.value)}>
-          </ox-input-barcode>
+          </operato-input-barcode>
         </div>
         ${validated ? html`
           <div class="scan-feedback success" style="margin:0;">
@@ -1412,7 +1413,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
   /**
    * 검색 조건 및 결과 초기화
-   * state와 함께 ox-input-barcode DOM 값도 직접 클리어한다
+   * state와 함께 operato-input-barcode DOM 값도 직접 클리어한다
    */
   _resetSearch() {
     this.searchBarcode = ''

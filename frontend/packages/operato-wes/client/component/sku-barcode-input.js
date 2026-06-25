@@ -10,7 +10,7 @@ import { ServiceUtil, TermsUtil } from '@operato-app/metapage/dist-client'
  * 결과가 1건이면 즉시 `sku-select` 이벤트를 발생시키고,
  * 복수이면 선택 팝업을 띄워 작업자가 선택하도록 한다.
  *
- * ox-input-barcode는 카메라 스캔 버튼을 내장하며, 모바일에서
+ * operato-input-barcode는 카메라 스캔 버튼을 내장하며, 모바일에서
  * 카메라 권한이 있으면 자동으로 버튼이 활성화된다.
  *
  * @property {string} comCd - 화주사 코드 (선택, 없으면 전체 검색)
@@ -61,8 +61,8 @@ export class SkuBarcodeInput extends LitElement {
   /** 입력값 존재 여부 (placeholder 숨김 처리용) */
   @state() _hasValue = false
 
-  /** ox-input-barcode 엘리먼트 참조 (값 초기화용) */
-  @query('ox-input-barcode') _barcodeEl
+  /** operato-input-barcode 엘리먼트 참조 (값 초기화용) */
+  @query('operato-input-barcode') _barcodeEl
 
   /** 컴포넌트 스타일 정의 */
   static get styles() {
@@ -73,14 +73,14 @@ export class SkuBarcodeInput extends LitElement {
         width: 100%;
       }
 
-      /* ox-input-barcode는 placeholder를 지원하지 않으므로
+      /* operato-input-barcode는 placeholder를 지원하지 않으므로
          wrapper + 절대위치 오버레이로 placeholder 효과를 구현 */
       .barcode-wrapper {
         position: relative;
         width: 100%;
       }
 
-      ox-input-barcode {
+      operato-input-barcode {
         width: 100%;
       }
 
@@ -234,10 +234,10 @@ export class SkuBarcodeInput extends LitElement {
 
     return html`
       <div class="barcode-wrapper">
-        <ox-input-barcode
+        <operato-input-barcode
           ?disabled=${this.disabled || this._processing}
           @change=${this._onBarcodeChange}>
-        </ox-input-barcode>
+        </operato-input-barcode>
 
         ${!this._hasValue ? html`
           <span class="placeholder-hint">${placeholderText}</span>
@@ -281,7 +281,7 @@ export class SkuBarcodeInput extends LitElement {
   }
 
   /**
-   * ox-input-barcode의 change 이벤트 처리
+   * operato-input-barcode change 이벤트 처리
    * @param {Event} e - change 이벤트
    */
   _onBarcodeChange(e) {
@@ -296,7 +296,7 @@ export class SkuBarcodeInput extends LitElement {
    */
   async _onScan(barcode) {
     if (!barcode || !barcode.trim()) return
-    // ox-input-barcode에서 Enter 키 입력 시 change 이벤트가 2회 발생하는 이슈 방어
+    // operato-input-barcode에서 Enter 키 입력 시 change 이벤트가 2회 발생하는 이슈 방어
     if (this._processing) return
 
     this._feedback = null
@@ -352,7 +352,7 @@ export class SkuBarcodeInput extends LitElement {
     )
   }
 
-  /** ox-input-barcode 입력값 초기화 (스캔 처리 후 호출) */
+  /** operato-input-barcode 입력값 초기화 (스캔 처리 후 호출) */
   _clearBarcodeInput() {
     if (this._barcodeEl) {
       this._barcodeEl.value = ''

@@ -3,6 +3,7 @@ import { html, css } from 'lit'
 import { customElement, query, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
 import { ServiceUtil, TermsUtil } from '@operato-app/metapage/dist-client'
+import '@operato-app/metapage/dist-client/components/input/operato-input-barcode'
 import { store, PageView } from '@operato/shell'
 import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
 
@@ -116,7 +117,7 @@ export class PdaStockMove extends connect(store)(PageView) {
         .scan-row.active .row-label { color: var(--md-sys-color-primary, #1976D2); }
         .scan-row.done .row-label { color: #2e7d32; }
 
-        .scan-row ox-input-barcode {
+        .scan-row operato-input-barcode {
           flex: 1;
           min-width: 0;
           --input-height: 28px;
@@ -423,11 +424,11 @@ export class PdaStockMove extends connect(store)(PageView) {
             <span class="confirmed-value">${this.toLocCd}</span>
             <button class="btn-clear" @click=${this._clearToLocation}>변경</button>
           ` : html`
-            <ox-input-barcode id="toLocationInput"
+            <operato-input-barcode id="toLocationInput"
               placeholder="${TermsUtil.tLabel('scan_location') || '목적지 로케이션 스캔'}"
               ?disabled=${this.processing}
               @change=${e => this._onScanToLocation(e.target.value)}>
-            </ox-input-barcode>
+            </operato-input-barcode>
           `}
         </div>
 
@@ -438,26 +439,26 @@ export class PdaStockMove extends connect(store)(PageView) {
             <span class="confirmed-value">${this.fromLocCd}</span>
             <button class="btn-clear" @click=${this._clearFromLocation}>변경</button>
           ` : html`
-            <ox-input-barcode id="fromLocationInput"
+            <operato-input-barcode id="fromLocationInput"
               placeholder="${this.toLocCd
           ? (TermsUtil.tLabel('scan_from_location') || 'From 로케이션 스캔')
           : 'To 로케이션 스캔 후 입력 가능'}"
               ?disabled=${this.processing || !this.toLocCd}
               @change=${e => this._onScanFromLocation(e.target.value)}>
-            </ox-input-barcode>
+            </operato-input-barcode>
           `}
         </div>
 
         <!-- 3단계: 바코드 — From + To 모두 확정 후 활성화 -->
         <div class="scan-row ${barcodeActive ? 'active' : ''}">
           <span class="row-label">${TermsUtil.tLabel('barcode') || '바코드'}</span>
-          <ox-input-barcode id="barcodeInput"
+          <operato-input-barcode id="barcodeInput"
             placeholder="${barcodeActive
         ? (TermsUtil.tLabel('scan_barcode') || '재고 바코드 스캔')
         : '로케이션 스캔 후 입력 가능'}"
             ?disabled=${this.processing || !barcodeActive}
             @change=${e => this._onScanBarcode(e.target.value)}>
-          </ox-input-barcode>
+          </operato-input-barcode>
         </div>
       </div>
 
@@ -539,8 +540,8 @@ export class PdaStockMove extends connect(store)(PageView) {
         <div class="check-icon">${hasFailure ? '⚠️' : '✅'}</div>
         <h3 style="color: ${hasFailure ? '#f57f17' : '#4caf50'}">
           ${hasFailure
-            ? `재고 이동 부분 완료 (${res.failed}건 실패)`
-            : (TermsUtil.tText('processed') || '재고 이동 완료!')}
+        ? `재고 이동 부분 완료 (${res.failed}건 실패)`
+        : (TermsUtil.tText('processed') || '재고 이동 완료!')}
         </h3>
 
         <div class="result-card">
