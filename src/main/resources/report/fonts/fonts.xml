@@ -2,7 +2,7 @@
 <fontFamilies>
     <fontFamily name="NanumGothic">
         <normal>report/fonts/NanumGothic.ttf</normal>
-        <bold>report/fonts/NanumGothic.ttf</bold>
+        <bold>report/fonts/NanumGothic-Bold.ttf</bold>
         <italic>report/fonts/NanumGothic.ttf</italic>
         <boldItalic>report/fonts/NanumGothic.ttf</boldItalic>
         <pdfEmbedded>true</pdfEmbedded>
