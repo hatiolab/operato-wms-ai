@@ -389,4 +389,9 @@ export class SkuBarcodeInput extends LitElement {
   focus() {
     this._barcodeEl?.input?.focus()
   }
+
+  /** 외부에서 바코드 값을 직접 주입 — barcode-listener 연동용 */
+  scan(barcode) {
+    this._onScan(barcode)
+  }
 }
