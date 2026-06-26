@@ -36,6 +36,13 @@ export class BarcodeListener extends LitElement {
   /** 전역 재개 요청 핸들러 (참조 고정용 클래스 필드) */
   _onResume = () => { this._paused = false }
 
+  /**
+   * 문서 내 포커스 이탈 핸들러 (참조 고정용).
+   * 입력 필드 → 빈 영역으로 포커스가 빠질 때 capture input이 포커스를 되찾도록 보장한다.
+   * (capture 자신의 blur만으로는 "입력필드 → 빈곳" 2단계 이동을 감지하지 못하는 문제 해결)
+   */
+  _onDocFocusout = () => { this._scheduleRefocus() }
+
   static get styles() {
     return css`
       :host { display: contents; }
@@ -61,6 +68,7 @@ export class BarcodeListener extends LitElement {
     super.connectedCallback()
     document.addEventListener('barcode-listener-pause', this._onPause)
     document.addEventListener('barcode-listener-resume', this._onResume)
+    document.addEventListener('focusout', this._onDocFocusout)
     this._scheduleRefocus()
   }
 
@@ -68,6 +76,7 @@ export class BarcodeListener extends LitElement {
     super.disconnectedCallback()
     document.removeEventListener('barcode-listener-pause', this._onPause)
     document.removeEventListener('barcode-listener-resume', this._onResume)
+    document.removeEventListener('focusout', this._onDocFocusout)
     clearTimeout(this._bufferTimer)
     clearTimeout(this._refocusTimer)
   }
