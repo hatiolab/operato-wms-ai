@@ -549,8 +549,9 @@ public class InboundTransactionService extends AbstractQueryService {
 
         // 3. 품목 및 수량 체크
         for (ReceivingItem item : receivingItems) {
-            if (ValueUtil.isEqual(item.getStatus(), WmsInboundConstants.STATUS_REJECTED)) {
-                // 반려된 아이템은 이미 불량 재고 처리 완료, 상태 유지
+            if (ValueUtil.isEqual(item.getStatus(), WmsInboundConstants.STATUS_REJECTED)
+                    || ValueUtil.isEqual(item.getStatus(), WmsInboundConstants.STATUS_CANCEL)) {
+                // 반려/취소된 아이템은 상태 유지
                 continue;
             }
             if (item.getRcvExpQty() <= item.getRcvQty()) {
