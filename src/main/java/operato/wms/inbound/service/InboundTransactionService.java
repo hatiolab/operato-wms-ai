@@ -484,8 +484,30 @@ public class InboundTransactionService extends AbstractQueryService {
         // 예정 수량과 입고 수량이 다르면 자동 분할 처리
         double splitQty = item.getRcvExpQty() - item.getRcvQty();
         if (splitQty > 0) {
-            item.split(splitQty, false, true);
+            ReceivingItem splitItem = item.split(splitQty, false, false);
+
+            if (ValueUtil.isNotEmpty(item.getDefectReasonCode())) {
+                // 불량 사유가 입력된 경우: 분할된 라인을 불량(BAD)으로 처리하고
+                // 불량 로케이션(DEFECT)에 불량 재고(STATUS_BAD)를 생성한다. (별도 미입고 관리 없음)
+                splitItem.setStatus(WmsInboundConstants.STATUS_BAD);
+                splitItem.setRcvQty(splitQty);
+                splitItem.setRcvDate(DateUtil.todayStr());
+                splitItem.setDefectReasonCode(item.getDefectReasonCode());
+                splitItem.setDefectReason(item.getDefectReason());
+                if (ValueUtil.isEmpty(splitItem.getBarcode())) {
+                    splitItem.setBarcode(Inventory.newBarcode());
+                }
+                this.queryManager.insert(splitItem);
+                this.processRejectedReceivingItem(receiving, splitItem);
+            } else {
+                // 불량 사유가 없으면 기존 동작(미입고 분할 라인 생성)
+                this.queryManager.insert(splitItem);
+            }
         }
+
+        // 정상 입고 라인에는 불량 정보를 남기지 않는다 (불량 정보는 분할된 BAD 라인에만)
+        item.setDefectReasonCode(null);
+        item.setDefectReason(null);
 
         // 유통기한 자동 계산: 제조일이 있고 유통기한이 비어있는 경우 SKU의 prdExpiredPeriod 기반으로 계산
         if (ValueUtil.isNotEmpty(item.getPrdDate()) && ValueUtil.isEmpty(item.getExpiredDate())) {

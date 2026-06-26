@@ -43,6 +43,11 @@ public class WmsInboundConstants {
 	public static final String STATUS_REJECTED = "REJECTED";
 
 	/**
+	 * 상태 : 불량 (입고 작업 중 발생한 불량 수량 라인)
+	 */
+	public static final String STATUS_BAD = "BAD";
+
+	/**
 	 * 상태 : 검수 승인 (화주사 검수 후 승인)
 	 */
 	public static final String STATUS_APPROVED = "APPROVED";

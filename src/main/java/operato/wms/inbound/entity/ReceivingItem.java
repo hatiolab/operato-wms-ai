@@ -241,6 +241,18 @@ public class ReceivingItem extends xyz.elidom.orm.entity.basic.ElidomStampHook {
     private String remarks;
 
     /**
+     * 불량 사유 코드 - 공통코드 INBOUND_DEFECT_REASON 값 (예: DAMAGED)
+     */
+    @Column(name = "defect_reason_code", length = 30)
+    private String defectReasonCode;
+
+    /**
+     * 불량 사유 - 사유 코드가 '기타(ETC)'일 때 작업자가 직접 입력한 상세 사유
+     */
+    @Column(name = "defect_reason", length = 500)
+    private String defectReason;
+
+    /**
      * 확장 필드 1
      */
     @Column(name = "attr01", length = 100)
@@ -552,6 +564,22 @@ public class ReceivingItem extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
     public void setRemarks(String remarks) {
         this.remarks = remarks;
+    }
+
+    public String getDefectReasonCode() {
+        return defectReasonCode;
+    }
+
+    public void setDefectReasonCode(String defectReasonCode) {
+        this.defectReasonCode = defectReasonCode;
+    }
+
+    public String getDefectReason() {
+        return defectReason;
+    }
+
+    public void setDefectReason(String defectReason) {
+        this.defectReason = defectReason;
     }
 
     public String getAttr01() {
