@@ -2,10 +2,12 @@ import '@things-factory/barcode-ui'
 import '../../component/sku-barcode-input.js'
 import '../../component/barcode-listener.js'
 import '../../component/numeric-keypad-input.js'
+import '../../component/code-select.js'
 import { html, css } from 'lit'
 import { customElement, query, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
-import { ServiceUtil, TermsUtil, UiUtil, ValueUtil } from '@operato-app/metapage/dist-client'
+import { MetaApi, ServiceUtil, TermsUtil, UiUtil, ValueUtil, PrintUtil } from '@operato-app/metapage/dist-client'
+import { operatoGet } from '@operato-app/operatofill'
 import '@operato-app/metapage/dist-client/components/input/operato-input-barcode'
 import { store, PageView } from '@operato/shell'
 import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
@@ -44,6 +46,18 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   @state() currentItemIndex = -1
   /** 실제 입고 수량 입력값 */
   @state() rcvQty = 0
+  /** 불량 수량 입력값 (예정수량 = 입고수량 + 불량수량) */
+  @state() defectQty = 0
+  /** 불량 사유 코드 (불량수량 > 0일 때 드롭다운 선택값) */
+  @state() defectReasonCode = ''
+  /** 불량 사유 상세 텍스트 (사유 코드가 '기타(ETC)'일 때 직접 입력) */
+  @state() defectReasonText = ''
+  /** 소비기한 입력값 (yyyy-MM-dd) */
+  @state() expiredDate = ''
+  /** LOT 번호 입력값 */
+  @state() lotNo = ''
+  /** 추가 입력(불량수량/사유/소비기한/LOT) 펼침 여부 */
+  @state() showExtraInputs = false
   /** 완료 항목 수 */
   @state() completedCount = 0
   /** 전체 항목 수 */
@@ -520,6 +534,62 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           opacity: 0.8;
         }
 
+        /* 추가 입력 펼침 토글 버튼 */
+        .btn-toggle-extra {
+          width: 100%;
+          margin-top: 8px;
+          padding: 3px 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          border: 1px dashed var(--md-sys-color-primary, #1976D2);
+          border-radius: 6px;
+          background: transparent;
+          color: var(--md-sys-color-primary, #1976D2);
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .btn-toggle-extra:active {
+          background: var(--md-sys-color-primary-container, #e3f2fd);
+        }
+
+        /* 일반 입력 행 (불량사유/소비기한/LOT) */
+        .field-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 6px;
+        }
+
+        .field-row label {
+          flex: 0 0 auto;
+          min-width: 56px;
+          font-size: 13px;
+          font-weight: bold;
+          color: var(--md-sys-color-on-primary-container, #1565c0);
+          white-space: nowrap;
+        }
+
+        .field-row input,
+        .field-row code-select {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .field-row input {
+          height: 32px;
+          padding: 0 8px;
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 8px;
+          font-size: 15px;
+          background: var(--md-sys-color-surface, #fff);
+          color: var(--md-sys-color-on-surface, #333);
+          box-sizing: border-box;
+        }
+
         /* 스캔 피드백 */
         .scan-feedback {
           margin-top: 8px;
@@ -663,6 +733,24 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         .item-card.current .qty-badge {
           background: var(--md-sys-color-primary, #1976D2);
           color: #fff;
+        }
+
+        /* 완료 항목 라벨 인쇄 버튼 */
+        .item-card .btn-print {
+          flex-shrink: 0;
+          padding: 4px 10px;
+          border: 1px solid var(--md-sys-color-primary, #1976D2);
+          border-radius: 6px;
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          color: var(--md-sys-color-primary, #1976D2);
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .item-card .btn-print:active {
+          background: var(--md-sys-color-primary-container, #e3f2fd);
         }
 
         /* 완료 화면 */
@@ -1029,20 +1117,84 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           <div class="qty-input-row">
             <label>${TermsUtil.tLabel('rcv_qty') || '입고수량'}</label>
             <button class="btn-qty"
-              @click=${() => { if (this.rcvQty > 0) this.rcvQty-- }}>−</button>
+              @click=${() => this._setRcvQty(this.rcvQty - 1)}>−</button>
             <numeric-keypad-input
               .value=${this.rcvQty}
               .min=${0}
               .max=${currentItem.rcv_exp_qty || null}
               ?disabled=${this.processing || this.viewOnly}
-              @change=${e => (this.rcvQty = e.detail.value)}>
+              @change=${e => this._setRcvQty(e.detail.value)}>
             </numeric-keypad-input>
             <button class="btn-qty"
-              @click=${() => {
-        const max = currentItem.rcv_exp_qty
-        if (!max || this.rcvQty < max) this.rcvQty++
-      }}>+</button>
+              @click=${() => this._setRcvQty(this.rcvQty + 1)}>+</button>
           </div>
+
+          <!-- 추가 입력 토글 (불량수량/사유/소비기한/LOT) -->
+          <button class="btn-toggle-extra" @click=${() => { this.showExtraInputs = !this.showExtraInputs }}>
+            ${this.showExtraInputs ? '▴' : '▾'}
+          </button>
+
+          ${this.showExtraInputs ? html`
+            <!-- 불량수량 — 입력 시 입고수량 = 예정 − 불량 자동 조정 -->
+            <div class="qty-input-row">
+              <label>${TermsUtil.tLabel('defect_qty') || '불량수량'}</label>
+              <button class="btn-qty"
+                @click=${() => this._setDefectQty(this.defectQty - 1)}>−</button>
+              <numeric-keypad-input
+                .value=${this.defectQty}
+                .min=${0}
+                .max=${currentItem.rcv_exp_qty || null}
+                ?disabled=${this.processing || this.viewOnly}
+                @change=${e => this._setDefectQty(e.detail.value)}>
+              </numeric-keypad-input>
+              <button class="btn-qty"
+                @click=${() => this._setDefectQty(this.defectQty + 1)}>+</button>
+            </div>
+
+            <!-- 불량사유 — 불량수량 > 0일 때만 노출 -->
+            ${this.defectQty > 0 ? html`
+              <div class="field-row">
+                <label>${TermsUtil.tLabel('defect_reason') || '불량사유'}</label>
+                <code-select
+                  code-name="INBOUND_DEFECT_REASON"
+                  placeholder="${TermsUtil.tText('select_one') || '사유 선택'}"
+                  .value=${this.defectReasonCode}
+                  ?disabled=${this.processing || this.viewOnly}
+                  @change=${e => { this.defectReasonCode = e.detail.value; if (e.detail.value !== 'ETC') this.defectReasonText = '' }}>
+                </code-select>
+              </div>
+              <!-- '기타(ETC)' 선택 시 상세 사유 자유 입력 -->
+              ${this.defectReasonCode === 'ETC' ? html`
+                <div class="field-row">
+                  <label>${TermsUtil.tLabel('defect_reason_detail') || '상세사유'}</label>
+                  <input type="text"
+                    .value=${this.defectReasonText}
+                    ?disabled=${this.processing || this.viewOnly}
+                    @input=${e => (this.defectReasonText = e.target.value)} />
+                </div>
+              ` : ''}
+            ` : ''}
+
+            <!-- 소비기한 -->
+            <div class="field-row">
+              <label>${TermsUtil.tLabel('expired_date') || '소비기한'}</label>
+              <input type="date"
+                .value=${this.expiredDate}
+                ?disabled=${this.processing || this.viewOnly}
+                @focus=${this._pauseScan}
+                @blur=${this._resumeScan}
+                @change=${e => (this.expiredDate = e.target.value)} />
+            </div>
+
+            <!-- LOT 번호 (자판 입력) -->
+            <div class="field-row">
+              <label>${TermsUtil.tLabel('lot_no') || 'LOT'}</label>
+              <input type="text"
+                .value=${this.lotNo}
+                ?disabled=${this.processing || this.viewOnly}
+                @input=${e => (this.lotNo = e.target.value)} />
+            </div>
+          ` : ''}
 
           ${this.lastFeedback ? html`
             <div class="scan-feedback ${this.lastFeedback.type}">
@@ -1065,7 +1217,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
   /** work 모드 탭 바 렌더링 — 미완료/완료 탭 */
   _renderWorkTabs() {
-    const todoItems = this.receivingItems.filter(i => i.status !== 'END' && i.status !== 'CANCEL')
+    const todoItems = this.receivingItems.filter(i => i.status !== 'END' && i.status !== 'CANCEL' && i.status !== 'BAD')
     const doneItems = this.receivingItems.filter(i => i.status === 'END')
 
     return html`
@@ -1090,7 +1242,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   /** work 모드 탭 콘텐츠 렌더링 — 미완료/완료 항목 목록 */
   _renderWorkTabContent() {
     const items = this.currentTabKey === 'todo'
-      ? this.receivingItems.filter(i => i.status !== 'END' && i.status !== 'CANCEL')
+      ? this.receivingItems.filter(i => i.status !== 'END' && i.status !== 'CANCEL' && i.status !== 'BAD')
       : this.receivingItems.filter(i => i.status === 'END')
 
     if (!items.length) {
@@ -1127,6 +1279,12 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
                   </div>
                 ` : ''}
               </div>
+              ${isDone && item.barcode ? html`
+                <button class="btn-print"
+                  @click=${e => { e.stopPropagation(); this._printBarcode(item) }}>
+                  🖨️ ${TermsUtil.tButton('print') || '인쇄'}
+                </button>
+              ` : ''}
               <span class="qty-badge ${isDone ? 'done' : ''}">
                 ${isDone
           ? `${item.rcv_qty || 0}/${item.rcv_exp_qty || 0}`
@@ -1232,7 +1390,8 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     try {
       const result = await ServiceUtil.restGet(`receivings/${receivingId}/items`)
       this.receivingItems = result?.items || result || []
-      this.totalCount = this.receivingItems.length
+      // 불량(BAD) 라인은 작업 대상 건수에서 제외 (진행률·자동마감 기준)
+      this.totalCount = this.receivingItems.filter(i => i.status !== 'BAD').length
       this.completedCount = this.receivingItems.filter(i => i.status === 'END').length
       this._moveToNextItem()
     } catch (error) {
@@ -1374,7 +1533,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
     // 1. 현재 항목과 sku_cd 매칭
     if (currentItem && currentItem.sku_cd === sku_cd) {
-      this.rcvQty = currentItem.rcv_exp_qty || 1
+      this._setInitialRcvQty()
       this.barcodeScanned = true
       this._showFeedback(`${sku_cd} 매칭 — ${this.rcvQty} 확인`, 'success')
       return
@@ -1382,13 +1541,13 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
     // 2. 전체 미완료 항목에서 sku_cd 검색
     const matchIndex = this.receivingItems.findIndex(
-      item => item.status !== 'END' && item.status !== 'CANCEL' && item.sku_cd === sku_cd
+      item => item.status !== 'END' && item.status !== 'CANCEL' && item.status !== 'BAD' && item.sku_cd === sku_cd
     )
 
     if (matchIndex >= 0) {
       this.currentItemIndex = matchIndex
       const item = this.receivingItems[matchIndex]
-      this.rcvQty = item.rcv_exp_qty || 1
+      this._setInitialRcvQty()
       this.barcodeScanned = true
       this._showFeedback(`${sku_cd} 매칭${item.loc_cd ? ` (${item.loc_cd})` : ''} — ${this.rcvQty}`, 'success')
       return
@@ -1425,14 +1584,35 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
       return
     }
 
+    // 불량수량 입력 시 불량사유 필수
+    if (this.defectQty > 0 && !this.defectReasonCode) {
+      this._showFeedback('불량사유를 선택해주세요', 'warning')
+      return
+    }
+    // '기타(ETC)' 선택 시 상세 사유 필수
+    if (this.defectQty > 0 && this.defectReasonCode === 'ETC' && !this.defectReasonText.trim()) {
+      this._showFeedback('상세 불량사유를 입력해주세요', 'warning')
+      return
+    }
+
     this.processing = true
     try {
       // Fix 2: 콜백 패턴 대신 성공 여부를 플래그로 받아 await 흐름을 콜백 밖에서 유지
       let success = false
       let errMsg = null
+      // rcv_qty(정상분)로 finish하면 백엔드가 (예정 − rcv_qty)만큼 불량 라인으로 분할하여
+      // BAD 상태 + NG 로케이션 불량 재고를 생성한다. (defect_reason_code 가 있을 때)
+      // 소비기한·LOT은 백엔드(finishReceivingOrderLine)가 그대로 저장한다.
       await ServiceUtil.restPost(
         `inbound_trx/receiving_orders/line/${item.id}/finish`,
-        { ...item, rcv_qty: qty },
+        {
+          ...item,
+          rcv_qty: qty,
+          expired_date: this.expiredDate || item.expired_date,
+          lot_no: this.lotNo || item.lot_no,
+          defect_reason_code: this.defectQty > 0 ? this.defectReasonCode : null,
+          defect_reason: (this.defectQty > 0 && this.defectReasonCode === 'ETC') ? this.defectReasonText : null
+        },
         null, null,
         () => { success = true },
         (err) => { errMsg = err?.msg || '입고 확인 실패' }
@@ -1462,7 +1642,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   async _closeReceiving() {
     if (!this.currentReceiving) return
 
-    const remaining = this.receivingItems.filter(i => i.status !== 'END' && i.status !== 'CANCEL')
+    const remaining = this.receivingItems.filter(i => i.status !== 'END' && i.status !== 'CANCEL' && i.status !== 'BAD')
     if (remaining.length > 0) {
       const confirmed = await UiUtil.showAlertPopup(
         'label.confirm',
@@ -1545,23 +1725,113 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     }
   }
 
-  /** 탭 목록에서 항목 직접 선택 — 바코드 스캔 상태 초기화 */
+  /** 탭 목록에서 항목 직접 선택 — 입력 필드 및 바코드 스캔 상태 초기화 */
   _selectItem(idx) {
     this.currentItemIndex = idx
-    this.barcodeScanned = false
+    this._setInitialRcvQty()
   }
 
   /** 다음 미완료 항목으로 인덱스 이동 */
   _moveToNextItem() {
-    const nextIdx = this.receivingItems.findIndex(i => i.status !== 'END' && i.status !== 'CANCEL')
+    const nextIdx = this.receivingItems.findIndex(i => i.status !== 'END' && i.status !== 'CANCEL' && i.status !== 'BAD')
     this.currentItemIndex = nextIdx
   }
 
-  /** 현재 항목의 rcv_exp_qty로 rcvQty 초기값 설정 — 항목 전환 시 바코드 스캔 상태 초기화 */
+  /** 현재 항목 기준으로 입력 필드 초기값 설정 — 항목 전환 시 바코드 스캔 상태 초기화 */
   _setInitialRcvQty() {
     const currentItem = this.currentItemIndex >= 0 ? this.receivingItems[this.currentItemIndex] : null
     this.rcvQty = currentItem ? (currentItem.rcv_exp_qty || 1) : 0
+    this.defectQty = 0
+    this.defectReasonCode = ''
+    this.defectReasonText = ''
+    this.expiredDate = currentItem?.expired_date || ''
+    this.lotNo = currentItem?.lot_no || ''
+    // 추가 입력은 항상 접힌 상태로 시작 (디폴트)
+    this.showExtraInputs = false
     this.barcodeScanned = false
+  }
+
+  /**
+   * 입고수량 설정 — 예정수량 범위로 보정하고 불량수량을 (예정 − 입고)으로 자동 조정
+   * @param {number} qty - 입력된 입고수량
+   */
+  _setRcvQty(qty) {
+    const currentItem = this.currentItemIndex >= 0 ? this.receivingItems[this.currentItemIndex] : null
+    const exp = currentItem ? (currentItem.rcv_exp_qty || 0) : 0
+    let rcv = Math.max(0, qty)
+    if (exp && rcv > exp) rcv = exp
+    this.rcvQty = rcv
+    this.defectQty = exp ? Math.max(0, exp - rcv) : 0
+  }
+
+  /**
+   * 불량수량 설정 — 예정수량 범위로 보정하고 입고수량을 (예정 − 불량)으로 자동 조정
+   * @param {number} qty - 입력된 불량수량
+   */
+  _setDefectQty(qty) {
+    const currentItem = this.currentItemIndex >= 0 ? this.receivingItems[this.currentItemIndex] : null
+    const exp = currentItem ? (currentItem.rcv_exp_qty || 0) : 0
+    let defect = Math.max(0, qty)
+    if (exp && defect > exp) defect = exp
+    this.defectQty = defect
+    this.rcvQty = exp ? Math.max(0, exp - defect) : this.rcvQty
+    // 불량수량이 0이면 사유 초기화
+    if (defect === 0) { this.defectReasonCode = ''; this.defectReasonText = '' }
+  }
+
+  /** 스캔 일시정지 — 날짜 선택 등 팝업/포커스 입력 중 스캔 오인식 방지 */
+  _pauseScan() {
+    document.dispatchEvent(new CustomEvent('barcode-listener-pause'))
+  }
+
+  /** 스캔 재개 */
+  _resumeScan() {
+    document.dispatchEvent(new CustomEvent('barcode-listener-resume'))
+  }
+
+  /**
+   * 재고 바코드 라벨 인쇄 — 완료 항목의 재고 라벨 출력
+   * 입고 완료 항목은 loc_cd가 없으므로 barcode로 재고(inventory)를 조회해 로케이션을 확보한다.
+   * 모바일: PDF를 새 탭에서 열어 인쇄 / PC: 라벨 미리보기 팝업
+   * @param {object} item - 완료된 입고 항목 (barcode 사용)
+   */
+  async _printBarcode(item) {
+    if (!item.barcode) return
+    try {
+      // barcode로 재고 조회 — find_by는 결과 없을 때 빈 응답(JSON 파싱 오류)이라 목록 검색 사용
+      const invRes = await ServiceUtil.searchByPagination('inventories', [{ name: 'barcode', value: item.barcode }], null, 1, 1)
+      const inventory = invRes?.items?.[0]
+      if (!inventory || !inventory.id) {
+        this._showFeedback(TermsUtil.tText('inventory_not_found') || '인쇄할 재고를 찾을 수 없습니다', 'warning')
+        return
+      }
+
+      const isMobile = 'ontouchstart' in window
+      if (isMobile) {
+        if (!inventory.loc_cd) {
+          this._showFeedback(TermsUtil.tText('inventory_loc_not_found') || '재고 로케이션이 없어 인쇄할 수 없습니다', 'warning')
+          return
+        }
+        const barcode = encodeURIComponent(item.barcode)
+        const locCd = encodeURIComponent(inventory.loc_cd)
+        const res = await operatoGet(`inventories/${barcode}/${locCd}/download_barcode`, {}, false)
+        const data = await res.arrayBuffer()
+        const file = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }))
+        PrintUtil.openPdfInNewTab(file)
+      } else {
+        MetaApi.openDynamicPopup(TermsUtil.tMenu('InventoryBarcode'), {
+          module: 'metapage',
+          import: 'pages/basic-pdf-element.js',
+          tagname: 'basic-pdf-element',
+          menu: 'InventoryBarcode',
+          size: 'large',
+          title_field: 'name'
+        }, inventory, inventory.id, null)
+      }
+    } catch (err) {
+      console.warn('재고 라벨 인쇄 실패:', err)
+      this._showFeedback(TermsUtil.tText('print_failed') || '라벨 인쇄 중 오류가 발생했습니다', 'error')
+    }
   }
 
   /** 피드백 메시지 표시 */
