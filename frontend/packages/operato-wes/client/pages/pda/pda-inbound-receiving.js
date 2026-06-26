@@ -1,5 +1,6 @@
 import '@things-factory/barcode-ui'
 import '../../component/sku-barcode-input.js'
+import '../../component/barcode-listener.js'
 import { html, css } from 'lit'
 import { customElement, query, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
@@ -29,6 +30,10 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   @state() loading = false
   /** API 처리 중 */
   @state() processing = false
+  /** 조회 기준 날짜 */
+  @state() orderDate = ValueUtil.todayFormatted()
+  /** 상태별 건수 요약 { ready, start, completed, total } */
+  @state() taskSummary = { ready: 0, start: 0, completed: 0, total: 0 }
 
   /** 선택된 입고 주문 헤더 */
   @state() currentReceiving = null
@@ -52,6 +57,8 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   @state() barcodeScanned = false
   /** 항목 목록 로딩 중 (work 화면 진입 초기 깜빡임 방지) */
   @state() itemsLoading = false
+  /** 완료된 주문 조회 전용 모드 — 버튼/탭 입력 비활성화 */
+  @state() viewOnly = false
 
   /** SKU 바코드 스캔 입력 컴포넌트 */
   @query('sku-barcode-input') _skuBarcodeInput
@@ -137,10 +144,85 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           background: var(--md-sys-color-surface-container-lowest, #fff);
         }
 
+        /* 날짜 필터 */
+        .date-filter {
+          padding: 8px 12px;
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
+        }
+
+        .date-filter .filter-row {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .date-filter input[type='date'] {
+          flex: 1;
+          padding: 7px 10px;
+          border: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
+          border-radius: 6px;
+          font-size: 13px;
+          background: var(--md-sys-color-surface, #fff);
+          color: var(--md-sys-color-on-surface, #333);
+          outline: none;
+        }
+
+        .date-filter input[type='date']:focus {
+          border-color: var(--md-sys-color-primary, #1976D2);
+        }
+
+        .date-filter .btn-search {
+          flex-shrink: 0;
+          padding: 7px 14px;
+          border: 1px solid var(--md-sys-color-primary, #1976D2);
+          border-radius: 6px;
+          background: var(--md-sys-color-primary, #1976D2);
+          color: #fff;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .date-filter .btn-search:active { opacity: 0.85; }
+
+        /* 목록 진행률 섹션 */
+        .list-progress-section {
+          padding: 6px 12px 4px;
+          flex-shrink: 0;
+        }
+
+        .list-progress-bar {
+          height: 6px;
+          background: var(--md-sys-color-surface-variant, #E0E0E0);
+          border-radius: 3px;
+          overflow: hidden;
+          margin-bottom: 5px;
+        }
+
+        .list-progress-fill {
+          height: 100%;
+          background: linear-gradient(90deg, #FF9800, #4CAF50);
+          border-radius: 3px;
+          transition: width 0.3s ease;
+        }
+
+        .list-progress-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant, #666);
+        }
+
+        .list-progress-header strong {
+          color: var(--md-sys-color-on-surface, #333);
+        }
+
         /* 현황 요약 카드 */
         .summary-cards {
           display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
+          grid-template-columns: 1fr 1fr 1fr 1fr;
           gap: 8px;
           padding: 8px 12px;
         }
@@ -174,7 +256,9 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         }
 
         .summary-card.waiting .count { color: var(--md-sys-color-error, #d32f2f); }
+        .summary-card.in-progress .count { color: #1976d2; }
         .summary-card.done .count { color: #4CAF50; }
+        .summary-card.all .count { color: #757575; }
 
         /* 입고번호 스캔 입력 */
         .scan-task-order {
@@ -308,10 +392,11 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
         /* 진행률 바 */
         .progress-section {
-          padding: 6px 12px;
+          padding: 4px 12px;
           display: flex;
           align-items: center;
           gap: 8px;
+          flex-shrink: 0;
         }
 
         .progress-bar-large {
@@ -338,10 +423,11 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
         /* 현재 입고 항목 */
         .current-item-section {
-          margin: 4px 12px;
-          padding: 12px;
+          margin: 2px 12px;
+          padding: 8px 10px;
           background: var(--md-sys-color-primary-container, #e3f2fd);
           border-radius: 8px;
+          flex-shrink: 0;
         }
 
         .location-display {
@@ -375,7 +461,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         }
 
         .barcode-input {
-          margin-top: 10px;
+          margin-top: 6px;
           display: flex;
           align-items: center;
           gap: 8px;
@@ -397,7 +483,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           display: flex;
           align-items: center;
           gap: 8px;
-          margin-top: 8px;
+          margin-top: 6px;
         }
 
         .qty-input-row label {
@@ -412,7 +498,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           flex: 1;
           min-width: 0;
           width: 0;
-          height: 36px;
+          height: 32px;
           padding: 0 8px;
           border: 1px solid var(--md-sys-color-outline-variant, #ccc);
           border-radius: 8px;
@@ -425,8 +511,8 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         }
 
         .qty-input-row .btn-qty {
-          width: 36px;
-          height: 36px;
+          width: 32px;
+          height: 32px;
           border: none;
           border-radius: 8px;
           background: var(--md-sys-color-primary, #1976D2);
@@ -472,7 +558,8 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         .tabs {
           display: flex;
           border-bottom: 2px solid var(--md-sys-color-outline-variant, #e0e0e0);
-          margin: 8px 12px 0;
+          margin: 4px 12px 0;
+          flex-shrink: 0;
         }
 
         .tab {
@@ -481,7 +568,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           align-items: center;
           justify-content: center;
           gap: 6px;
-          padding: 10px 0;
+          padding: 7px 0;
           font-size: 13px;
           font-weight: 600;
           color: var(--md-sys-color-on-surface-variant, #666);
@@ -512,7 +599,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         .tab-content {
           padding: 8px 12px;
           overflow-y: auto;
-          max-height: 280px;
+          min-height: calc(100svh - 290px);
         }
 
         .item-card {
@@ -565,6 +652,27 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         .item-card .qty-badge.done {
           background: #e8f5e9;
           color: #2e7d32;
+        }
+
+        .item-card.current {
+          background: var(--md-sys-color-primary-container, #e3f2fd);
+          border: 2px solid var(--md-sys-color-primary, #1976D2);
+          box-shadow: 0 2px 8px rgba(25, 118, 210, 0.25);
+        }
+
+        .item-card.current .icon {
+          color: var(--md-sys-color-primary, #1976D2);
+          font-size: 20px;
+        }
+
+        .item-card.current .sku {
+          color: var(--md-sys-color-primary, #1976D2);
+          font-weight: 700;
+        }
+
+        .item-card.current .qty-badge {
+          background: var(--md-sys-color-primary, #1976D2);
+          color: #fff;
         }
 
         /* 완료 화면 */
@@ -704,12 +812,12 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         </span>
         <div class="actions">
           <button class="primary"
-            ?disabled=${this.processing || !this.rcvQty || !this.barcodeScanned}
+            ?disabled=${this.viewOnly || this.processing || !this.rcvQty || !this.barcodeScanned}
             @click=${this._confirmReceive}>
             ${TermsUtil.tButton('confirm') || '확인'}
           </button>
           <button class="primary"
-            ?disabled=${this.processing}
+            ?disabled=${this.viewOnly || this.processing}
             @click=${this._closeReceiving}>
             ${TermsUtil.tButton('complete') || '작업완료'}
           </button>
@@ -718,21 +826,18 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     `
   }
 
-  /** list 모드 렌더링 — 현황 요약, 입고주문 목록, 입고번호 스캔 */
+  /** list 모드 렌더링 — 날짜 필터, 진행률, 현황 요약 카드, 입고주문 목록, 입고번호 스캔 */
   _renderListMode() {
-    if (this.loading) {
-      return html`<div class="loading-overlay">${TermsUtil.tLabel('loading') || '로딩 중...'}</div>`
-    }
-
     const DONE_STATUSES = new Set(['END', 'APPROVED', 'PUTAWAY', 'STORED'])
     const ready = this.taskList.filter(t => t.status === 'READY')
     const start = this.taskList.filter(t => t.status === 'START')
     const end = this.taskList.filter(t => DONE_STATUSES.has(t.status))
+    const all = [...ready, ...start, ...end]
     const filtered =
       this.filterStatus === 'READY' ? ready
         : this.filterStatus === 'START' ? start
           : this.filterStatus === 'END' ? end
-            : [...ready, ...start, ...end]
+            : all
 
     const emptyMessage =
       this.filterStatus === 'READY' ? '대기 중인 입고 주문이 없습니다' :
@@ -740,7 +845,35 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           this.filterStatus === 'END' ? '오늘 완료된 입고 주문이 없습니다' :
             '조회된 입고 주문이 없습니다'
 
+    const progressPct = all.length > 0 ? (end.length / all.length) * 100 : 0
+    const progressPctDisplay = progressPct.toFixed(1)
+
     return html`
+      <barcode-listener
+        @barcode-scanned=${e => this._onScanReceivingNo(e.detail.barcode)}>
+      </barcode-listener>
+
+      <div class="date-filter">
+        <div class="filter-row">
+          <input
+            type="date"
+            .value="${this.orderDate}"
+            @change=${e => { this.orderDate = e.target.value }}
+          />
+          <button class="btn-search" @click=${() => { this.filterStatus = 'ALL'; this._loadTaskList(); }}>🔍 검색</button>
+        </div>
+      </div>
+
+      <div class="list-progress-section">
+        <div class="list-progress-bar">
+          <div class="list-progress-fill" style="width: ${progressPct}%"></div>
+        </div>
+        <div class="list-progress-header">
+          <span>입고 ${progressPctDisplay}%</span>
+          <span>진행 <strong>${ready.length + start.length}</strong> / 완료 <strong>${end.length}</strong> (총 ${all.length}건)</span>
+        </div>
+      </div>
+
       <div class="summary-cards">
         <div class="summary-card waiting"
           ?active=${this.filterStatus === 'READY'}
@@ -748,11 +881,11 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           <div class="count">${ready.length}</div>
           <div class="card-label">${TermsUtil.tLabel('wait') || '대기'}</div>
         </div>
-        <div class="summary-card"
+        <div class="summary-card in-progress"
           ?active=${this.filterStatus === 'START'}
           @click=${() => this._toggleFilter('START')}>
           <div class="count">${start.length}</div>
-          <div class="card-label">${TermsUtil.tLabel('in_progress') || '진행중'}</div>
+          <div class="card-label">${TermsUtil.tLabel('in_progress') || '작업중'}</div>
         </div>
         <div class="summary-card done"
           ?active=${this.filterStatus === 'END'}
@@ -760,13 +893,23 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           <div class="count">${end.length}</div>
           <div class="card-label">${TermsUtil.tLabel('completed') || '완료'}</div>
         </div>
+        <div class="summary-card all"
+          ?active=${this.filterStatus === 'ALL'}
+          @click=${() => this._toggleFilter('ALL')}>
+          <div class="count">${all.length}</div>
+          <div class="card-label">${TermsUtil.tLabel('all') || '전체'}</div>
+        </div>
       </div>
 
-      <div class="task-list">
-        ${filtered.length === 0
-        ? html`<div class="empty-message">${emptyMessage}</div>`
-        : filtered.map(r => this._renderTaskCard(r))}
-      </div>
+      ${this.loading
+        ? html`<div class="loading-overlay">${TermsUtil.tLabel('loading') || '로딩 중...'}</div>`
+        : html`
+          <div class="task-list">
+            ${filtered.length === 0
+            ? html`<div class="empty-message">${emptyMessage}</div>`
+            : filtered.map(r => this._renderTaskCard(r))}
+          </div>
+        `}
 
       <div class="scan-task-order">
         <label>${TermsUtil.tLabel('rcv_no') || '입고번호 스캔'}</label>
@@ -829,6 +972,10 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     const rcv = this.currentReceiving
 
     return html`
+      <barcode-listener
+        @barcode-scanned=${e => this._skuBarcodeInput?.scan(e.detail.barcode)}>
+      </barcode-listener>
+
       <div class="progress-section">
         <div class="progress-bar-large">
           <div class="fill" style="width: ${progressPct}%"></div>
@@ -838,12 +985,13 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
       <!-- 입고 주문 요약 정보 -->
       <div style="
-        display:flex; gap:12px; flex-wrap:wrap;
-        padding:6px 12px 4px;
+        display:flex; gap:10px; flex-wrap:wrap;
+        padding:4px 12px;
         font-size:12px;
         color:var(--md-sys-color-on-surface-variant,#666);
         border-bottom:1px solid var(--md-sys-color-outline-variant,#e0e0e0);
         background:var(--md-sys-color-surface-container-low,#f5f5f5);
+        flex-shrink:0;
       ">
         <span>📅 ${TermsUtil.tLabel('rcv_req_date') || '입고예정일'}: <strong>${rcv?.rcv_req_date || '-'}</strong></span>
         <span>🏢 ${TermsUtil.tLabel('com_cd') || '화주사'}: <strong>${rcv?.com_cd || '-'}</strong></span>
@@ -925,8 +1073,11 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
     return html`
       <div class="tabs">
-        <div class="tab" ?activate=${'todo' === this.currentTabKey}
-          @click=${() => (this.currentTabKey = 'todo')}>
+        <div class="tab"
+          ?activate=${'todo' === this.currentTabKey}
+          ?disabled=${this.viewOnly}
+          style=${this.viewOnly ? 'opacity:0.4; pointer-events:none; cursor:not-allowed;' : ''}
+          @click=${() => { if (!this.viewOnly) this.currentTabKey = 'todo' }}>
           <span>${TermsUtil.tLabel('not_completed') || '미완료'}</span>
           <span class="badge">${todoItems.length}</span>
         </div>
@@ -964,7 +1115,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
       const icon = isDone ? '✅' : isCurrent ? '▶' : '☐'
 
       return html`
-            <div class="item-card" @click=${() => !isDone && this._selectItem(idx)}>
+            <div class="item-card ${isCurrent ? 'current' : ''}" @click=${() => !isDone && this._selectItem(idx)}>
               <span class="icon">${icon}</span>
               <div class="info">
                 <div class="loc">
@@ -1049,19 +1200,19 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   async _loadTaskList() {
     this.loading = true
     try {
-      const today = ValueUtil.todayFormatted()
+      const date = this.orderDate || ValueUtil.todayFormatted()
 
       const [readyResult, startResult, endResult] = await Promise.all([
         ServiceUtil.restGet(`receivings?query=${encodeURIComponent(JSON.stringify([
           { name: 'status', operator: 'eq', value: 'READY' },
-          { name: 'rcv_req_date', operator: 'eq', value: today }
+          { name: 'rcv_req_date', operator: 'eq', value: date }
         ]))}&limit=100`),
         ServiceUtil.restGet(`receivings?query=${encodeURIComponent(JSON.stringify([
           { name: 'status', operator: 'eq', value: 'START' }
         ]))}&limit=100`),
         ServiceUtil.restGet(`receivings?query=${encodeURIComponent(JSON.stringify([
           { name: 'status', operator: 'in', value: 'END,APPROVED,PUTAWAY,STORED' },
-          { name: 'rcv_end_date', operator: 'eq', value: today }
+          { name: 'rcv_end_date', operator: 'eq', value: date }
         ]))}&limit=100`)
       ])
 
@@ -1140,12 +1291,27 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
   /** 입고 주문 선택 → 작업 시작 → 항목 로드 → work 모드 전환 */
   async _selectReceiving(r) {
-    // 완료 이후 상태는 재작업 불가 — 피드백만 표시
     const DONE_STATUSES = new Set(['END', 'APPROVED', 'PUTAWAY', 'STORED'])
+
+    // 완료된 주문 — 조회 전용(viewOnly)으로 work 뷰 진입
     if (DONE_STATUSES.has(r.status)) {
-      document.dispatchEvent(new CustomEvent('notify', {
-        detail: { level: 'warn', message: `이미 입고 완료된 주문입니다 (${r.rcv_no})` }
-      }))
+      if (this.processing) return
+      this.processing = true
+      try {
+        this.currentReceiving = r
+        this.viewOnly = true
+        this.currentTabKey = 'done'
+        this.lastFeedback = null
+        this.rcvQty = 0
+        await this._loadReceivingItems(r.id)
+        this.mode = 'work'
+      } catch (error) {
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: { level: 'error', message: error.message || '항목을 불러올 수 없습니다' }
+        }))
+      } finally {
+        this.processing = false
+      }
       return
     }
 
@@ -1168,6 +1334,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         if (startSuccess) {
           r.status = 'START'
           this.currentReceiving = r
+          this.viewOnly = false
           this.startedAt = Date.now()
           this.lastFeedback = null
           this.currentTabKey = 'todo'
@@ -1175,11 +1342,11 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           await this._loadReceivingItems(r.id)  // Fix 1: await 추가
           this._setInitialRcvQty()
           this.mode = 'work'
-          setTimeout(() => this._focusBarcodeInput(), 200)
         }
 
       } else if (r.status === 'START') {
         this.currentReceiving = r
+        this.viewOnly = false
         this.startedAt = Date.now()
         this.lastFeedback = null
         this.currentTabKey = 'todo'
@@ -1187,7 +1354,6 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         await this._loadReceivingItems(r.id)
         this._setInitialRcvQty()
         this.mode = 'work'
-        setTimeout(() => this._focusBarcodeInput(), 200)
       }
 
     } catch (error) {
@@ -1282,7 +1448,6 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           await this._onAllItemsCompleted()
         } else {
           this._setInitialRcvQty()
-          setTimeout(() => this._focusBarcodeInput(), 200)
         }
       } else if (errMsg) {
         this._showFeedback(errMsg, 'error')
@@ -1407,8 +1572,4 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     this.lastFeedback = { type, message }
   }
 
-  /** sku-barcode-input에 포커스 — PDA 하드웨어 스캐너 연동용 */
-  _focusBarcodeInput() {
-    this._skuBarcodeInput?.focus()
-  }
 }
