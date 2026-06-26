@@ -148,7 +148,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
         /* 현황 요약 카드 */
         .summary-cards {
           display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
+          grid-template-columns: 1fr 1fr;
           gap: 8px;
           padding: 8px 12px;
         }
@@ -816,12 +816,11 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
     // 입고주문 단위 분류 (재고 건수가 아닌 입고주문 개수 기준)
     const waitingList = this.receivingList.filter(r => r.putaway_status === 'WAITING')
     const putawayList = this.receivingList.filter(r => r.putaway_status === 'PUTAWAY')
-    const doneList = this.receivingList.filter(r => r.putaway_status === 'DONE')
+    // ALL은 대기 + 작업중만 표시 (완료 DONE 입고는 목록에서 제외)
     const filteredList =
       this.listFilter === 'WAITING' ? waitingList
         : this.listFilter === 'PUTAWAY' ? putawayList
-          : this.listFilter === 'DONE' ? doneList
-            : this.receivingList
+          : [...waitingList, ...putawayList]
 
     return html`
       <div class="summary-cards">
@@ -836,12 +835,6 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
           @click=${() => this._toggleListFilter('PUTAWAY')}>
           <div class="count">${putawayList.length}</div>
           <div class="card-label">${TermsUtil.tLabel('in_progress') || '작업중'}</div>
-        </div>
-        <div class="summary-card done"
-          ?active=${this.listFilter === 'DONE'}
-          @click=${() => this._toggleListFilter('DONE')}>
-          <div class="count">${doneList.length}</div>
-          <div class="card-label">${TermsUtil.tLabel('completed') || '완료'}</div>
         </div>
       </div>
 
