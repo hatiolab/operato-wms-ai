@@ -1,4 +1,5 @@
 import { html, css, LitElement } from 'lit'
+import { ifDefined } from 'lit/directives/if-defined.js'
 import { customElement, property, state } from 'lit/decorators.js'
 import { TermsUtil } from '@operato-app/metapage/dist-client'
 
@@ -49,6 +50,9 @@ export class NumericKeypadInput extends LitElement {
   /** 팝업 내 입력 중인 임시 문자열 */
   @state() _draft = ''
 
+  /** 터치 디바이스(모바일/PDA) 여부 — false면 PC로 보고 키보드 직접 입력 */
+  _isMobile = 'ontouchstart' in window
+
   /** 컴포넌트 스타일 정의 */
   static get styles() {
     return css`
@@ -86,6 +90,31 @@ export class NumericKeypadInput extends LitElement {
       .display-field[disabled] {
         opacity: 0.5;
         pointer-events: none;
+      }
+
+      /* PC용 키보드 직접 입력 필드 */
+      .pc-input {
+        width: 100%;
+        height: 100%;
+        min-height: 32px;
+        padding: 0 8px;
+        border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+        border-radius: 8px;
+        font-size: 18px;
+        font-weight: bold;
+        text-align: center;
+        background: var(--md-sys-color-surface, #fff);
+        color: var(--md-sys-color-on-surface, #333);
+        box-sizing: border-box;
+        outline: none;
+      }
+
+      .pc-input:focus {
+        border-color: var(--md-sys-color-primary, #1976d2);
+      }
+
+      .pc-input:disabled {
+        opacity: 0.5;
       }
 
       /* 키패드 팝업 — 모바일: 바텀 시트 */
@@ -205,8 +234,24 @@ export class NumericKeypadInput extends LitElement {
     `
   }
 
-  /** 컴포넌트 렌더링 — 표시 필드 + (열렸을 때) 키패드 팝업 */
+  /** 컴포넌트 렌더링 — PC는 키보드 입력 필드, 모바일은 표시 필드 + 키패드 팝업 */
   render() {
+    // PC: 일반 number input으로 키보드 직접 입력
+    if (!this._isMobile) {
+      return html`
+        <input
+          class="pc-input"
+          type="number"
+          inputmode="numeric"
+          .value=${this.value !== null && this.value !== undefined ? String(this.value) : ''}
+          min=${ifDefined(this.min ?? undefined)}
+          max=${ifDefined(this.max ?? undefined)}
+          ?disabled=${this.disabled}
+          @input=${this._onPcInput} />
+      `
+    }
+
+    // 모바일/PDA: 표시 필드 탭 → 키패드 팝업
     const hasValue = this.value !== null && this.value !== undefined && this.value !== ''
     const displayText = hasValue ? String(this.value) : (this.placeholder || '')
 
@@ -220,6 +265,36 @@ export class NumericKeypadInput extends LitElement {
 
       ${this._open ? this._renderKeypad() : ''}
     `
+  }
+
+  /**
+   * PC 키보드 입력 처리 — 값을 min/max로 보정 후 change 이벤트 발생
+   * @param {Event} e - input 이벤트
+   */
+  _onPcInput(e) {
+    let next = parseInt(e.target.value, 10)
+    if (isNaN(next)) next = this.min ?? 0
+    next = this._clampValue(next)
+    this.value = next
+    this.dispatchEvent(
+      new CustomEvent('change', {
+        detail: { value: next },
+        bubbles: true,
+        composed: true
+      })
+    )
+  }
+
+  /**
+   * 값을 min/max 범위로 보정
+   * @param {number} v - 입력값
+   * @returns {number} 보정된 값
+   */
+  _clampValue(v) {
+    let next = v
+    if (this.min !== null && this.min !== undefined && next < this.min) next = this.min
+    if (this.max !== null && this.max !== undefined && next > this.max) next = this.max
+    return next
   }
 
   /** 키패드 팝업 렌더링 */
@@ -296,9 +371,8 @@ export class NumericKeypadInput extends LitElement {
   /** 확인 — min/max 보정 후 값 확정, change 이벤트 발생 */
   _confirm() {
     let next = parseInt(this._draft, 10)
-    if (isNaN(next)) next = this.min || 0
-    if (this.min !== null && this.min !== undefined && next < this.min) next = this.min
-    if (this.max !== null && this.max !== undefined && next > this.max) next = this.max
+    if (isNaN(next)) next = this.min ?? 0
+    next = this._clampValue(next)
 
     this.value = next
     this._closeKeypad()
