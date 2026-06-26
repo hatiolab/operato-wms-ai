@@ -1799,22 +1799,18 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     if (!item.barcode) return
     try {
       // barcode로 재고 조회 — find_by는 결과 없을 때 빈 응답(JSON 파싱 오류)이라 목록 검색 사용
-      const invRes = await ServiceUtil.searchByPagination('inventories', [{ name: 'barcode', value: item.barcode }], null, 1, 1)
-      const inventory = invRes?.items?.[0]
+      const comCd = this.currentReceiving?.com_cd
+      const whCd = this.currentReceiving?.wh_cd
+      const inventory = await ServiceUtil.restGet(`inventories/find_by?com_cd=${encodeURIComponent(comCd)}&wh_cd=${encodeURIComponent(whCd)}&barcode=${encodeURIComponent(item.barcode)}&loc_cd=${encodeURIComponent('_RCV_WAIT_')}`)
+      // 재고 조회 실패 시 리턴
       if (!inventory || !inventory.id) {
-        this._showFeedback(TermsUtil.tText('inventory_not_found') || '인쇄할 재고를 찾을 수 없습니다', 'warning')
+        this._showFeedback('입고 대기 존에 적치 대기 중인 재고가 없습니다.', 'error')
         return
       }
 
       const isMobile = 'ontouchstart' in window
       if (isMobile) {
-        if (!inventory.loc_cd) {
-          this._showFeedback(TermsUtil.tText('inventory_loc_not_found') || '재고 로케이션이 없어 인쇄할 수 없습니다', 'warning')
-          return
-        }
-        const barcode = encodeURIComponent(item.barcode)
-        const locCd = encodeURIComponent(inventory.loc_cd)
-        const res = await operatoGet(`inventories/${barcode}/${locCd}/download_barcode`, {}, false)
+        const res = await operatoGet(`inventories/${inventory.id}/download_barcode`, {}, false)
         const data = await res.arrayBuffer()
         const file = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }))
         PrintUtil.openPdfInNewTab(file)

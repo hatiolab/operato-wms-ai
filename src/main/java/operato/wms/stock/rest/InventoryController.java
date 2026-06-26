@@ -27,6 +27,9 @@ import com.google.zxing.oned.Code128Writer;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import operato.wms.base.entity.Location;
+import operato.wms.base.entity.StoragePolicy;
+import operato.wms.base.service.WmsBaseService;
 import operato.wms.stock.entity.Inventory;
 import xyz.elidom.dbist.dml.Filter;
 import xyz.elidom.dbist.dml.Page;
@@ -45,6 +48,11 @@ import xyz.elidom.util.ValueUtil;
 @RequestMapping("/rest/inventories")
 @ServiceDesc(description = "Inventory Service API")
 public class InventoryController extends AbstractRestService {
+	/**
+	 * WMS 기본 서비스
+	 */
+	@Autowired
+	protected WmsBaseService wmsBaseSvc;
 	/**
 	 * 리포트 컨트롤러
 	 */
@@ -93,13 +101,17 @@ public class InventoryController extends AbstractRestService {
 	@ApiDesc(description = "Find one by conditions")
 	public Inventory findBy(
 			@RequestParam(name = "barcode", required = true) String barcode,
-			@RequestParam(name = "locCd", required = false) String locCd) {
+			@RequestParam(name = "loc_cd", required = false) String locCd,
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd", required = false) String whCd) {
 
-		Map<String, Object> params = ValueUtil.newMap("domainId,barcode", Domain.currentDomainId(), barcode);
-		if (ValueUtil.isNotEmpty(locCd)) {
-			params.put("locCd", locCd);
+		// 입고 대기 존인 경우 - 디폴트 입고 대기 존 조회
+		if (ValueUtil.isEqualIgnoreCase("_RCV_WAIT_", locCd)) {
+			StoragePolicy policy = this.wmsBaseSvc.findStoragePolicy(Domain.currentDomainId(), comCd, whCd);
+			locCd = policy.getDefaultWaitLoc();
 		}
-		return this.queryManager.selectByCondition(Inventory.class, params);
+
+		return this.checkInventoryForPrint(barcode, locCd);
 	}
 
 	@RequestMapping(value = "/{id}/exist", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -166,38 +178,9 @@ public class InventoryController extends AbstractRestService {
 			@PathVariable("loc_cd") String locCd) {
 
 		// 1. 조회
-		List<Inventory> invList = this.queryManager.selectList(Inventory.class,
-				new Inventory(Domain.currentDomainId(), barcode, locCd));
+		Inventory inventory = this.checkInventoryForPrint(barcode, locCd);
 
-		// 2. 재고 존재 여부 체크
-		if (ValueUtil.isEmpty(invList)) {
-			throw new ElidomRuntimeException("재고를 찾을 수 없습니다.");
-		}
-
-		// 3. 사용 가능한 재고 찾기
-		Inventory inventory = null;
-
-		if (invList.size() == 1) {
-			inventory = invList.get(0);
-
-			if (ValueUtil.isNotEmpty(inventory.getClosedAt())) {
-				throw new ElidomRuntimeException("이 재고는 이미 사용이 종료되었습니다.");
-			}
-		} else {
-			for (Inventory inv : invList) {
-				if (ValueUtil.isEmpty(inv.getClosedAt())) {
-					inventory = inv;
-					break;
-				}
-			}
-		}
-
-		// 4. 사용 불가능한 재고만 있는 경우
-		if (inventory == null) {
-			throw new ElidomRuntimeException("사용 가능한 재고를 찾을 수 없습니다.");
-		}
-
-		// 5. 재고 바코드 라벨 PDF 다운로드
+		// 2. 재고 바코드 라벨 PDF 다운로드
 		this.printoutCtrl.showPdfByPrintTemplateName(req, res, "GENERAL_BARCODE_SHEET",
 				ValueUtil.newMap("inventory", inventory));
 	}
@@ -210,19 +193,9 @@ public class InventoryController extends AbstractRestService {
 			@PathVariable("id") String id) {
 
 		// 1. 조회
-		Inventory inventory = this.queryManager.select(Inventory.class, id);
+		Inventory inventory = this.checkInventoryForPrint(id);
 
-		// 2. 재고 존재 여부 체크
-		if (inventory == null) {
-			throw new ElidomRuntimeException("재고를 찾을 수 없습니다.");
-		}
-
-		// 3. 사용이 종료된 재고인지 체크
-		if (ValueUtil.isNotEmpty(inventory.getClosedAt())) {
-			throw new ElidomRuntimeException("이 재고는 이미 사용이 종료되었습니다.");
-		}
-
-		// 4. 재고 바코드 라벨 PDF 다운로드
+		// 2. 재고 바코드 라벨 PDF 다운로드
 		this.printoutCtrl.showPdfByPrintTemplateName(req, res, "GENERAL_BARCODE_SHEET",
 				ValueUtil.newMap("inventory", inventory));
 	}
@@ -239,13 +212,7 @@ public class InventoryController extends AbstractRestService {
 			@PathVariable("barcode") String barcode,
 			@PathVariable("loc_cd") String locCd) throws Exception {
 
-		Inventory inventory = this.queryManager.selectByCondition(Inventory.class,
-				new Inventory(Domain.currentDomainId(), barcode, locCd));
-
-		if (inventory == null) {
-			throw new ElidomRuntimeException("재고를 찾을 수 없습니다.");
-		}
-
+		Inventory inventory = this.checkInventoryForPrint(barcode, locCd);
 		String barcodeValue = inventory.getBarcode();
 
 		// ZXing으로 Code-128 바코드 PNG 생성 후 base64 인코딩
@@ -355,5 +322,81 @@ public class InventoryController extends AbstractRestService {
 				"remarks");
 
 		return true;
+	}
+
+	/**
+	 * 재고 바코드 ID로 재고 바코드 조회 & 프린트 전 예외 체크
+	 * 
+	 * @param id
+	 * @return
+	 */
+	private Inventory checkInventoryForPrint(String id) {
+		// 1. 조회
+		Inventory inventory = this.queryManager.select(Inventory.class, id);
+
+		// 2. 재고 존재 여부 체크
+		if (inventory == null) {
+			throw new ElidomRuntimeException("재고를 찾을 수 없습니다.");
+		}
+
+		// 3. 사용이 종료된 재고인지 체크
+		if (ValueUtil.isNotEmpty(inventory.getClosedAt())) {
+			throw new ElidomRuntimeException("이 재고는 이미 사용이 종료되었습니다.");
+		}
+
+		return inventory;
+	}
+
+	/**
+	 * 재고 바코드 & 로케이션으로 재고 바코드 조회 & 프린트 전 예외 체크
+	 * 
+	 * @param barcode
+	 * @param locCd
+	 * @return
+	 */
+	private Inventory checkInventoryForPrint(String barcode, String locCd) {
+		// 1. 파라미터 체크
+		if (ValueUtil.isEmpty(barcode)) {
+			throw new ElidomRuntimeException("바코드 값이 비어있어서 재고 조회를 할 수 없습니다.");
+		}
+
+		// 2. 조회 조건
+		Inventory condition = new Inventory(Domain.currentDomainId(), barcode, ValueUtil.isEmpty(locCd) ? null : locCd);
+
+		// 3. 바코드, 로케이션으로 재고 리스트 조회
+		List<Inventory> invList = this.queryManager.selectList(Inventory.class, condition);
+
+		// 4. 재고 존재 여부 체크
+		if (ValueUtil.isEmpty(invList)) {
+			throw new ElidomRuntimeException("재고를 찾을 수 없습니다.");
+		}
+
+		// 5. 사용 가능한 재고 찾기
+		Inventory inventory = null;
+
+		if (invList.size() == 1) {
+			inventory = invList.get(0);
+
+		} else {
+			for (Inventory inv : invList) {
+				if (ValueUtil.isEmpty(inv.getClosedAt())) {
+					inventory = inv;
+					break;
+				}
+			}
+		}
+
+		// 6. 사용 불가능한 재고만 있는 경우
+		if (inventory == null) {
+			throw new ElidomRuntimeException("사용 가능한 재고를 찾을 수 없습니다.");
+		}
+
+		// 7. 종료 여부 체크
+		if (ValueUtil.isNotEmpty(inventory.getClosedAt())) {
+			throw new ElidomRuntimeException("이 재고는 이미 사용이 종료되었습니다.");
+		}
+
+		// 8. 재고 리턴
+		return inventory;
 	}
 }

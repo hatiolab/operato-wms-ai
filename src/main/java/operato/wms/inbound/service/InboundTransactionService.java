@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.web.WebProperties.Resources.Chain.Strategy;
 import org.springframework.stereotype.Component;
 
 import operato.wms.base.entity.Location;
@@ -514,12 +513,16 @@ public class InboundTransactionService extends AbstractQueryService {
             this.calculateExpiryDateForItem(receiving, item, sku);
         }
 
-        // 완료 처리
-        if (ValueUtil.isEmpty(item.getBarcode())) {
-            item.setBarcode(Inventory.newBarcode());
-        }
         item.setRcvDate(DateUtil.todayStr());
         item.setStatus(WmsInboundConstants.STATUS_END);
+
+        // 입고 항목별 완료 처리
+        if (ValueUtil.isEmpty(item.getBarcode())) {
+            // 재고 바코드 생성 & 재고 생성
+            item.setBarcode(Inventory.newBarcode());
+            this.createInventoryByItem(receiving, item);
+        }
+
         return item;
     }
 
@@ -593,7 +596,8 @@ public class InboundTransactionService extends AbstractQueryService {
         this.queryManager.updateBatch(receivingItems, "status", "rcvDate", "updatedAt");
 
         // 6. 재고 정보 생성
-        this.createInventoriesByReceivingOrder(receiving, receivingItems);
+        // 2026-06-26 수정 : 재고 생성 시점을 입고 항목 완료 시점으로 변경
+        // this.createInventoriesByReceivingOrder(receiving, receivingItems);
 
         // 7. 입고 정보 리턴
         return receiving;
@@ -706,7 +710,64 @@ public class InboundTransactionService extends AbstractQueryService {
         }
 
         return new BaseResponse(true, "ok");
+    }
 
+    /**
+     * 입고 작업 항목 별로 재고 생성
+     * 
+     * @param receiving
+     * @param item
+     * @return
+     */
+    public Inventory createInventoryByItem(Receiving receiving, ReceivingItem item) {
+        // 1. 기본 로케이션 설정에서 조회
+        StoragePolicy policy = this.wmsBaseSvc.findStoragePolicy(receiving.getDomainId(), receiving.getComCd(),
+                receiving.getWhCd());
+        String defaultLocCd = policy.getDefaultWaitLoc();
+        String status = item.getStatus();
+
+        // 2. 상태 체크 : END, BAD인 경우에만 재고 생성 가능
+        if (ValueUtil.isNotEqual(status, WmsInboundConstants.STATUS_END)
+                && ValueUtil.isNotEqual(status, WmsInboundConstants.STATUS_BAD)) {
+            throw new ElidomRuntimeException("입고 항목의 작업이 끝나지 않았습니다.");
+        }
+
+        if (item.getRcvQty() == null || item.getRcvQty() < 0.0f) {
+            throw new ElidomRuntimeException("입고 수량이 유효하지 않습니다.");
+        }
+
+        SKU sku = queryManager.selectByCondition(SKU.class,
+                new SKU(receiving.getDomainId(), receiving.getComCd(), item.getSkuCd()));
+
+        // 3. 입고 정보로 재고 생성
+        Inventory inv = new Inventory();
+        inv.setBarcode(item.getBarcode());
+        inv.setStatus(Inventory.STATUS_WAITING);
+        inv.setLastTranCd(Inventory.TRANSACTION_IN_INSP);
+        inv.setWhCd(receiving.getWhCd());
+        inv.setComCd(receiving.getComCd());
+        inv.setVendCd(receiving.getVendCd());
+        inv.setPoNo(ValueUtil.isNotEmpty(item.getPoNo()) ? item.getPoNo() : receiving.getRcvReqNo());
+        inv.setRcvNo(receiving.getRcvNo());
+        inv.setRcvSeq(item.getRcvSeq());
+        inv.setSkuCd(item.getSkuCd());
+        inv.setSkuBcd(sku.getSkuBarcd());
+        inv.setSkuNm(sku.getSkuNm());
+        inv.setLocCd(defaultLocCd);
+        inv.setProdDate(item.getPrdDate());
+        inv.setExpiredDate(item.getExpiredDate());
+        inv.setInvoiceNo(item.getInvoiceNo());
+        inv.setInvQty(item.getRcvQty());
+        inv.setPalletQty(item.getRcvPalletQty());
+        inv.setBoxQty(item.getRcvBoxQty());
+        inv.setLotNo(item.getLotNo());
+        inv.setOrigin(item.getOrigin());
+        inv.setDelFlag(false);
+        this.updateInventoryExpiredInfo(inv, sku);
+        this.queryManager.insert(inv);
+
+        // 4. 생성 재고 리턴
+        return inv;
     }
 
     /**
