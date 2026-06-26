@@ -1,6 +1,6 @@
 {
   "name": "@operato-app/operato-wes",
-  "version": "7.0.66",
+  "version": "7.0.67",
   "main": "dist-server/index.js",
   "browser": "dist-client/index.js",
   "things-factory": true,

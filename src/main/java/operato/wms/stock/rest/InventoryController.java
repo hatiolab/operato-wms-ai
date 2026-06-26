@@ -1,7 +1,11 @@
 package operato.wms.stock.rest;
 
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -14,6 +18,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.EncodeHintType;
+import com.google.zxing.client.j2se.MatrixToImageWriter;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.oned.Code128Writer;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -57,6 +67,7 @@ public class InventoryController extends AbstractRestService {
 		Query queryObj = this.parseQuery(this.entityClass(), page, limit, select, sort, query);
 		List<Filter> filters = queryObj.getFilter();
 		boolean delFlagExist = false;
+
 		for (Filter filter : filters) {
 			if (ValueUtil.isEqualIgnoreCase("del_flag", filter.getName())) {
 				delFlagExist = true;
@@ -76,6 +87,19 @@ public class InventoryController extends AbstractRestService {
 	@ApiDesc(description = "Find one by ID")
 	public Inventory findOne(@PathVariable("id") String id) {
 		return this.getOne(this.entityClass(), id);
+	}
+
+	@RequestMapping(value = "/find_by", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Find one by conditions")
+	public Inventory findBy(
+			@RequestParam(name = "barcode", required = true) String barcode,
+			@RequestParam(name = "locCd", required = false) String locCd) {
+
+		Map<String, Object> params = ValueUtil.newMap("domainId,barcode", Domain.currentDomainId(), barcode);
+		if (ValueUtil.isNotEmpty(locCd)) {
+			params.put("locCd", locCd);
+		}
+		return this.queryManager.selectByCondition(Inventory.class, params);
 	}
 
 	@RequestMapping(value = "/{id}/exist", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -142,17 +166,40 @@ public class InventoryController extends AbstractRestService {
 			@PathVariable("loc_cd") String locCd) {
 
 		// 1. 조회
-		Inventory inventory = this.queryManager.selectByCondition(Inventory.class,
+		List<Inventory> invList = this.queryManager.selectList(Inventory.class,
 				new Inventory(Domain.currentDomainId(), barcode, locCd));
 
 		// 2. 재고 존재 여부 체크
-		if (inventory == null) {
+		if (ValueUtil.isEmpty(invList)) {
 			throw new ElidomRuntimeException("재고를 찾을 수 없습니다.");
 		}
 
-		// 3. 로케이션 바코드 생성을 위한 PDF 다운로드
+		// 3. 사용 가능한 재고 찾기
+		Inventory inventory = null;
+
+		if (invList.size() == 1) {
+			inventory = invList.get(0);
+
+			if (ValueUtil.isNotEmpty(inventory.getClosedAt())) {
+				throw new ElidomRuntimeException("이 재고는 이미 사용이 종료되었습니다.");
+			}
+		} else {
+			for (Inventory inv : invList) {
+				if (ValueUtil.isEmpty(inv.getClosedAt())) {
+					inventory = inv;
+					break;
+				}
+			}
+		}
+
+		// 4. 사용 불가능한 재고만 있는 경우
+		if (inventory == null) {
+			throw new ElidomRuntimeException("사용 가능한 재고를 찾을 수 없습니다.");
+		}
+
+		// 5. 재고 바코드 라벨 PDF 다운로드
 		this.printoutCtrl.showPdfByPrintTemplateName(req, res, "GENERAL_BARCODE_SHEET",
-				ValueUtil.newMap("barcode", inventory.getBarcode()));
+				ValueUtil.newMap("inventory", inventory));
 	}
 
 	@RequestMapping(value = "/{id}/download_barcode", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -170,16 +217,85 @@ public class InventoryController extends AbstractRestService {
 			throw new ElidomRuntimeException("재고를 찾을 수 없습니다.");
 		}
 
-		// 3. 로케이션 바코드 생성을 위한 PDF 다운로드
+		// 3. 사용이 종료된 재고인지 체크
+		if (ValueUtil.isNotEmpty(inventory.getClosedAt())) {
+			throw new ElidomRuntimeException("이 재고는 이미 사용이 종료되었습니다.");
+		}
+
+		// 4. 재고 바코드 라벨 PDF 다운로드
 		this.printoutCtrl.showPdfByPrintTemplateName(req, res, "GENERAL_BARCODE_SHEET",
-				ValueUtil.newMap("barcode", inventory.getBarcode()));
+				ValueUtil.newMap("inventory", inventory));
+	}
+
+	/**
+	 * 모바일 바코드 인쇄용 HTML 페이지 반환 (Android Chrome 자동 인쇄 지원)
+	 * PDF 뷰어 탭에서는 외부 print() 호출이 무시되므로, HTML 페이지 내부에서 auto-print
+	 */
+	@RequestMapping(value = "/{barcode}/{loc_cd}/print_barcode_html", method = RequestMethod.GET)
+	@ApiDesc(description = "Print Inventory Barcode as HTML (mobile auto-print)")
+	public void printInventoryBarcodeHtml(
+			HttpServletRequest req,
+			HttpServletResponse res,
+			@PathVariable("barcode") String barcode,
+			@PathVariable("loc_cd") String locCd) throws Exception {
+
+		Inventory inventory = this.queryManager.selectByCondition(Inventory.class,
+				new Inventory(Domain.currentDomainId(), barcode, locCd));
+
+		if (inventory == null) {
+			throw new ElidomRuntimeException("재고를 찾을 수 없습니다.");
+		}
+
+		String barcodeValue = inventory.getBarcode();
+
+		// ZXing으로 Code-128 바코드 PNG 생성 후 base64 인코딩
+		Map<EncodeHintType, Object> hints = new HashMap<>();
+		hints.put(EncodeHintType.MARGIN, 1);
+		Code128Writer writer = new Code128Writer();
+		BitMatrix bitMatrix = writer.encode(barcodeValue, BarcodeFormat.CODE_128, 360, 90, hints);
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		MatrixToImageWriter.writeToStream(bitMatrix, "PNG", baos);
+		String base64Barcode = Base64.getEncoder().encodeToString(baos.toByteArray());
+
+		String html = String.format("""
+				<!DOCTYPE html>
+				<html>
+				<head>
+				<meta charset="utf-8">
+				<meta name="viewport" content="width=device-width,initial-scale=1">
+				<style>
+				@page { size: 62mm 42mm; margin: 2mm; }
+				@media print { button { display: none !important; } }
+				* { box-sizing: border-box; margin: 0; padding: 0; }
+				body { font-family: monospace; text-align: center; padding: 3mm; }
+				img { width: 100%%; max-width: 56mm; display: block; margin: 0 auto; }
+				.code { font-size: 7pt; margin-top: 1mm; letter-spacing: 0.5px; }
+				.loc { font-size: 9pt; font-weight: bold; margin-top: 2mm; }
+				</style>
+				</head>
+				<body>
+				<img src="data:image/png;base64,%s" alt="%s">
+				<div class="code">%s</div>
+				<div class="loc">%s</div>
+				<script>
+				window.addEventListener('load', function() {
+				  setTimeout(function() { window.print(); }, 400);
+				});
+				</script>
+				</body>
+				</html>
+				""", base64Barcode, barcodeValue, barcodeValue, locCd);
+
+		res.setContentType("text/html; charset=UTF-8");
+		res.setHeader("Cache-Control", "no-cache");
+		res.getWriter().write(html);
 	}
 
 	/**
 	 * 재고 관리 > 입고 적치 작업 처리
 	 * 상태 : 입고 대기 > 보관 중
 	 * 로케이션 : 입력 받은 로케이션으로 변경
-	 * 
+	 *
 	 * @param list
 	 * @return
 	 */
