@@ -453,7 +453,13 @@ class ReceivingOrderImportPopup extends LitElement {
       /** SKU 마스터에 존재하지 않는 sku_cd 목록 */
       unknownSkuCds: { type: Array },
       /** SKU명 자동 조회 진행 중 여부 */
-      skuLookupLoading: { type: Boolean }
+      skuLookupLoading: { type: Boolean },
+      /** 창고코드 → 창고명 맵 */
+      _whMap: { type: Object },
+      /** 화주사코드 → 화주사명 맵 */
+      _comMap: { type: Object },
+      /** 공급업체코드 → 공급업체명 맵 */
+      _vendMap: { type: Object }
     }
   }
 
@@ -468,6 +474,9 @@ class ReceivingOrderImportPopup extends LitElement {
     this._dragover = false
     this.unknownSkuCds = []
     this.skuLookupLoading = false
+    this._whMap = {}
+    this._comMap = {}
+    this._vendMap = {}
   }
 
   /** 화면 렌더링 - 2단계 위자드 (파일 업로드/미리보기 → 결과) */
@@ -598,20 +607,20 @@ class ReceivingOrderImportPopup extends LitElement {
           : ''}
       </div>
 
+      <!-- 파일 선택 후 마스터 조회 중 (parsedData 세팅 전) -->
+      ${this.skuLookupLoading && (!this.parsedData || this.parsedData.length === 0)
+        ? html`
+            <div class="sku-lookup-loading">
+              <div class="mini-spinner"></div>
+              <span>데이터 처리 중...</span>
+            </div>
+          `
+        : ''}
+
       <!-- 미리보기 -->
       ${this.parsedData && this.parsedData.length > 0
         ? html`
             <div class="preview-header">📋 미리보기 (${this.parsedData.length}건)</div>
-
-            <!-- SKU 조회 중 -->
-            ${this.skuLookupLoading
-              ? html`
-                  <div class="sku-lookup-loading">
-                    <div class="mini-spinner"></div>
-                    <span>상품 마스터 확인 중...</span>
-                  </div>
-                `
-              : ''}
 
             <!-- 미등록 SKU 오류 배너 (임포트 차단) -->
             ${this.unknownSkuCds.length > 0
@@ -677,9 +686,9 @@ class ReceivingOrderImportPopup extends LitElement {
                           <td class="${this._isFieldMissing(row, ['rcv_no', 'rcvNo', 'rcv_req_no', 'rcvReqNo']) ? 'cell-error' : ''}">${row.rcv_req_no || row.rcvReqNo || ''}</td>
                           <td class="${this._isFieldMissing(row, ['rcv_req_date', 'rcvReqDate']) ? 'cell-error' : ''}">${row.rcv_req_date || row.rcvReqDate || ''}</td>
                           <td class="${this._isFieldMissing(row, ['rcv_type', 'rcvType']) ? 'cell-error' : ''}"><code-label code-name="RECEIVING_TYPE" .value=${row.rcv_type || row.rcvType || ''}></code-label></td>
-                          <td>${row.wh_cd || row.whCd || ''}</td>
-                          <td>${row.com_cd || row.comCd || ''}</td>
-                          <td>${row.vend_cd || row.vendCd || ''}</td>
+                          <td>${this._whMap[row.wh_cd || row.whCd || ''] || row.wh_cd || row.whCd || ''}</td>
+                          <td>${this._comMap[row.com_cd || row.comCd || ''] || row.com_cd || row.comCd || ''}</td>
+                          <td>${this._vendMap[row.vend_cd || row.vendCd || ''] || row.vend_cd || row.vendCd || ''}</td>
                           <td class="${isUnknownSku ? 'cell-sku-unknown' : this._isFieldMissing(row, ['sku_cd', 'skuCd']) ? 'cell-error' : ''}">${skuCd}</td>
                           <td>${row.sku_nm || row.skuNm || ''}</td>
                           <td>${row.rcv_exp_date || row.rcvExpDate || ''}</td>
@@ -822,7 +831,7 @@ class ReceivingOrderImportPopup extends LitElement {
     return val
   }
 
-  /** Excel 파싱 완료 콜백 - 미리보기 데이터 세팅 (빈 행 제거 포함) */
+  /** Excel 파싱 완료 콜백 - 모든 마스터 조회 완료 후 parsedData 세팅 (코드 플래시 방지) */
   async _onExcelParsed(records) {
     const importData = records.header ? records.data : records
     if (importData && importData.length > 0) {
@@ -838,73 +847,104 @@ class ReceivingOrderImportPopup extends LitElement {
         return
       }
       // 모든 필드를 순회해서 Date 객체이면 YYYY-MM-DD 문자열로 변환
-      // (엑셀 날짜 셀을 import-base가 Date 객체로 파싱하는 경우 대응)
-      this.parsedData = filtered.map(row => {
-        const normalized = {}
+      const normalized = filtered.map(row => {
+        const result = {}
         Object.keys(row).forEach(key => {
-          normalized[key] = this._formatDateValue(row[key])
+          result[key] = this._formatDateValue(row[key])
         })
-        return normalized
+        return result
       })
-      this.requestUpdate()
 
-      // sku_nm이 비어 있는 행에 대해 SKU 마스터에서 자동 조회
-      await this._fillSkuNames()
+      // parsedData 세팅 전에 모든 마스터 조회 수행 — 코드가 잠깐 보이는 플래시 방지
+      this.skuLookupLoading = true
+      try {
+        const { data: filledData, unknownSkuCds } = await this._fillSkuNames(normalized)
+        const { whMap, comMap, vendMap } = await this._fillMasterNames(filledData)
+
+        // 모든 조회 완료 후 한 번에 state 반영 → 그리드가 완성된 데이터로 단 한 번 렌더링
+        this._whMap = whMap
+        this._comMap = comMap
+        this._vendMap = vendMap
+        this.unknownSkuCds = unknownSkuCds
+        this.parsedData = filledData
+      } finally {
+        this.skuLookupLoading = false
+      }
     } else {
       UiUtil.showToast('warning', '파일에서 데이터를 읽을 수 없습니다.')
     }
   }
 
   /**
-   * 모든 sku_cd에 대해 SKU 마스터 조회를 수행한다.
-   * - sku_nm이 비어 있으면 조회 결과로 자동 채움
-   * - 마스터에 없는 코드는 unknownSkuCds에 추가하여 임포트를 차단한다
+   * SKU 마스터 조회 — 전달받은 데이터 배열 기준으로 sku_nm 채우기
+   * @param {Array} rows - 파싱된 엑셀 데이터 배열
+   * @returns {{ data: Array, unknownSkuCds: Array }} sku_nm이 채워진 데이터와 미등록 코드 목록
    */
-  async _fillSkuNames() {
-    // 유효한 sku_cd 목록 수집 (중복 제거)
-    const allCds = [
-      ...new Set(
-        this.parsedData
-          .map(row => row.sku_cd || row.skuCd || '')
-          .filter(cd => cd)
-      )
-    ]
+  async _fillSkuNames(rows) {
+    const allCds = [...new Set(rows.map(r => r.sku_cd || r.skuCd || '').filter(Boolean))]
+    if (allCds.length === 0) return { data: rows, unknownSkuCds: [] }
 
-    if (allCds.length === 0) return
-
-    this.skuLookupLoading = true
-    this.unknownSkuCds = []
+    const skuMap = {}
+    const unknowns = []
 
     try {
-      const skuMap = {}
-      const unknowns = []
-
       for (const cd of allCds) {
-        const data = await ServiceUtil.searchByPagination('sku', [{ name: 'sku_cd', value: cd }], null, 1, 1)
-        const sku = data?.items?.[0]
+        const res = await ServiceUtil.searchByPagination('sku', [{ name: 'sku_cd', value: cd }], null, 1, 1)
+        const sku = res?.items?.[0]
         if (sku) {
           skuMap[cd] = sku.sku_nm || ''
         } else {
           unknowns.push(cd)
         }
       }
-
-      // sku_nm 자동 채우기
-      this.parsedData = this.parsedData.map(row => {
-        const cd = row.sku_cd || row.skuCd || ''
-        if (cd && skuMap[cd] !== undefined) {
-          return { ...row, sku_nm: skuMap[cd] }
-        }
-        return row
-      })
-
-      // 미등록 SKU 목록 세팅 (있으면 임포트 버튼 비활성화됨)
-      this.unknownSkuCds = unknowns
     } catch (err) {
       console.warn('SKU 마스터 조회 실패:', err)
-    } finally {
-      this.skuLookupLoading = false
     }
+
+    const data = rows.map(row => {
+      const cd = row.sku_cd || row.skuCd || ''
+      if (cd && skuMap[cd] !== undefined) return { ...row, sku_nm: skuMap[cd] }
+      return row
+    })
+
+    return { data, unknownSkuCds: unknowns }
+  }
+
+  /**
+   * 창고/화주사/공급업체 코드 → 이름 맵 조회
+   * @param {Array} rows - 파싱된 엑셀 데이터 배열
+   * @returns {{ whMap: Object, comMap: Object, vendMap: Object }}
+   */
+  async _fillMasterNames(rows) {
+    const whCds = [...new Set(rows.map(r => r.wh_cd || r.whCd || '').filter(Boolean))]
+    const comCds = [...new Set(rows.map(r => r.com_cd || r.comCd || '').filter(Boolean))]
+    const vendCds = [...new Set(rows.map(r => r.vend_cd || r.vendCd || '').filter(Boolean))]
+
+    const whMap = {}
+    const comMap = {}
+    const vendMap = {}
+
+    try {
+      for (const cd of whCds) {
+        const res = await ServiceUtil.searchByPagination('warehouses', [{ name: 'wh_cd', value: cd }], null, 1, 1)
+        const item = res?.items?.[0]
+        if (item) whMap[cd] = item.wh_nm || cd
+      }
+      for (const cd of comCds) {
+        const res = await ServiceUtil.searchByPagination('companies', [{ name: 'com_cd', value: cd }], null, 1, 1)
+        const item = res?.items?.[0]
+        if (item) comMap[cd] = item.com_nm || cd
+      }
+      for (const cd of vendCds) {
+        const res = await ServiceUtil.searchByPagination('vendors', [{ name: 'vend_cd', value: cd }], null, 1, 1)
+        const item = res?.items?.[0]
+        if (item) vendMap[cd] = item.vend_nm || cd
+      }
+    } catch (err) {
+      console.warn('마스터 이름 조회 실패:', err)
+    }
+
+    return { whMap, comMap, vendMap }
   }
 
   /** 임포트 실행 - 서버 API 호출 */
