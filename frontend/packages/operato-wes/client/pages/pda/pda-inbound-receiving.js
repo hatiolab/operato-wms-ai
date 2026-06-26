@@ -1,6 +1,7 @@
 import '@things-factory/barcode-ui'
 import '../../component/sku-barcode-input.js'
 import '../../component/barcode-listener.js'
+import '../../component/numeric-keypad-input.js'
 import { html, css } from 'lit'
 import { customElement, query, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
@@ -494,20 +495,9 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           white-space: nowrap;
         }
 
-        .qty-input-row input {
+        .qty-input-row numeric-keypad-input {
           flex: 1;
           min-width: 0;
-          width: 0;
-          height: 32px;
-          padding: 0 8px;
-          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
-          border-radius: 8px;
-          font-size: 18px;
-          font-weight: bold;
-          text-align: center;
-          background: var(--md-sys-color-surface, #fff);
-          color: var(--md-sys-color-on-surface, #333);
-          box-sizing: border-box;
         }
 
         .qty-input-row .btn-qty {
@@ -1040,11 +1030,18 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
             <label>${TermsUtil.tLabel('rcv_qty') || '입고수량'}</label>
             <button class="btn-qty"
               @click=${() => { if (this.rcvQty > 0) this.rcvQty-- }}>−</button>
-            <input type="number" min="0"
-              .value=${String(this.rcvQty)}
-              @input=${e => (this.rcvQty = parseInt(e.target.value) || 0)} />
+            <numeric-keypad-input
+              .value=${this.rcvQty}
+              .min=${0}
+              .max=${currentItem.rcv_exp_qty || null}
+              ?disabled=${this.processing || this.viewOnly}
+              @change=${e => (this.rcvQty = e.detail.value)}>
+            </numeric-keypad-input>
             <button class="btn-qty"
-              @click=${() => { this.rcvQty++ }}>+</button>
+              @click=${() => {
+        const max = currentItem.rcv_exp_qty
+        if (!max || this.rcvQty < max) this.rcvQty++
+      }}>+</button>
           </div>
 
           ${this.lastFeedback ? html`

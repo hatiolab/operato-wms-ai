@@ -27,6 +27,15 @@ export class BarcodeListener extends LitElement {
   _bufferTimer = null
   _refocusTimer = null
 
+  /** 일시정지 상태 — 다른 팝업(숫자 키패드 등)이 열려 있을 때 스캔 무시 */
+  _paused = false
+
+  /** 전역 일시정지 요청 핸들러 (참조 고정용 클래스 필드) */
+  _onPause = () => { this._paused = true }
+
+  /** 전역 재개 요청 핸들러 (참조 고정용 클래스 필드) */
+  _onResume = () => { this._paused = false }
+
   static get styles() {
     return css`
       :host { display: contents; }
@@ -50,11 +59,15 @@ export class BarcodeListener extends LitElement {
 
   connectedCallback() {
     super.connectedCallback()
+    document.addEventListener('barcode-listener-pause', this._onPause)
+    document.addEventListener('barcode-listener-resume', this._onResume)
     this._scheduleRefocus()
   }
 
   disconnectedCallback() {
     super.disconnectedCallback()
+    document.removeEventListener('barcode-listener-pause', this._onPause)
+    document.removeEventListener('barcode-listener-resume', this._onResume)
     clearTimeout(this._bufferTimer)
     clearTimeout(this._refocusTimer)
   }
@@ -114,6 +127,9 @@ export class BarcodeListener extends LitElement {
    * 스캐너는 문자 간격 100ms 이내로 전송하고 Enter로 종료.
    */
   _onKeydown(e) {
+    // 일시정지 중(팝업 열림 등)에는 스캔 입력을 무시한다.
+    if (this._paused) return
+
     if (e.key === 'Enter') {
       clearTimeout(this._bufferTimer)
       const barcode = this._buffer.trim()
