@@ -1,6 +1,6 @@
 # 출고 재고 부족 대응 프로세스 설계
 
-> 작성일: 2026-06-22 | 최종 업데이트: 2026-06-23  
+> 작성일: 2026-06-22 | 최종 업데이트: 2026-06-25 (논리 오류 수정)  
 > 대상 모듈: `oms` (주문/알당) + `fulfillment` (피킹/포장/출하)
 
 ---
@@ -26,7 +26,7 @@
 | 시점 | Case | 원인 | 현재 처리 |
 |------|------|------|----------|
 | **재고 할당** | A | 가용 재고 < 주문 수량 | BACK_ORDER → 보충 지시 생성 (구현됨) |
-| **피킹 작업** (INDIVIDUAL) | B | 할당된 로케이션의 실재고 불일치 | 부분·전량 부족 처리 (일부 버그) |
+| **피킹 작업** (INDIVIDUAL) | B | 할당된 로케이션의 실재고 불일치 | 부분·전량 부족 확정 구현 완료 (B-1~B-3 버그 수정). 3단계 처리(N-7~N-10) 미구현 |
 | **피킹 작업** (TOTAL) + **포장 작업** | C | 총량 부족 후 주문별 배분 불확실 | 포장 시점에 작업자가 확정 (미구현) |
 
 ---
@@ -165,39 +165,95 @@ BACK_ORDER
 - 재고 할당은 완료됐으나 실물 재고와 시스템 재고 불일치
 - 해당 로케이션 SKU가 없거나, 수량이 적거나, 바코드 오류
 
-### 처리 설계
+### 부족 처리 3단계 의사결정 흐름
 
-| 케이스 | pick_qty | short_qty | PickingTaskItem.status | stock_allocations 처리 |
-|--------|----------|-----------|----------------------|----------------------|
-| 정상 피킹 | = order_qty | 0 | PICKED | 유지 |
-| **부분 부족** | > 0, < order_qty | > 0 | **PICKED** | short_qty만큼 부분 해제 |
-| **전량 부족** | 0 | = order_qty | SHORT | 전체 해제 |
-
-#### 부분 부족 처리 상세
+작업 화면에서 **[부족]** 버튼 클릭 시 다음 순서로 재고를 조회하고 처리 방식을 결정한다.
 
 ```
-shortItem() 호출 (pick_qty=3, short_qty=7)
+[부족] 버튼 클릭 (부족 수량 입력: shortage_qty)
   ↓
-1. PickingTaskItem: pick_qty=3, short_qty=7, status=PICKED
-2. deallocateShortQty(): short_qty 7EA만큼 stock_allocations 해제
-   - alloc_qty 전체가 short_qty 이하 → deallocateInventory() (전체 삭제)
-   - alloc_qty 일부만 해제 → alloc_qty 조정 + reserved_qty 환원
-3. 피킹 완료 후 updateShipmentOrdersAfterPicking():
-   - 해당 주문의 모든 PickingTaskItem 완료 확인
-   - pick_qty > 0 → ShipmentOrder: PICKING → PACKING
-   - pick_qty = 0 → ShipmentOrder: PICKING → BACK_ORDER
-   - ShipmentOrderItem.short_qty 갱신
+① 피킹 존(PICKABLE 로케이션, 현재 로케이션 제외)에 해당 SKU 가용 재고 조회
+  │
+  ├─ 가용 재고 ≥ shortage_qty → [자동 재할당]
+  │    기존 할당 해제 → 새 로케이션 재할당
+  │    PickingTaskItem: 재할당 로케이션 안내, status=WAIT (재피킹 대기)
+  │    작업자가 새 로케이션에서 피킹 재시도
+  │
+  ├─ 0 < 가용 재고 < shortage_qty → [부분 재할당 + 나머지 2단계 진입]
+  │    가용분만 재할당 → 작업자 재피킹
+  │    재피킹 완료 후에도 잔여 부족이 있으면 다시 [부족] 버튼 흐름 재진입
+  │
+  └─ 피킹 존 재고 없음
+       ↓
+       ② 보충 존(STORAGE/RECEIVE 등 비피킹 로케이션)에 가용 재고 조회
+         │
+         ├─ 보충 존 재고 있음 → [보충 지시 생성]
+         │    ReplenishOrder 자동 생성
+         │    PickingTaskItem: REPLENISH_WAIT 상태 (보충 대기)
+         │    보충 작업자가 완료 처리 → PickingTaskItem: WAIT (재피킹 가능)
+         │    * 연결 고리: ReplenishOrderItem.remarks에 pickTaskItemId 저장 →
+         │      completeReplenishItem() 완료 시 해당 PickingTaskItem을 WAIT으로 복원
+         │
+         └─ 보충 존도 재고 없음 → [재고 부족 확정]
+              PickingTaskItem: pick_qty=피킹된 수량, short_qty=부족 수량
+              부분 피킹: status=PICKED, 전량 부족: status=SHORT
+              stock_allocations 해제
 ```
 
-#### 전량 부족 처리 상세
+### 처리 결과 상태 정의
+
+| 케이스 | 조건 | 처리 | PickingTaskItem.status |
+|--------|------|------|----------------------|
+| 자동 재할당 | 피킹 존에 가용 재고 있음 | 재할당 후 피킹 재시도 | WAIT (재피킹 대기) |
+| 보충 지시 생성 | 피킹 존 없음, 보충 존 있음 | ReplenishOrder 생성 | REPLENISH_WAIT |
+| 정상 피킹 | 재고 일치 | — | PICKED |
+| **부분 부족 확정** | 피킹 존+보충 존 모두 없음, pick_qty > 0 | stock_allocations 부분 해제 | **PICKED** |
+| **전량 부족 확정** | 피킹 존+보충 존 모두 없음, pick_qty = 0 | stock_allocations 전체 해제 | **SHORT** |
+
+### 자동 재할당 처리 상세
 
 ```
-shortItem() 호출 (pick_qty=0, short_qty=10)
+[부족] 클릭 → 피킹 존 재고 조회: 있음
   ↓
-1. PickingTaskItem: pick_qty=0, short_qty=10, status=SHORT
-2. deallocateShortQty(): 전체 stock_allocations 해제
-3. 피킹 완료 후 updateShipmentOrdersAfterPicking():
-   - 모든 PickingTaskItem이 SHORT → ShipmentOrder: BACK_ORDER
+1. 기존 stock_allocations 해제 (부족 수량만큼)
+2. 피킹 존 내 다른 로케이션으로 재할당
+   - StoragePolicy.releaseStrategy (FEFO/FIFO/LIFO) 적용
+3. PickingTaskItem: 새 로케이션 정보로 갱신, status=WAIT
+4. 화면에 새 로케이션 안내 → 작업자 이동 후 재피킹
+```
+
+### 보충 지시 생성 처리 상세
+
+```
+[부족] 클릭 → 피킹 존 재고 없음 → 보충 존 재고 조회: 있음
+  ↓
+1. ReplenishOrder 자동 생성 (createReplenishFromShortItem())
+   - 보충 존 로케이션 → 피킹 존 로케이션 이동 지시
+   - ReplenishOrderItem.remarks에 pickTaskItemId 저장 (역참조용)
+2. PickingTaskItem: status=REPLENISH_WAIT
+   - ShipmentOrder: PICKING 상태 유지 (보충 대기 중)
+3. 보충 작업자가 보충 완료 처리 → completeReplenishItem() 호출
+   - remarks의 pickTaskItemId 조회 → PickingTaskItem: WAIT으로 복원
+   - 피킹 화면에서 해당 작업 항목 재활성화
+4. 피킹 화면에 "보충 지시 생성됨, 보충 완료 후 재피킹" 안내
+```
+
+### 재고 부족 확정 처리 상세 (기존)
+
+```
+[부족] 클릭 → 피킹 존+보충 존 모두 재고 없음
+  ↓
+부분 부족 (pick_qty=3, short_qty=7):
+  1. PickingTaskItem: pick_qty=3, short_qty=7, status=PICKED
+  2. deallocateShortQty(): short_qty 7EA만큼 stock_allocations 해제
+  3. 피킹 완료 후 updateShipmentOrdersAfterPicking():
+     - pick_qty > 0 → ShipmentOrder: PICKING → PACKING
+
+전량 부족 (pick_qty=0, short_qty=10):
+  1. PickingTaskItem: pick_qty=0, short_qty=10, status=SHORT
+  2. deallocateShortQty(): 전체 stock_allocations 해제
+  3. 피킹 완료 후 updateShipmentOrdersAfterPicking():
+     - 모든 PickingTaskItem이 SHORT → ShipmentOrder: BACK_ORDER
 ```
 
 #### 포장 지시 생성 (INDIVIDUAL)
@@ -211,8 +267,6 @@ PackingOrderItem 생성 규칙:
   ├─────────────────────────────┼──────────────┼───────────┼──────────┼────────────┤
   │ PICKED, pick_qty=10, short=0│ 10           │ 0         │ WAIT     │ ✅ 있음    │
   │ PICKED, pick_qty=3,  short=7│ 3            │ 7         │ WAIT     │ ✅ 있음    │
-  │ SHORT,  pick_qty=3,  short=7│ 3            │ 7         │ WAIT     │ ✅ 있음    │
-  │ (B-1 수정 전 구 데이터)      │              │           │          │            │
   │ SHORT,  pick_qty=0, short=10│ 0            │ 10        │ SHORT    │ ❌ 없음    │
   └─────────────────────────────┴──────────────┴───────────┴──────────┴────────────┘
 
@@ -221,11 +275,16 @@ PackingOrderItem 생성 규칙:
   → completePackingOrder()에서 SHORT 감지 → PackingOrder.STATUS_SHORT → 출하 차단
 ```
 
-#### 포장 화면에서의 처리
+#### 포장 화면에서의 처리 (INDIVIDUAL)
 
-- `short_qty > 0`인 아이템: "⚠ 3EA 중 7EA 부족" 표시
-- 포장 가능한 3EA 검수/포장 진행
-- 포장 완료 시 → [Case C 포장 부족 확정] 동일하게 SHORT 분기 처리
+- `short_qty > 0`인 아이템: "⚠ 10EA 중 7EA 부족 (3EA 포장)" 형식으로 경고 표시
+- 포장 가능한 3EA 검수/포장 진행 → `status = INSPECTED → PACKED`
+- `completePackingOrder()` 실행 시 아래 조건으로 SHORT 여부 판단:
+  - `status = 'SHORT'` 아이템 존재 (전량 부족 확정 아이템)
+  - OR `status = 'PACKED'` 이면서 `short_qty > 0` 아이템 존재 (부분 부족 포장 완료 아이템)
+  - 위 중 하나라도 해당하면 → `PackingOrder.status = SHORT`
+
+> ⚠ **TOTAL 피킹(Case C)과의 차이**: Case C의 포장 화면은 wave 전체 부족을 포장 시점에 작업자가 결정하는 구조이나, INDIVIDUAL(Case B)은 피킹 시점에 short_qty가 이미 확정되어 있으므로 포장 화면에서 별도의 [부족 처리] 버튼 클릭 없이 자동 감지한다.
 
 ---
 
@@ -388,11 +447,14 @@ CREATED → IN_PROGRESS → COMPLETED → CANCELLED
 ### PickingTaskItem
 
 ```
-WAIT → RUN → PICKED  (정상 또는 부분 부족: pick_qty > 0)
-           → SHORT   (전량 부족: pick_qty = 0)
+WAIT → RUN → PICKED          (정상 또는 부분 부족 확정: pick_qty > 0)
+           → SHORT            (전량 부족 확정: pick_qty = 0)
+           → REPLENISH_WAIT   (보충 존에 재고 있어 보충 지시 생성됨)
+               └→ WAIT        (보충 완료 후 자동 복원 → 재피킹 가능)
 ```
 
-> 부분 부족: `status = PICKED`, `pick_qty > 0`, `short_qty > 0`
+> 부분 부족 확정: `status = PICKED`, `pick_qty > 0`, `short_qty > 0`  
+> REPLENISH_WAIT 중 ShipmentOrder: `PICKING` 상태 유지
 
 ### PackingOrder
 
@@ -452,6 +514,15 @@ WAIT → INSPECTED → PACKED   (정상)
 | B-2 | 포장 지시 아이템 생성 로직 | `FulfillmentTransactionService.createPackingOrders()` | PICKED + SHORT 전체 포함, 전량 부족(pick_qty=0)은 STATUS_SHORT로 즉시 생성 |
 | B-3 | PackingOrderItem.short_qty 미저장 | `FulfillmentTransactionService.createPackingOrders()` | `pti.getShortQty()` 실제 값 저장 |
 
+### ❌ 미구현 (피킹 단계 재고 부족 3단계 처리 — 신규 설계)
+
+| # | 항목 | 관련 내용 |
+|---|------|-----------|
+| N-7 | 피킹 존 재고 조회 후 자동 재할당 | `FulfillmentPickingService.reallocateFromPickingZone()` — 피킹 존(PICKABLE) 가용 재고 확인 후 재할당 |
+| N-8 | 보충 존 재고 확인 후 보충 지시 생성 | `FulfillmentPickingService.createReplenishFromShortItem()` — 보충 존 재고 확인 후 `ReplenishOrder` 자동 생성 |
+| N-9 | `PickingTaskItem.status = REPLENISH_WAIT` 상태 추가 | 보충 대기 상태 상수 및 화면 처리 |
+| N-10 | 피킹 PC 화면 3단계 부족 처리 UI | `fulfillment-picking-pc.js` — [부족] 클릭 시 자동 재할당/보충 지시/부족 확정 분기 결과 안내 |
+
 ### ❌ 미구현 (후속 처리 — 별도 설계 필요)
 
 | # | 항목 | 관련 내용 |
@@ -510,8 +581,11 @@ public static final String STATUS_SHORT = "SHORT";
 
 ```java
 // L154 이후, 상태 업데이트 SQL 앞에 추가
+// ① 전량 부족 확정 아이템 (INDIVIDUAL/TOTAL 공통)
+// ② INDIVIDUAL 부분 부족 — 피킹 시점에 short_qty가 이미 확정되어 status는 PACKED이지만 부족분 존재
 String shortCheckSql = "SELECT COUNT(*) FROM packing_order_items"
-    + " WHERE domain_id = :domainId AND packing_order_id = :id AND status = 'SHORT'";
+    + " WHERE domain_id = :domainId AND packing_order_id = :id"
+    + " AND (status = 'SHORT' OR (status = 'PACKED' AND short_qty > 0))";
 int shortCount = this.queryManager.selectBySql(shortCheckSql,
     ValueUtil.newMap("domainId,id", domainId, id), Integer.class);
 
@@ -618,6 +692,15 @@ fulfillment/shortage-packing-list.js
 | N-3 | 포장 아이템 부족 처리 서비스 + API | 2026-06-22 | ✅ 완료 |
 | N-5 | B2C 포장 PC 화면 부족 처리 UI | 2026-06-23 | ✅ 완료 |
 | N-6 | B2B 포장 PC 화면 부족 처리 UI | 2026-06-23 | ✅ 완료 |
+
+### ❌ 미구현 항목 (피킹 단계 3단계 처리 — 신규 설계)
+
+| 순서 | 항목 | 이유 |
+|------|------|------|
+| N-7 | 피킹 존 재고 자동 재할당 서비스 | 피킹 존(PICKABLE) 가용 재고 확인 후 재할당 로직 |
+| N-8 | 보충 존 재고 확인 + 보충 지시 생성 서비스 | 보충 존 조회 → `ReplenishOrder` 자동 생성 |
+| N-9 | `PickingTaskItem.REPLENISH_WAIT` 상태 추가 | 보충 대기 상태 상수 및 화면 처리 |
+| N-10 | 피킹 PC 화면 3단계 부족 처리 UI | [부족] 클릭 → 재할당/보충/부족 확정 분기 결과 안내 |
 
 ### ❌ 미구현 항목 (후속 처리 — 별도 설계 필요)
 
