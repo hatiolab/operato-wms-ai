@@ -5,35 +5,36 @@ import { ServiceUtil } from '@operato-app/metapage/dist-client'
 /**
  * 로케이션 자동완성 입력 컴포넌트
  *
- * 텍스트를 입력할 때마다 로케이션 목록을 조회하여 드롭다운으로 표시하고,
- * 선택 시 `location-select` 이벤트를 발생시킨다.
+ * - 존(Zone) 콤보박스: 초기화 시 존 목록을 조회하여 표시.
+ *   존을 선택하면 해당 존의 로케이션 목록을 드롭다운으로 즉시 표시.
+ * - 텍스트 입력: 존 미선택 시 입력 문자로 로케이션 자동완성.
+ *   존 선택 시 존 + 입력 문자 조건으로 필터링.
  *
- * @property {string}  placeholder - 입력창 placeholder 텍스트
+ * @property {string}  placeholder - 텍스트 입력창 placeholder
  * @property {boolean} disabled    - 비활성화 여부
  *
  * @fires location-select - 로케이션 선택 시 발생
  *   detail: { loc_cd, loc_nm, ...location } — 선택된 로케이션 전체 객체
  * @fires location-clear - 입력값이 비워질 때 발생
  *
- * @method clear()  - 입력값 및 드롭다운 초기화
- * @method focus()  - 입력창에 포커스
- *
- * @example
- * <location-input
- *   placeholder="로케이션 코드 입력"
- *   @location-select=${e => this._onLocSelect(e.detail)}
- *   @location-clear=${this._onLocClear}>
- * </location-input>
+ * @method clear()  - 입력값·존 선택·드롭다운 초기화
+ * @method focus()  - 텍스트 입력창에 포커스
  */
 @customElement('location-input')
 export class LocationInput extends LitElement {
-  /** 입력창 placeholder */
+  /** 텍스트 입력창 placeholder */
   @property({ type: String }) placeholder = '로케이션 코드 입력'
 
   /** 비활성화 여부 */
   @property({ type: Boolean }) disabled = false
 
-  /** 자동완성 후보 목록 */
+  /** 존 목록 */
+  @state() _zones = []
+
+  /** 선택된 존 코드 */
+  @state() _selectedZoneCd = ''
+
+  /** 자동완성/존 선택 후보 목록 */
   @state() _searchResults = []
 
   _searchTimer = null
@@ -41,8 +42,35 @@ export class LocationInput extends LitElement {
   static get styles() {
     return css`
       :host {
-        display: block;
+        display: flex;
+        align-items: center;
+        gap: 6px;
         position: relative;
+      }
+
+      select {
+        flex-shrink: 0;
+        height: 30px;
+        padding: 0 6px;
+        border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+        border-radius: 6px;
+        font-size: 13px;
+        color: var(--md-sys-color-on-surface, #333);
+        background: var(--md-sys-color-surface-container-lowest, #fff);
+        cursor: pointer;
+        outline: none;
+        max-width: 100px;
+      }
+
+      select:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .input-wrap {
+        flex: 1;
+        position: relative;
+        min-width: 0;
       }
 
       input {
@@ -100,12 +128,50 @@ export class LocationInput extends LitElement {
     `
   }
 
+  /** 컴포넌트 연결 시 존 목록 조회 */
+  async connectedCallback() {
+    super.connectedCallback()
+    try {
+      const result = await ServiceUtil.restGet(`locations/zones`)
+      this._zones = result?.items || result || []
+    } catch (err) {
+      this._zones = []
+    }
+  }
+
+  /** 존 콤보박스 선택 시 해당 존의 로케이션 목록 즉시 조회 */
+  async _onZoneChange(e) {
+    const zoneCd = e.target.value
+    this._selectedZoneCd = zoneCd
+    this._searchResults = []
+
+    const input = this.shadowRoot?.querySelector('input')
+    if (input) input.value = ''
+
+    if (!zoneCd) {
+      this.dispatchEvent(new CustomEvent('location-clear', { bubbles: true, composed: true }))
+      return
+    }
+
+    try {
+      const textVal = input?.value?.trim() || ''
+      const filters = [{ name: 'zone_cd', operator: 'eq', value: zoneCd }]
+      if (textVal) filters.push({ name: 'loc_cd', operator: 'contains', value: textVal })
+      const query = encodeURIComponent(JSON.stringify(filters))
+      const sort = encodeURIComponent(JSON.stringify([{ field: 'loc_cd', ascending: true }]))
+      const result = await ServiceUtil.restGet(`locations?query=${query}&sort=${sort}&limit=100`)
+      this._searchResults = result?.items || result || []
+    } catch (err) {
+      this._searchResults = []
+    }
+  }
+
   /** 텍스트 입력 시 200ms 디바운스로 로케이션 조회 */
   async _onInput(e) {
     const val = e.target.value
     clearTimeout(this._searchTimer)
 
-    if (!val) {
+    if (!val && !this._selectedZoneCd) {
       this._searchResults = []
       this.dispatchEvent(new CustomEvent('location-clear', { bubbles: true, composed: true }))
       return
@@ -113,8 +179,12 @@ export class LocationInput extends LitElement {
 
     this._searchTimer = setTimeout(async () => {
       try {
-        const query = encodeURIComponent(JSON.stringify([{ name: 'loc_cd', operator: 'contains', value: val }]))
-        const result = await ServiceUtil.restGet(`locations?query=${query}&limit=20`)
+        const filters = []
+        if (this._selectedZoneCd) filters.push({ name: 'zone_cd', operator: 'eq', value: this._selectedZoneCd })
+        if (val) filters.push({ name: 'loc_cd', operator: 'contains', value: val })
+        const query = encodeURIComponent(JSON.stringify(filters))
+        const sort = encodeURIComponent(JSON.stringify([{ field: 'loc_cd', ascending: true }]))
+        const result = await ServiceUtil.restGet(`locations?query=${query}&sort=${sort}&limit=100`)
         this._searchResults = result?.items || result || []
       } catch (err) {
         this._searchResults = []
@@ -139,36 +209,54 @@ export class LocationInput extends LitElement {
     setTimeout(() => { this._searchResults = [] }, 150)
   }
 
-  /** 외부에서 입력값과 드롭다운 초기화 */
+  /** 외부에서 입력값·존 선택·드롭다운 초기화 */
   clear() {
     this._searchResults = []
+    this._selectedZoneCd = ''
     const input = this.shadowRoot?.querySelector('input')
     if (input) input.value = ''
+    const select = this.shadowRoot?.querySelector('select')
+    if (select) select.value = ''
   }
 
-  /** 외부에서 포커스 설정 */
+  /** 외부에서 텍스트 입력창에 포커스 */
   focus() {
     this.shadowRoot?.querySelector('input')?.focus()
   }
 
   render() {
     return html`
-      <input
-        type="text"
-        placeholder=${this.placeholder}
-        ?disabled=${this.disabled}
-        @input=${this._onInput}
-        @blur=${this._onBlur}
-        autocomplete="off">
-      ${this._searchResults.length ? html`
-        <div class="dropdown">
-          ${this._searchResults.map(loc => html`
-            <div class="dropdown-item" @mousedown=${() => this._onSelect(loc)}>
-              ${loc.loc_cd}${loc.loc_nm ? ` (${loc.loc_nm})` : ''}
-            </div>
+      ${this._zones.length ? html`
+        <select
+          ?disabled=${this.disabled}
+          @change=${this._onZoneChange}>
+          <option value="">존 전체</option>
+          ${this._zones.map(z => html`
+            <option value=${z.zone_cd} ?selected=${this._selectedZoneCd === z.zone_cd}>
+              ${z.zone_cd}
+            </option>
           `)}
-        </div>
+        </select>
       ` : ''}
+
+      <div class="input-wrap">
+        <input
+          type="text"
+          placeholder=${this.placeholder}
+          ?disabled=${this.disabled}
+          @input=${this._onInput}
+          @blur=${this._onBlur}
+          autocomplete="off">
+        ${this._searchResults.length ? html`
+          <div class="dropdown">
+            ${this._searchResults.map(loc => html`
+              <div class="dropdown-item" @mousedown=${() => this._onSelect(loc)}>
+                ${loc.loc_cd}${loc.loc_nm ? ` (${loc.loc_nm})` : ''}
+              </div>
+            `)}
+          </div>
+        ` : ''}
+      </div>
     `
   }
 }

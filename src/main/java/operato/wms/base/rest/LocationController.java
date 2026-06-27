@@ -17,9 +17,11 @@ import org.springframework.web.bind.annotation.RestController;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import operato.wms.base.entity.Location;
+import operato.wms.base.entity.Zone;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.print.rest.PrintoutController;
+import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.system.service.AbstractRestService;
 import xyz.elidom.util.ValueUtil;
 import xyz.elidom.dbist.dml.Page;
@@ -50,6 +52,14 @@ public class LocationController extends AbstractRestService {
 			@RequestParam(name = "sort", required = false) String sort,
 			@RequestParam(name = "query", required = false) String query) {
 		return this.search(this.entityClass(), page, limit, select, sort, query);
+	}
+
+	@RequestMapping(value = "/zones", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Search Zone List")
+	public List<Zone> searchZoneList() {
+		String zoneSql = "SELECT DISTINCT zone_cd FROM LOCATIONS WHERE DOMAIN_ID = :domainId AND (DEL_FLAG IS NULL OR DEL_FLAG = false) ORDER BY ZONE_CD ASC";
+		return this.queryManager.selectListBySql(zoneSql, ValueUtil.newMap("domainId", Domain.currentDomainId()),
+				Zone.class, 0, 0);
 	}
 
 	@RequestMapping(value = "/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
