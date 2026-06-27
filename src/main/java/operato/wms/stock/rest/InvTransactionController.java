@@ -649,6 +649,33 @@ public class InvTransactionController extends AbstractRestService {
         }
     }
 
+    /**
+     * 피킹 처리
+     *
+     * POST /rest/inventory_trx/{id}/pick_inventory
+     *
+     * 재고를 피킹하여 출고대기 또는 유통가공 로케이션으로 이동한다.
+     * - tran_cd = OUTBOUND → STG-01 (출고대기 로케이션)
+     * - tran_cd = SET → VAS-01 (유통가공 작업 로케이션)
+     *
+     * @param id    피킹할 재고 ID
+     * @param input 피킹 정보 (tran_cd: OUTBOUND|SET, to_qty: 피킹 수량)
+     * @return 이동된 재고 엔티티
+     */
+    @RequestMapping(value = "/{id}/pick_inventory", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Pick Inventory")
+    public Inventory pickInventory(@PathVariable("id") String id, @RequestBody InvTransaction input) {
+        Long domainId = Domain.currentDomainId();
+        input.setId(id);
+
+        // TODO 출고 / 세트 구분에 따라 출고 대기 존, 세트 상품 대기 존을 조회하여 이동 처리
+        // TODO 출고 / 세트 구분에 따라 트랜잭션 유형이 'OUTBOUND' 또는 'SET'로 처리, 이동 수량까지 모두 처리되는지 확인 필요
+        String toLocCd = "SET".equals(input.getTranCd()) ? "VAS-01" : "STG-01";
+        input.setToLocCd(toLocCd);
+
+        return this.invTrxSvc.moveInventory(domainId, input);
+    }
+
     @SuppressWarnings("unchecked")
     @RequestMapping(value = "/summarize_daily_stock", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiDesc(description = "Summarize Daily Stock")

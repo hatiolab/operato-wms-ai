@@ -86,6 +86,11 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   /** 재고 조정 소비기한 입력값 */
   @state() _adjExpiredDate = ''
 
+  /** 피킹 유형: OUTBOUND(출고) | SET(세트) */
+  @state() _pickType = 'OUTBOUND'
+  /** 피킹 수량 */
+  @state() _pickQty = 0
+
   /** 재고 이동 To 로케이션 코드 */
   @state() _moveToLocCd = ''
   /** 재고 이동 수량 입력값 */
@@ -626,6 +631,36 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           opacity: 0.8;
         }
 
+        .radio-group {
+          flex: 1;
+          display: flex;
+          gap: 16px;
+          align-items: center;
+        }
+
+        .radio-group label {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 14px;
+          font-weight: normal;
+          color: var(--md-sys-color-on-surface, #333);
+          cursor: pointer;
+          width: auto;
+          text-align: left;
+        }
+
+        .radio-group input[type="radio"] {
+          flex: none;
+          width: 18px;
+          height: 18px;
+          accent-color: var(--md-sys-color-primary, #1976D2);
+          cursor: pointer;
+          margin: 0;
+          padding: 0;
+          border: none;
+        }
+
         .form-field input,
         .form-field select {
           flex: 1;
@@ -684,6 +719,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       case 'add': return this._renderAddMode()
       case 'adjust': return this._renderAdjustMode()
       case 'move': return this._renderMoveMode()
+      case 'pick': return this._renderPickMode()
       case 'merge': return this._renderMergeMode()
       default: return this._renderListMode()
     }
@@ -817,6 +853,9 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       <div class="header-bar">
         <button class="back-btn" @click=${this._goList}>◀</button>
         <span class="title">${inv.barcode} . ${TermsUtil.tButton('detail') || '재고 상세'}</span>
+        <button class="btn-secondary" style="margin-left:auto; padding: 4px 10px; font-size:13px;" @click=${this._printBarcode}>
+          🖨️ ${TermsUtil.tButton('print') || '인쇄'}
+        </button>
       </div>
 
       <div class="detail-body">
@@ -856,8 +895,8 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           <button class="btn-secondary" @click=${this._goAdjust}>
             ${TermsUtil.tButton('adjust') || '조정'}
           </button>
-          <button class="btn-secondary" @click=${this._printBarcode}>
-            🖨️ ${TermsUtil.tButton('print') || '인쇄'}
+          <button class="btn-secondary" @click=${this._goPick}>
+            ${TermsUtil.tButton('pick') || '피킹'}
           </button>
         </div>
       </div>
@@ -1277,6 +1316,102 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           ${this.processing
         ? (TermsUtil.tText('processing') || '처리 중...')
         : (TermsUtil.tButton('move') || '이동')}
+        </button>
+        <button class="btn-secondary" ?disabled=${this.processing}
+          @click=${() => (this.mode = 'detail')}>
+          ${TermsUtil.tButton('cancel') || '취소'}
+        </button>
+      </div>
+    `
+  }
+
+  /** pick 모드 렌더링 — 피킹 폼 */
+  _renderPickMode() {
+    const inv = this.selectedInventory
+    const availableQty = (inv?.inv_qty ?? 0) - (inv?.reserved_qty ?? 0)
+
+    return html`
+      <div class="header-bar">
+        <button class="back-btn" @click=${() => (this.mode = 'detail')}>◀</button>
+        <span class="title">${inv?.barcode} . ${TermsUtil.tButton('pick') || '피킹'}</span>
+      </div>
+
+      ${this.lastFeedback ? html`
+        <div class="scan-feedback ${this.lastFeedback.type}">${this.lastFeedback.message}</div>
+      ` : ''}
+
+      <div class="add-form">
+        <!-- 현재 재고 정보 (읽기 전용) -->
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('sku_nm') || 'SKU 명'}</label>
+          <input type="text" readonly .value=${inv?.sku_nm || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('sku_cd') || 'SKU'}</label>
+          <input type="text" readonly .value=${inv?.sku_cd || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('from_loc_cd') || 'From 로케이션'}</label>
+          <input type="text" readonly .value=${inv?.loc_cd || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('available_qty') || '가용 수량'}</label>
+          <input type="text" readonly .value=${availableQty}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-primary, #1976D2); font-weight: 600;">
+        </div>
+
+        <div style="height:1px; background: var(--md-sys-color-outline-variant,#e0e0e0); margin: 4px 0;"></div>
+
+        <!-- 피킹 입력 -->
+        <div class="form-field">
+          <label>
+            ${TermsUtil.tLabel('pick_type') || '피킹 유형'}
+            <span class="required">*</span>
+          </label>
+          <div class="radio-group">
+            <label>
+              <input type="radio" name="pickType" value="OUTBOUND"
+                ?checked=${this._pickType === 'OUTBOUND'}
+                @change=${() => (this._pickType = 'OUTBOUND')}>
+              출고
+            </label>
+            <label>
+              <input type="radio" name="pickType" value="SET"
+                ?checked=${this._pickType === 'SET'}
+                @change=${() => (this._pickType = 'SET')}>
+              세트
+            </label>
+          </div>
+        </div>
+        <div class="form-field">
+          <label>
+            ${TermsUtil.tLabel('pick_qty') || '피킹 수량'}
+            <span class="required">*</span>
+          </label>
+          <button class="btn-qty"
+            @click=${() => (this._pickQty = Math.max(1, (this._pickQty || 0) - 1))}>−</button>
+          <numeric-keypad-input
+            .value=${this._pickQty}
+            .min=${1}
+            .max=${availableQty}
+            ?disabled=${this.processing}
+            @change=${e => (this._pickQty = e.detail.value)}>
+          </numeric-keypad-input>
+          <button class="btn-qty"
+            @click=${() => (this._pickQty = Math.min(availableQty, (this._pickQty || 0) + 1))}>+</button>
+        </div>
+      </div>
+
+      <div class="footer-area">
+        <button class="btn-primary"
+          ?disabled=${this.processing}
+          @click=${this._submitPick}>
+          ${this.processing
+            ? (TermsUtil.tText('processing') || '처리 중...')
+            : (TermsUtil.tButton('pick') || '피킹')}
         </button>
         <button class="btn-secondary" ?disabled=${this.processing}
           @click=${() => (this.mode = 'detail')}>
@@ -1718,6 +1853,56 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     this._adjReasonCd = ''
     this.lastFeedback = null
     this.mode = 'adjust'
+  }
+
+  /**
+   * 피킹 화면으로 이동
+   */
+  _goPick() {
+    const inv = this.selectedInventory
+    this._pickType = 'OUTBOUND'
+    this._pickQty = (inv?.inv_qty ?? 0) - (inv?.reserved_qty ?? 0)
+    this.lastFeedback = null
+    this.mode = 'pick'
+  }
+
+  /**
+   * 피킹 확정 API 호출
+   * POST /rest/inventory_trx/{id}/pick_inventory
+   */
+  async _submitPick() {
+    if (!this._pickQty || this._pickQty <= 0) {
+      this._showFeedback('피킹 수량은 1 이상이어야 합니다', 'warning')
+      return
+    }
+
+    const inv = this.selectedInventory
+    const availableQty = (inv?.inv_qty ?? 0) - (inv?.reserved_qty ?? 0)
+    if (this._pickQty > availableQty) {
+      this._showFeedback(`피킹 수량(${this._pickQty})이 가용 수량(${availableQty})을 초과합니다`, 'warning')
+      return
+    }
+
+    const toLocLabel = this._pickType === 'SET' ? 'VAS-01 (유통가공)' : 'STG-01 (출고대기)'
+
+    this.processing = true
+    try {
+      await ServiceUtil.restPost(`inventory_trx/${inv.id}/pick_inventory`, {
+        tran_cd: this._pickType,
+        to_qty: this._pickQty
+      }, null, null, () => {
+        document.dispatchEvent(new CustomEvent('notify', {
+          detail: { level: 'info', message: `피킹 완료: ${inv.barcode} → ${toLocLabel} (${this._pickQty})` }
+        }))
+        this._goList()
+      }, (err) => {
+        this._updateErrorFeedback(err?.msg || '피킹 처리에 실패했습니다')
+      })
+    } catch (error) {
+      this._updateErrorFeedback(error?.message || '피킹 처리에 실패했습니다')
+    } finally {
+      this.processing = false
+    }
   }
 
   /**
