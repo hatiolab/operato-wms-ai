@@ -2,6 +2,9 @@ import '@things-factory/barcode-ui'
 import { html, css } from 'lit'
 import '../../component/sku-barcode-input.js'
 import '../../component/code-label.js'
+import '../../component/code-select.js'
+import '../../component/location-input.js'
+import '../../component/numeric-keypad-input.js'
 import '../../component/entity-label.js'
 import { customElement, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
@@ -66,13 +69,13 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   @state() warehouses = []
   /** 화주사 목록 (select 옵션용) */
   @state() companies = []
-  /** 재고 생성 사유 코드 목록 (INV_NEW_REASON) */
-  @state() _newReasonCodes = []
 
   /** 바코드 입력 필드 값 유무 (placeholder overlay 제어용) */
   @state() _hasBarcodeValue = false
-  /** 로케이션 입력 필드 값 유무 (placeholder overlay 제어용) */
-  @state() _hasLocCdValue = false
+  /** 로케이션 스캔 후 해당 위치의 상품 목록 (상품 콤보용) */
+  @state() _skuOptions = []
+  /** 로케이션별 상품 목록 조회 중 */
+  @state() _locSkuLoading = false
 
   /** 재고 조정 수량 입력값 */
   @state() _adjQty = ''
@@ -80,15 +83,15 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   @state() _adjReason = ''
   /** 재고 조정 사유 코드 선택값 */
   @state() _adjReasonCd = ''
-  /** 재고 조정 사유 코드 목록 (INV_ADJUST_REASON) */
-  @state() _adjReasonCodes = []
+  /** 재고 조정 소비기한 입력값 */
+  @state() _adjExpiredDate = ''
 
   /** 재고 이동 To 로케이션 코드 */
   @state() _moveToLocCd = ''
   /** 재고 이동 수량 입력값 */
   @state() _moveQty = ''
-  /** 재고 이동 사유 입력값 */
-  @state() _moveReason = ''
+  /** 재고 이동 사유 코드 선택값 */
+  @state() _moveReasonCd = ''
   /** 재고 이동 To 로케이션 유효성 검증 결과 */
   @state() _moveToLocation = null
 
@@ -193,6 +196,11 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           width: 100%;
         }
 
+        .ox-input-wrapper input {
+          width: 100%;
+          box-sizing: border-box;
+        }
+
         .ox-placeholder {
           position: absolute;
           top: 50%;
@@ -227,6 +235,33 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
         .search-row input:focus {
           border-color: var(--md-sys-color-primary, #1976D2);
+        }
+
+        .search-row select {
+          flex: 1;
+          padding: 6px 10px;
+          height: 30px;
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 6px;
+          font-size: 13px;
+          color: var(--md-sys-color-on-surface, #333);
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          outline: none;
+          box-sizing: border-box;
+          cursor: pointer;
+        }
+
+        .search-row select:focus {
+          border-color: var(--md-sys-color-primary, #1976D2);
+        }
+
+        .search-row select:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
+
+        .search-row location-input {
+          flex: 1;
         }
 
         .btn-search {
@@ -564,6 +599,33 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           flex: 1;
         }
 
+        .form-field code-select,
+        .form-field location-input,
+        .form-field numeric-keypad-input {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .btn-qty {
+          width: 36px;
+          height: 36px;
+          border: none;
+          border-radius: 8px;
+          background: var(--md-sys-color-primary, #1976D2);
+          color: #fff;
+          font-size: 20px;
+          font-weight: bold;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .btn-qty:active {
+          opacity: 0.8;
+        }
+
         .form-field input,
         .form-field select {
           flex: 1;
@@ -631,6 +693,35 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   _renderListMode() {
     return html`
       <div class="search-area">
+        <!-- 1. 로케이션 -->
+        <div class="search-row">
+          <span class="s-label">${TermsUtil.tLabel('loc_cd') || '로케이션'}</span>
+          <location-input
+            id="locCdInput"
+            placeholder="${TermsUtil.tLabel('loc_cd') || '로케이션 코드 입력'}"
+            @location-select=${e => this._onLocSelect(e.detail.loc_cd)}
+            @location-clear=${this._onLocClear}>
+          </location-input>
+        </div>
+        <!-- 2. 상품 코드 (콤보) -->
+        <div class="search-row">
+          <span class="s-label">${TermsUtil.tLabel('sku_cd') || '상품코드'}</span>
+          ${this._locSkuLoading ? html`
+            <span style="font-size:12px; color:var(--md-sys-color-on-surface-variant,#888); padding:6px 0;">조회 중...</span>
+          ` : html`
+            <select id="skuSelect"
+              ?disabled=${!this.searchLocCd}
+              @change=${this._onLocSkuSelect}>
+              <option value="">-- 선택 --</option>
+              ${this._skuOptions.map(sku => html`
+                <option value="${sku.sku_cd}" ?selected=${this.searchSkuCd === sku.sku_cd}>
+                  ${sku.sku_nm ? `${sku.sku_nm} (${sku.sku_cd})` : sku.sku_cd}
+                </option>
+              `)}
+            </select>
+          `}
+        </div>
+        <!-- 3. 바코드 -->
         <div class="search-row">
           <span class="s-label">${TermsUtil.tLabel('barcode') || '바코드'}</span>
           <div class="ox-input-wrapper">
@@ -642,27 +733,6 @@ export class PdaStockInquiry extends connect(store)(PageView) {
               <span class="ox-placeholder">${TermsUtil.tLabel('scan_barcode') || '재고 바코드 스캔/입력'}</span>
             ` : ''}
           </div>
-        </div>
-        <div class="search-row">
-          <span class="s-label">${TermsUtil.tLabel('loc_cd') || '로케이션'}</span>
-          <div class="ox-input-wrapper">
-            <operato-input-barcode
-              id="locCdInput"
-              @change=${e => this._onLocCdChange(e.target.value)}>
-            </operato-input-barcode>
-            ${!this._hasLocCdValue ? html`
-              <span class="ox-placeholder">${TermsUtil.tLabel('loc_cd') || '로케이션 코드 스캔/입력'}</span>
-            ` : ''}
-          </div>
-        </div>
-        <div class="search-row">
-          <span class="s-label">${TermsUtil.tLabel('sku_cd') || '상품코드'}</span>
-          <sku-barcode-input
-            id="skuCdInput"
-            placeholder="${TermsUtil.tLabel('sku_cd') || '상품코드 또는 88코드 스캔/입력'}"
-            .skipInventory=${true}
-            @sku-select=${e => this._onSkuSelect(e.detail)}>
-          </sku-barcode-input>
         </div>
       </div>
 
@@ -685,7 +755,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         <div class="empty-guide">
           <div class="guide-icon">🔍</div>
           <div class="guide-text">
-            재고 바코드·로케이션·상품 코드로\n재고를 조회하세요
+            로케이션·상품 코드·재고 바코드로 재고를 조회하세요
           </div>
         </div>
       `}
@@ -715,16 +785,14 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         <div class="status-dot ${statusCls}"></div>
         <div class="info">
           <div class="barcode-row">
-            <span class="barcode-text">${inv.barcode}</span>
-            <span class="status-badge ${statusCls}">${inv.status || '-'}</span>
+            <span class="barcode-text">${inv.barcode}</span> / <span class="barcode-text">${inv.loc_cd}</span>
+            <span class="status-badge ${statusCls}"><code-label code-name="INVENTORY_STATUS" .value=${inv.status || ''}></code-label></span>
           </div>
           <div class="sub-row">
-            ${inv.sku_cd || '-'}${inv.sku_nm ? ` (${inv.sku_nm})` : ''}
+            ${inv.sku_nm} (${inv.sku_cd})
           </div>
           <div class="sub-row">
-            ${TermsUtil.tLabel('loc_cd') || '로케이션'}: ${inv.loc_cd || '-'}
-            ${inv.lot_no ? ` · LOT: ${inv.lot_no}` : ''}
-            ${inv.expired_date ? ` · ${inv.expired_date}` : ''}
+            ${inv.expired_date ? `소비기한: ${inv.expired_date}` : ''} ${inv.lot_no ? ` / LOT No.: ${inv.lot_no}` : ''}
           </div>
         </div>
         <div class="qty-col">
@@ -748,17 +816,16 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     return html`
       <div class="header-bar">
         <button class="back-btn" @click=${this._goList}>◀</button>
-        <span class="title">${TermsUtil.tButton('detail') || '재고 상세'}</span>
+        <span class="title">${inv.barcode} . ${TermsUtil.tButton('detail') || '재고 상세'}</span>
       </div>
 
       <div class="detail-body">
         <div class="detail-card">
           <div class="detail-barcode-area">
-            <div class="detail-barcode">${inv.barcode} / ${inv.loc_cd}</div>
-            <span class="status-badge ${statusCls}">${inv.status || '-'}</span>
+            <div class="detail-barcode">로케이션: ${inv.loc_cd}</div>
+            <span class="status-badge ${statusCls}"><code-label code-name="INVENTORY_STATUS" .value=${inv.status}></span>
           </div>
 
-          ${this._detailRow(TermsUtil.tLabel('loc_cd') || '로케이션', inv.loc_cd || '-', 'highlight')}
           ${this._detailRow(TermsUtil.tLabel('sku_cd') || 'SKU', `${inv.sku_cd || '-'}`)}
           ${this._detailRow(TermsUtil.tLabel('sku_nm') || '품명', `${inv.sku_nm}`)}
           ${this._detailRow(TermsUtil.tLabel('inv_qty') || '재고 수량', inv.inv_qty ?? '-')}
@@ -769,9 +836,9 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           ${this._detailRow(TermsUtil.tLabel('com_cd') || '화주사', html`<entity-label table="companies" key-col="com_cd" display-col="com_nm" .value=${inv.com_cd || ''} .fallback=${inv.com_cd || '-'}></entity-label>`)}
           ${this._detailRow(TermsUtil.tLabel('wh_cd') || '창고', html`<entity-label table="warehouses" key-col="wh_cd" display-col="wh_nm" .value=${inv.wh_cd || ''} .fallback=${inv.wh_cd || '-'}></entity-label>`)}
           ${this._detailRow(TermsUtil.tLabel('rcv_no') || '입고번호', inv.rcv_no || '-')}
-          ${this._detailRow(TermsUtil.tLabel('created_at') || '입고 시간', createdAt)}
           ${this._detailRow(TermsUtil.tLabel('last_tran_cd') || '마지막 트랜잭션', html`<code-label code-name="INVENTORY_TRANSACTION" .value=${inv.last_tran_cd || ''}></code-label>`)}
           ${this._detailRow(TermsUtil.tLabel('remarks') || '비고', inv.remarks || '-')}
+          ${this._detailRow(TermsUtil.tLabel('created_at') || '입고 시간', createdAt)}
         </div>
       </div>
 
@@ -815,10 +882,12 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   /** history 모드 렌더링 — 재고 이력 목록 */
   _renderHistoryMode() {
     const inv = this.selectedInventory
+    let histSeq = this.historyItems.length
+
     return html`
       <div class="header-bar">
         <button class="back-btn" @click=${() => (this.mode = 'detail')}>◀</button>
-        <span class="title">${inv?.barcode || ''} · ${TermsUtil.tMenu('InventoryHist') || '재고 이력'}</span>
+        <span class="title">${inv?.barcode || ''} · ${TermsUtil.tMenu('InventoryTran') || '재고 트랜잭션'}</span>
       </div>
 
       ${this.historyLoading ? html`
@@ -829,21 +898,17 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           ${this.historyItems.map(h => html`
             <div class="history-card">
               <div class="h-top">
-                <span class="h-tran"><code-label code-name="INVENTORY_TRANSACTION" .value=${h.last_tran_cd || ''}></code-label></span>
-                <span class="h-seq">#${h.hist_seq || '-'}</span>
+                <span class="h-tran">${TermsUtil.tLabel('loc_cd') || '로케이션'}: ${h.loc_cd || '-'} / ${h.to_loc_cd || '-'}</span>
+                <span class="h-seq">#${histSeq-- || '-'} <code-label code-name="INVENTORY_TRAN_TYPE" .value=${h.tran_type || ''}></code-label></span>
               </div>
               <div class="h-info">
-                ${TermsUtil.tLabel('loc_cd') || '로케이션'}: ${h.loc_cd || '-'}
-                · ${TermsUtil.tLabel('inv_qty') || '재고 수량'}: ${h.inv_qty ?? '-'}
-                · ${TermsUtil.tLabel('reserved_qty') || '할당 수량'}: ${h.reserved_qty ?? '-'}
+                ${TermsUtil.tLabel('tran_qty') + ' (이전 / 이후)' || '변경 수량 (이전 / 이후)'}: ${h.before_qty ?? '-'} / ${h.after_qty ?? '-'}
               </div>
-              ${h.remarks ? html`
-                <div class="h-info" style="margin-top:2px;">
-                  ${TermsUtil.tLabel('remarks') || '비고'}: ${h.remarks}
-                </div>
-              ` : ''}
+              <div class="h-info" style="margin-top:2px;">
+                ${TermsUtil.tLabel('expired_date') || '소비기한'}: ${h.expired_date || '-'} ${TermsUtil.tLabel('reason') || '사유'}: <code-label code-name="INV_ADJUST_REASON" .value=${h.reason_cd || ''}></code-label>
+              </div>
               <div class="h-date">
-                ${h.created_at ? h.created_at.substring(0, 16).replace('T', ' ') : '-'}
+                ${h.worker_id} / ${h.tran_at}
               </div>
             </div>
           `)}
@@ -918,10 +983,12 @@ export class PdaStockInquiry extends connect(store)(PageView) {
             ${TermsUtil.tLabel('loc_cd') || '로케이션'}
             <span class="required">*</span>
           </label>
-          <input type="text"
+          <location-input
+            id="addLocInput"
             placeholder="${TermsUtil.tLabel('loc_cd') || '로케이션 코드 입력'}"
-            .value=${this.addForm.loc_cd}
-            @input=${e => this._updateAddForm('loc_cd', e.target.value)}>
+            @location-select=${e => this._updateAddForm('loc_cd', e.detail.loc_cd)}
+            @location-clear=${() => this._updateAddForm('loc_cd', '')}>
+          </location-input>
         </div>
 
         <div class="form-field">
@@ -953,14 +1020,11 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
         <div class="form-field">
           <label>${TermsUtil.tLabel('reason_cd') || '사유 코드'}</label>
-          <select @change=${e => this._updateAddForm('reason_cd', e.target.value)}>
-            <option value="">-- ${TermsUtil.tButton('select') || '선택'} --</option>
-            ${this._newReasonCodes.map(rc => html`
-              <option value="${rc.name}" ?selected=${this.addForm.reason_cd === rc.name}>
-                ${rc.name}${rc.description ? ` (${rc.description})` : ''}
-              </option>
-            `)}
-          </select>
+          <code-select
+            code-name="INV_NEW_REASON"
+            .value=${this.addForm.reason_cd}
+            @change=${e => this._updateAddForm('reason_cd', e.detail.value)}>
+          </code-select>
         </div>
 
         <div class="form-field">
@@ -993,7 +1057,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     return html`
       <div class="header-bar">
         <button class="back-btn" @click=${() => (this.mode = 'detail')}>◀</button>
-        <span class="title">${TermsUtil.tButton('adjust') || '재고 조정'}</span>
+        <span class="title">${inv?.barcode || '-'} . ${TermsUtil.tButton('adjust') || '재고 조정'}</span>
       </div>
 
       ${this.lastFeedback ? html`
@@ -1003,8 +1067,8 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       <div class="add-form">
         <!-- 현재 재고 정보 (읽기 전용) -->
         <div class="form-field">
-          <label>${TermsUtil.tLabel('barcode') || '바코드'}</label>
-          <input type="text" readonly .value=${inv?.barcode || '-'}
+          <label>${TermsUtil.tLabel('sku_nm') || 'SKU 명'}</label>
+          <input type="text" readonly .value=${inv?.sku_nm || '-'}
             style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
         </div>
         <div class="form-field">
@@ -1015,6 +1079,16 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         <div class="form-field">
           <label>${TermsUtil.tLabel('loc_cd') || '로케이션'}</label>
           <input type="text" readonly .value=${inv?.loc_cd || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('expired_date') || '소비기한'}</label>
+          <input type="text" readonly .value=${inv?.expired_date || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('lot_no') || 'LOT 번호'}</label>
+          <input type="text" readonly .value=${inv?.lot_no || '-'}
             style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
         </div>
         <div class="form-field">
@@ -1041,30 +1115,39 @@ export class PdaStockInquiry extends connect(store)(PageView) {
             ${TermsUtil.tLabel('to_qty') || '조정 수량'}
             <span class="required">*</span>
           </label>
-          <input type="number"
-            id="adjQtyInput"
-            placeholder="예약 수량보다는 커야합니다."
+          <button class="btn-qty"
+            @click=${() => (this._adjQty = Math.max(0, (this._adjQty || 0) - 1))}>−</button>
+          <numeric-keypad-input
             .value=${this._adjQty}
-            @input=${e => (this._adjQty = e.target.value)}>
-        </div>
-        <div class="form-field">
-          <label>${TermsUtil.tLabel('reason_cd') || '사유 코드'}</label>
-          <select @change=${e => (this._adjReasonCd = e.target.value)}>
-            <option value="">-- ${TermsUtil.tButton('select') || '선택'} --</option>
-            ${this._adjReasonCodes.map(rc => html`
-              <option value="${rc.name}" ?selected=${this._adjReasonCd === rc.name}>
-                ${rc.name}${rc.description ? ` (${rc.description})` : ''}
-              </option>
-            `)}
-          </select>
+            .min=${0}
+            ?disabled=${this.processing}
+            @change=${e => (this._adjQty = e.detail.value)}>
+          </numeric-keypad-input>
+          <button class="btn-qty"
+            @click=${() => (this._adjQty = (this._adjQty || 0) + 1)}>+</button>
         </div>
         <div class="form-field">
           <label>
-            ${TermsUtil.tLabel('remarks') || '비고'}
+            ${TermsUtil.tLabel('reason_cd') || '사유 코드'}
             <span class="required">*</span>
           </label>
+          <code-select
+            code-name="INV_ADJUST_REASON"
+            .value=${this._adjReasonCd}
+            @change=${e => (this._adjReasonCd = e.detail.value)}>
+          </code-select>
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('expired_date') || '소비기한'}</label>
+          <input type="date"
+            .value=${this._adjExpiredDate}
+            ?disabled=${this.processing}
+            @change=${e => (this._adjExpiredDate = e.target.value)}>
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('remarks') || '비고'}</label>
           <input type="text"
-            placeholder="${TermsUtil.tLabel('remarks') || '비고'}"
+            placeholder="${TermsUtil.tLabel('remarks') || '비고 (선택)'}"
             .value=${this._adjReason}
             @input=${e => (this._adjReason = e.target.value)}>
         </div>
@@ -1093,7 +1176,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     return html`
       <div class="header-bar">
         <button class="back-btn" @click=${() => (this.mode = 'detail')}>◀</button>
-        <span class="title">${TermsUtil.tButton('move') || '재고 이동'}</span>
+        <span class="title">${inv?.barcode} . ${TermsUtil.tButton('move') || '재고 이동'}</span>
       </div>
 
       ${this.lastFeedback ? html`
@@ -1103,8 +1186,8 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       <div class="add-form">
         <!-- 현재 재고 정보 (읽기 전용) -->
         <div class="form-field">
-          <label>${TermsUtil.tLabel('barcode') || '바코드'}</label>
-          <input type="text" readonly .value=${inv?.barcode || '-'}
+          <label>${TermsUtil.tLabel('sku_nm') || 'SKU 명'}</label>
+          <input type="text" readonly .value=${inv?.sku_nm || '-'}
             style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
         </div>
         <div class="form-field">
@@ -1113,8 +1196,28 @@ export class PdaStockInquiry extends connect(store)(PageView) {
             style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
         </div>
         <div class="form-field">
-          <label>${TermsUtil.tLabel('loc_cd') || 'From'}</label>
+          <label>${TermsUtil.tLabel('from_loc_cd') || 'From 로케이션'}</label>
           <input type="text" readonly .value=${inv?.loc_cd || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('expired_date') || '소비기한'}</label>
+          <input type="text" readonly .value=${inv?.expired_date || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('lot_no') || 'LOT 번호'}</label>
+          <input type="text" readonly .value=${inv?.lot_no || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('inv_qty') || '재고 수량'}</label>
+          <input type="text" readonly .value=${inv?.inv_qty ?? '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('reserved_qty') || '예약 수량'}</label>
+          <input type="text" readonly .value=${inv?.reserved_qty ?? '0'}
             style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
         </div>
         <div class="form-field">
@@ -1131,33 +1234,39 @@ export class PdaStockInquiry extends connect(store)(PageView) {
             ${TermsUtil.tLabel('to_loc_cd') || 'To 로케이션'}
             <span class="required">*</span>
           </label>
-          <operato-input-barcode
+          <location-input
             id="moveToLocInput"
-            placeholder="${TermsUtil.tLabel('to_loc_cd') || 'To 로케이션 스캔/입력'}"
-            @change=${e => this._onMoveToLocCdChange(e.target.value)}>
-          </operato-input-barcode>
+            placeholder="${TermsUtil.tLabel('to_loc_cd') || 'To 로케이션 입력'}"
+            @location-select=${e => this._onMoveToLocSelect(e.detail.loc_cd)}>
+          </location-input>
         </div>
         <div class="form-field">
           <label>
             ${TermsUtil.tLabel('move_qty') || '이동 수량'}
             <span class="required">*</span>
           </label>
-          <input type="number"
-            id="moveQtyInput"
-            min="1"
+          <button class="btn-qty"
+            @click=${() => (this._moveQty = Math.max(1, (this._moveQty || 0) - 1))}>−</button>
+          <numeric-keypad-input
             .value=${this._moveQty}
-            placeholder="${availableQty}"
-            @input=${e => (this._moveQty = e.target.value)}>
+            .min=${1}
+            .max=${availableQty}
+            ?disabled=${this.processing}
+            @change=${e => (this._moveQty = e.detail.value)}>
+          </numeric-keypad-input>
+          <button class="btn-qty"
+            @click=${() => (this._moveQty = Math.min(availableQty, (this._moveQty || 0) + 1))}>+</button>
         </div>
         <div class="form-field">
           <label>
-            ${TermsUtil.tLabel('reason') || '이동 사유'}
+            ${TermsUtil.tLabel('reason_cd') || '이동 사유'}
             <span class="required">*</span>
           </label>
-          <input type="text"
-            placeholder="${TermsUtil.tLabel('reason') || '이동 사유 입력'}"
-            .value=${this._moveReason}
-            @input=${e => (this._moveReason = e.target.value)}>
+          <code-select
+            code-name="INV_MOVE_REASON"
+            .value=${this._moveReasonCd}
+            @change=${e => (this._moveReasonCd = e.detail.value)}>
+          </code-select>
         </div>
       </div>
 
@@ -1181,21 +1290,24 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   _renderMergeMode() {
     const inv = this.selectedInventory
     const validated = !!this._mergeInventory
+    const availableQty = (inv?.inv_qty ?? 0) - (inv?.reserved_qty ?? 0)
+
     return html`
       <div class="header-bar">
         <button class="back-btn" @click=${() => (this.mode = 'detail')}>◀</button>
-        <span class="title">${TermsUtil.tButton('merge') || '재고 병합'}</span>
+        <span class="title">${inv?.barcode} . ${TermsUtil.tButton('merge') || '재고 병합'}</span>
       </div>
 
       ${this.lastFeedback ? html`
         <div class="scan-feedback ${this.lastFeedback.type}">${this.lastFeedback.message}</div>
-      ` : ''}
+      ` : ''
+      }
 
       <div class="add-form">
         <!-- 기준 재고 정보 (읽기 전용) -->
         <div class="form-field">
-          <label>${TermsUtil.tLabel('barcode') || '바코드'}</label>
-          <input type="text" readonly .value=${inv?.barcode || '-'}
+          <label>${TermsUtil.tLabel('sku_nm') || 'SKU 명'}</label>
+          <input type="text" readonly .value=${inv?.sku_nm || '-'}
             style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
         </div>
         <div class="form-field">
@@ -1209,9 +1321,29 @@ export class PdaStockInquiry extends connect(store)(PageView) {
             style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
         </div>
         <div class="form-field">
+          <label>${TermsUtil.tLabel('expired_date') || '소비기한'}</label>
+          <input type="text" readonly .value=${inv?.expired_date || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('lot_no') || 'LOT 번호'}</label>
+          <input type="text" readonly .value=${inv?.lot_no || '-'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
           <label>${TermsUtil.tLabel('inv_qty') || '재고 수량'}</label>
           <input type="text" readonly .value=${inv?.inv_qty ?? '-'}
             style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('reserved_qty') || '예약 수량'}</label>
+          <input type="text" readonly .value=${inv?.reserved_qty ?? '0'}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-on-surface-variant, #666);">
+        </div>
+        <div class="form-field">
+          <label>${TermsUtil.tLabel('available_qty') || '가용 수량'}</label>
+          <input type="text" readonly .value=${availableQty}
+            style="background: var(--md-sys-color-surface-variant, #f5f5f5); color: var(--md-sys-color-primary, #1976D2); font-weight: 600;">
         </div>
 
         <div style="height:1px; background: var(--md-sys-color-outline-variant,#e0e0e0); margin: 4px 0;"></div>
@@ -1233,28 +1365,29 @@ export class PdaStockInquiry extends connect(store)(PageView) {
             ${TermsUtil.tLabel('loc_cd') || '로케이션'}
             <span class="required">*</span>
           </label>
-          <operato-input-barcode
+          <location-input
             id="mergeLocCdInput"
-            placeholder="${TermsUtil.tLabel('loc_cd') || '로케이션 스캔/입력'}"
-            @change=${e => this._onMergeLocCdChange(e.target.value)}>
-          </operato-input-barcode>
+            placeholder="${TermsUtil.tLabel('loc_cd') || '로케이션 입력'}"
+            @location-select=${e => this._onMergeLocSelect(e.detail.loc_cd)}>
+          </location-input>
         </div>
-        ${validated ? html`
+      ${validated ? html`
           <div class="scan-feedback success" style="margin:0;">
             ${this._mergeInventory.sku_cd || ''} · ${this._mergeInventory.loc_cd || ''} · ${this._mergeInventory.inv_qty ?? 0}개 확인
           </div>
-        ` : ''}
-        <div class="form-field">
-          <label>
-            ${TermsUtil.tLabel('reason') || '사유'}
-            <span class="required">*</span>
-          </label>
-          <input type="text"
-            placeholder="${TermsUtil.tLabel('reason') || '병합 사유 입력'}"
+        ` : ''
+      }
+    <div class="form-field">
+      <label>
+        ${TermsUtil.tLabel('reason') || '사유'}
+        <span class="required">*</span>
+      </label>
+      <input type="text"
+        placeholder="${TermsUtil.tLabel('reason') || '병합 사유 입력'}"
             .value=${this._mergeReason}
-            @input=${e => (this._mergeReason = e.target.value)}>
-        </div>
-      </div>
+      @input=${e => (this._mergeReason = e.target.value)}>
+    </div>
+      </div >
 
       <div class="footer-area">
         <button class="btn-primary"
@@ -1266,10 +1399,10 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         </button>
         <button class="btn-secondary" ?disabled=${this.processing}
           @click=${() => (this.mode = 'detail')}>
-          ${TermsUtil.tButton('cancel') || '취소'}
-        </button>
-      </div>
-    `
+      ${TermsUtil.tButton('cancel') || '취소'}
+        </button >
+      </div >
+      `
   }
 
   /** 페이지 초기화 */
@@ -1279,22 +1412,21 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     this.searchBarcode = ''
     this.searchLocCd = ''
     this.searchSkuCd = ''
+    this._skuOptions = []
+    this._locSkuLoading = false
+    this._hasBarcodeValue = false
     this.lastFeedback = null
 
     setTimeout(() => {
-      const oxInput = this.shadowRoot?.querySelector('#barcodeInput')
-      const innerInput = oxInput?.shadowRoot?.querySelector('input')
-      if (innerInput) innerInput.focus()
+      const locInput = this.shadowRoot?.querySelector('#locCdInput')
+      if (locInput) locInput.focus()
     }, 100)
 
     await this._loadMasterData()
   }
 
   /**
-   * 바코드 스캔/입력 시 자동 조회 트리거
-   * 빈 문자열 입력(텍스트 직접 삭제) 시 searchBarcode를 즉시 초기화한다
-   * — 초기화하지 않으면 이후 다른 조건으로 검색할 때 이전 바코드 조건이
-   *   AND로 함께 적용되어 결과가 필터링되는 문제가 발생한다
+   * 바코드 스캔/입력 시 조회 후 바코드 입력 클리어 + 포커스 유지
    * @param {string} barcode
    */
   async _onBarcodeChange(barcode) {
@@ -1308,63 +1440,73 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     this.searchBarcode = barcode
     await this._search()
 
-    // 결과 유무와 관계없이 입력값 초기화 (스캐너 연속 입력 대응)
+    // 입력값 초기화 후 바코드 입력에 포커스 유지 (연속 스캔 대응)
     this.searchBarcode = ''
     this._hasBarcodeValue = false
     const oxInput = this.shadowRoot?.querySelector('#barcodeInput')
     const innerInput = oxInput?.shadowRoot?.querySelector('input')
-    if (innerInput) innerInput.value = ''
-
-    if (this.inventories.length) {
-      // 결과 있으면 로케이션 입력으로 포커스 이동
-      const locInput = this.shadowRoot?.querySelector('#locCdInput')
-      const locInner = locInput?.shadowRoot?.querySelector('input')
-      if (locInner) locInner.focus()
+    if (innerInput) {
+      innerInput.value = ''
+      innerInput.focus()
     }
   }
 
   /**
-   * 로케이션 스캔/입력 시 자동 조회 트리거
-   * 빈 문자열 입력(텍스트 직접 삭제) 시 searchLocCd를 즉시 초기화한다
-   * — 초기화하지 않으면 이후 다른 조건으로 검색할 때 이전 로케이션 조건이
-   *   AND로 함께 적용되어 결과가 필터링되는 문제가 발생한다
+   * 로케이션 선택 시 SKU 목록 조회
    * @param {string} locCd
    */
-  async _onLocCdChange(locCd) {
-    if (!locCd) {
-      this.searchLocCd = ''
-      this._hasLocCdValue = false
-      return
-    }
-
-    this._hasLocCdValue = true
+  async _onLocSelect(locCd) {
     this.searchLocCd = locCd
-    await this._search()
-
-    // 결과 유무와 관계없이 입력값 초기화 (스캐너 연속 입력 대응)
-    this.searchLocCd = ''
-    this._hasLocCdValue = false
-    const input = this.shadowRoot?.querySelector('#locCdInput')
-    const innerInput = input?.shadowRoot?.querySelector('input')
-    if (innerInput) innerInput.value = ''
+    this._skuOptions = []
+    this.searchSkuCd = ''
+    this.inventories = []
+    await this._fetchSkusAtLocation(locCd)
   }
 
   /**
-   * sku-barcode-input의 sku-select 이벤트 처리
-   * 상품코드(sku_cd) 또는 88코드(sku_barcd) 스캔 시 호출된다
-   * resolve_barcode API가 88코드 → sku_cd 변환을 담당하므로
-   * 여기서는 항상 sku_cd 값으로 inventories 조회를 수행한다
-   * @param {{ com_cd, sku_cd, sku_nm, barcode }} detail
+   * 로케이션 입력 클리어 시 상태 초기화
    */
-  async _onSkuSelect(detail) {
-    if (!detail?.sku_cd) return
+  _onLocClear() {
+    this.searchLocCd = ''
+    this._skuOptions = []
+    this.searchSkuCd = ''
+    this.inventories = []
+  }
 
-    this.searchSkuCd = detail.sku_cd
-    await this._search()
-
-    if (!this.inventories.length) {
-      this.searchSkuCd = ''
+  /**
+   * 로케이션에 존재하는 SKU 목록 조회 — 상품 콤보 populate
+   * @param {string} locCd
+   */
+  async _fetchSkusAtLocation(locCd) {
+    this._locSkuLoading = true
+    try {
+      const result = await ServiceUtil.restGet(
+        `inventories/search_sku_by_location?loc_cd=${encodeURIComponent(locCd)} `
+      )
+      this._skuOptions = result || []
+      if (!this._skuOptions.length) {
+        this._showFeedback('재고가 존재하지 않습니다.', 'warning')
+      }
+    } catch (e) {
+      console.error('로케이션 SKU 조회 실패:', e)
+      this._skuOptions = []
+      this._showFeedback('상품 목록 조회 중 오류가 발생했습니다', 'error')
+    } finally {
+      this._locSkuLoading = false
     }
+  }
+
+  /**
+   * 상품 콤보 선택 처리 — 선택된 로케이션 + 상품으로 재고 조회
+   * @param {Event} e
+   */
+  async _onLocSkuSelect(e) {
+    this.searchSkuCd = e.target.value
+    if (!this.searchSkuCd) {
+      this.inventories = []
+      return
+    }
+    await this._search()
   }
 
   /**
@@ -1413,27 +1555,30 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
   /**
    * 검색 조건 및 결과 초기화
-   * state와 함께 operato-input-barcode DOM 값도 직접 클리어한다
    */
   _resetSearch() {
     this.searchBarcode = ''
     this.searchLocCd = ''
     this.searchSkuCd = ''
     this._hasBarcodeValue = false
-    this._hasLocCdValue = false
+    this._skuOptions = []
     this.inventories = []
     this.lastFeedback = null
 
-    for (const id of ['#barcodeInput', '#locCdInput']) {
-      const el = this.shadowRoot?.querySelector(id)
-      const innerEl = el?.shadowRoot?.querySelector('input')
-      if (innerEl) innerEl.value = ''
-    }
-    // sku-barcode-input은 스캔 완료 후 자동으로 내부 입력값을 초기화함
+    // operato-input-barcode (shadow DOM 내부 input 클리어)
+    const barcodeEl = this.shadowRoot?.querySelector('#barcodeInput')
+    const barcodeInner = barcodeEl?.shadowRoot?.querySelector('input')
+    if (barcodeInner) barcodeInner.value = ''
 
-    const oxInput = this.shadowRoot?.querySelector('#barcodeInput')
-    const innerInput = oxInput?.shadowRoot?.querySelector('input')
-    if (innerInput) innerInput.focus()
+    // location-input 컴포넌트 클리어 + 포커스
+    const locInput = this.shadowRoot?.querySelector('#locCdInput')
+    if (locInput) {
+      locInput.clear()
+      locInput.focus()
+    }
+
+    const skuSelect = this.shadowRoot?.querySelector('#skuSelect')
+    if (skuSelect) skuSelect.value = ''
   }
 
   /**
@@ -1448,7 +1593,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
   /**
    * 이력 화면으로 이동 — 선택된 재고의 이력 조회
-   * GET /rest/inventory_hists/by_inventory_id/{id}
+   * GET /rest/inventory_trans/by_inventory_id/{id}
    */
   async _goHistory() {
     if (!this.selectedInventory) return
@@ -1458,7 +1603,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     this.historyLoading = true
     try {
       const result = await ServiceUtil.restGet(
-        `inventory_hists/by_inventory_id/${this.selectedInventory.id}`
+        `inventory_trans/by_inventory_id/${this.selectedInventory.id}`
       )
       this.historyItems = result || []
 
@@ -1490,55 +1635,18 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   }
 
   /**
-   * 창고·화주사 마스터 데이터 + INV_NEW_REASON 사유 코드 로드
-   * GET /rest/warehouses, GET /rest/companies, GET /rest/common_codes
+   * 창고·화주사 마스터 데이터 로드
    */
   async _loadMasterData() {
-    // 창고, 화주사 정보 조회
     try {
       const [whResult, comResult] = await Promise.all([
         ServiceUtil.restGet('warehouses?limit=200'),
         ServiceUtil.restGet('companies?limit=200')
       ])
-
       this.warehouses = whResult?.items || whResult || []
       this.companies = comResult?.items || comResult || []
     } catch (error) {
       console.error('마스터 데이터 로드 실패:', error)
-    }
-
-    // 재고 생성, 재고 조정 사유 코드 + 트랜잭션 유형 코드 조회
-    await Promise.all([
-      this._loadNewReasonCodes(),
-      this._loadAdjustReasonCodes()
-    ])
-  }
-
-  /**
-   * INV_NEW_REASON 공통코드 상세 목록 로드
-   * GET /rest/common_codes/show_by_name?name=INV_NEW_REASON
-   */
-  async _loadNewReasonCodes() {
-    try {
-      const codeMaster = await ServiceUtil.codeItems('INV_NEW_REASON')
-      if (!codeMaster || !codeMaster.id) return
-      this._newReasonCodes = codeMaster.items || []
-    } catch (error) {
-      console.error('재고 생성 사유 코드 로드 실패:', error)
-    }
-  }
-
-  /**
-   * INV_ADJUST_REASON 공통코드 상세 목록 로드
-   * GET /rest/common_codes/show_by_name?name=INV_ADJUST_REASON
-   */
-  async _loadAdjustReasonCodes() {
-    try {
-      const codeMaster = await ServiceUtil.codeItems('INV_ADJUST_REASON')
-      if (!codeMaster || !codeMaster.id) return
-      this._adjReasonCodes = codeMaster.items || []
-    } catch (error) {
-      console.error('재고 조정 사유 코드 로드 실패:', error)
     }
   }
 
@@ -1581,9 +1689,9 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         expired_date: this.addForm.expired_date || null,
         reason_cd: this.addForm.reason_cd || null,
         remarks: this.addForm.remarks || null
-      }, null, null, (res) => {
+      }, null, null, () => {
         document.dispatchEvent(new CustomEvent('notify', {
-          detail: { level: 'info', message: `재고 추가 완료: ${sku_cd} → ${loc_cd}` }
+          detail: { level: 'info', message: `재고 추가 완료: ${sku_cd} → ${loc_cd} ` }
         }))
         this._goList()
 
@@ -1603,15 +1711,13 @@ export class PdaStockInquiry extends connect(store)(PageView) {
    * 재고 조정 화면으로 이동
    */
   _goAdjust() {
-    this._adjQty = ''
+    const inv = this.selectedInventory
+    this._adjQty = inv?.inv_qty ?? 0
+    this._adjExpiredDate = inv?.expired_date || ''
     this._adjReason = ''
     this._adjReasonCd = ''
     this.lastFeedback = null
     this.mode = 'adjust'
-    setTimeout(() => {
-      const input = this.shadowRoot?.querySelector('#adjQtyInput')
-      if (input) input.focus()
-    }, 100)
   }
 
   /**
@@ -1621,57 +1727,48 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   _goMove() {
     const inv = this.selectedInventory
     this._moveToLocCd = ''
-    this._moveQty = String((inv?.inv_qty ?? 0) - (inv?.reserved_qty ?? 0))
-    this._moveReason = ''
+    this._moveQty = (inv?.inv_qty ?? 0) - (inv?.reserved_qty ?? 0)
+    this._moveReasonCd = ''
     this._moveToLocation = null
     this.lastFeedback = null
     this.mode = 'move'
     setTimeout(() => {
-      const oxInput = this.shadowRoot?.querySelector('#moveToLocInput')
-      const innerInput = oxInput?.shadowRoot?.querySelector('input')
-      if (innerInput) innerInput.focus()
+      this.shadowRoot?.querySelector('#moveToLocInput')?.focus()
     }, 100)
   }
 
   /**
-   * To 로케이션 스캔/입력 — inventory_trx/validate_location_for_move로 유효성 검증
-   * 유효하지 않으면 입력 박스를 초기화하고 오류 피드백 표시
+   * To 로케이션 선택 후 유효성 검증
    * @param {string} locCd
    */
-  async _onMoveToLocCdChange(locCd) {
-    if (!locCd) return
+  async _onMoveToLocSelect(locCd) {
+    if (locCd === this.selectedInventory?.loc_cd) {
+      this._moveToLocCd = ''
+      this._moveToLocation = null
+      this.shadowRoot?.querySelector('#moveToLocInput')?.clear()
+      this._updateErrorFeedback('현재 로케이션과 동일합니다. 다른 로케이션을 입력하세요.')
+      return
+    }
 
     try {
       await ServiceUtil.restPost('inventory_trx/validate_location_for_move', {
         to_loc_cd: locCd
       }, null, null, (res) => {
-        // To 로케이션이 현재 재고의 From 로케이션과 동일한 경우 이동 불가
-        if (locCd === this.selectedInventory?.loc_cd) {
-          this.clearForValidateMoveFailed('현재 로케이션과 동일합니다. 다른 로케이션을 입력하세요.')
-          return
-        }
         this._moveToLocCd = locCd
         this._moveToLocation = res
         this._showFeedback(`${locCd} 로케이션 확인`, 'success')
       }, (err) => {
-        this.clearForValidateMoveFailed(err?.msg || '유효하지 않은 로케이션입니다')
+        this._moveToLocCd = ''
+        this._moveToLocation = null
+        this.shadowRoot?.querySelector('#moveToLocInput')?.clear()
+        this._updateErrorFeedback(err?.msg || '유효하지 않은 로케이션입니다')
       })
     } catch (error) {
-      this.clearForValidateMoveFailed(error?.message || '유효하지 않은 로케이션입니다')
+      this._moveToLocCd = ''
+      this._moveToLocation = null
+      this.shadowRoot?.querySelector('#moveToLocInput')?.clear()
+      this._updateErrorFeedback(error?.message || '유효하지 않은 로케이션입니다')
     }
-  }
-
-  /**
-   * 로케이션 유효성 에러 처리
-   * @param {*} errorMessage 
-   */
-  clearForValidateMoveFailed(errorMessage) {
-    this._moveToLocCd = ''
-    this._moveToLocation = null
-    const oxLocInput = this.shadowRoot?.querySelector('#moveToLocInput')
-    const innerInput = oxLocInput?.shadowRoot?.querySelector('input')
-    if (innerInput) innerInput.value = ''
-    this._updateErrorFeedback(errorMessage)
   }
 
   /**
@@ -1688,18 +1785,14 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       this._showFeedback('이동 수량을 입력하세요', 'warning')
       return
     }
-    if (!this._moveReason || !this._moveReason.trim()) {
-      this._showFeedback('이동 사유를 입력하세요', 'warning')
+    if (!this._moveReasonCd) {
+      this._showFeedback('이동 사유 코드를 선택하세요', 'warning')
       return
     }
 
-    const qty = parseFloat(this._moveQty)
-    if (isNaN(qty) || qty <= 0) {
+    const qty = this._moveQty
+    if (!qty || qty <= 0) {
       this._showFeedback('이동 수량은 1 이상이어야 합니다', 'warning')
-      return
-    }
-    if (!Number.isInteger(qty)) {
-      this._showFeedback('이동 수량은 정수만 입력 가능합니다', 'warning')
       return
     }
 
@@ -1715,7 +1808,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       await ServiceUtil.restPost(`inventory_trx/${inv.id}/move_inventory`, {
         to_loc_cd: this._moveToLocCd,
         to_qty: qty,
-        reason: this._moveReason.trim()
+        reason_cd: this._moveReasonCd
       }, null, null, (res) => {
         document.dispatchEvent(new CustomEvent('notify', {
           detail: { level: 'info', message: `재고 이동 완료: ${inv.barcode} → ${this._moveToLocCd} (${qty})` }
@@ -1763,20 +1856,15 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     if (this._mergeMergeLocCd) {
       await this._validateMergeInventory()
     } else {
-      const oxInput = this.shadowRoot?.querySelector('#mergeLocCdInput')
-      const innerInput = oxInput?.shadowRoot?.querySelector('input')
-      if (innerInput) innerInput.focus()
+      this.shadowRoot?.querySelector('#mergeLocCdInput')?.focus()
     }
   }
 
   /**
-   * 병합 로케이션 스캔/입력 처리
-   * 바코드도 입력된 경우 재고 존재 여부 즉시 검증
-   * 유효하지 않으면 입력 초기화
+   * 병합 로케이션 선택 — 바코드도 입력된 경우 즉시 검증
    * @param {string} locCd
    */
-  async _onMergeLocCdChange(locCd) {
-    if (!locCd) return
+  async _onMergeLocSelect(locCd) {
     this._mergeMergeLocCd = locCd
     this._mergeInventory = null
     if (this._mergeBarcode) {
@@ -1830,9 +1918,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     const innerBarcode = barcodeOx?.shadowRoot?.querySelector('input')
     if (innerBarcode) innerBarcode.value = ''
 
-    const locOx = this.shadowRoot?.querySelector('#mergeLocCdInput')
-    const innerLoc = locOx?.shadowRoot?.querySelector('input')
-    if (innerLoc) innerLoc.value = ''
+    this.shadowRoot?.querySelector('#mergeLocCdInput')?.clear()
 
     this._updateErrorFeedback(errMsg)
   }
@@ -1894,25 +1980,21 @@ export class PdaStockInquiry extends connect(store)(PageView) {
    * POST /rest/inventory_trx/{id}/adjust_inventory
    */
   async _submitAdjust() {
-    if (!this._adjQty) {
+    if (!this._adjQty && this._adjQty !== 0) {
       this._showFeedback('조정 수량을 입력하세요', 'warning')
       return
     }
-    if (!this._adjReason || !this._adjReason.trim()) {
-      this._showFeedback('비고를 입력하세요', 'warning')
+    if (!this._adjReasonCd) {
+      this._showFeedback('사유 코드를 선택하세요', 'warning')
       return
     }
 
-    const qty = parseInt(this._adjQty, 10)
-    if (isNaN(qty) || qty < 0) {
-      this._showFeedback('조정 수량은 0 이상이어야 합니다', 'warning')
-      return
-    }
-
+    const qty = this._adjQty ?? 0
     const inv = this.selectedInventory
     const reservedQty = inv?.reserved_qty ?? 0
-    if (qty === (inv?.inv_qty ?? 0)) {
-      this._showFeedback(`현재 수량(${qty})과 동일합니다. 변경할 수량을 입력하세요.`, 'warning')
+    const expiredDateChanged = this._adjExpiredDate !== (inv?.expired_date || '')
+    if (qty === (inv?.inv_qty ?? 0) && !expiredDateChanged) {
+      this._showFeedback('변경된 내용이 없습니다.', 'warning')
       return
     }
     if (qty < reservedQty) {
@@ -1924,8 +2006,9 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     try {
       await ServiceUtil.restPost(`inventory_trx/${inv.id}/adjust_inventory`, {
         to_qty: qty,
-        remarks: this._adjReason.trim(),
-        reason_cd: this._adjReasonCd || null
+        expired_date: this._adjExpiredDate || null,
+        remarks: this._adjReason?.trim() || null,
+        reason_cd: this._adjReasonCd
       }, null, null, (result) => {
         const diff = qty - (inv.inv_qty ?? 0)
         const diffStr = diff > 0 ? `+${diff}` : `${diff}`

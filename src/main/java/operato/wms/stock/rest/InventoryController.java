@@ -27,7 +27,7 @@ import com.google.zxing.oned.Code128Writer;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import operato.wms.base.entity.Location;
+import operato.wms.base.entity.SKU;
 import operato.wms.base.entity.StoragePolicy;
 import operato.wms.base.service.WmsBaseService;
 import operato.wms.stock.entity.Inventory;
@@ -143,18 +143,13 @@ public class InventoryController extends AbstractRestService {
 	@RequestMapping(value = "/work/load/{id}", method = RequestMethod.PUT, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Update")
 	public Inventory updateWorkLoad(@PathVariable("id") String id, @RequestBody Inventory input) {
-		Inventory inv = null;
-
 		input.setId(id);
 
-		List<Inventory> list = new ArrayList<Inventory>();
-		list.add(input);
-
-		if (this.MultipleUpdateLoad(list)) {
-			inv = this.findOne(id);
+		if (this.MultipleUpdateLoad(ValueUtil.toList(input))) {
+			return this.findOne(id);
 		}
 
-		return inv;
+		return null;
 	}
 
 	@RequestMapping(value = "/{id}", method = RequestMethod.DELETE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -167,6 +162,52 @@ public class InventoryController extends AbstractRestService {
 	@ApiDesc(description = "Create, Update or Delete multiple at one time")
 	public Boolean multipleUpdate(@RequestBody List<Inventory> list) {
 		return this.cudMultipleData(this.entityClass(), list);
+	}
+
+	@RequestMapping(value = "/search_sku_by_location", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Search SKU List By Location")
+	public List<SKU> searchSkuListByLocation(@RequestParam(name = "loc_cd", required = true) String locCd) {
+		String sql = "select distinct sku_cd, sku_nm from inventories where domain_id = :domainId and loc_cd = :locCd and status <> :status and inv_qty > 0";
+		return this.queryManager.selectListBySql(sql,
+				ValueUtil.newMap("domainId,locCd,status", Domain.currentDomainId(), locCd, Inventory.STATUS_EMPTY),
+				SKU.class, 0, 0);
+	}
+
+	/**
+	 * 재고 관리 > 재고 조정
+	 * 
+	 * @param list
+	 * @return
+	 */
+	@RequestMapping(value = "/adjust/update_multiple", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Create, Update or Delete multiple at one time")
+	public Boolean MultipleUpdateAdjust(@RequestBody List<Inventory> list) {
+
+		List<Inventory> updateList = new ArrayList<Inventory>();
+
+		for (Inventory item : list) {
+			if (ValueUtil.isEqual(item.getCudFlag_(), "u") && ValueUtil.isNotEmpty(item.getInvQty())) {
+				if (ValueUtil.isNotEqual(this.findOne(item.getId()), item.getInvQty())) {
+					if (ValueUtil.isEmpty(item.getRemarks())) {
+						throw new ElidomRuntimeException("재고 조정 사유를 반드시 입력해야 합니다.");
+					}
+
+					// 재고 정보 변경
+					item.setLastTranCd(Inventory.TRANSACTION_ADJUST);
+					if (item.getInvQty() <= 0) {
+						// 재고가 0보다 작으면 상태 변경 : 비어있음
+						item.setStatus(Inventory.STATUS_EMPTY);
+						item.setDelFlag(true);
+					}
+					updateList.add(item);
+				}
+			}
+		}
+
+		queryManager.updateBatch(this.entityClass(), updateList, "status", "lastTranCd", "delFlag", "invQty",
+				"remarks");
+
+		return true;
 	}
 
 	@RequestMapping(value = "/{barcode}/{loc_cd}/download_barcode", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -283,43 +324,6 @@ public class InventoryController extends AbstractRestService {
 		}
 
 		queryManager.updateBatch(this.entityClass(), updateList, "status", "lastTranCd", "locCd");
-
-		return true;
-	}
-
-	/**
-	 * 재고 관리 > 재고 조정
-	 * 
-	 * @param list
-	 * @return
-	 */
-	@RequestMapping(value = "/adjust/update_multiple", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-	@ApiDesc(description = "Create, Update or Delete multiple at one time")
-	public Boolean MultipleUpdateAdjust(@RequestBody List<Inventory> list) {
-
-		List<Inventory> updateList = new ArrayList<Inventory>();
-
-		for (Inventory item : list) {
-			if (ValueUtil.isEqual(item.getCudFlag_(), "u") && ValueUtil.isNotEmpty(item.getInvQty())) {
-				if (ValueUtil.isNotEqual(this.findOne(item.getId()), item.getInvQty())) {
-					if (ValueUtil.isEmpty(item.getRemarks())) {
-						throw new ElidomRuntimeException("재고 조정 사유를 반드시 입력해야 합니다.");
-					}
-
-					// 재고 정보 변경
-					item.setLastTranCd(Inventory.TRANSACTION_ADJUST);
-					if (item.getInvQty() <= 0) {
-						// 재고가 0보다 작으면 상태 변경 : 비어있음
-						item.setStatus(Inventory.STATUS_EMPTY);
-						item.setDelFlag(true);
-					}
-					updateList.add(item);
-				}
-			}
-		}
-
-		queryManager.updateBatch(this.entityClass(), updateList, "status", "lastTranCd", "delFlag", "invQty",
-				"remarks");
 
 		return true;
 	}

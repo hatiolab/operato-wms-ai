@@ -614,6 +614,14 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 		this.direction = this.beforeQty > this.afterQty ? InventoryTran.DIRECTION_OUT : InventoryTran.DIRECTION_IN;
 
 		// 재고 조정 처리
+		if (ValueUtil.isNotEmpty(this.expiredDate)) {
+			inventory.setExpiredDate(this.expiredDate);
+		}
+
+		if (ValueUtil.isNotEmpty(this.lotNo)) {
+			inventory.setLotNo(this.lotNo);
+		}
+
 		inventory.setInvQty(this.afterQty);
 		inventory.setRemarks(this.remarks);
 		inventory.setLastTranCd(Inventory.TRANSACTION_ADJUST);

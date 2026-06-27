@@ -5,8 +5,6 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.annotation.JacksonInject.Value;
-
 import operato.wms.base.entity.Location;
 import operato.wms.base.entity.SKU;
 import operato.wms.base.entity.StoragePolicy;
@@ -380,6 +378,16 @@ public class StockTransactionService extends BaseStockService {
         // 입력값으로 재고 객체 생성
         InventoryTran invTran = ValueUtil.populate(inventory, new InventoryTran(), "domainId", "barcode", "whCd",
                 "comCd", "skuCd", "skuNm", "locCd", "lotNo", "serialNo", "expiredDate");
+
+        // 소비기한, Lot 정보는 수정되었을 때만 업데이트한다.
+        if (ValueUtil.isNotEmpty(input.getExpiredDate())) {
+            invTran.setExpiredDate(input.getExpiredDate());
+        }
+        if (ValueUtil.isNotEmpty(input.getLotNo())) {
+            invTran.setLotNo(input.getLotNo());
+        }
+
+        // 재고 조정 수량, 사유, 비고 설정
         invTran.setTranQty(input.getToQty());
         invTran.setReasonCd(input.getReasonCd());
         invTran.setReason(input.getReason());
