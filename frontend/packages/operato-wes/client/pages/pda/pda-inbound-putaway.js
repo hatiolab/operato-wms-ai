@@ -70,6 +70,8 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
 
   /** 적치 대기 입고 목록 (list 모드 중단 표시) */
   @state() receivingList = []
+  /** vend_cd → vend_nm 매핑 (목록 표시용) */
+  _vendorMap = {}
   /** 추천 로케이션 목록 (work 모드 스텝 2 진입 시 조회) */
   @state() recommendedLocations = []
   /** 추천 로케이션 조회 중 */
@@ -709,7 +711,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
         .item-card {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 1px;
           padding: 8px 10px;
           margin-bottom: 6px;
           border-radius: 8px;
@@ -1089,16 +1091,14 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
     return html`
       <div class="rcv-card" @click=${() => this._onScanRcvNo(rcv.rcv_no)}>
         <div class="rcv-header">
-          <span class="rcv-no">${rcv.rcv_no}</span>
+          <span class="rcv-no">${TermsUtil.tLabel('rcv_no') || '입고번호'}: ${rcv.rcv_no}</span>
           <div class="rcv-badges">
             ${rcv.waiting_count > 0 ? html`<span class="badge-waiting">${TermsUtil.tLabel('wait') || '대기'} ${rcv.waiting_count}</span>` : ''}
             ${rcv.stored_count > 0 ? html`<span class="badge-stored">${TermsUtil.tLabel('completed') || '완료'} ${rcv.stored_count}</span>` : ''}
           </div>
         </div>
         <div class="rcv-sub">
-          ${rcv.rcv_req_date ? html`<span>${rcv.rcv_req_date}</span>` : ''}
-          ${rcv.com_cd ? html`<span>${TermsUtil.tLabel('com_cd') || '화주사'}: ${rcv.com_cd}</span>` : ''}
-          ${rcv.vend_cd ? html`<span>${TermsUtil.tLabel('vend_cd') || '공급처'}: ${rcv.vend_cd}</span>` : ''}
+          ${TermsUtil.tLabel('vend_cd') || '공급처'}: ${this._vendorMap[rcv.vend_cd] || rcv.vend_cd || '-'} | ${TermsUtil.tLabel('rcv_req_date') || '입고 예정일'}: ${rcv.rcv_req_date || '-'}
         </div>
       </div>
     `
@@ -1388,8 +1388,10 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
               <div class="info">
                 <div class="sku">${item.sku_nm || item.sku_cd}${item.sku_nm ? ` (${item.sku_cd})` : ''}</div>
                 <div class="sub">
-                  ${item.barcode || '-'}
-                  ${item.lot_no ? ` · LOT: ${item.lot_no}` : ''}
+                  ${TermsUtil.tLabel('barcode')}: ${item.barcode} | ${TermsUtil.tLabel('qty')}: ${item.inv_qty}
+                </div>
+                <div class="sub">
+                  ${TermsUtil.tLabel('expired_date')}: ${item.expired_date || '-'} | ${TermsUtil.tLabel('lot_no')}: ${item.lot_no || '-'}
                 </div>
               </div>`
 
@@ -1407,8 +1409,8 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
                     @click=${e => { e.stopPropagation(); this._printBarcode(item) }}>
                     🖨️ ${TermsUtil.tButton('print') || '인쇄'}
                   </button>
+                  <span class="loc-badge done">${item.loc_cd || '-'}</span>
                 ` : ''}
-                <span class="loc-badge done">${item.loc_cd || '-'}</span>
               </div>
             </div>
           `
@@ -1440,7 +1442,8 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
         : items.map(item => html`
               <div class="picker-item" @click=${() => this._pickItem(item)}>
                 <div class="p-nm">${item.sku_nm || item.sku_cd}${item.sku_nm ? ` (${item.sku_cd})` : ''}</div>
-                <div class="p-sub">${item.barcode || '-'}${item.lot_no ? ` · LOT: ${item.lot_no}` : ''} · ${TermsUtil.tLabel('inv_qty') || '수량'} ${item.inv_qty || 0}</div>
+                <div class="p-sub">${item.barcode || '-'}· ${TermsUtil.tLabel('inv_qty') || '수량'} ${item.inv_qty || 0}</div>
+                <div class="p-sub">${TermsUtil.tLabel('expired_date') || '소비기한'}: ${item.expired_date || '-'} · ${TermsUtil.tLabel('lot_no') || 'LOT NO.'}: ${item.lot_no || '-'}</div>
               </div>
             `)}
           <button class="picker-cancel" @click=${() => { this._showItemPicker = false }}>
@@ -1899,7 +1902,12 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
    */
   async _loadReceivingList() {
     try {
-      const data = await ServiceUtil.restGet('inbound_trx/putaway/receiving_list')
+      const [data, vendorResult] = await Promise.all([
+        ServiceUtil.restGet('inbound_trx/putaway/receiving_list'),
+        ServiceUtil.restGet('vendors?select=vend_cd,vend_nm&limit=500')
+      ])
+      const vendors = vendorResult?.items || vendorResult || []
+      this._vendorMap = Object.fromEntries(vendors.map(v => [v.vend_cd, v.vend_nm]))
       this.receivingList = data || []
     } catch (error) {
       console.error('입고 목록 조회 실패:', error)

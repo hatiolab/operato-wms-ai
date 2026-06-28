@@ -27,6 +27,8 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
   /** 입고 주문 목록 */
   @state() taskList = []
+  /** vend_cd → vend_nm 매핑 (목록 표시용) */
+  _vendorMap = {}
   /** 목록 필터 상태 */
   @state() filterStatus = 'ALL'
   /** 목록 로딩 중 */
@@ -775,7 +777,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         .item-card {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 1px;
           padding: 8px 10px;
           margin-bottom: 6px;
           border-radius: 8px;
@@ -832,14 +834,14 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         .item-card.done-card .card-main {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 1px;
         }
         .item-card.done-card .card-actions {
           display: flex;
           align-items: center;
           justify-content: flex-end;
-          gap: 8px;
-          margin-top: 6px;
+          gap: 6px;
+          margin-top: 1px;
         }
         /* 완료 항목은 상품명을 전체 폭에서 줄바꿈하여 모두 표시 */
         .item-card.done-card .sku {
@@ -1161,7 +1163,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           </span>
         </div>
         <div class="sub-info">
-          화주사 : ${r.com_cd || ''} | 공급사 : ${r.vend_cd || ''} | 입고 예정일 : ${r.rcv_req_date || ''}
+          ${TermsUtil.tLabel('vend_cd') || '공급처'}: ${this._vendorMap[r.vend_cd] || r.vend_cd || ''} | ${TermsUtil.tLabel('rcv_req_date') || '입고 예정일'}: ${r.rcv_req_date || ''}
           ${totalItems ? ` · ${totalItems}건` : ''}
         </div>
         ${isStart ? html`
@@ -1421,9 +1423,8 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
                 </div>
                 <div class="sku">${item.sku_nm || ''}</div>
                 ${isDone && item.barcode ? html`
-                  <div class="loc" style="margin-top:2px; color:var(--md-sys-color-primary,#1976D2); font-family:'Courier New',monospace; font-size:12px;">
-                    📦 ${item.barcode}
-                  </div>
+                  <div class="loc">${item.barcode}</div>
+                  <div class="loc">${TermsUtil.tLabel('expired_date')}: ${item.expired_date || '-'} | ${TermsUtil.tLabel('lot_no')}: ${item.lot_no || '-'}</div>
                 ` : ''}
               </div>`
 
@@ -1443,7 +1444,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
                   </button>
                 ` : ''}
                 <span class="qty-badge done">
-                  ${item.rcv_qty || 0}/${item.rcv_exp_qty || 0}
+                  ${item.rcv_qty || 0}
                 </span>
               </div>
             </div>
@@ -1564,7 +1565,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     try {
       const date = this.orderDate || ValueUtil.todayFormatted()
 
-      const [readyResult, startResult, endResult] = await Promise.all([
+      const [readyResult, startResult, endResult, vendorResult] = await Promise.all([
         ServiceUtil.restGet(`receivings?query=${encodeURIComponent(JSON.stringify([
           { name: 'status', operator: 'eq', value: 'READY' },
           { name: 'rcv_req_date', operator: 'eq', value: date }
@@ -1575,8 +1576,12 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         ServiceUtil.restGet(`receivings?query=${encodeURIComponent(JSON.stringify([
           { name: 'status', operator: 'in', value: 'END,APPROVED,PUTAWAY,STORED' },
           { name: 'rcv_end_date', operator: 'eq', value: date }
-        ]))}&limit=100`)
+        ]))}&limit=100`),
+        ServiceUtil.restGet('vendors?select=vend_cd,vend_nm&limit=500')
       ])
+
+      const vendors = vendorResult?.items || vendorResult || []
+      this._vendorMap = Object.fromEntries(vendors.map(v => [v.vend_cd, v.vend_nm]))
 
       this.taskList = [
         ...(readyResult?.items || readyResult || []),
