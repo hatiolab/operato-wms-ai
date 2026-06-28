@@ -673,6 +673,11 @@ public class InvTransactionController extends AbstractRestService {
         String toLocCd = "SET".equals(input.getTranCd()) ? "VAS-01" : "STG-01";
         input.setToLocCd(toLocCd);
 
+        String reasonCd = "SET".equals(input.getTranCd()) ? "SET_WORK" : "OUTBOUND";
+        String reason = "SET".equals(input.getTranCd()) ? "세트작업이동" : "출고이동";
+        input.setReasonCd(reasonCd);
+        input.setReason(reason);
+
         return this.invTrxSvc.moveInventory(domainId, input);
     }
 

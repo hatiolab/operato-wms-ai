@@ -16,7 +16,7 @@ import { fetchCodeItems } from './common-code-cache.js'
  * @property {boolean} allowEmpty - 빈 옵션(미선택) 허용 여부 (기본: true)
  *
  * @fires change - 선택 변경 시 발생
- *   detail: { value: string } — 선택된 코드값
+ *   detail: { value: string, label: string } — 선택된 코드값과 표시 명칭
  *
  * @example
  * <!-- 기본 사용 -->
@@ -118,9 +118,10 @@ export class CodeSelect extends LitElement {
   _onChange(e) {
     const val = e.target.value
     this.value = val
+    const item = this._items.find(i => String(i.name) === val)
     this.dispatchEvent(
       new CustomEvent('change', {
-        detail: { value: val },
+        detail: { value: val, label: item?.description || val },
         bubbles: true,
         composed: true
       })

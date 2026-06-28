@@ -125,7 +125,8 @@ public class StockTransactionService extends BaseStockService {
         // 3. 바코드 재고 수량이 입력 수량보다 크다면 재고 분할 처리
         if (invQty > inputQty) {
             // 재고 분할 및 이동 처리
-            Inventory[] invs = this.splitInventory(inventory, toLocCd, inputQty, null, true);
+            Inventory[] invs = this.splitInventory(inventory, toLocCd, inputQty, input.getReasonCd(), input.getReason(),
+                    input.getRemarks(), true);
             inventory = invs[0];
         }
 
@@ -137,6 +138,9 @@ public class StockTransactionService extends BaseStockService {
         tran.setRefDocType(InventoryTran.REF_DOC_TYPE_RCV);
         tran.setRefDocNo(inventory.getRcvNo());
         tran.setRefLineNo(ValueUtil.toString(inventory.getRcvSeq()));
+        tran.setReasonCd(input.getReasonCd());
+        tran.setReason(input.getReason());
+        tran.setRemarks(input.getRemarks());
         tran.createReceiveTransaction(inventory);
 
         // 5. 입고 지시 상태 변경
@@ -174,21 +178,25 @@ public class StockTransactionService extends BaseStockService {
 
         // 재고 이동 처리
         if (ValueUtil.isEmpty(input.getToQty())) {
-            return this.moveInventory(inventory, input.getToLocCd(), input.getReason());
+            return this.moveInventory(inventory, input.getToLocCd(), input.getReasonCd(), input.getReason(),
+                    input.getRemarks());
         } else {
-            return this.moveInventory(inventory, input.getToLocCd(), input.getToQty(), input.getReason());
+            return this.moveInventory(inventory, input.getToLocCd(), input.getToQty(), input.getReasonCd(),
+                    input.getReason(), input.getRemarks());
         }
     }
 
     /**
      * 재고 이동 처리
      * 
-     * @param inventory
-     * @param toLocCd
-     * @param remark
+     * @param inventory 이동하려는 재고
+     * @param toLocCd   이동 로케이션 코드
+     * @param reasonCd  이동 사유 코드
+     * @param reason    이동 사유 명
+     * @param remark    비고
      * @return
      */
-    public Inventory moveInventory(Inventory inventory, String toLocCd, String remark) {
+    public Inventory moveInventory(Inventory inventory, String toLocCd, String reasonCd, String reason, String remark) {
         // 로케이션에 동일 바코드 조회
         Inventory cond = new Inventory(inventory.getDomainId(), inventory.getBarcode(), toLocCd);
         cond.setSkuCd(inventory.getSkuCd());
@@ -196,12 +204,14 @@ public class StockTransactionService extends BaseStockService {
 
         // 로케이션에 동일 바코드 재고가 이미 있다면 병합 처리
         if (alreadyExistInv != null) {
-            return this.mergeInventory(alreadyExistInv, inventory, remark);
+            return this.mergeInventory(alreadyExistInv, inventory, reasonCd, reason, "이동 전 병합");
             // 재고 이동 트랜잭션 처리
         } else {
             InventoryTran tran = new InventoryTran();
             tran.setTranQty(inventory.getInvQty());
             tran.setToLocCd(toLocCd);
+            tran.setReasonCd(reasonCd);
+            tran.setReason(reason);
             tran.setRemarks(remark);
             return tran.createMoveTransaction(inventory);
         }
@@ -213,21 +223,24 @@ public class StockTransactionService extends BaseStockService {
      * @param inventory 이동하려는 재고 바코드
      * @param toLocCd   이동 로케이션 코드
      * @param moveQty   이동 수량
+     * @param reasonCd  이동 사유 코드
+     * @param reason    이동 사유 명
      * @param remark    비고
      * @return
      */
-    public Inventory moveInventory(Inventory inventory, String toLocCd, double moveQty, String remark) {
+    public Inventory moveInventory(Inventory inventory, String toLocCd, double moveQty, String reasonCd, String reason,
+            String remark) {
         // 바코드 재고 수량, 작업자 입력 수량 체크
         double invQty = inventory.getInvQty();
 
         // 바코드 재고 수량이 이동할 수량보다 크다면 재고 분할 처리
         if (invQty > moveQty) {
             // 재고 분할 && 이동 처리
-            Inventory[] invs = this.splitInventory(inventory, toLocCd, moveQty, "이동 전 분할", true);
+            Inventory[] invs = this.splitInventory(inventory, toLocCd, moveQty, reasonCd, reason, "이동 전 분할", true);
             return invs[0];
         } else {
             // 재고 이동 처리
-            return this.moveInventory(inventory, toLocCd, remark);
+            return this.moveInventory(inventory, toLocCd, reasonCd, reason, remark);
         }
     }
 
@@ -236,12 +249,17 @@ public class StockTransactionService extends BaseStockService {
      * 
      * @param mainInv
      * @param mergeInv
+     * @param reasonCd
+     * @param reason
      * @param remark
      * @return
      */
-    public Inventory mergeInventory(Inventory mainInv, Inventory mergeInv, String remark) {
+    public Inventory mergeInventory(Inventory mainInv, Inventory mergeInv, String reasonCd, String reason,
+            String remark) {
         // 1. 재고 이동 트랜잭션 처리
         InventoryTran invTran = new InventoryTran();
+        invTran.setReasonCd(reasonCd);
+        invTran.setReason(reason);
         invTran.setRemarks(remark);
         invTran.createMergeTransaction(mainInv, mergeInv);
 
@@ -263,7 +281,8 @@ public class StockTransactionService extends BaseStockService {
         Inventory mergeInventory = invArray[1];
 
         // 병합 처리 & 결과 리턴
-        return this.mergeInventory(mainInventory, mergeInventory, input.getReason());
+        return this.mergeInventory(mainInventory, mergeInventory, input.getReasonCd(), input.getReason(),
+                input.getRemarks());
     }
 
     /**
@@ -275,28 +294,32 @@ public class StockTransactionService extends BaseStockService {
      */
     public Inventory splitInventory(Long domainId, InvTransaction input) {
         Inventory inventory = this.checkForSplitInventory(domainId, input);
-        Inventory[] inv = this.splitInventory(inventory, input.getToLocCd(), input.getToQty(), input.getRemarks(),
-                true);
+        Inventory[] inv = this.splitInventory(inventory, input.getToLocCd(), input.getToQty(), input.getReasonCd(),
+                input.getReason(), input.getRemarks(), true);
         return inv[1];
     }
 
     /**
      * 재고 분할 처리
      * 
-     * @param inventory
-     * @param toLocCd
-     * @param splitQty
-     * @param remark
-     * @param saveFlag
-     * @return
+     * @param inventory 분할하려는 재고
+     * @param toLocCd   분할 후 이동할 로케이션 코드
+     * @param splitQty  분할 수량
+     * @param reasonCd  분할 사유 코드
+     * @param reason    분할 사유 명
+     * @param remark    비고
+     * @param saveFlag  저장 플래그
+     * @return {분할 후 이동할 재고, 분할 전 원본 재고}
      */
-    private Inventory[] splitInventory(Inventory inventory, String toLocCd, double splitQty, String remark,
-            boolean saveFlag) {
+    private Inventory[] splitInventory(Inventory inventory, String toLocCd, double splitQty, String reasonCd,
+            String reason, String remark, boolean saveFlag) {
         // 재고 분할 처리
         InventoryTran invTran = new InventoryTran();
         invTran.setLocCd(inventory.getLocCd());
         invTran.setToLocCd(toLocCd);
         invTran.setTranQty(splitQty);
+        invTran.setReasonCd(reasonCd);
+        invTran.setReason(reason);
         invTran.setRemarks(remark);
         Inventory splitInv = invTran.createSplitTransaction(inventory);
 

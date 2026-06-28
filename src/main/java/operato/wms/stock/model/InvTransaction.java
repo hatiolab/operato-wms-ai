@@ -72,7 +72,7 @@ public class InvTransaction {
      */
     private String mergeLocCd;
     /**
-     * 잔여 수량
+     * 각종 사유 코드
      */
     private String reasonCd;
     /**

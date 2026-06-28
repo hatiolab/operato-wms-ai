@@ -79,10 +79,12 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
   /** 재고 조정 수량 입력값 */
   @state() _adjQty = ''
-  /** 재고 조정 원인 입력값 */
+  /** 재고 조정 비고값 */
   @state() _adjReason = ''
   /** 재고 조정 사유 코드 선택값 */
   @state() _adjReasonCd = ''
+  /** 재고 조정 사유 명 */
+  _adjReasonNm = ''
   /** 재고 조정 소비기한 입력값 */
   @state() _adjExpiredDate = ''
 
@@ -97,6 +99,8 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   @state() _moveQty = ''
   /** 재고 이동 사유 코드 선택값 */
   @state() _moveReasonCd = ''
+  /** 재고 이동 사유 명 */
+  _moveReasonNm = ''
   /** 재고 이동 To 로케이션 유효성 검증 결과 */
   @state() _moveToLocation = null
 
@@ -821,14 +825,14 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         <div class="status-dot ${statusCls}"></div>
         <div class="info">
           <div class="barcode-row">
-            <span class="barcode-text">${inv.barcode}</span> / <span class="barcode-text">${inv.loc_cd}</span>
+            <span class="barcode-text">${inv.barcode}</span> | <span class="barcode-text">${inv.loc_cd}</span>
             <span class="status-badge ${statusCls}"><code-label code-name="INVENTORY_STATUS" .value=${inv.status || ''}></code-label></span>
           </div>
           <div class="sub-row">
             ${inv.sku_nm} (${inv.sku_cd})
           </div>
           <div class="sub-row">
-            ${inv.expired_date ? `소비기한: ${inv.expired_date}` : ''} ${inv.lot_no ? ` / LOT No.: ${inv.lot_no}` : ''}
+            ${inv.expired_date ? `소비기한: ${inv.expired_date}` : ''} ${inv.lot_no ? ` | LOT No.: ${inv.lot_no}` : ''}
           </div>
         </div>
         <div class="qty-col">
@@ -896,7 +900,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
             ${TermsUtil.tButton('adjust') || '조정'}
           </button>
           <button class="btn-secondary" @click=${this._goPick}>
-            ${TermsUtil.tButton('pick') || '피킹'}
+            ${TermsUtil.tButton('picking') || '피킹'}
           </button>
         </div>
       </div>
@@ -1173,7 +1177,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           <code-select
             code-name="INV_ADJUST_REASON"
             .value=${this._adjReasonCd}
-            @change=${e => (this._adjReasonCd = e.detail.value)}>
+            @change=${e => { this._adjReasonCd = e.detail.value; this._adjReasonNm = e.detail.label || '' }}>
           </code-select>
         </div>
         <div class="form-field">
@@ -1304,7 +1308,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           <code-select
             code-name="INV_MOVE_REASON"
             .value=${this._moveReasonCd}
-            @change=${e => (this._moveReasonCd = e.detail.value)}>
+            @change=${e => { this._moveReasonCd = e.detail.value; this._moveReasonNm = e.detail.label || '' }}>
           </code-select>
         </div>
       </div>
@@ -1333,7 +1337,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     return html`
       <div class="header-bar">
         <button class="back-btn" @click=${() => (this.mode = 'detail')}>◀</button>
-        <span class="title">${inv?.barcode} . ${TermsUtil.tButton('pick') || '피킹'}</span>
+        <span class="title">${inv?.barcode} . ${TermsUtil.tButton('picking') || '피킹'}</span>
       </div>
 
       ${this.lastFeedback ? html`
@@ -1410,8 +1414,8 @@ export class PdaStockInquiry extends connect(store)(PageView) {
           ?disabled=${this.processing}
           @click=${this._submitPick}>
           ${this.processing
-            ? (TermsUtil.tText('processing') || '처리 중...')
-            : (TermsUtil.tButton('pick') || '피킹')}
+        ? (TermsUtil.tText('processing') || '처리 중...')
+        : (TermsUtil.tButton('picking') || '피킹')}
         </button>
         <button class="btn-secondary" ?disabled=${this.processing}
           @click=${() => (this.mode = 'detail')}>
@@ -1851,6 +1855,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     this._adjExpiredDate = inv?.expired_date || ''
     this._adjReason = ''
     this._adjReasonCd = ''
+    this._adjReasonNm = ''
     this.lastFeedback = null
     this.mode = 'adjust'
   }
@@ -1914,6 +1919,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     this._moveToLocCd = ''
     this._moveQty = (inv?.inv_qty ?? 0) - (inv?.reserved_qty ?? 0)
     this._moveReasonCd = ''
+    this._moveReasonNm = ''
     this._moveToLocation = null
     this.lastFeedback = null
     this.mode = 'move'
@@ -1993,7 +1999,8 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       await ServiceUtil.restPost(`inventory_trx/${inv.id}/move_inventory`, {
         to_loc_cd: this._moveToLocCd,
         to_qty: qty,
-        reason_cd: this._moveReasonCd
+        reason_cd: this._moveReasonCd,
+        reason: this._moveReasonNm || null
       }, null, null, (res) => {
         document.dispatchEvent(new CustomEvent('notify', {
           detail: { level: 'info', message: `재고 이동 완료: ${inv.barcode} → ${this._moveToLocCd} (${qty})` }
@@ -2193,7 +2200,8 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         to_qty: qty,
         expired_date: this._adjExpiredDate || null,
         remarks: this._adjReason?.trim() || null,
-        reason_cd: this._adjReasonCd
+        reason_cd: this._adjReasonCd,
+        reason: this._adjReasonNm || null
       }, null, null, (result) => {
         const diff = qty - (inv.inv_qty ?? 0)
         const diffStr = diff > 0 ? `+${diff}` : `${diff}`

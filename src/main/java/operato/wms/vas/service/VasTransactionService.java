@@ -1132,7 +1132,8 @@ public class VasTransactionService extends AbstractQueryService {
 				continue;
 			}
 
-			this.stockTrxSvc.moveInventory(inventory, destLocCd, "VAS 완성품 적치 이동: " + vasOrder.getVasNo());
+			this.stockTrxSvc.moveInventory(inventory, destLocCd, "SET_WORK", "세트 작업 이동",
+					"VAS 완성품 적치 이동: " + vasOrder.getVasNo());
 		}
 	}
 

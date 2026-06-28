@@ -548,6 +548,7 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 		this.tranDate = DateUtil.todayStr();
 		this.tranAt = new Date();
 		this.workerId = inventory.getCreatorId();
+		this.skuNm = sku.getSkuNm();
 		this.createTransaction();
 
 		// 재고 정보 반환
