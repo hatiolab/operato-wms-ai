@@ -58,6 +58,12 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   @state() lotNo = ''
   /** 추가 입력(불량수량/사유/소비기한/LOT) 펼침 여부 */
   @state() showExtraInputs = false
+  /** 화주사명 (코드 → 명칭 표시용) */
+  @state() _comNm = ''
+  /** 공급처명 (코드 → 명칭 표시용) */
+  @state() _vendNm = ''
+  /** 상품 선택 팝업 표시 여부 */
+  @state() _showItemPicker = false
   /** 완료 항목 수 */
   @state() completedCount = 0
   /** 전체 항목 수 */
@@ -493,6 +499,110 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           flex: 1;
         }
 
+        /* 바코드 스캔 우측 상품 선택 버튼 */
+        .barcode-input .btn-item-picker {
+          flex-shrink: 0;
+          width: 34px;
+          height: 34px;
+          border: 1px solid var(--md-sys-color-primary, #1976D2);
+          border-radius: 8px;
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          font-size: 16px;
+          cursor: pointer;
+        }
+        .barcode-input .btn-item-picker:active {
+          background: var(--md-sys-color-primary-container, #e3f2fd);
+        }
+        .barcode-input .btn-item-picker:disabled {
+          opacity: 0.4;
+        }
+
+        /* 미완료 탭 항목 — 선택 불가 */
+        .item-card.no-select {
+          cursor: default;
+        }
+
+        /* 완료된 주문 조회 시 완료 탭 항목 — 선택 가능 */
+        .item-card.selectable {
+          cursor: pointer;
+        }
+        .item-card.selectable:active {
+          opacity: 0.85;
+        }
+
+        /* 상품 선택 팝업 (바텀 시트) */
+        .picker-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          z-index: 1000;
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+        }
+        .picker-sheet {
+          background: var(--md-sys-color-surface, #fff);
+          border-radius: 16px 16px 0 0;
+          width: 100%;
+          max-height: 70vh;
+          overflow-y: auto;
+          padding: 12px 12px env(safe-area-inset-bottom, 16px);
+          box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+        }
+        .picker-handle {
+          width: 40px;
+          height: 4px;
+          background: var(--md-sys-color-outline, #ccc);
+          border-radius: 2px;
+          margin: 0 auto 12px;
+        }
+        .picker-title {
+          font-size: 15px;
+          font-weight: 600;
+          padding: 0 4px 10px;
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #eee);
+          color: var(--md-sys-color-on-surface, #222);
+        }
+        .picker-empty {
+          text-align: center;
+          padding: 24px;
+          color: var(--md-sys-color-on-surface-variant, #999);
+        }
+        .picker-item {
+          padding: 10px 8px;
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #f0f0f0);
+          cursor: pointer;
+        }
+        .picker-item:active {
+          background: var(--md-sys-color-surface-variant, #f0f0f0);
+        }
+        .picker-item .p-nm {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-surface, #222);
+        }
+        .picker-item .p-sub {
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant, #777);
+          margin-top: 2px;
+        }
+        .picker-cancel {
+          width: 100%;
+          margin-top: 10px;
+          padding: 12px;
+          border: 1px solid var(--md-sys-color-outline, #ccc);
+          border-radius: 8px;
+          background: transparent;
+          font-size: 14px;
+          color: var(--md-sys-color-on-surface-variant, #555);
+          cursor: pointer;
+        }
+        @media (min-width: 768px) {
+          .picker-backdrop { align-items: center; }
+          .picker-sheet { border-radius: 12px; width: 420px; max-width: 90vw; }
+          .picker-handle { display: none; }
+        }
+
         /* 수량 입력 행 */
         .qty-input-row {
           display: flex;
@@ -712,6 +822,30 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         .item-card .qty-badge.done {
           background: #e8f5e9;
           color: #2e7d32;
+        }
+
+        /* 완료 항목 카드 — 정보(전체폭) / 인쇄·수량 2행 구조로 상품명 잘림 방지 */
+        .item-card.done-card {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .item-card.done-card .card-main {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .item-card.done-card .card-actions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 6px;
+        }
+        /* 완료 항목은 상품명을 전체 폭에서 줄바꿈하여 모두 표시 */
+        .item-card.done-card .sku {
+          white-space: normal;
+          overflow: visible;
+          text-overflow: clip;
         }
 
         .item-card.current {
@@ -1072,8 +1206,8 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         flex-shrink:0;
       ">
         <span>📅 ${TermsUtil.tLabel('rcv_req_date') || '입고예정일'}: <strong>${rcv?.rcv_req_date || '-'}</strong></span>
-        <span>🏢 ${TermsUtil.tLabel('com_cd') || '화주사'}: <strong>${rcv?.com_cd || '-'}</strong></span>
-        <span>🚚 ${TermsUtil.tLabel('vend_cd') || '공급사'}: <strong>${rcv?.vend_cd || '-'}</strong></span>
+        <span>🏢 ${TermsUtil.tLabel('com_cd') || '화주사'}: <strong>${this._comNm || rcv?.com_cd || '-'}</strong></span>
+        <span>🚚 ${TermsUtil.tLabel('vend_cd') || '공급사'}: <strong>${this._vendNm || rcv?.vend_cd || '-'}</strong></span>
       </div>
 
       ${this.itemsLoading ? html`
@@ -1082,20 +1216,21 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
             항목 로딩 중...
           </div>
         </div>
-      ` : currentItem ? html`
+      ` : html`
         <div class="current-item-section">
-          ${currentItem.loc_cd
+          ${currentItem?.loc_cd
           ? html`<div class="location-display">${currentItem.loc_cd}</div>`
           : ''}
           <div class="item-info">
             <div class="sku">
-              #${currentItem.rcv_exp_seq} : ${currentItem.sku_cd}
-              ${currentItem.sku_nm ? html`<span style="font-weight:normal;font-size:13px;"> (${currentItem.sku_nm})</span>` : ''}
+              ${currentItem
+          ? html`#${currentItem.rcv_exp_seq} : ${currentItem.sku_nm || currentItem.sku_cd}${currentItem.sku_nm ? html`<span style="font-weight:normal;font-size:13px;"> (${currentItem.sku_cd})</span>` : ''}`
+          : '-'}
             </div>
             <div class="qty">
-              예정: ${currentItem.rcv_exp_qty || 0}
+              예정: ${currentItem ? (currentItem.rcv_exp_qty || 0) : ''}
             </div>
-            ${currentItem.lot_no ? html`
+            ${currentItem?.lot_no ? html`
               <div class="lot">
                 LOT: ${currentItem.lot_no}
                 ${currentItem.expired_date ? ` · 유통기한: ${currentItem.expired_date}` : ''}
@@ -1108,27 +1243,31 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
             <sku-barcode-input
               .comCd=${this.currentReceiving?.com_cd || ''}
               placeholder="${TermsUtil.tLabel('scan_barcode') || '상품 바코드 스캔'}"
-              ?disabled=${this.processing}
+              ?disabled=${this.processing || this.viewOnly}
               skipInventory
               @sku-select=${e => this._onSkuSelect(e.detail)}>
             </sku-barcode-input>
+            <button class="btn-item-picker" title="상품 선택"
+              ?disabled=${this.viewOnly}
+              @click=${() => { this._showItemPicker = true }}>📋</button>
           </div>
 
           <div class="qty-input-row">
             <label>${TermsUtil.tLabel('rcv_qty') || '입고수량'}</label>
-            <button class="btn-qty"
+            <button class="btn-qty" ?disabled=${!currentItem}
               @click=${() => this._setRcvQty(this.rcvQty - 1)}>−</button>
             <numeric-keypad-input
               .value=${this.rcvQty}
               .min=${0}
-              .max=${currentItem.rcv_exp_qty || null}
-              ?disabled=${this.processing || this.viewOnly}
+              .max=${currentItem?.rcv_exp_qty || null}
+              ?disabled=${this.processing || this.viewOnly || !currentItem}
               @change=${e => this._setRcvQty(e.detail.value)}>
             </numeric-keypad-input>
-            <button class="btn-qty"
+            <button class="btn-qty" ?disabled=${!currentItem}
               @click=${() => this._setRcvQty(this.rcvQty + 1)}>+</button>
           </div>
 
+          ${currentItem ? html`
           <!-- 추가 입력 토글 (불량수량/사유/소비기한/LOT) -->
           <button class="btn-toggle-extra" @click=${() => { this.showExtraInputs = !this.showExtraInputs }}>
             ${this.showExtraInputs ? '▴' : '▾'}
@@ -1195,6 +1334,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
                 @input=${e => (this.lotNo = e.target.value)} />
             </div>
           ` : ''}
+          ` : ''}
 
           ${this.lastFeedback ? html`
             <div class="scan-feedback ${this.lastFeedback.type}">
@@ -1202,23 +1342,29 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
             </div>
           ` : ''}
         </div>
-      ` : html`
-        <div class="current-item-section">
-          <div class="item-info" style="text-align:center; padding: 12px 0;">
-            모든 항목의 입고가 완료되었습니다 ✅
-          </div>
-        </div>
       `}
 
       ${this._renderWorkTabs()}
       ${this._renderWorkTabContent()}
+      ${this._renderItemPicker()}
     `
+  }
+
+  /**
+   * 항목이 완료(작업완료 또는 그 이후 단계) 상태인지 여부.
+   * 입고완료(END)뿐 아니라 검수승인(APPROVED)·적치중(PUTAWAY)·적치완료(STORED)도 완료로 간주한다.
+   * (검수승인 시 디테일 상태가 END→APPROVED로 바뀌어도 완료 탭에 그대로 표시되도록 보장)
+   * @param {string} status - 항목 상태 코드
+   * @returns {boolean} 완료 단계이면 true
+   */
+  _isItemDone(status) {
+    return status === 'END' || status === 'APPROVED' || status === 'PUTAWAY' || status === 'STORED'
   }
 
   /** work 모드 탭 바 렌더링 — 미완료/완료 탭 */
   _renderWorkTabs() {
-    const todoItems = this.receivingItems.filter(i => i.status !== 'END' && i.status !== 'CANCEL' && i.status !== 'BAD')
-    const doneItems = this.receivingItems.filter(i => i.status === 'END')
+    const todoItems = this.receivingItems.filter(i => !this._isItemDone(i.status) && i.status !== 'CANCEL' && i.status !== 'BAD')
+    const doneItems = this.receivingItems.filter(i => this._isItemDone(i.status))
 
     return html`
       <div class="tabs">
@@ -1242,8 +1388,8 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   /** work 모드 탭 콘텐츠 렌더링 — 미완료/완료 항목 목록 */
   _renderWorkTabContent() {
     const items = this.currentTabKey === 'todo'
-      ? this.receivingItems.filter(i => i.status !== 'END' && i.status !== 'CANCEL' && i.status !== 'BAD')
-      : this.receivingItems.filter(i => i.status === 'END')
+      ? this.receivingItems.filter(i => !this._isItemDone(i.status) && i.status !== 'CANCEL' && i.status !== 'BAD')
+      : this.receivingItems.filter(i => this._isItemDone(i.status))
 
     if (!items.length) {
       return html`
@@ -1260,12 +1406,13 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         ${items.map(item => {
       const idx = this.receivingItems.indexOf(item)
       const isCurrent = idx === this.currentItemIndex
-      const isDone = item.status === 'END'
+      const isDone = this._isItemDone(item.status)
       const icon = isDone ? '✅' : isCurrent ? '▶' : '☐'
+      // 완료된 주문 조회(viewOnly) 시에만 완료 탭 항목을 사용자가 선택 가능
+      const selectable = this.viewOnly && this.currentTabKey === 'done'
 
-      return html`
-            <div class="item-card ${isCurrent ? 'current' : ''}" @click=${() => !isDone && this._selectItem(idx)}>
-              <span class="icon">${icon}</span>
+      // 완료 항목: 상품명이 잘리지 않도록 정보(전체폭) 행 / 인쇄·수량 행 2단 구조
+      const infoBlock = html`
               <div class="info">
                 <div class="loc">
                   #${item.rcv_exp_seq || '-'}
@@ -1278,17 +1425,38 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
                     📦 ${item.barcode}
                   </div>
                 ` : ''}
+              </div>`
+
+      if (isDone) {
+        return html`
+            <div class="item-card done-card ${isCurrent ? 'current' : ''} ${selectable ? 'selectable' : 'no-select'}"
+              @click=${selectable ? () => { this.currentItemIndex = idx } : null}>
+              <div class="card-main">
+                <span class="icon">${icon}</span>
+                ${infoBlock}
               </div>
-              ${isDone && item.barcode ? html`
-                <button class="btn-print"
-                  @click=${e => { e.stopPropagation(); this._printBarcode(item) }}>
-                  🖨️ ${TermsUtil.tButton('print') || '인쇄'}
-                </button>
-              ` : ''}
-              <span class="qty-badge ${isDone ? 'done' : ''}">
-                ${isDone
-          ? `${item.rcv_qty || 0}/${item.rcv_exp_qty || 0}`
-          : `${item.rcv_exp_qty || 0}`}
+              <div class="card-actions">
+                ${item.barcode ? html`
+                  <button class="btn-print"
+                    @click=${e => { e.stopPropagation(); this._printBarcode(item) }}>
+                    🖨️ ${TermsUtil.tButton('print') || '인쇄'}
+                  </button>
+                ` : ''}
+                <span class="qty-badge done">
+                  ${item.rcv_qty || 0}/${item.rcv_exp_qty || 0}
+                </span>
+              </div>
+            </div>
+          `
+      }
+
+      return html`
+            <div class="item-card ${isCurrent ? 'current' : ''} ${selectable ? 'selectable' : 'no-select'}"
+              @click=${selectable ? () => { this.currentItemIndex = idx } : null}>
+              <span class="icon">${icon}</span>
+              ${infoBlock}
+              <span class="qty-badge">
+                ${item.rcv_exp_qty || 0}
               </span>
             </div>
           `
@@ -1297,13 +1465,52 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     `
   }
 
+  /** 상품 선택 팝업 렌더링 — 미완료 항목 목록에서 선택 */
+  _renderItemPicker() {
+    if (!this._showItemPicker) return ''
+    const items = this.receivingItems.filter(i => !this._isItemDone(i.status) && i.status !== 'CANCEL' && i.status !== 'BAD')
+    return html`
+      <div class="picker-backdrop" @click=${() => { this._showItemPicker = false }}>
+        <div class="picker-sheet" @click=${e => e.stopPropagation()}>
+          <div class="picker-handle"></div>
+          <div class="picker-title">${TermsUtil.tText('select_one') || '상품 선택'} (${items.length})</div>
+          ${items.length === 0
+        ? html`<div class="picker-empty">미완료 항목 없음</div>`
+        : items.map(item => html`
+              <div class="picker-item" @click=${() => this._pickItem(item)}>
+                <div class="p-nm">${item.sku_nm || item.sku_cd}</div>
+                <div class="p-sub">#${item.rcv_exp_seq} · ${item.sku_cd}${item.loc_cd ? ` · ${item.loc_cd}` : ''} · ${TermsUtil.tLabel('rcv_exp_qty') || '예정'} ${item.rcv_exp_qty || 0}</div>
+              </div>
+            `)}
+          <button class="picker-cancel" @click=${() => { this._showItemPicker = false }}>
+            ${TermsUtil.tButton('cancel') || '취소'}
+          </button>
+        </div>
+      </div>
+    `
+  }
+
+  /**
+   * 팝업에서 상품 선택 — 바코드 스캔과 동일하게 현재 항목으로 설정
+   * @param {object} item - 선택된 미완료 항목
+   */
+  _pickItem(item) {
+    this._showItemPicker = false
+    const idx = this.receivingItems.indexOf(item)
+    if (idx < 0) return
+    this.currentItemIndex = idx
+    this._setInitialRcvQty()
+    this.barcodeScanned = true
+    this._showFeedback(`${item.sku_nm || item.sku_cd} ${TermsUtil.tText('selected') || '선택'} — ${this.rcvQty}`, 'success')
+  }
+
   /** complete 모드 렌더링 — 완료 통계 + 버튼 */
   _renderCompleteMode() {
     const elapsed = this.startedAt ? Math.round((Date.now() - this.startedAt) / 1000) : 0
     const min = Math.floor(elapsed / 60)
     const sec = elapsed % 60
     const totalRcvQty = this.receivingItems.reduce((s, i) => s + (i.rcv_qty || 0), 0)
-    const doneCount = this.receivingItems.filter(i => i.status === 'END').length
+    const doneCount = this.receivingItems.filter(i => this._isItemDone(i.status)).length
 
     return html`
       <div class="complete-section">
@@ -1392,13 +1599,39 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
       this.receivingItems = result?.items || result || []
       // 불량(BAD) 라인은 작업 대상 건수에서 제외 (진행률·자동마감 기준)
       this.totalCount = this.receivingItems.filter(i => i.status !== 'BAD').length
-      this.completedCount = this.receivingItems.filter(i => i.status === 'END').length
-      this._moveToNextItem()
+      this.completedCount = this.receivingItems.filter(i => this._isItemDone(i.status)).length
+      // 자동 선택하지 않음 — 사용자가 바코드 스캔 또는 상품 선택 팝업으로 직접 선택
+      this.currentItemIndex = -1
+      // 화주사·공급처 명칭 조회 (상단 표시용)
+      await this._loadComVendNames(this.currentReceiving)
     } catch (error) {
       console.error('입고 항목 조회 실패:', error)
       this.receivingItems = []
     } finally {
       this.itemsLoading = false
+    }
+  }
+
+  /**
+   * 화주사·공급처 코드 → 명칭 조회 (상단 요약 표시용)
+   * @param {object} r - 입고 주문 헤더 (com_cd, vend_cd 사용)
+   */
+  async _loadComVendNames(r) {
+    this._comNm = r?.com_cd || ''
+    this._vendNm = r?.vend_cd || ''
+    try {
+      if (r?.com_cd) {
+        const res = await ServiceUtil.searchByPagination('companies', [{ name: 'com_cd', value: r.com_cd }], null, 1, 1)
+        const c = res?.items?.[0]
+        if (c) this._comNm = c.com_nm || r.com_cd
+      }
+      if (r?.vend_cd) {
+        const res = await ServiceUtil.searchByPagination('vendors', [{ name: 'vend_cd', value: r.vend_cd }], null, 1, 1)
+        const v = res?.items?.[0]
+        if (v) this._vendNm = v.vend_nm || r.vend_cd
+      }
+    } catch (e) {
+      console.warn('화주사/공급처명 조회 실패:', e)
     }
   }
 
@@ -1460,6 +1693,9 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         this.lastFeedback = null
         this.rcvQty = 0
         await this._loadReceivingItems(r.id)
+        // 완료 탭 최상단 항목 자동 선택 (완료된 주문 조회 시)
+        const firstDoneIdx = this.receivingItems.findIndex(i => this._isItemDone(i.status))
+        this.currentItemIndex = firstDoneIdx
         this.mode = 'work'
       } catch (error) {
         document.dispatchEvent(new CustomEvent('notify', {
@@ -1615,7 +1851,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         },
         null, null,
         () => { success = true },
-        (err) => { errMsg = err?.msg || '입고 확인 실패' }
+        (err) => { errMsg = err?.msg || err?.message || (typeof err === 'string' ? err : JSON.stringify(err)) || '입고 확인 실패' }
       )
 
       if (success) {
