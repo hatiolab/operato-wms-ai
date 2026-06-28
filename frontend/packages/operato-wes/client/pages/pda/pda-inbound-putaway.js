@@ -95,7 +95,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
           flex-direction: column;
           height: 100%;
           background: var(--md-sys-color-surface, #fafafa);
-          overflow-y: auto;
+          overflow: hidden;
         }
 
         /* 헤더 바 */
@@ -307,6 +307,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
           align-items: center;
           gap: 10px;
           padding: 8px 12px;
+          flex-shrink: 0;
         }
 
         .progress-bar-large {
@@ -338,6 +339,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
           padding: 7px 10px 10px 8px;
           background: var(--md-sys-color-primary-container, #e3f2fd);
           border-radius: 8px;
+          flex-shrink: 0;
         }
 
         .barcode-display {
@@ -666,6 +668,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
           display: flex;
           border-bottom: 2px solid var(--md-sys-color-outline-variant, #e0e0e0);
           margin: 1px 12px 0;
+          flex-shrink: 0;
         }
 
         .tab {
@@ -705,7 +708,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
         .tab-content {
           padding: 8px 12px;
           overflow-y: auto;
-          max-height: 220px;
+          flex: 1;
         }
 
         .item-card {
