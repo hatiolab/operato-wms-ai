@@ -1,6 +1,7 @@
 import '@things-factory/barcode-ui'
 import { html, css } from 'lit'
 import '../../component/sku-barcode-input.js'
+import '../../component/sku-search-input.js'
 import '../../component/code-label.js'
 import '../../component/code-select.js'
 import '../../component/location-input.js'
@@ -8,8 +9,9 @@ import '../../component/numeric-keypad-input.js'
 import '../../component/entity-label.js'
 import { customElement, state } from 'lit/decorators.js'
 import { connect } from 'pwa-helpers/connect-mixin.js'
-import { ServiceUtil, TermsUtil } from '@operato-app/metapage/dist-client'
+import { MetaApi, ServiceUtil, TermsUtil, UiUtil, PrintUtil } from '@operato-app/metapage/dist-client'
 import '@operato-app/metapage/dist-client/components/input/operato-input-barcode'
+import { operatoGet } from '@operato-app/operatofill'
 import { store, PageView } from '@operato/shell'
 import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
 
@@ -610,7 +612,8 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
         .form-field code-select,
         .form-field location-input,
-        .form-field numeric-keypad-input {
+        .form-field numeric-keypad-input,
+        .form-field sku-search-input {
           flex: 1;
           min-width: 0;
         }
@@ -1012,13 +1015,15 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
         <div class="form-field">
           <label>
-            ${TermsUtil.tLabel('sku_cd') || '상품 코드'}
+            ${TermsUtil.tLabel('sku') || '상품'}
             <span class="required">*</span>
           </label>
-          <input type="text"
-            placeholder="${TermsUtil.tLabel('sku_cd') || '상품 코드 입력'}"
+          <sku-search-input
+            .comCd=${this.addForm.com_cd}
             .value=${this.addForm.sku_cd}
-            @input=${e => this._updateAddForm('sku_cd', e.target.value)}>
+            placeholder="${TermsUtil.tText('select_sku') || '상품 선택'}"
+            @sku-select=${e => this._updateAddForm('sku_cd', e.detail.sku_cd)}>
+          </sku-search-input>
         </div>
 
         <div class="form-field">
@@ -1759,14 +1764,14 @@ export class PdaStockInquiry extends connect(store)(PageView) {
    */
   async _goAdd() {
     this.addForm = {
-      wh_cd: '',
-      com_cd: '',
+      wh_cd: 'WH001',
+      com_cd: 'GRAIN_ON',
       sku_cd: '',
       loc_cd: '',
       inv_qty: '',
       lot_no: '',
       expired_date: '',
-      reason_cd: '',
+      reason_cd: 'ADJUST',
       remarks: ''
     }
     this.lastFeedback = null
@@ -1818,6 +1823,9 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
     this.processing = true
     try {
+      // 콜백 대신 성공 여부를 플래그로 받아 await 흐름을 콜백 밖에서 유지 (인쇄 확인 팝업 처리)
+      let success = false
+      let errMsg = null
       await ServiceUtil.restPost('inventory_trx/create_inventory', {
         wh_cd,
         com_cd,
@@ -1828,21 +1836,70 @@ export class PdaStockInquiry extends connect(store)(PageView) {
         expired_date: this.addForm.expired_date || null,
         reason_cd: this.addForm.reason_cd || null,
         remarks: this.addForm.remarks || null
-      }, null, null, () => {
+      }, null, null,
+        () => { success = true },
+        (err) => { errMsg = err?.msg || '재고 추가에 실패했습니다' }
+      )
+
+      if (success) {
         document.dispatchEvent(new CustomEvent('notify', {
-          detail: { level: 'info', message: `재고 추가 완료: ${sku_cd} → ${loc_cd} ` }
+          detail: { level: 'info', message: `재고 추가 완료: ${sku_cd} → ${loc_cd}` }
         }))
+
+        // 저장 성공 → 라벨 인쇄 여부 확인
+        const doPrint = await UiUtil.showAlertPopup(
+          'label.confirm',
+          TermsUtil.tText('confirm_print_label') || '재고 라벨을 인쇄하시겠습니까?',
+          'question', 'confirm', 'cancel'
+        )
+        if (doPrint) {
+          const created = await this._findCreatedInventory()
+          if (created?.id) {
+            // PDF 뷰어로 이동 — 뷰어에서 나가면 이미 초기화면이므로 그대로 복귀
+            await this._openBarcodeLabel(created)
+          } else {
+            document.dispatchEvent(new CustomEvent('notify', {
+              detail: { level: 'warn', message: '생성된 재고를 찾지 못해 인쇄를 건너뜁니다' }
+            }))
+          }
+        }
+
         this._goList()
 
-      }, (err) => {
-        this._updateErrorFeedback(err?.msg || '재고 추가에 실패했습니다')
-      })
+      } else if (errMsg) {
+        this._updateErrorFeedback(errMsg)
+      }
 
     } catch (error) {
       this._updateErrorFeedback(error.message || '재고 추가에 실패했습니다')
 
     } finally {
       this.processing = false
+    }
+  }
+
+  /**
+   * 방금 생성한 재고 재조회 — create_inventory 응답에 id가 없어 조건+최신순으로 1건 조회
+   * @returns {Promise<object|null>} 가장 최근 생성된 일치 재고 (없으면 null)
+   */
+  async _findCreatedInventory() {
+    const { wh_cd, com_cd, sku_cd, loc_cd, lot_no } = this.addForm
+    try {
+      const conditions = [
+        { name: 'com_cd', operator: 'eq', value: com_cd },
+        { name: 'wh_cd', operator: 'eq', value: wh_cd },
+        { name: 'sku_cd', operator: 'eq', value: sku_cd },
+        { name: 'loc_cd', operator: 'eq', value: loc_cd }
+      ]
+      if (lot_no) conditions.push({ name: 'lot_no', operator: 'eq', value: lot_no })
+      const query = encodeURIComponent(JSON.stringify(conditions))
+      const sort = encodeURIComponent(JSON.stringify([{ name: 'created_at', desc: true }]))
+      const result = await ServiceUtil.restGet(`inventories?query=${query}&sort=${sort}&limit=1`)
+      const items = result?.items || result || []
+      return items[0] || null
+    } catch (e) {
+      console.error('생성 재고 재조회 실패:', e)
+      return null
     }
   }
 
@@ -2225,12 +2282,44 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   }
 
   /**
-   * 재고 바코드 라벨 PDF 출력
-   * GET /rest/inventories/{id}/download_barcode
+   * 재고 바코드 라벨 인쇄
    */
-  _printBarcode() {
-    if (!this.selectedInventory) return
-    window.open(`/rest/inventories/${this.selectedInventory.id}/download_barcode`, '_blank')
+  async _printBarcode() {
+    await this._openBarcodeLabel(this.selectedInventory)
+  }
+
+  /**
+   * 재고 바코드 라벨 인쇄 (입고작업 PDA pda-inbound-receiving 와 동일 방식)
+   * - 모바일: download_barcode 를 ArrayBuffer로 받아 Blob URL 생성 후 PDF 뷰어 새 탭으로 표시
+   * - PC: InventoryBarcode 동적 PDF 팝업 표시
+   * @param {object} inv - 재고 객체 (id 사용)
+   */
+  async _openBarcodeLabel(inv) {
+    if (!inv || !inv.id) {
+      this._showFeedback('인쇄할 재고 정보가 없습니다', 'warning')
+      return
+    }
+    try {
+      const isMobile = 'ontouchstart' in window
+      if (isMobile) {
+        const res = await operatoGet(`inventories/${inv.id}/download_barcode`, {}, false)
+        const data = await res.arrayBuffer()
+        const file = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }))
+        PrintUtil.openPdfInNewTab(file)
+      } else {
+        MetaApi.openDynamicPopup(TermsUtil.tMenu('InventoryBarcode'), {
+          module: 'metapage',
+          import: 'pages/basic-pdf-element.js',
+          tagname: 'basic-pdf-element',
+          menu: 'InventoryBarcode',
+          size: 'large',
+          title_field: 'name'
+        }, inv, inv.id, null)
+      }
+    } catch (err) {
+      console.warn('재고 라벨 인쇄 실패:', err)
+      this._showFeedback(TermsUtil.tText('print_failed') || '라벨 인쇄 중 오류가 발생했습니다', 'error')
+    }
   }
 
   /**
