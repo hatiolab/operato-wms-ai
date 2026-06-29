@@ -2,6 +2,7 @@ package operato.wms.inbound.service;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -31,6 +32,7 @@ import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.print.PrintConstants;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.util.ThrowUtil;
+import xyz.elidom.util.BeanUtil;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
@@ -80,39 +82,12 @@ public class InboundTransactionService extends AbstractQueryService {
      * @return
      */
     public Receiving importReleaseOrders(List<ImportReceivingOrder> list) {
-        ImportReceivingOrder firstOrder = list.get(0);
-
-        // 요청일이 없다면 오늘 날짜로 입력
-        if (ValueUtil.isEmpty(firstOrder.getRcvExpDate())) {
-            firstOrder.setRcvExpDate(DateUtil.todayStr());
-        }
-
-        // 요청 유형이 없다면 일반 입고
-        if (ValueUtil.isEmpty(firstOrder.getRcvType())) {
-            firstOrder.setRcvType(WmsInboundConstants.RECEIVING_TYPE_NORMAL);
-        }
-
-        // 입고요청번호 중복 체크
         Long domainId = Domain.currentDomainId();
-        String rcvReqNo = firstOrder.getRcvReqNo();
-        if (ValueUtil.isNotEmpty(rcvReqNo)) {
-            String dupCheckSql = "SELECT count(id) FROM receivings WHERE domain_id = :domainId AND rcv_req_no = :rcvReqNo";
-            int count = this.queryManager.selectBySql(dupCheckSql,
-                    ValueUtil.newMap("domainId,rcvReqNo", domainId, rcvReqNo), Integer.class);
-            if (count > 0) {
-                throw new ElidomRuntimeException("입고요청번호 [" + rcvReqNo + "]는 이미 등록된 입고 주문입니다. 기존 주문을 확인해 주세요.");
-            }
-        }
+        ICustomService custSvc = BeanUtil.get(ICustomService.class);
 
-        // 입고 예정 마스터 생성
-        Receiving ro = ValueUtil.populate(firstOrder, new Receiving());
-        // ro.setCreatedAt(null);
-        // ro.setUpdatedAt(null);
-        this.queryManager.insert(ro);
-
-        // 입고 상세 정보
-        List<ReceivingItem> newOrderItems = new ArrayList<ReceivingItem>();
-        int rcvExpSeq = 1;
+        // 엑셀의 각 행을 독립적인 입고주문(마스터 1 + 상세 1)으로 생성한다.
+        // 입고번호(입고요청번호)는 행마다 diy-generate-rcv-req-no 로 자동 채번하여 고유하게 부여한다.
+        Receiving firstRo = null;
 
         for (ImportReceivingOrder order : list) {
             if (ValueUtil.isEmpty(order.getSkuCd()))
@@ -122,28 +97,43 @@ public class InboundTransactionService extends AbstractQueryService {
                 throw new ElidomRuntimeException("SKU [" + order.getSkuCd() + "]의 예정수량은 0보다 커야 합니다.");
             }
 
-            ReceivingItem ri = ValueUtil.populate(order, new ReceivingItem());
-            ri.setReceivingId(ro.getId());
-
-            if (ValueUtil.isEmpty(ri.getRcvExpSeq())) {
-                ri.setRcvExpSeq(rcvExpSeq++);
+            // 요청일이 없다면 오늘 날짜로 입력
+            if (ValueUtil.isEmpty(order.getRcvExpDate())) {
+                order.setRcvExpDate(DateUtil.todayStr());
+            }
+            // 요청 유형이 없다면 일반 입고
+            if (ValueUtil.isEmpty(order.getRcvType())) {
+                order.setRcvType(WmsInboundConstants.RECEIVING_TYPE_NORMAL);
             }
 
+            // 행마다 고유 입고번호 자동 채번
+            String rcvNo = ValueUtil.toString(custSvc.doCustomService(domainId, "diy-generate-rcv-req-no", new HashMap<String, Object>()));
+
+            // 입고 예정 마스터 생성 (행별 1건)
+            Receiving ro = ValueUtil.populate(order, new Receiving());
+            ro.setRcvNo(rcvNo);
+            ro.setRcvReqNo(rcvNo);
+            this.queryManager.insert(ro);
+
+            // 입고 상세 정보 생성 (행별 1건)
+            ReceivingItem ri = ValueUtil.populate(order, new ReceivingItem());
+            ri.setReceivingId(ro.getId());
+            ri.setRcvExpSeq(1);
             if (ValueUtil.isEmpty(ri.getRcvExpDate())) {
                 ri.setRcvExpDate(ro.getRcvReqDate());
             }
-
             ri.setRemarks(order.getItemRemarks());
             ri.setCreatedAt(null);
             ri.setUpdatedAt(null);
-            newOrderItems.add(ri);
+            this.queryManager.insert(ri);
+
+            if (firstRo == null) {
+                firstRo = ro;
+            }
         }
 
-        // 입고 상세 정보 생성
-        AnyOrmUtil.insertBatch(newOrderItems, 100);
-
-        // 리턴
-        return ro;
+        // 후처리 커스텀 서비스 호환을 위해 대표(첫) 입고주문을 리턴
+        return firstRo;
     }
 
     /**
@@ -451,9 +441,7 @@ public class InboundTransactionService extends AbstractQueryService {
             throw new ElidomRuntimeException("입고 순번 [" + item.getRcvSeq() + "]은 입고 수량이 0보다 커야 합니다.");
         }
 
-        if (item.getRcvQty() > item.getRcvExpQty()) {
-            throw new ElidomRuntimeException("입고 순번 [" + item.getRcvSeq() + "]은 입고 수량이 입고 예정수량보다 큽니다.");
-        }
+        // 초과 입고(오버수량) 허용 — 현장에서 예정수량보다 많이 입고되는 경우가 있어 예정수량 초과 검증을 제거함
 
         if (receiving.getInspFlag()) {
             if (ValueUtil.isEmpty(item.getItemType())) {
@@ -627,15 +615,18 @@ public class InboundTransactionService extends AbstractQueryService {
         for (ReceivingItem item : receivingItems) {
             if (ValueUtil.isEqual(item.getStatus(), WmsInboundConstants.STATUS_REJECTED)
                     || ValueUtil.isEqual(item.getStatus(), WmsInboundConstants.STATUS_BAD)
+                    || ValueUtil.isEqual(item.getStatus(), WmsInboundConstants.STATUS_SHORT)
                     || ValueUtil.isEqual(item.getStatus(), WmsInboundConstants.STATUS_CANCEL)) {
-                // 반려/취소/불량된 아이템은 상태 유지
+                // 반려/취소/불량/미입고된 아이템은 상태 유지
                 continue;
             }
             if (item.getRcvExpQty() <= item.getRcvQty()) {
                 item.setStatus(WmsInboundConstants.STATUS_END);
                 item.setRcvDate(rcvDate);
             } else {
-                throw new ElidomRuntimeException("품목 [" + item.getSkuCd() + "]은 아직 입고 처리가 완료되지 않았습니다.");
+                // 예정수량보다 적게 입고된(부족) 라인은 마감 시 미입고(SHORT)로 종결한다.
+                // (현장: 예정 1000개 중 900개만 입고되고 100개는 들어오지 않는 under 입고 케이스)
+                item.setStatus(WmsInboundConstants.STATUS_SHORT);
             }
         }
 
@@ -679,8 +670,10 @@ public class InboundTransactionService extends AbstractQueryService {
                 ValueUtil.newMap("domainId,receivingId", receiving.getDomainId(), receiving.getId()));
 
         for (ReceivingItem item : receivingItems) {
-            // 반려된 아이템은 상태 유지
-            if (ValueUtil.isEqual(item.getStatus(), WmsInboundConstants.STATUS_REJECTED)) {
+            // 반려(REJECTED)·불량(BAD)·미입고(SHORT) 아이템은 상태 유지 (검수 승인 대상에서 제외)
+            if (ValueUtil.isEqual(item.getStatus(), WmsInboundConstants.STATUS_REJECTED)
+                    || ValueUtil.isEqual(item.getStatus(), WmsInboundConstants.STATUS_BAD)
+                    || ValueUtil.isEqual(item.getStatus(), WmsInboundConstants.STATUS_SHORT)) {
                 continue;
             }
             item.setStatus(WmsInboundConstants.STATUS_APPROVED);

@@ -76,6 +76,7 @@ export default {
     { tagname: 'pda-inbound-putaway', page: 'pda-inbound-putaway' },
     { tagname: 'pda-stock-move', page: 'pda-stock-move' },
     { tagname: 'pda-stock-inquiry', page: 'pda-stock-inquiry' },
+    { tagname: 'pda-stock-inquiry-temp', page: 'pda-stock-inquiry-temp' },
     { tagname: 'pda-oms-replenish', page: 'pda-oms-replenish' }
   ],
   bootstrap

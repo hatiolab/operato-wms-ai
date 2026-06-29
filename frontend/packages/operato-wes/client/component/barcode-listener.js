@@ -89,6 +89,9 @@ export class BarcodeListener extends LitElement {
   _scheduleRefocus() {
     clearTimeout(this._refocusTimer)
     this._refocusTimer = setTimeout(() => {
+      // 일시정지 중(팝업/다이얼로그 등)에는 재포커스도 하지 않는다.
+      // (capture input이 모달 다이얼로그의 포커스를 가로채 팝업이 즉시 닫히는 문제 방지)
+      if (this._paused) return
       // 사용자가 입력 필드에 포커스를 둔 상태라면 재포커스를 양보한다.
       // (operato-input-barcode 두 번 터치 시 자판이 올라오도록 보장)
       if (this._isEditableActive()) return

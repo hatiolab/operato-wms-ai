@@ -48,6 +48,11 @@ public class WmsInboundConstants {
 	public static final String STATUS_BAD = "BAD";
 
 	/**
+	 * 상태 : 미입고 (예정수량보다 적게 입고되어 마감 시 종결된 부족분 라인)
+	 */
+	public static final String STATUS_SHORT = "SHORT";
+
+	/**
 	 * 상태 : 검수 승인 (화주사 검수 후 승인)
 	 */
 	public static final String STATUS_APPROVED = "APPROVED";

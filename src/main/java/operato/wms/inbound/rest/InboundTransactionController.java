@@ -443,12 +443,12 @@ public class InboundTransactionController extends AbstractRestService {
         String rcvAutoFlag = this.runtimeConfSvc.getRuntimeConfigValue(receiving.getComCd(), receiving.getWhCd(),
                 WmsInboundConfigConstants.RECEIPT_FINISH_AUTO_FLAG);
         if (ValueUtil.toBoolean(rcvAutoFlag, true)) {
-            String sql = "select count(id) from receiving_items where domain_id = :domainId and receiving_id = :receivingId and (status != :cancelStatus and status != :endStatus and status != :rejectedStatus and status != :badStatus)";
+            String sql = "select count(id) from receiving_items where domain_id = :domainId and receiving_id = :receivingId and (status != :cancelStatus and status != :endStatus and status != :rejectedStatus and status != :badStatus and status != :shortStatus)";
             Map<String, Object> params = ValueUtil.newMap(
-                    "domainId,receivingId,cancelStatus,endStatus,rejectedStatus,badStatus",
+                    "domainId,receivingId,cancelStatus,endStatus,rejectedStatus,badStatus,shortStatus",
                     receiving.getDomainId(), receiving.getId(), WmsInboundConstants.STATUS_CANCEL,
                     WmsInboundConstants.STATUS_END, WmsInboundConstants.STATUS_REJECTED,
-                    WmsInboundConstants.STATUS_BAD);
+                    WmsInboundConstants.STATUS_BAD, WmsInboundConstants.STATUS_SHORT);
             if (this.queryManager.selectBySql(sql, params, Integer.class) == 0) {
                 // 4.1 자동 마감 처리
                 this.closeReceivingOrder(receiving.getId());
@@ -495,12 +495,12 @@ public class InboundTransactionController extends AbstractRestService {
         String rcvAutoFlag = this.runtimeConfSvc.getRuntimeConfigValue(receiving.getComCd(), receiving.getWhCd(),
                 WmsInboundConfigConstants.RECEIPT_FINISH_AUTO_FLAG);
         if (ValueUtil.toBoolean(rcvAutoFlag, true)) {
-            String sql = "select count(id) from receiving_items where domain_id = :domainId and receiving_id = :receivingId and (status != :cancelStatus and status != :endStatus and status != :rejectedStatus and status != :badStatus)";
+            String sql = "select count(id) from receiving_items where domain_id = :domainId and receiving_id = :receivingId and (status != :cancelStatus and status != :endStatus and status != :rejectedStatus and status != :badStatus and status != :shortStatus)";
             Map<String, Object> params = ValueUtil.newMap(
-                    "domainId,receivingId,cancelStatus,endStatus,rejectedStatus,badStatus",
+                    "domainId,receivingId,cancelStatus,endStatus,rejectedStatus,badStatus,shortStatus",
                     receiving.getDomainId(), receiving.getId(), WmsInboundConstants.STATUS_CANCEL,
                     WmsInboundConstants.STATUS_END, WmsInboundConstants.STATUS_REJECTED,
-                    WmsInboundConstants.STATUS_BAD);
+                    WmsInboundConstants.STATUS_BAD, WmsInboundConstants.STATUS_SHORT);
             if (this.queryManager.selectBySql(sql, params, Integer.class) == 0) {
                 // 4.1 자동 마감 처리
                 this.closeReceivingOrder(receiving.getId());
@@ -544,12 +544,12 @@ public class InboundTransactionController extends AbstractRestService {
         String rcvAutoFlag = this.runtimeConfSvc.getRuntimeConfigValue(receiving.getComCd(), receiving.getWhCd(),
                 WmsInboundConfigConstants.RECEIPT_FINISH_AUTO_FLAG);
         if (ValueUtil.toBoolean(rcvAutoFlag, true)) {
-            String sql = "select count(id) from receiving_items where domain_id = :domainId and receiving_id = :receivingId and (status != :cancelStatus and status != :endStatus and status != :rejectedStatus and status != :badStatus)";
+            String sql = "select count(id) from receiving_items where domain_id = :domainId and receiving_id = :receivingId and (status != :cancelStatus and status != :endStatus and status != :rejectedStatus and status != :badStatus and status != :shortStatus)";
             Map<String, Object> params = ValueUtil.newMap(
-                    "domainId,receivingId,cancelStatus,endStatus,rejectedStatus,badStatus",
+                    "domainId,receivingId,cancelStatus,endStatus,rejectedStatus,badStatus,shortStatus",
                     receiving.getDomainId(), receiving.getId(), WmsInboundConstants.STATUS_CANCEL,
                     WmsInboundConstants.STATUS_END, WmsInboundConstants.STATUS_REJECTED,
-                    WmsInboundConstants.STATUS_BAD);
+                    WmsInboundConstants.STATUS_BAD, WmsInboundConstants.STATUS_SHORT);
             if (this.queryManager.selectBySql(sql, params, Integer.class) == 0) {
                 // 4.1 자동 마감 처리
                 this.closeReceivingOrder(receiving.getId());

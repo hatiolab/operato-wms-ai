@@ -5,6 +5,7 @@ import { connect } from 'pwa-helpers/connect-mixin.js'
 import { MetaApi, ServiceUtil, TermsUtil, UiUtil, PrintUtil } from '@operato-app/metapage/dist-client'
 import '@operato-app/metapage/dist-client/components/input/operato-input-barcode'
 import '../../component/barcode-listener.js'
+import '../../component/location-input.js'
 import { store, PageView } from '@operato/shell'
 import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
 import { operatoGet } from '@operato-app/operatofill'
@@ -434,6 +435,12 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
           text-align: right;
           color: var(--md-sys-color-on-surface, #333);
           background: var(--md-sys-color-surface-container-lowest, #fff);
+        }
+
+        /* 로케이션 입력 컴포넌트(location-input) — 스텝 행에서 가로 확장 */
+        .scan-step location-input {
+          flex: 1;
+          min-width: 0;
         }
 
         /* 로케이션 텍스트 입력 + 자동완성 드롭다운 */
@@ -1228,16 +1235,11 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
         <span class="step-badge ${step2Done ? 'done-badge' : ''}">${step2Done ? '✓' : '2'}</span>
         <span class="step-label-text">${TermsUtil.tLabel('loc_cd') || '로케이션'}</span>
         ${this.scanStep === 'location' ? html`
-          <div class="loc-input-wrap">
-            <input type="text" id="locationInput" class="loc-text-input"
-              placeholder="로케이션 스캔 / 입력"
-              autocomplete="off"
-              ?disabled=${this.processing}
-              @input=${e => this._onLocInput(e.target.value)}
-              @keydown=${e => this._onLocKeydown(e)}
-              @blur=${() => this._onLocBlur()}>
-            ${this._renderLocDropdown()}
-          </div>
+          <location-input id="locationInput"
+            placeholder="${TermsUtil.tLabel('loc_cd') || '로케이션 코드 입력'}"
+            ?disabled=${this.processing}
+            @location-select=${e => this._onScanLocation(e.detail.loc_cd)}>
+          </location-input>
         ` : this.locCd ? html`
           <span class="location-confirmed">${this.locCd}</span>
           <button class="btn-loc-change"
@@ -1628,10 +1630,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
     const currentItem = this.currentItemIndex >= 0 ? this.workItems[this.currentItemIndex] : null
     this.putawayQty = currentItem ? (currentItem.inv_qty || 0) : 0
     this._showFeedback(`로케이션 확인: ${value} — 적치 수량을 확인하고 확정하세요`, 'success')
-    // 자동완성 드롭다운 정리
-    clearTimeout(this._locSearchTimer)
-    this._locSearchResults = []
-    if (this._locationInput) this._locationInput.value = ''
+    if (this._locationInput) this._locationInput.clear?.()
   }
 
   /**
@@ -2055,8 +2054,8 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
    */
   _focusLocationInput() {
     if (this._locationInput) {
-      this._locationInput.value = ''
-      this._locationInput.focus()
+      this._locationInput.clear?.()
+      this._locationInput.focus?.()
     }
   }
 }

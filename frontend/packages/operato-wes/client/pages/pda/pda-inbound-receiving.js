@@ -1114,7 +1114,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     return html`
       <div class="task-card" @click=${() => this._selectReceiving(r)}>
         <div class="card-header">
-          <span class="task-no">입고번호 : ${r.rcv_no}</span>
+          <span class="task-no">${r._skuNm || r.sku_nm || '-'}</span>
           <span class="status-badge ${(r.status || '').toLowerCase()}">
             ${{
         READY: TermsUtil.tLabel('wait') || '대기',
@@ -1127,7 +1127,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           </span>
         </div>
         <div class="sub-info">
-          ${TermsUtil.tLabel('vend_cd') || '공급처'}: ${this._vendorMap[r.vend_cd] || r.vend_cd || ''} | ${TermsUtil.tLabel('rcv_req_date') || '입고 예정일'}: ${r.rcv_req_date || ''}
+          ${TermsUtil.tLabel('rcv_no') || '입고번호'}: ${r.rcv_no} | ${TermsUtil.tLabel('vend_cd') || '공급처'}: ${this._vendorMap[r.vend_cd] || r.vend_cd || ''} | ${TermsUtil.tLabel('rcv_req_date') || '입고 예정일'}: ${r.rcv_req_date || ''}
           ${totalItems ? ` · ${totalItems}건` : ''}
         </div>
         ${isStart ? html`
@@ -1225,7 +1225,6 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
             <numeric-keypad-input
               .value=${this.rcvQty}
               .min=${0}
-              .max=${currentItem?.rcv_exp_qty || null}
               ?disabled=${this.processing || this.viewOnly || !currentItem}
               @change=${e => this._setRcvQty(e.detail.value)}>
             </numeric-keypad-input>
@@ -1294,7 +1293,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
   /** work 모드 탭 바 렌더링 — 미완료/완료 탭 */
   _renderWorkTabs() {
-    const todoItems = this.receivingItems.filter(i => !this._isItemDone(i.status) && i.status !== 'CANCEL' && i.status !== 'BAD')
+    const todoItems = this.receivingItems.filter(i => !this._isItemDone(i.status) && i.status !== 'CANCEL' && i.status !== 'BAD' && i.status !== 'SHORT')
     const doneItems = this.receivingItems.filter(i => this._isItemDone(i.status))
 
     return html`
@@ -1319,7 +1318,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   /** work 모드 탭 콘텐츠 렌더링 — 미완료/완료 항목 목록 */
   _renderWorkTabContent() {
     const items = this.currentTabKey === 'todo'
-      ? this.receivingItems.filter(i => !this._isItemDone(i.status) && i.status !== 'CANCEL' && i.status !== 'BAD')
+      ? this.receivingItems.filter(i => !this._isItemDone(i.status) && i.status !== 'CANCEL' && i.status !== 'BAD' && i.status !== 'SHORT')
       : this.receivingItems.filter(i => this._isItemDone(i.status))
 
     if (!items.length) {
@@ -1392,7 +1391,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   /** 상품 선택 팝업 렌더링 — 미완료 항목 목록에서 선택 */
   _renderItemPicker() {
     if (!this._showItemPicker) return ''
-    const items = this.receivingItems.filter(i => !this._isItemDone(i.status) && i.status !== 'CANCEL' && i.status !== 'BAD')
+    const items = this.receivingItems.filter(i => !this._isItemDone(i.status) && i.status !== 'CANCEL' && i.status !== 'BAD' && i.status !== 'SHORT')
     return html`
       <div class="picker-backdrop" @click=${() => { this._showItemPicker = false }}>
         <div class="picker-sheet" @click=${e => e.stopPropagation()}>
@@ -1511,11 +1510,38 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
         ...(startResult?.items || startResult || []),
         ...(endResult?.items || endResult || [])
       ]
+
+      // 1주문-1상품 관계 — 각 입고주문의 상품명을 디테일에서 일괄 조회하여 매핑
+      await this._loadTaskSkuNames()
     } catch (error) {
       console.error('입고 주문 목록 조회 실패:', error)
       this.taskList = []
     } finally {
       this.loading = false
+    }
+  }
+
+  /**
+   * 입고주문 목록의 상품명 조회 — 각 주문의 상세(receivings/{id}/items)에서 첫 상품명을 가져와 매핑.
+   * (ReceivingItem은 receivings/{id}/items 커스텀 경로로만 조회 가능하므로 주문별로 조회)
+   */
+  async _loadTaskSkuNames() {
+    const targets = this.taskList.filter(t => t.id)
+    if (!targets.length) return
+    try {
+      const results = await Promise.all(targets.map(t =>
+        ServiceUtil.restGet(`receivings/${t.id}/items`)
+          .then(r => ({ id: t.id, items: r?.items || r || [] }))
+          .catch(() => ({ id: t.id, items: [] }))
+      ))
+      const map = {}
+      for (const { id, items } of results) {
+        const it = items[0]
+        if (it) map[id] = it.sku_nm || it.sku_cd || ''
+      }
+      this.taskList = this.taskList.map(t => ({ ...t, _skuNm: map[t.id] || '' }))
+    } catch (e) {
+      console.warn('입고주문 상품명 조회 실패:', e)
     }
   }
 
@@ -1526,7 +1552,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
       const result = await ServiceUtil.restGet(`receivings/${receivingId}/items`)
       this.receivingItems = result?.items || result || []
       // 불량(BAD) 라인은 작업 대상 건수에서 제외 (진행률·자동마감 기준)
-      this.totalCount = this.receivingItems.filter(i => i.status !== 'BAD').length
+      this.totalCount = this.receivingItems.filter(i => i.status !== 'BAD' && i.status !== 'SHORT').length
       this.completedCount = this.receivingItems.filter(i => this._isItemDone(i.status)).length
       // 자동 선택하지 않음 — 사용자가 바코드 스캔 또는 상품 선택 팝업으로 직접 선택
       this.currentItemIndex = -1
@@ -1705,7 +1731,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
     // 2. 전체 미완료 항목에서 sku_cd 검색
     const matchIndex = this.receivingItems.findIndex(
-      item => item.status !== 'END' && item.status !== 'CANCEL' && item.status !== 'BAD' && item.sku_cd === sku_cd
+      item => item.status !== 'END' && item.status !== 'CANCEL' && item.status !== 'BAD' && item.status !== 'SHORT' && item.sku_cd === sku_cd
     )
 
     if (matchIndex >= 0) {
@@ -1839,13 +1865,9 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   async _closeReceiving() {
     if (!this.currentReceiving) return
 
-    const remaining = this.receivingItems.filter(i => i.status !== 'END' && i.status !== 'CANCEL' && i.status !== 'BAD')
+    const remaining = this.receivingItems.filter(i => i.status !== 'END' && i.status !== 'CANCEL' && i.status !== 'BAD' && i.status !== 'SHORT')
     if (remaining.length > 0) {
-      const confirmed = await UiUtil.showAlertPopup(
-        'label.confirm',
-        `미완료 항목 ${remaining.length}건이 있습니다. 입고 작업을 완료하시겠습니까?`,
-        'question', 'confirm', 'cancel'
-      )
+      const confirmed = await this._confirmDialog(`미완료 항목 ${remaining.length}건이 있습니다. 입고 작업을 완료하시겠습니까?`)
       if (!confirmed) return
     }
 
@@ -1876,11 +1898,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   /** 모든 항목 완료 시 마감 처리 — 최종 확인 후 마감 */
   async _onAllItemsCompleted() {
     const totalRcvQty = this.receivingItems.reduce((s, i) => s + (i.rcv_qty || 0), 0)
-    const confirmed = await UiUtil.showAlertPopup(
-      'label.confirm',
-      `모든 항목(${this.totalCount}건, 총 ${totalRcvQty}개) 입고 완료.\n마감 처리하시겠습니까?`,
-      'question', 'confirm', 'cancel'
-    )
+    const confirmed = await this._confirmDialog(`모든 항목(${this.totalCount}건, 총 ${totalRcvQty}개) 입고 완료.\n마감 처리하시겠습니까?`)
     if (!confirmed) return
     await this._closeReceiving()
   }
@@ -1930,7 +1948,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
   /** 다음 미완료 항목으로 인덱스 이동 */
   _moveToNextItem() {
-    const nextIdx = this.receivingItems.findIndex(i => i.status !== 'END' && i.status !== 'CANCEL' && i.status !== 'BAD')
+    const nextIdx = this.receivingItems.findIndex(i => i.status !== 'END' && i.status !== 'CANCEL' && i.status !== 'BAD' && i.status !== 'SHORT')
     this.currentItemIndex = nextIdx
   }
 
@@ -1945,15 +1963,12 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   }
 
   /**
-   * 입고수량 설정 — 예정수량 범위로 보정하고 불량수량을 (예정 − 입고)으로 자동 조정
+   * 입고수량 설정 — 음수만 방지하고 예정수량 초과(오버수량) 입력은 허용한다.
+   * (현장: 예정 1000개인데 1100개가 들어오는 경우가 있어 초과 입고를 허용)
    * @param {number} qty - 입력된 입고수량
    */
   _setRcvQty(qty) {
-    const currentItem = this.currentItemIndex >= 0 ? this.receivingItems[this.currentItemIndex] : null
-    const exp = currentItem ? (currentItem.rcv_exp_qty || 0) : 0
-    let rcv = Math.max(0, qty)
-    if (exp && rcv > exp) rcv = exp
-    this.rcvQty = rcv
+    this.rcvQty = Math.max(0, qty)
   }
 
   /** 스캔 일시정지 — 날짜 선택 등 팝업/포커스 입력 중 스캔 오인식 방지 */
@@ -1964,6 +1979,22 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   /** 스캔 재개 */
   _resumeScan() {
     document.dispatchEvent(new CustomEvent('barcode-listener-resume'))
+  }
+
+  /**
+   * 확인 팝업 표시 — 팝업이 떠 있는 동안 스캔(및 capture 재포커스)을 일시정지하여
+   * barcode-listener가 모달 다이얼로그의 포커스를 가로채 팝업이 즉시 닫히는 충돌을 방지한다.
+   * @param {string} message - 확인 메시지
+   * @returns {Promise<boolean>} 사용자가 확인했으면 true
+   */
+  async _confirmDialog(message) {
+    this._pauseScan()
+    try {
+      return await UiUtil.showAlertPopup('label.confirm', message, 'question', 'confirm', 'cancel')
+    } finally {
+      // 팝업 닫힌 직후 잔여 포커스 이벤트가 정리될 시간을 두고 스캔 재개
+      setTimeout(() => this._resumeScan(), 100)
+    }
   }
 
   /**
