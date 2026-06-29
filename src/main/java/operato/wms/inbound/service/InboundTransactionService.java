@@ -467,6 +467,7 @@ public class InboundTransactionService extends AbstractQueryService {
             }
         }
 
+        // 상품 조회
         SKU sku = this.queryManager.selectByCondition(SKU.class,
                 new SKU(receiving.getDomainId(), receiving.getComCd(), item.getSkuCd()));
 
@@ -483,30 +484,9 @@ public class InboundTransactionService extends AbstractQueryService {
         // 예정 수량과 입고 수량이 다르면 자동 분할 처리
         double splitQty = item.getRcvExpQty() - item.getRcvQty();
         if (splitQty > 0) {
-            ReceivingItem splitItem = item.split(splitQty, false, false);
-
-            if (ValueUtil.isNotEmpty(item.getDefectReasonCode())) {
-                // 불량 사유가 입력된 경우: 분할된 라인을 불량(BAD)으로 처리하고
-                // 불량 로케이션(DEFECT)에 불량 재고(STATUS_BAD)를 생성한다. (별도 미입고 관리 없음)
-                splitItem.setStatus(WmsInboundConstants.STATUS_BAD);
-                splitItem.setRcvQty(splitQty);
-                splitItem.setRcvDate(DateUtil.todayStr());
-                splitItem.setDefectReasonCode(item.getDefectReasonCode());
-                splitItem.setDefectReason(item.getDefectReason());
-                if (ValueUtil.isEmpty(splitItem.getBarcode())) {
-                    splitItem.setBarcode(Inventory.newBarcode());
-                }
-                this.queryManager.insert(splitItem);
-                this.processRejectedReceivingItem(receiving, splitItem);
-            } else {
-                // 불량 사유가 없으면 기존 동작(미입고 분할 라인 생성)
-                this.queryManager.insert(splitItem);
-            }
+            // 분할 처리
+            item.split(splitQty, false, true);
         }
-
-        // 정상 입고 라인에는 불량 정보를 남기지 않는다 (불량 정보는 분할된 BAD 라인에만)
-        item.setDefectReasonCode(null);
-        item.setDefectReason(null);
 
         // 유통기한 자동 계산: 제조일이 있고 유통기한이 비어있는 경우 SKU의 prdExpiredPeriod 기반으로 계산
         if (ValueUtil.isNotEmpty(item.getPrdDate()) && ValueUtil.isEmpty(item.getExpiredDate())) {
@@ -523,6 +503,77 @@ public class InboundTransactionService extends AbstractQueryService {
             this.createInventoryByItem(receiving, item);
         }
 
+        // 아이템 리턴
+        return item;
+    }
+
+    /**
+     * 입고 상세 라인 불량 처리
+     * 
+     * @param receiving
+     * @param item
+     * @param printerId
+     * @return
+     */
+    public ReceivingItem defectReceivingOrderLine(Receiving receiving, ReceivingItem item, String printerId) {
+        // 상태 체크
+        if (ValueUtil.isNotEqual(item.getStatus(), WmsInboundConstants.STATUS_START)) {
+            throw new ElidomRuntimeException("입고 순번 [" + item.getRcvSeq() + "]은 작업 중인 상태가 아닙니다.");
+        }
+
+        if (item.getRcvQty() == null || item.getRcvQty() <= 0) {
+            throw new ElidomRuntimeException("입고 순번 [" + item.getRcvSeq() + "]은 입고 수량이 0보다 커야 합니다.");
+        }
+
+        if (item.getRcvQty() > item.getRcvExpQty()) {
+            throw new ElidomRuntimeException("입고 순번 [" + item.getRcvSeq() + "]은 입고 수량이 입고 예정수량보다 큽니다.");
+        }
+
+        // 입고 지시 검수 필수인 경우 검수 여부 체크
+        if (receiving.getInspFlag()) {
+            if (ValueUtil.isEmpty(item.getItemType())) {
+                throw new ElidomRuntimeException("검수 결과 정보가 없습니다.");
+            } else if (ValueUtil.isNotEqual(item.getItemType(), WmsInboundConstants.INSP_STATUS_PASS)) {
+                throw new ElidomRuntimeException("검수 결과가 패스가 아닙니다.");
+            }
+
+            if (item.getInspQty() == 0 || item.getInspQty() < item.getRcvQty()) {
+                throw new ElidomRuntimeException("검수 수량이 입고 수량보다 작습니다.");
+            }
+        }
+
+        // 상품 조회
+        SKU sku = this.queryManager.selectByCondition(SKU.class,
+                new SKU(receiving.getDomainId(), receiving.getComCd(), item.getSkuCd()));
+
+        // lotFlag에 따른 필수 입력 검증
+        if (sku != null && Boolean.TRUE.equals(sku.getLotFlag()) && ValueUtil.isEmpty(item.getLotNo())) {
+            throw new ElidomRuntimeException("SKU [" + item.getSkuCd() + "]는 로트 추적 대상입니다. 로트 번호를 입력하세요.");
+        }
+
+        // serialFlag에 따른 필수 입력 검증
+        if (sku != null && Boolean.TRUE.equals(sku.getSerialFlag()) && ValueUtil.isEmpty(item.getSerialNo())) {
+            throw new ElidomRuntimeException("SKU [" + item.getSkuCd() + "]는 시리얼 추적 대상입니다. 시리얼 번호를 입력하세요.");
+        }
+
+        // 예정 수량과 입고 수량이 다르면 자동 분할 처리
+        double splitQty = item.getRcvExpQty() - item.getRcvQty();
+        if (splitQty > 0) {
+            item.split(splitQty, false, true);
+        }
+
+        // 메인 입고 항목에 불량 정보 설정 - 불량 처리 로직
+        item.setStatus(WmsInboundConstants.STATUS_BAD);
+        item.setRcvDate(DateUtil.todayStr());
+        if (ValueUtil.isEmpty(item.getBarcode())) {
+            item.setBarcode(Inventory.newBarcode());
+        }
+        this.queryManager.update(item);
+
+        // 불량 재고 생성 후 불량 로케이션 이동 처리
+        this.processRejectedReceivingItem(receiving, item);
+
+        // 아이템 리턴
         return item;
     }
 
@@ -1346,6 +1397,7 @@ public class InboundTransactionService extends AbstractQueryService {
         item.setRemarks(rejectReason);
         item.setRcvDate(DateUtil.todayStr());
 
+        // TODO 검수 승인 시 반려를 하는 경우 불량 재고를 생성해야 하는지 체크 필요 - 반려 상태만 남기면 되는 거 아닌지 ...
         this.processRejectedReceivingItem(receiving, item);
         return item;
     }
@@ -1365,10 +1417,7 @@ public class InboundTransactionService extends AbstractQueryService {
         }
 
         // DEFECT 로케이션 조회
-        String defectLocSql = "SELECT loc_cd FROM locations"
-                + " WHERE domain_id = :domainId AND wh_cd = :whCd AND loc_type = 'DEFECT'"
-                + " AND (del_flag IS NULL OR del_flag = false)"
-                + " LIMIT 1";
+        String defectLocSql = "SELECT loc_cd FROM locations WHERE domain_id = :domainId AND wh_cd = :whCd AND loc_type = 'DEFECT' AND (del_flag IS NULL OR del_flag = false) LIMIT 1";
         String defectLocCd = this.queryManager.selectBySql(defectLocSql,
                 ValueUtil.newMap("domainId,whCd", receiving.getDomainId(), receiving.getWhCd()), String.class);
 
@@ -1376,6 +1425,7 @@ public class InboundTransactionService extends AbstractQueryService {
             return;
         }
 
+        // 불량 로케이션에 재고 생성
         SKU sku = this.queryManager.selectByCondition(SKU.class,
                 new SKU(receiving.getDomainId(), receiving.getComCd(), item.getSkuCd()));
 
@@ -1402,7 +1452,6 @@ public class InboundTransactionService extends AbstractQueryService {
         inv.setLotNo(item.getLotNo());
         inv.setRemarks(item.getRemarks());
         inv.setDelFlag(false);
-
         this.queryManager.insert(inv);
     }
 

@@ -242,6 +242,36 @@ public class InventoryController extends AbstractRestService {
 	}
 
 	/**
+	 * 재고 ID 목록으로 여러 장의 바코드 라벨 PDF 다운로드 (MULTI_BARCODE_SHEET 템플릿)
+	 * 각 재고마다 한 페이지씩 생성하여 하나의 PDF로 반환
+	 *
+	 * @param req
+	 * @param res
+	 * @param body ids — 재고 ID 목록
+	 */
+	@RequestMapping(value = "/download_multi_barcode", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Download Multi Inventory Barcode Sheet")
+	public void downloadMultiBarcode(
+			HttpServletRequest req,
+			HttpServletResponse res,
+			@RequestBody Map<String, Object> body) {
+
+		@SuppressWarnings("unchecked")
+		List<String> ids = (List<String>) body.get("ids");
+		if (ValueUtil.isEmpty(ids)) {
+			throw new ElidomRuntimeException("인쇄할 재고 ID 목록이 비어있습니다.");
+		}
+
+		List<Inventory> inventories = new ArrayList<>();
+		for (String id : ids) {
+			inventories.add(this.checkInventoryForPrint(id));
+		}
+
+		this.printoutCtrl.showPdfByPrintTemplateName(req, res, "MULTI_BARCODE_SHEET",
+				ValueUtil.newMap("inventories", inventories));
+	}
+
+	/**
 	 * 모바일 바코드 인쇄용 HTML 페이지 반환 (Android Chrome 자동 인쇄 지원)
 	 * PDF 뷰어 탭에서는 외부 print() 호출이 무시되므로, HTML 페이지 내부에서 auto-print
 	 */

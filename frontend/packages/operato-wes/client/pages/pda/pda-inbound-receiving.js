@@ -48,18 +48,12 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   @state() currentItemIndex = -1
   /** 실제 입고 수량 입력값 */
   @state() rcvQty = 0
-  /** 불량 수량 입력값 (예정수량 = 입고수량 + 불량수량) */
-  @state() defectQty = 0
-  /** 불량 사유 코드 (불량수량 > 0일 때 드롭다운 선택값) */
+  /** 불량 사유 코드 */
   @state() defectReasonCode = ''
-  /** 불량 사유 상세 텍스트 (사유 코드가 '기타(ETC)'일 때 직접 입력) */
-  @state() defectReasonText = ''
   /** 소비기한 입력값 (yyyy-MM-dd) */
   @state() expiredDate = ''
   /** LOT 번호 입력값 */
   @state() lotNo = ''
-  /** 추가 입력(불량수량/사유/소비기한/LOT) 펼침 여부 */
-  @state() showExtraInputs = false
   /** 화주사명 (코드 → 명칭 표시용) */
   @state() _comNm = ''
   /** 공급처명 (코드 → 명칭 표시용) */
@@ -646,28 +640,6 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           opacity: 0.8;
         }
 
-        /* 추가 입력 펼침 토글 버튼 */
-        .btn-toggle-extra {
-          width: 100%;
-          margin-top: 8px;
-          padding: 3px 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          border: 1px dashed var(--md-sys-color-primary, #1976D2);
-          border-radius: 6px;
-          background: transparent;
-          color: var(--md-sys-color-primary, #1976D2);
-          font-size: 12px;
-          font-weight: 600;
-          cursor: pointer;
-        }
-
-        .btn-toggle-extra:active {
-          background: var(--md-sys-color-primary-container, #e3f2fd);
-        }
-
         /* 일반 입력 행 (불량사유/소비기한/LOT) */
         .field-row {
           display: flex;
@@ -871,24 +843,6 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           color: #fff;
         }
 
-        /* 완료 항목 라벨 인쇄 버튼 */
-        .item-card .btn-print {
-          flex-shrink: 0;
-          padding: 4px 10px;
-          border: 1px solid var(--md-sys-color-primary, #1976D2);
-          border-radius: 6px;
-          background: var(--md-sys-color-surface-container-lowest, #fff);
-          color: var(--md-sys-color-primary, #1976D2);
-          font-size: 12px;
-          font-weight: 600;
-          cursor: pointer;
-          white-space: nowrap;
-        }
-
-        .item-card .btn-print:active {
-          background: var(--md-sys-color-primary-container, #e3f2fd);
-        }
-
         /* 완료 화면 */
         .complete-section {
           display: flex;
@@ -1025,10 +979,20 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           입고번호 : ${rcvNo}
         </span>
         <div class="actions">
+          <button
+            ?disabled=${this.processing || !this.currentReceiving?.id}
+            @click=${this._printBarcodeSheet}>
+            🖨️ ${TermsUtil.tButton('print') || '인쇄'}
+          </button>
           <button class="primary"
             ?disabled=${this.viewOnly || this.processing || !this.rcvQty || !this.barcodeScanned}
             @click=${this._confirmReceive}>
             ${TermsUtil.tButton('confirm') || '확인'}
+          </button>
+          <button class="danger"
+            ?disabled=${this.viewOnly || this.processing || !this.barcodeScanned || !this.defectReasonCode}
+            @click=${this._defectReceive}>
+            ${TermsUtil.tButton('defect') || '불량'}
           </button>
           <button class="primary"
             ?disabled=${this.viewOnly || this.processing}
@@ -1270,52 +1234,6 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           </div>
 
           ${currentItem ? html`
-          <!-- 추가 입력 토글 (불량수량/사유/소비기한/LOT) -->
-          <button class="btn-toggle-extra" @click=${() => { this.showExtraInputs = !this.showExtraInputs }}>
-            ${this.showExtraInputs ? '▴' : '▾'}
-          </button>
-
-          ${this.showExtraInputs ? html`
-            <!-- 불량수량 — 입력 시 입고수량 = 예정 − 불량 자동 조정 -->
-            <div class="qty-input-row">
-              <label>${TermsUtil.tLabel('defect_qty') || '불량수량'}</label>
-              <button class="btn-qty"
-                @click=${() => this._setDefectQty(this.defectQty - 1)}>−</button>
-              <numeric-keypad-input
-                .value=${this.defectQty}
-                .min=${0}
-                .max=${currentItem.rcv_exp_qty || null}
-                ?disabled=${this.processing || this.viewOnly}
-                @change=${e => this._setDefectQty(e.detail.value)}>
-              </numeric-keypad-input>
-              <button class="btn-qty"
-                @click=${() => this._setDefectQty(this.defectQty + 1)}>+</button>
-            </div>
-
-            <!-- 불량사유 — 불량수량 > 0일 때만 노출 -->
-            ${this.defectQty > 0 ? html`
-              <div class="field-row">
-                <label>${TermsUtil.tLabel('defect_reason') || '불량사유'}</label>
-                <code-select
-                  code-name="INBOUND_DEFECT_REASON"
-                  placeholder="${TermsUtil.tText('select_one') || '사유 선택'}"
-                  .value=${this.defectReasonCode}
-                  ?disabled=${this.processing || this.viewOnly}
-                  @change=${e => { this.defectReasonCode = e.detail.value; if (e.detail.value !== 'ETC') this.defectReasonText = '' }}>
-                </code-select>
-              </div>
-              <!-- '기타(ETC)' 선택 시 상세 사유 자유 입력 -->
-              ${this.defectReasonCode === 'ETC' ? html`
-                <div class="field-row">
-                  <label>${TermsUtil.tLabel('defect_reason_detail') || '상세사유'}</label>
-                  <input type="text"
-                    .value=${this.defectReasonText}
-                    ?disabled=${this.processing || this.viewOnly}
-                    @input=${e => (this.defectReasonText = e.target.value)} />
-                </div>
-              ` : ''}
-            ` : ''}
-
             <!-- 소비기한 -->
             <div class="field-row">
               <label>${TermsUtil.tLabel('expired_date') || '소비기한'}</label>
@@ -1327,7 +1245,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
                 @change=${e => (this.expiredDate = e.target.value)} />
             </div>
 
-            <!-- LOT 번호 (자판 입력) -->
+            <!-- LOT 번호 -->
             <div class="field-row">
               <label>${TermsUtil.tLabel('lot_no') || 'LOT'}</label>
               <input type="text"
@@ -1335,7 +1253,18 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
                 ?disabled=${this.processing || this.viewOnly}
                 @input=${e => (this.lotNo = e.target.value)} />
             </div>
-          ` : ''}
+
+            <!-- 불량 사유 코드 -->
+            <div class="field-row">
+              <label>${TermsUtil.tLabel('defect_reason') || '불량사유'}</label>
+              <code-select
+                code-name="INBOUND_DEFECT_REASON"
+                placeholder="${TermsUtil.tText('select_one') || '사유 선택'}"
+                .value=${this.defectReasonCode}
+                ?disabled=${this.processing || this.viewOnly}
+                @change=${e => { this.defectReasonCode = e.detail.value }}>
+              </code-select>
+            </div>
           ` : ''}
 
           ${this.lastFeedback ? html`
@@ -1437,12 +1366,6 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
                 ${infoBlock}
               </div>
               <div class="card-actions">
-                ${item.barcode ? html`
-                  <button class="btn-print"
-                    @click=${e => { e.stopPropagation(); this._printBarcode(item) }}>
-                    🖨️ ${TermsUtil.tButton('print') || '인쇄'}
-                  </button>
-                ` : ''}
                 <span class="qty-badge done">
                   ${item.rcv_qty || 0}
                 </span>
@@ -1825,17 +1748,6 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
       return
     }
 
-    // 불량수량 입력 시 불량사유 필수
-    if (this.defectQty > 0 && !this.defectReasonCode) {
-      this._showFeedback('불량사유를 선택해주세요', 'warning')
-      return
-    }
-    // '기타(ETC)' 선택 시 상세 사유 필수
-    if (this.defectQty > 0 && this.defectReasonCode === 'ETC' && !this.defectReasonText.trim()) {
-      this._showFeedback('상세 불량사유를 입력해주세요', 'warning')
-      return
-    }
-
     this.processing = true
     try {
       // Fix 2: 콜백 패턴 대신 성공 여부를 플래그로 받아 await 흐름을 콜백 밖에서 유지
@@ -1850,9 +1762,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
           ...item,
           rcv_qty: qty,
           expired_date: this.expiredDate || item.expired_date,
-          lot_no: this.lotNo || item.lot_no,
-          defect_reason_code: this.defectQty > 0 ? this.defectReasonCode : null,
-          defect_reason: (this.defectQty > 0 && this.defectReasonCode === 'ETC') ? this.defectReasonText : null
+          lot_no: this.lotNo || item.lot_no
         },
         null, null,
         () => { success = true },
@@ -1873,6 +1783,52 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
 
     } catch (error) {
       this._showFeedback(error.message || '입고 확인 실패', 'error')
+
+    } finally {
+      this.processing = false
+    }
+  }
+
+  /** 불량 처리 API 호출 — 현재 항목을 불량으로 등록 */
+  async _defectReceive() {
+    const item = this.currentItemIndex >= 0 ? this.receivingItems[this.currentItemIndex] : null
+    if (!item) {
+      this._showFeedback('처리할 항목이 없습니다', 'warning')
+      return
+    }
+
+    this.processing = true
+    try {
+      let success = false
+      let errMsg = null
+      await ServiceUtil.restPost(
+        `inbound_trx/receiving_orders/line/${item.id}/defect`,
+        {
+          ...item,
+          rcv_qty: this.rcvQty,
+          expired_date: this.expiredDate || item.expired_date,
+          lot_no: this.lotNo || item.lot_no,
+          defect_reason_code: this.defectReasonCode || null
+        },
+        null, null,
+        () => { success = true },
+        (err) => { errMsg = err?.msg || err?.message || (typeof err === 'string' ? err : JSON.stringify(err)) || '불량 처리 실패' }
+      )
+
+      if (success) {
+        await this._loadReceivingItems(this.currentReceiving.id)
+        this._showFeedback(`불량 처리 완료 (${this.completedCount}/${this.totalCount})`, 'success')
+        if (this.completedCount >= this.totalCount) {
+          await this._onAllItemsCompleted()
+        } else {
+          this._setInitialRcvQty()
+        }
+      } else if (errMsg) {
+        this._showFeedback(errMsg, 'error')
+      }
+
+    } catch (error) {
+      this._showFeedback(error.message || '불량 처리 실패', 'error')
 
     } finally {
       this.processing = false
@@ -1982,13 +1938,9 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   _setInitialRcvQty() {
     const currentItem = this.currentItemIndex >= 0 ? this.receivingItems[this.currentItemIndex] : null
     this.rcvQty = currentItem ? (currentItem.rcv_exp_qty || 1) : 0
-    this.defectQty = 0
     this.defectReasonCode = ''
-    this.defectReasonText = ''
     this.expiredDate = currentItem?.expired_date || ''
     this.lotNo = currentItem?.lot_no || ''
-    // 추가 입력은 항상 접힌 상태로 시작 (디폴트)
-    this.showExtraInputs = false
     this.barcodeScanned = false
   }
 
@@ -2002,22 +1954,6 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     let rcv = Math.max(0, qty)
     if (exp && rcv > exp) rcv = exp
     this.rcvQty = rcv
-    this.defectQty = exp ? Math.max(0, exp - rcv) : 0
-  }
-
-  /**
-   * 불량수량 설정 — 예정수량 범위로 보정하고 입고수량을 (예정 − 불량)으로 자동 조정
-   * @param {number} qty - 입력된 불량수량
-   */
-  _setDefectQty(qty) {
-    const currentItem = this.currentItemIndex >= 0 ? this.receivingItems[this.currentItemIndex] : null
-    const exp = currentItem ? (currentItem.rcv_exp_qty || 0) : 0
-    let defect = Math.max(0, qty)
-    if (exp && defect > exp) defect = exp
-    this.defectQty = defect
-    this.rcvQty = exp ? Math.max(0, exp - defect) : this.rcvQty
-    // 불량수량이 0이면 사유 초기화
-    if (defect === 0) { this.defectReasonCode = ''; this.defectReasonText = '' }
   }
 
   /** 스캔 일시정지 — 날짜 선택 등 팝업/포커스 입력 중 스캔 오인식 방지 */
@@ -2068,6 +2004,27 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     } catch (err) {
       console.warn('재고 라벨 인쇄 실패:', err)
       this._showFeedback(TermsUtil.tText('print_failed') || '라벨 인쇄 중 오류가 발생했습니다', 'error')
+    }
+  }
+
+  /**
+   * 입고 지시 전체 재고 바코드 라벨 일괄 인쇄
+   * 백엔드에서 rcv_no로 생성된 모든 inventories를 조회하여 MULTI_BARCODE_SHEET PDF로 출력
+   */
+  async _printBarcodeSheet() {
+    if (!this.currentReceiving?.id) return
+    try {
+      const res = await operatoGet(`inbound_trx/receiving_orders/${this.currentReceiving.id}/download_barcode_sheets`, {}, false)
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(text || `HTTP ${res.status}`)
+      }
+      const data = await res.arrayBuffer()
+      const file = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }))
+      PrintUtil.openPdfInNewTab(file)
+    } catch (err) {
+      console.warn('바코드 시트 인쇄 실패:', err)
+      this._showFeedback(err.message || '바코드 라벨 PDF 생성에 실패했습니다', 'error')
     }
   }
 

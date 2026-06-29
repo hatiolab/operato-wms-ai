@@ -6,8 +6,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Map;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -206,6 +210,23 @@ public class StreamController extends AbstractRestService {
             @PathVariable("loc_cd") String locCd) {
 
         this.invCtrl.downloadInventoryBarcode(req, res, barcode, locCd);
+    }
+
+    /**
+     * 재고 ID 목록으로 여러 장의 바코드 라벨 PDF 다운로드 (MULTI_BARCODE_SHEET 템플릿)
+     *
+     * @param req
+     * @param res
+     * @param body ids — 재고 ID 목록
+     */
+    @PostMapping(value = "/inventories/download_multi_barcode", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Download Multi Inventory Barcode Sheet")
+    public void downloadMultiBarcode(
+            HttpServletRequest req,
+            HttpServletResponse res,
+            @RequestBody Map<String, Object> body) {
+
+        this.invCtrl.downloadMultiBarcode(req, res, body);
     }
 
     /**

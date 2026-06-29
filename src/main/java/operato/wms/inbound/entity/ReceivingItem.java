@@ -749,17 +749,16 @@ public class ReceivingItem extends xyz.elidom.orm.entity.basic.ElidomStampHook {
      */
     public ReceivingItem split(Double splitQty, boolean saveMain, boolean saveSplit) {
         ReceivingItem splitItem = ValueUtil.populate(this, new ReceivingItem());
-
         splitItem.setId(null);
         splitItem.setItemType(null);
         splitItem.setInspQty(0.0);
-
         splitItem.setPrdDate(null);
-
         splitItem.setRcvExpQty(splitQty);
         splitItem.setRcvQty(0.0);
         splitItem.setRcvPalletQty(0);
         splitItem.setRcvBoxQty(0);
+        splitItem.setDefectReasonCode(null);
+        splitItem.setDefectReasonCode(null);
         splitItem.setCreatedAt(null);
         splitItem.setUpdatedAt(null);
 
@@ -801,6 +800,7 @@ public class ReceivingItem extends xyz.elidom.orm.entity.basic.ElidomStampHook {
             queryMgr.update(this);
         }
 
+        // 분할 처리된 (작업이 안 된) 입고 항목 리턴
         return splitItem;
     }
 }

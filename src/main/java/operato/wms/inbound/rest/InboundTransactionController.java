@@ -116,6 +116,16 @@ public class InboundTransactionController extends AbstractRestService {
      * 커스텀 서비스 - 입고 예정 주문 라인 하나 입고 완료 후 처리
      */
     public static final String TRX_INB_POST_LINE_FINISH_RECEIPT = "diy-inb-post-line-finish-receiving";
+
+    /**
+     * 커스텀 서비스 - 입고 예정 주문 라인 하나 불량 완료 전 처리
+     */
+    public static final String TRX_INB_PRE_LINE_DEFECT_RECEIPT = "diy-inb-pre-line-defect-receiving";
+    /**
+     * 커스텀 서비스 - 입고 예정 주문 라인 하나 불량 완료 후 처리
+     */
+    public static final String TRX_INB_POST_LINE_DEFECT_RECEIPT = "diy-inb-post-line-defect-receiving";
+
     /**
      * 커스텀 서비스 - 입고 예정 주문 라인 리스트 입고 완료 전 처리
      */
@@ -434,9 +444,11 @@ public class InboundTransactionController extends AbstractRestService {
                 WmsInboundConfigConstants.RECEIPT_FINISH_AUTO_FLAG);
         if (ValueUtil.toBoolean(rcvAutoFlag, true)) {
             String sql = "select count(id) from receiving_items where domain_id = :domainId and receiving_id = :receivingId and (status != :cancelStatus and status != :endStatus and status != :rejectedStatus and status != :badStatus)";
-            Map<String, Object> params = ValueUtil.newMap("domainId,receivingId,cancelStatus,endStatus,rejectedStatus,badStatus",
+            Map<String, Object> params = ValueUtil.newMap(
+                    "domainId,receivingId,cancelStatus,endStatus,rejectedStatus,badStatus",
                     receiving.getDomainId(), receiving.getId(), WmsInboundConstants.STATUS_CANCEL,
-                    WmsInboundConstants.STATUS_END, WmsInboundConstants.STATUS_REJECTED, WmsInboundConstants.STATUS_BAD);
+                    WmsInboundConstants.STATUS_END, WmsInboundConstants.STATUS_REJECTED,
+                    WmsInboundConstants.STATUS_BAD);
             if (this.queryManager.selectBySql(sql, params, Integer.class) == 0) {
                 // 4.1 자동 마감 처리
                 this.closeReceivingOrder(receiving.getId());
@@ -484,9 +496,11 @@ public class InboundTransactionController extends AbstractRestService {
                 WmsInboundConfigConstants.RECEIPT_FINISH_AUTO_FLAG);
         if (ValueUtil.toBoolean(rcvAutoFlag, true)) {
             String sql = "select count(id) from receiving_items where domain_id = :domainId and receiving_id = :receivingId and (status != :cancelStatus and status != :endStatus and status != :rejectedStatus and status != :badStatus)";
-            Map<String, Object> params = ValueUtil.newMap("domainId,receivingId,cancelStatus,endStatus,rejectedStatus,badStatus",
+            Map<String, Object> params = ValueUtil.newMap(
+                    "domainId,receivingId,cancelStatus,endStatus,rejectedStatus,badStatus",
                     receiving.getDomainId(), receiving.getId(), WmsInboundConstants.STATUS_CANCEL,
-                    WmsInboundConstants.STATUS_END, WmsInboundConstants.STATUS_REJECTED, WmsInboundConstants.STATUS_BAD);
+                    WmsInboundConstants.STATUS_END, WmsInboundConstants.STATUS_REJECTED,
+                    WmsInboundConstants.STATUS_BAD);
             if (this.queryManager.selectBySql(sql, params, Integer.class) == 0) {
                 // 4.1 자동 마감 처리
                 this.closeReceivingOrder(receiving.getId());
@@ -498,6 +512,55 @@ public class InboundTransactionController extends AbstractRestService {
 
         // 6. 라인 정보 리턴
         return itemToFinish;
+    }
+
+    /**
+     * 입고 라인 불량 처리 (입고 라인별 완료 처리) (입고 상세 상태 : START -> BAD)
+     * 
+     * @param id
+     * @param receivingItem
+     * @return
+     */
+    @RequestMapping(value = "receiving_orders/line/{id}/defect", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Defect Receiving Order Line")
+    public ReceivingItem defectReceivingOrderLine(
+            @PathVariable("id") String id,
+            @RequestBody ReceivingItem receivingItem,
+            @RequestParam(name = "printerId", required = false) String printerId) {
+
+        // 1. 입고 예정 라인 처리
+        ReceivingItem itemToDefect = this.queryManager.select(ReceivingItem.class, id);
+        Receiving receiving = this.queryManager.select(Receiving.class, itemToDefect.getReceivingId());
+        itemToDefect = ValueUtil.populateOnlyNotNullValue(receivingItem, itemToDefect);
+
+        // 2. 전 처리 커스텀 서비스 호출
+        Map<String, Object> custSvcParams = ValueUtil.newMap("receiving,receivingItem", receiving, itemToDefect);
+        this.customSvc.doCustomService(receiving.getDomainId(), TRX_INB_PRE_LINE_DEFECT_RECEIPT, custSvcParams);
+
+        // 3. 입고 예정 라인 입고 완료 처리
+        itemToDefect = this.inbTrxService.defectReceivingOrderLine(receiving, itemToDefect, printerId);
+
+        // 4. 입고가 모두 끝났다면 자동 완료 처리
+        String rcvAutoFlag = this.runtimeConfSvc.getRuntimeConfigValue(receiving.getComCd(), receiving.getWhCd(),
+                WmsInboundConfigConstants.RECEIPT_FINISH_AUTO_FLAG);
+        if (ValueUtil.toBoolean(rcvAutoFlag, true)) {
+            String sql = "select count(id) from receiving_items where domain_id = :domainId and receiving_id = :receivingId and (status != :cancelStatus and status != :endStatus and status != :rejectedStatus and status != :badStatus)";
+            Map<String, Object> params = ValueUtil.newMap(
+                    "domainId,receivingId,cancelStatus,endStatus,rejectedStatus,badStatus",
+                    receiving.getDomainId(), receiving.getId(), WmsInboundConstants.STATUS_CANCEL,
+                    WmsInboundConstants.STATUS_END, WmsInboundConstants.STATUS_REJECTED,
+                    WmsInboundConstants.STATUS_BAD);
+            if (this.queryManager.selectBySql(sql, params, Integer.class) == 0) {
+                // 4.1 자동 마감 처리
+                this.closeReceivingOrder(receiving.getId());
+            }
+        }
+
+        // 5. 후 처리 커스텀 서비스 호출
+        this.customSvc.doCustomService(receiving.getDomainId(), TRX_INB_POST_LINE_DEFECT_RECEIPT, custSvcParams);
+
+        // 6. 라인 정보 리턴
+        return itemToDefect;
     }
 
     /**
@@ -834,6 +897,15 @@ public class InboundTransactionController extends AbstractRestService {
         return this.inbTrxService.completePutaway(Domain.currentDomainId(), rcvNo);
     }
 
+    /**
+     * 적치 추천 로케이션 조회
+     * 
+     * @param comCd
+     * @param whCd
+     * @param skuCd
+     * @param limit
+     * @return
+     */
     @RequestMapping(value = "/putaway/recommend_locations", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiDesc(description = "Recommend putaway locations by StoragePolicy strategy")
     public List<Location> recommendPutawayLocations(
@@ -902,5 +974,43 @@ public class InboundTransactionController extends AbstractRestService {
 
         // 3. 피킹지시서 출력을 위한 PDF 다운로드
         this.printoutCtrl.showPdfByPrintTemplateName(req, res, template, ValueUtil.newMap("receiving", ro));
+    }
+
+    /**
+     * 입고 지시 ID로 입고 완료된 모든 재고 바코드 라벨 PDF 일괄 다운로드 (MULTI_BARCODE_SHEET 템플릿)
+     * 입고 지시의 rcv_no로 생성된 inventories를 조회하여 각 재고마다 한 페이지씩 출력한다.
+     *
+     * @param req
+     * @param res
+     * @param id  입고 지시 ID
+     */
+    @RequestMapping(value = "receiving_orders/{id}/download_barcode_sheets", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Download Inventory Barcode Sheets for Receiving Order")
+    public void downloadBarcodeSheetForReceiving(
+            HttpServletRequest req,
+            HttpServletResponse res,
+            @PathVariable("id") String id) {
+
+        Long domainId = Domain.currentDomainId();
+
+        // 1. 입고 지시 조회
+        Receiving ro = this.queryManager.select(Receiving.class, id);
+        if (ro == null) {
+            throw new xyz.elidom.exception.server.ElidomRuntimeException("입고 지시를 찾을 수 없습니다.");
+        }
+
+        // 2. 해당 입고 지시의 rcv_no로 생성된 재고 조회
+        Query query = new Query();
+        query.addFilter(new Filter("domainId", domainId));
+        query.addFilter(new Filter("rcvNo", ro.getRcvNo()));
+        List<Inventory> inventories = this.queryManager.selectList(Inventory.class, query);
+
+        if (ValueUtil.isEmpty(inventories)) {
+            throw new xyz.elidom.exception.server.ElidomRuntimeException("출력할 재고가 없습니다. 입고 작업이 완료된 재고가 있는지 확인하세요.");
+        }
+
+        // 3. MULTI_BARCODE_SHEET 템플릿으로 전체 재고 라벨 PDF 다운로드
+        this.printoutCtrl.showPdfByPrintTemplateName(req, res, "MULTI_BARCODE_SHEET",
+                ValueUtil.newMap("inventories", inventories));
     }
 }
