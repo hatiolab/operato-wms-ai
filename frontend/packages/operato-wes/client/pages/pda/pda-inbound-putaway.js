@@ -1998,7 +1998,9 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
   async _loadRecommendedLocations(item) {
     this.recommendedLocations = []
     this.loadingLocations = true
-    try {
+
+    // TODO 추천 로케이션은 추후 사용
+    /*try {
       const params = new URLSearchParams({
         com_cd: item.com_cd || '',
         wh_cd: item.wh_cd || '',
@@ -2007,11 +2009,14 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
       })
       const result = await ServiceUtil.restGet(`inbound_trx/putaway/recommend_locations?${params}`)
       this.recommendedLocations = result || []
+
     } catch (_) {
       this.recommendedLocations = []
     } finally {
       this.loadingLocations = false
-    }
+    }*/
+
+    this.loadingLocations = false
   }
 
   /**
