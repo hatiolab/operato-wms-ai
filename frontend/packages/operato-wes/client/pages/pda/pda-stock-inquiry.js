@@ -1044,11 +1044,16 @@ export class PdaStockInquiry extends connect(store)(PageView) {
             ${TermsUtil.tLabel('inv_qty') || '재고 수량'}
             <span class="required">*</span>
           </label>
-          <input type="number"
-            min="1"
-            placeholder="0"
+          <button class="btn-qty"
+            @click=${() => this._updateAddForm('inv_qty', Math.max(1, (Number(this.addForm.inv_qty) || 0) - 1))}>−</button>
+          <numeric-keypad-input
             .value=${this.addForm.inv_qty}
-            @input=${e => this._updateAddForm('inv_qty', e.target.value)}>
+            .min=${1}
+            ?disabled=${this.processing}
+            @change=${e => this._updateAddForm('inv_qty', e.detail.value)}>
+          </numeric-keypad-input>
+          <button class="btn-qty"
+            @click=${() => this._updateAddForm('inv_qty', (Number(this.addForm.inv_qty) || 0) + 1)}>+</button>
         </div>
 
         <div class="form-field">
