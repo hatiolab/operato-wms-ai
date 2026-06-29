@@ -640,6 +640,7 @@ public class InboundTransactionService extends AbstractQueryService {
         }
 
         // 4. 입고 예정 상태 변경
+        // TODO 여기에 항목 중에 불량 상태의 항목이 있다면 불량 존재 플래그를 업데이트 해야함
         receiving.setStatus(WmsInboundConstants.STATUS_END);
         receiving.setRcvEndDate(rcvDate);
         this.queryManager.update(receiving, "status", "rcvEndDate", "updatedAt");
