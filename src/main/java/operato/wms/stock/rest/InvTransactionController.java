@@ -654,12 +654,13 @@ public class InvTransactionController extends AbstractRestService {
      *
      * POST /rest/inventory_trx/{id}/pick_inventory
      *
-     * 재고를 피킹하여 출고대기 또는 유통가공 로케이션으로 이동한다.
+     * 재고를 피킹하여 출고대기·유통가공·선포장 로케이션으로 이동한다.
      * - tran_cd = OUTBOUND → STG-01 (출고대기 로케이션)
-     * - tran_cd = SET → VAS-01 (유통가공 작업 로케이션)
+     * - tran_cd = SET     → VAS-01  (유통가공 작업 로케이션)
+     * - tran_cd = PREPACK → PREPACK (선포장 로케이션)
      *
      * @param id    피킹할 재고 ID
-     * @param input 피킹 정보 (tran_cd: OUTBOUND|SET, to_qty: 피킹 수량)
+     * @param input 피킹 정보 (tran_cd: OUTBOUND|SET|PREPACK, to_qty: 피킹 수량)
      * @return 이동된 재고 엔티티
      */
     @RequestMapping(value = "/{id}/pick_inventory", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -668,13 +669,26 @@ public class InvTransactionController extends AbstractRestService {
         Long domainId = Domain.currentDomainId();
         input.setId(id);
 
-        // TODO 출고 / 세트 구분에 따라 출고 대기 존, 세트 상품 대기 존을 조회하여 이동 처리
-        // TODO 출고 / 세트 구분에 따라 트랜잭션 유형이 'OUTBOUND' 또는 'SET'로 처리, 이동 수량까지 모두 처리되는지 확인 필요
-        String toLocCd = "SET".equals(input.getTranCd()) ? "VAS-01" : "STG-01";
-        input.setToLocCd(toLocCd);
+        String tranCd = input.getTranCd();
+        String toLocCd;
+        String reasonCd;
+        String reason;
 
-        String reasonCd = "SET".equals(input.getTranCd()) ? "SET_WORK" : "OUTBOUND";
-        String reason = "SET".equals(input.getTranCd()) ? "세트작업이동" : "출고이동";
+        if ("SET".equals(tranCd)) {
+            toLocCd = "VAS-01";
+            reasonCd = "SET_WORK";
+            reason = "세트작업이동";
+        } else if ("PREPACK".equals(tranCd)) {
+            toLocCd = "PREPACK";
+            reasonCd = "PREPACK";
+            reason = "선포장이동";
+        } else {
+            toLocCd = "STG-01";
+            reasonCd = "OUTBOUND";
+            reason = "출고이동";
+        }
+
+        input.setToLocCd(toLocCd);
         input.setReasonCd(reasonCd);
         input.setReason(reason);
 

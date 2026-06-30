@@ -90,7 +90,7 @@ export class PdaStockInquiryTemp extends connect(store)(PageView) {
   /** 재고 조정 소비기한 입력값 */
   @state() _adjExpiredDate = ''
 
-  /** 피킹 유형: OUTBOUND(출고) | SET(세트) */
+  /** 피킹 유형: OUTBOUND(출고) | SET(세트) | PREPACK(선포장) */
   @state() _pickType = 'OUTBOUND'
   /** 피킹 수량 */
   @state() _pickQty = 0
@@ -1392,6 +1392,12 @@ export class PdaStockInquiryTemp extends connect(store)(PageView) {
                 @change=${() => (this._pickType = 'SET')}>
               세트
             </label>
+            <label>
+              <input type="radio" name="pickType" value="PREPACK"
+                ?checked=${this._pickType === 'PREPACK'}
+                @change=${() => (this._pickType = 'PREPACK')}>
+              선포장
+            </label>
           </div>
         </div>
         <div class="form-field">
@@ -1943,7 +1949,7 @@ export class PdaStockInquiryTemp extends connect(store)(PageView) {
       return
     }
 
-    const toLocLabel = this._pickType === 'SET' ? 'VAS-01 (유통가공)' : 'STG-01 (출고대기)'
+    const toLocLabel = this._pickType === 'SET' ? 'VAS-01 (유통가공)' : this._pickType === 'PREPACK' ? 'PREPACK (선포장)' : 'STG-01 (출고대기)'
 
     this.processing = true
     try {
