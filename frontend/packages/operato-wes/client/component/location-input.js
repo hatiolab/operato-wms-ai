@@ -12,6 +12,9 @@ import { ServiceUtil } from '@operato-app/metapage/dist-client'
  *
  * @property {string}  placeholder - 텍스트 입력창 placeholder
  * @property {boolean} disabled    - 비활성화 여부
+ * @property {string}  locTypes    - 허용 로케이션 타입(loc_type) 콤마 목록. 지정 시 해당 타입만 조회
+ *                                    (예: 'STORE,PICKABLE' — 보관·피킹가능 로케이션만)
+ * @property {string}  whCd        - 현재 창고 코드. 지정 시 해당 창고의 로케이션만 조회
  *
  * @fires location-select - 로케이션 선택 시 발생
  *   detail: { loc_cd, loc_nm, ...location } — 선택된 로케이션 전체 객체
@@ -27,6 +30,12 @@ export class LocationInput extends LitElement {
 
   /** 비활성화 여부 */
   @property({ type: Boolean }) disabled = false
+
+  /** 허용 로케이션 타입(loc_type) 콤마 목록 — 지정 시 해당 타입만 조회 (예: 'STORE,PICKABLE') */
+  @property({ type: String }) locTypes = ''
+
+  /** 현재 창고 코드 — 지정 시 해당 창고의 로케이션만 조회 */
+  @property({ type: String }) whCd = ''
 
   /** 존 목록 */
   @state() _zones = []
@@ -128,6 +137,17 @@ export class LocationInput extends LitElement {
     `
   }
 
+  /**
+   * 공통 조회 조건 — locTypes(loc_type in)·whCd(wh_cd eq) 지정 시 필터에 포함
+   * @returns {Array} 기본 필터 배열
+   */
+  _baseFilters() {
+    const filters = []
+    if (this.locTypes) filters.push({ name: 'loc_type', operator: 'in', value: this.locTypes })
+    if (this.whCd) filters.push({ name: 'wh_cd', operator: 'eq', value: this.whCd })
+    return filters
+  }
+
   /** 컴포넌트 연결 시 존 목록 조회 */
   async connectedCallback() {
     super.connectedCallback()
@@ -155,11 +175,11 @@ export class LocationInput extends LitElement {
 
     try {
       const textVal = input?.value?.trim() || ''
-      const filters = [{ name: 'zone_cd', operator: 'eq', value: zoneCd }]
+      const filters = [...this._baseFilters(), { name: 'zone_cd', operator: 'eq', value: zoneCd }]
       if (textVal) filters.push({ name: 'loc_cd', operator: 'contains', value: textVal })
       const query = encodeURIComponent(JSON.stringify(filters))
       const sort = encodeURIComponent(JSON.stringify([{ field: 'loc_cd', ascending: true }]))
-      const result = await ServiceUtil.restGet(`locations?query=${query}&sort=${sort}&limit=100`)
+      const result = await ServiceUtil.restGet(`locations?query=${query}&sort=${sort}&limit=1000`)
       this._searchResults = result?.items || result || []
     } catch (err) {
       this._searchResults = []
@@ -179,12 +199,12 @@ export class LocationInput extends LitElement {
 
     this._searchTimer = setTimeout(async () => {
       try {
-        const filters = []
+        const filters = [...this._baseFilters()]
         if (this._selectedZoneCd) filters.push({ name: 'zone_cd', operator: 'eq', value: this._selectedZoneCd })
         if (val) filters.push({ name: 'loc_cd', operator: 'contains', value: val })
         const query = encodeURIComponent(JSON.stringify(filters))
         const sort = encodeURIComponent(JSON.stringify([{ field: 'loc_cd', ascending: true }]))
-        const result = await ServiceUtil.restGet(`locations?query=${query}&sort=${sort}&limit=100`)
+        const result = await ServiceUtil.restGet(`locations?query=${query}&sort=${sort}&limit=1000`)
         this._searchResults = result?.items || result || []
       } catch (err) {
         this._searchResults = []
