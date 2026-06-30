@@ -876,6 +876,8 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 		// 9. 이동하려는 로케이션 (oriToLocCd)에 동일 바코드의 재고가 존재하면 병합 처리
 		if (prevInventory != null) {
 			InventoryTran mergeTran = new InventoryTran();
+			mergeTran.setReasonCd(this.reasonCd);
+			mergeTran.setReason(this.reason);
 			mergeTran.setRemarks(this.remarks + " (분할로 인해 병합된 재고)");
 			return mergeTran.createMergeTransaction(prevInventory, splitInv);
 		}

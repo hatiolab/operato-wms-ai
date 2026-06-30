@@ -656,7 +656,7 @@ public class InvTransactionController extends AbstractRestService {
      *
      * 재고를 피킹하여 출고대기·유통가공·선포장 로케이션으로 이동한다.
      * - tran_cd = OUTBOUND → STG-01 (출고대기 로케이션)
-     * - tran_cd = SET     → VAS-01  (유통가공 작업 로케이션)
+     * - tran_cd = SET → VAS-01 (유통가공 작업 로케이션)
      * - tran_cd = PREPACK → PREPACK (선포장 로케이션)
      *
      * @param id    피킹할 재고 ID
@@ -692,7 +692,13 @@ public class InvTransactionController extends AbstractRestService {
         input.setReasonCd(reasonCd);
         input.setReason(reason);
 
-        return this.invTrxSvc.moveInventory(domainId, input);
+        // 이동 처리
+        Inventory inv = this.invTrxSvc.moveInventory(domainId, input);
+
+        // 상태는 피킹 상태로 변경
+        inv.setStatus(Inventory.STATUS_PICK);
+        this.queryManager.update(inv, "status");
+        return inv;
     }
 
     @SuppressWarnings("unchecked")

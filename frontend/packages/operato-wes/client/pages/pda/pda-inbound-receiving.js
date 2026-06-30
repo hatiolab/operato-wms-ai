@@ -2046,10 +2046,6 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     if (!this.currentReceiving?.id) return
     try {
       const res = await operatoGet(`inbound_trx/receiving_orders/${this.currentReceiving.id}/download_barcode_sheets`, {}, false)
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || `HTTP ${res.status}`)
-      }
       const data = await res.arrayBuffer()
       const file = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }))
       PrintUtil.openPdfInNewTab(file)

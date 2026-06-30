@@ -1669,7 +1669,7 @@ export class PdaStockInquiry extends connect(store)(PageView) {
    * GET /rest/inventories?query=...
    */
   async _search() {
-    const conditions = []
+    const conditions = [{ name: 'status', operator: 'eq', value: 'STORED' }]
 
     if (this.searchBarcode) {
       conditions.push({ name: 'barcode', operator: 'eq', value: this.searchBarcode })
