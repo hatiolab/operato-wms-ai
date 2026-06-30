@@ -89,8 +89,7 @@ export const MetaFormEventMixin = superClass =>
 
       // 버튼 콘테이너 스타일 추가 (팝업으로 로드시 사용)  
       styles.push(...MetaUiUtil.getPopupButtonContainerStyles())
-
-
+      // 스타일 리턴
       return styles
     }
 
@@ -150,8 +149,8 @@ export const MetaFormEventMixin = superClass =>
       return html`
         <div id="container">
           ${columns.map(column => {
-            let { editable, mandatory } = column.record
-            return html`
+        let { editable, mandatory } = column.record
+        return html`
               <label ?editable=${editable}
                 ><span>${mandatory ? '*' : ''}${column.header}</span>
                 <md-icon>edit</md-icon>
@@ -163,7 +162,7 @@ export const MetaFormEventMixin = superClass =>
                 editable=${editable}
               ></operato-input-editor>
             `
-          })}
+      })}
         </div>
         ${this.getButtonHtml ? html`${this.getButtonHtml()}` : html``}
       `

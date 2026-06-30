@@ -107,7 +107,8 @@ public class InboundTransactionService extends AbstractQueryService {
             }
 
             // 행마다 고유 입고번호 자동 채번
-            String rcvNo = ValueUtil.toString(custSvc.doCustomService(domainId, "diy-generate-rcv-req-no", new HashMap<String, Object>()));
+            String rcvNo = ValueUtil.toString(
+                    custSvc.doCustomService(domainId, "diy-generate-rcv-req-no", new HashMap<String, Object>()));
 
             // 입고 예정 마스터 생성 (행별 1건)
             Receiving ro = ValueUtil.populate(order, new Receiving());
@@ -134,6 +135,85 @@ public class InboundTransactionService extends AbstractQueryService {
 
         // 후처리 커스텀 서비스 호환을 위해 대표(첫) 입고주문을 리턴
         return firstRo;
+    }
+
+    /**
+     * 입고 예정 정보 생성 - 입고 항목 1건으로만 생성하는 케이스
+     * 
+     * @param order
+     * @return
+     */
+    public Receiving createSingleReceivingOrder(ImportReceivingOrder order) {
+        // 1. 필수 컬럼 체크 - 창고
+        if (ValueUtil.isEmpty(order.getWhCd())) {
+            throw ThrowUtil.newValidationErrorWithNoLog("창고 코드가 없습니다.");
+        }
+
+        // 2. 필수 컬럼 체크 - 화주사
+        if (ValueUtil.isEmpty(order.getComCd())) {
+            throw ThrowUtil.newValidationErrorWithNoLog("화주사 코드가 없습니다.");
+        }
+
+        // 3. 필수 컬럼 체크 - 공급처
+        if (ValueUtil.isEmpty(order.getVendCd())) {
+            throw ThrowUtil.newValidationErrorWithNoLog("공급처 코드가 없습니다.");
+        }
+
+        // 4. 필수 컬럼 체크 - 상품
+        if (ValueUtil.isEmpty(order.getSkuCd())) {
+            throw ThrowUtil.newValidationErrorWithNoLog("상품 코드가 없습니다.");
+        }
+
+        // 5. 필수 컬럼 체크 - 입고예정일
+        if (ValueUtil.isEmpty(order.getRcvReqDate())) {
+            throw ThrowUtil.newValidationErrorWithNoLog("입고예정일이 없습니다.");
+        }
+
+        // 6. 필수 컬럼 체크 - 입고예정수량
+        if (ValueUtil.isEmpty(order.getRcvExpQty()) || order.getRcvExpQty() <= 0) {
+            throw ThrowUtil.newValidationErrorWithNoLog("입고예정수량이 없습니다.");
+        }
+
+        // 7. 상품 조회
+        SKU sku = this.queryManager.selectByCondition(SKU.class,
+                ValueUtil.newMap("domainId,skuCd,comCd", Domain.currentDomainId(), order.getSkuCd(), order.getComCd()));
+
+        // 8. 상품 존재여부 체크
+        if (ValueUtil.isEmpty(sku)) {
+            throw ThrowUtil.newValidationErrorWithNoLog("상품 정보가 존재하지 않습니다.");
+        }
+
+        // 9. 입고 지시 마스터 설정
+        Receiving receiving = ValueUtil.populate(order, new Receiving());
+
+        // 10. 요청일이 없다면 오늘 날짜로 입력
+        if (ValueUtil.isEmpty(order.getRcvExpDate())) {
+            receiving.setRcvReqDate(DateUtil.todayStr());
+        }
+
+        // 11. 요청 유형이 없다면 일반 입고
+        if (ValueUtil.isEmpty(order.getRcvType())) {
+            order.setRcvType(WmsInboundConstants.RECEIVING_TYPE_NORMAL);
+        }
+
+        // 12. 입고 지시 마스터 생성
+        this.queryManager.insert(receiving);
+
+        // 13. 입고 상세 정보 생성 (행별 1건)
+        ReceivingItem item = ValueUtil.populate(order, new ReceivingItem());
+        item.setReceivingId(receiving.getId());
+        item.setRcvExpSeq(1);
+        if (ValueUtil.isEmpty(item.getRcvExpDate())) {
+            item.setRcvExpDate(receiving.getRcvReqDate());
+        }
+        item.setSkuNm(sku.getSkuNm());
+        item.setExpPalletQty(sku.getPltInQty());
+        item.setExpBoxQty(sku.getBoxInQty());
+        item.setRemarks(order.getItemRemarks());
+        this.queryManager.insert(item);
+
+        // 14. 생성된 입고 지시 리턴
+        return receiving;
     }
 
     /**
