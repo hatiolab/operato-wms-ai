@@ -11,12 +11,6 @@ import { CommonGristStyles, CommonHeaderStyles } from '@operato/styles'
 import { operatoGet } from '@operato-app/operatofill'
 
 /**
- * 적치 가능 로케이션 타입 — 보관(STORE)·피킹가능(PICKABLE) 로케이션에만 적치 허용.
- * (DEFECT/RCV-WAIT/VAS/RETURN 등 다른 타입에는 적치 불가)
- */
-const PUTAWAY_LOC_TYPES = 'STORE,PICKABLE'
-
-/**
  * PDA 입고 적치 작업 화면
  *
  * 입고 완료(END) 후 WAITING 상태의 재고를 실제 창고 로케이션에 배치(적치)하는 화면.
@@ -1246,7 +1240,6 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
           <location-input id="locationInput"
             placeholder="${TermsUtil.tLabel('loc_cd') || '로케이션 코드 입력'}"
             ?disabled=${this.processing}
-            .locTypes=${PUTAWAY_LOC_TYPES}
             .whCd=${whCd}
             @location-select=${e => this._onScanLocation(e.detail.loc_cd)}>
           </location-input>
@@ -1625,11 +1618,11 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
     const value = (locCd || '').trim()
     if (!value || this.processing) return
 
-    // 직접 입력/스캔 값은 적치 가능 로케이션인지 검증 (추천칩·드롭다운 선택은 이미 검증된 값)
+    // 직접 입력/스캔 값은 실존 로케이션인지 검증 (추천칩·드롭다운 선택은 이미 검증된 값)
     if (verify) {
       const exists = await this._existsLocation(value)
       if (!exists) {
-        this._showFeedback(`적치할 수 없는 로케이션입니다 (보관/피킹 로케이션만 가능): ${value}`, 'error')
+        this._showFeedback(`존재하지 않는 로케이션입니다: ${value}`, 'error')
         navigator.vibrate?.(200)
         return  // 확정하지 않고 입력/드롭다운 유지
       }
@@ -1685,11 +1678,8 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
     const currentItem = this.currentItemIndex >= 0 ? this.workItems[this.currentItemIndex] : null
     const whCd = currentItem?.wh_cd || ''
     try {
-      // 적치 가능 타입(STORE/PICKABLE) + 현재 창고로 한정하여 실존 여부 확인
-      const filters = [
-        { name: 'loc_cd', operator: 'eq', value: locCd },
-        { name: 'loc_type', operator: 'in', value: PUTAWAY_LOC_TYPES }
-      ]
+      // 현재 창고로 한정하여 실존 여부 확인 (로케이션 타입 제한 없음)
+      const filters = [{ name: 'loc_cd', operator: 'eq', value: locCd }]
       if (whCd) filters.push({ name: 'wh_cd', operator: 'eq', value: whCd })
       const res = await ServiceUtil.searchByPagination('locations', filters, null, 1, 1)
       return (res?.items?.length || 0) > 0
