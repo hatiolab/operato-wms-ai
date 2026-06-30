@@ -222,8 +222,8 @@ export const MetaFormMixin = superClass =>
 
         <div id="container">
           ${columns.map(column => {
-            let { editable, mandatory } = column.record
-            return html`
+        let { editable, mandatory } = column.record
+        return html`
               <label ?editable=${editable}
                 ><span>${mandatory ? '*' : ''}${column.header}</span>
                 <md-icon>edit</md-icon>
@@ -231,7 +231,7 @@ export const MetaFormMixin = superClass =>
               <operato-input-editor id=${column.name} .column=${column} rowIndex=${++rowIndex} editable=${editable}>
               </operato-input-editor>
             `
-          })}
+      })}
         </div>
         ${this.getButtonHtml ? html`${this.getButtonHtml()}` : html``}
       `
@@ -266,7 +266,7 @@ export const MetaFormMixin = superClass =>
         MetaApi.showToast('info', TermsUtil.tText('NOTHING_CHANGED'))
       } else {
         params = this.setParentIdFieldByElement(params)
-        await this.requestRestService('PUT', this.saveUrl, params)
+        await this.requestRestService('PUT', this.saveUrl, params, () => { MetaApi.closePopupBy(this) });
       }
     }
 
