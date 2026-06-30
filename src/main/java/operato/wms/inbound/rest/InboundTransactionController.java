@@ -61,6 +61,14 @@ public class InboundTransactionController extends AbstractRestService {
      */
     public static final String TRX_INB_POST_IMPORT_RECEIPT = "diy-inb-post-import-receiving";
     /**
+     * 커스텀 서비스 - 입고 주문 (상품 한 건) 생성 전 처리
+     */
+    public static final String TRX_INB_PRE_CREATE_SINGLE_RECEIPT = "diy-inb-pre-create-single-receiving";
+    /**
+     * 커스텀 서비스 - 입고 주문 (상품 한 건) 생성 후 처리
+     */
+    public static final String TRX_INB_POST_CREATE_SINGLE_RECEIPT = "diy-inb-post-create-single-receiving";
+    /**
      * 커스텀 서비스 - 입고 요청 전 처리
      */
     public static final String TRX_INB_PRE_REQUEST_RECEIPT = "diy-inb-pre-request-receiving";
@@ -235,6 +243,33 @@ public class InboundTransactionController extends AbstractRestService {
 
         // 5. 리턴
         return list;
+    }
+
+    @RequestMapping(value = "receiving_orders/create_single_order", method = RequestMethod.PUT, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Create single receiving order")
+    public Receiving createReceivingOrder(@RequestBody ImportReceivingOrder order) {
+        // 1. 커스텀 서비스 전 처리
+        order.setId(null);
+        Long domainId = Domain.currentDomainId();
+        Map<String, Object> custSvcParams = ValueUtil.newMap("order", order);
+        Object preSvcResult = this.customSvc.doCustomService(domainId, TRX_INB_PRE_CREATE_SINGLE_RECEIPT,
+                custSvcParams);
+
+        // 2. 리턴값이 true이면 커스텀 서비스에서 완전 커스터마이징 처리
+        if (preSvcResult != null && preSvcResult instanceof Boolean && ValueUtil.toBoolean(preSvcResult) == true) {
+            this.customSvc.doCustomService(domainId, TRX_INB_POST_CREATE_SINGLE_RECEIPT, custSvcParams);
+            return null;
+        }
+
+        // 3. 임포트 처리
+        Receiving receiving = this.inbTrxService.createSingleReceivingOrder(order);
+
+        // 4. 커스텀 서비스 후 처리
+        custSvcParams.put("receiving", receiving);
+        this.customSvc.doCustomService(domainId, TRX_INB_POST_CREATE_SINGLE_RECEIPT, custSvcParams);
+
+        // 5. 리턴
+        return receiving;
     }
 
     /**
