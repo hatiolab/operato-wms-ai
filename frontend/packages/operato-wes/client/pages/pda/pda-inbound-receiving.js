@@ -1114,7 +1114,7 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     return html`
       <div class="task-card" @click=${() => this._selectReceiving(r)}>
         <div class="card-header">
-          <span class="task-no">${r._skuNm || r.sku_nm || '-'}</span>
+          <span class="task-no">${r._skuNm || r.sku_nm || '-'}${r._itemCount > 1 ? html`<span style="font-weight:normal;font-size:12px;color:var(--md-sys-color-on-surface-variant,#666);"> 외 ${r._itemCount - 1}건</span>` : ''}</span>
           <span class="status-badge ${(r.status || '').toLowerCase()}">
             ${{
         READY: TermsUtil.tLabel('wait') || '대기',
@@ -1522,26 +1522,31 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
   }
 
   /**
-   * 입고주문 목록의 상품명 조회 — 각 주문의 상세(receivings/{id}/items)에서 첫 상품명을 가져와 매핑.
-   * (ReceivingItem은 receivings/{id}/items 커스텀 경로로만 조회 가능하므로 주문별로 조회)
+   * 입고주문 목록의 대표 상품명·디테일 라인 수 조회 — 단일 배치 호출로 N+1 제거.
+   * 기존에는 주문마다 receivings/{id}/items 로 디테일 전체를 받아와 첫 상품명만 사용했으나,
+   * inbound_trx/receivings/sku_summary 한 번의 호출로 주문별 대표 상품명(첫 라인)과 라인 수를 받아 매핑한다.
    */
   async _loadTaskSkuNames() {
     const targets = this.taskList.filter(t => t.id)
     if (!targets.length) return
     try {
-      const results = await Promise.all(targets.map(t =>
-        ServiceUtil.restGet(`receivings/${t.id}/items`)
-          .then(r => ({ id: t.id, items: r?.items || r || [] }))
-          .catch(() => ({ id: t.id, items: [] }))
-      ))
+      const ids = targets.map(t => t.id).join(',')
+      const result = await ServiceUtil.restGet(`inbound_trx/receivings/sku_summary?ids=${encodeURIComponent(ids)}`)
+      const rows = result?.items || result || []
       const map = {}
-      for (const { id, items } of results) {
-        const it = items[0]
-        if (it) map[id] = it.sku_nm || it.sku_cd || ''
+      for (const row of rows) {
+        map[row.receiving_id] = {
+          skuNm: row.sku_nm || '',
+          itemCount: Number(row.item_count) || 0
+        }
       }
-      this.taskList = this.taskList.map(t => ({ ...t, _skuNm: map[t.id] || '' }))
+      this.taskList = this.taskList.map(t => ({
+        ...t,
+        _skuNm: map[t.id]?.skuNm || '',
+        _itemCount: map[t.id]?.itemCount || 0
+      }))
     } catch (e) {
-      console.warn('입고주문 상품명 조회 실패:', e)
+      console.warn('입고주문 상품 요약 조회 실패:', e)
     }
   }
 
@@ -2046,6 +2051,15 @@ export class PdaInboundReceiving extends connect(store)(PageView) {
     if (!this.currentReceiving?.id) return
     try {
       const res = await operatoGet(`inbound_trx/receiving_orders/${this.currentReceiving.id}/download_barcode_sheets`, {}, false)
+      // operatoGet은 HTTP 오류 시 Response가 아니라 에러 본문({code,msg} 또는 문자열)을 반환한다.
+      // 따라서 Response(arrayBuffer 보유)가 아니면 PDF가 아닌 에러로 간주하고 실제 사유를 표시한다.
+      if (!res || typeof res.arrayBuffer !== 'function') {
+        const msg = typeof res === 'string'
+          ? res
+          : (res?.msg || res?.message || '출력할 재고가 없습니다. 입고 작업이 완료된 재고가 있는지 확인하세요.')
+        this._showFeedback(msg, 'error')
+        return
+      }
       const data = await res.arrayBuffer()
       const file = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }))
       PrintUtil.openPdfInNewTab(file)

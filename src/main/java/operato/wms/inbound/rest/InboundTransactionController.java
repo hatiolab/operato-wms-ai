@@ -903,6 +903,32 @@ public class InboundTransactionController extends AbstractRestService {
     }
 
     /**
+     * 입고주문 목록용 상품 요약 조회 — N+1 제거
+     *
+     * 여러 입고주문 ID에 대해 한 번의 쿼리로 대표 상품명·디테일 라인 수를 집계한다.
+     * (PDA 입고 작업 목록에서 주문마다 디테일 전체를 조회하던 N+1 호출 대체)
+     *
+     * GET /rest/inbound_trx/receivings/sku_summary?ids=id1,id2,...
+     *
+     * @param ids 입고주문 ID 콤마 구분 목록
+     * @return 주문별 요약 [{ receiving_id, sku_nm, item_count }]
+     */
+    @RequestMapping(value = "/receivings/sku_summary", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Get representative sku name and item count per receiving order")
+    public List<Map> getReceivingSkuSummary(@RequestParam(name = "ids") String ids) {
+        if (ValueUtil.isEmpty(ids)) {
+            return new ArrayList<Map>(1);
+        }
+        List<String> idList = new ArrayList<String>();
+        for (String id : ids.split(",")) {
+            if (ValueUtil.isNotEmpty(id.trim())) {
+                idList.add(id.trim());
+            }
+        }
+        return this.inbTrxService.getReceivingSkuSummary(Domain.currentDomainId(), idList);
+    }
+
+    /**
      * 적치 추천 로케이션 조회
      *
      * StoragePolicy.putawayStrategy에 따라 SKU·화주사 조건에 맞는 빈 로케이션을 추천한다.

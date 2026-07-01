@@ -1286,6 +1286,31 @@ public class InboundTransactionService extends AbstractQueryService {
         return (List<Map>) this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
     }
 
+    /**
+     * 입고주문 목록용 상품 요약 조회 — N+1 제거
+     *
+     * 여러 입고주문(receiving_id)에 대해 한 번의 쿼리로 각 주문의
+     * 대표 상품명(첫 디테일 라인 기준)과 디테일 라인 수를 집계한다.
+     * (기존: 주문마다 receivings/{id}/items 를 호출해 전체 디테일을 받아오던 방식 대체)
+     *
+     * @param domainId     도메인 ID
+     * @param receivingIds 입고주문 ID 목록
+     * @return 주문별 요약 [{ receiving_id, sku_nm, item_count }]
+     */
+    public List<Map> getReceivingSkuSummary(Long domainId, List<String> receivingIds) {
+        if (ValueUtil.isEmpty(receivingIds)) {
+            return new java.util.ArrayList<Map>(1);
+        }
+        String sql = "SELECT ri.receiving_id AS receiving_id" +
+                ", (array_agg(ri.sku_nm ORDER BY ri.rcv_seq))[1] AS sku_nm" +
+                ", COUNT(*) AS item_count" +
+                " FROM receiving_items ri" +
+                " WHERE ri.domain_id = :domainId AND ri.receiving_id IN (:receivingIds)" +
+                " GROUP BY ri.receiving_id";
+        Map<String, Object> params = ValueUtil.newMap("domainId,receivingIds", domainId, receivingIds);
+        return (List<Map>) this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+    }
+
     /********************************************************************************************************
      * 인 쇄
      ********************************************************************************************************/
