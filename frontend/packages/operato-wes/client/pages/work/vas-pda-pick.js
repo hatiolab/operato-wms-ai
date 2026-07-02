@@ -97,6 +97,96 @@ class VasPdaPick extends localize(i18next)(PageView) {
           --barcodescan-input-border-radius: 8px;
         }
 
+        /* 스캔 입력 우측 대상선택 버튼 */
+        .scan-input .btn-target-picker {
+          flex-shrink: 0;
+          width: 40px;
+          border: 1px solid var(--md-sys-color-primary, #1976D2);
+          border-radius: 8px;
+          background: var(--md-sys-color-surface-container-lowest, #fff);
+          font-size: 18px;
+          cursor: pointer;
+        }
+        .scan-input .btn-target-picker:active {
+          background: var(--md-sys-color-primary-container, #e3f2fd);
+        }
+        .scan-input .btn-target-picker:disabled {
+          opacity: 0.4;
+        }
+
+        /* 대상 선택 팝업 (바텀 시트) */
+        .picker-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          z-index: 1000;
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+        }
+        .picker-sheet {
+          background: var(--md-sys-color-surface, #fff);
+          border-radius: 16px 16px 0 0;
+          width: 100%;
+          max-height: 70vh;
+          overflow-y: auto;
+          padding: 12px 12px env(safe-area-inset-bottom, 16px);
+          box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+        }
+        .picker-handle {
+          width: 40px;
+          height: 4px;
+          background: var(--md-sys-color-outline, #ccc);
+          border-radius: 2px;
+          margin: 0 auto 12px;
+        }
+        .picker-title {
+          font-size: 15px;
+          font-weight: 600;
+          padding: 0 4px 10px;
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #eee);
+          color: var(--md-sys-color-on-surface, #222);
+        }
+        .picker-empty {
+          text-align: center;
+          padding: 24px;
+          color: var(--md-sys-color-on-surface-variant, #999);
+        }
+        .picker-item {
+          padding: 10px 8px;
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #f0f0f0);
+          cursor: pointer;
+        }
+        .picker-item:active {
+          background: var(--md-sys-color-surface-variant, #f0f0f0);
+        }
+        .picker-item .p-nm {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--md-sys-color-on-surface, #222);
+        }
+        .picker-item .p-sub {
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant, #777);
+          margin-top: 2px;
+        }
+        .picker-cancel {
+          width: 100%;
+          margin-top: 10px;
+          padding: 12px;
+          border: 1px solid var(--md-sys-color-outline, #ccc);
+          border-radius: 8px;
+          background: transparent;
+          font-size: 14px;
+          color: var(--md-sys-color-on-surface-variant, #555);
+          cursor: pointer;
+        }
+        @media (min-width: 768px) {
+          .picker-backdrop { align-items: center; }
+          .picker-sheet { border-radius: 12px; width: 420px; max-width: 90vw; }
+          .picker-handle { display: none; }
+        }
+
         .btn-refresh {
           flex-shrink: 0;
           padding: 8px 12px;
@@ -591,7 +681,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
         }
 
         .current-item-form .title {
-          font-size: 13px;
+          font-size: 15px;
           font-weight: 700;
           margin-bottom: 6px;
           color: #E65100;
@@ -894,7 +984,8 @@ class VasPdaPick extends localize(i18next)(PageView) {
       feedbackMsg: String,
       feedbackType: String,
       voiceEnabled: Boolean,
-      expandedItems: Object
+      expandedItems: Object,
+      showTargetPicker: Boolean
     }
   }
 
@@ -915,6 +1006,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
     this.feedbackType = ''
     this.voiceEnabled = voiceService.enabled
     this.expandedItems = {}
+    this.showTargetPicker = false
     this._scannerService = null
   }
 
@@ -937,6 +1029,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
       ${this.feedbackMsg
         ? html`<div class="feedback-toast ${this.feedbackType}">${this.feedbackMsg}</div>`
         : ''}
+      ${this._renderTargetPicker()}
     `
   }
 
@@ -1066,8 +1159,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
         <button class="back-btn" @click="${this._backToOrderSelect}" title="주문 목록으로">◀</button>
         <span class="oi-no">${order.vas_no}</span>
         <span class="oi-sub">
-          ${bom?.set_sku_nm || bom?.set_sku_cd || '-'}
-          · ${this._vasTypeLabel(order.vas_type)}
+          ${this._vasTypeLabel(order.vas_type)}
           · 계획 <strong>${order.plan_qty || 0}</strong> EA
         </span>
       </div>
@@ -1100,9 +1192,66 @@ class VasPdaPick extends localize(i18next)(PageView) {
             placeholder="재고 바코드 스캔"
             @change="${e => this._onInventoryBarcodeScan(e.target.value)}"
           ></ox-input-barcode>
+          <button class="btn-target-picker" title="대상 선택"
+            @click="${() => { this.showTargetPicker = true }}">📋</button>
         </div>
       </div>
     `
+  }
+
+  /**
+   * 대상 선택 팝업 렌더링 — 스캔 대신 미스캔 재고(할당 바코드)를 목록에서 직접 선택
+   * 미피킹 항목의 할당 바코드 중 아직 스캔하지 않은 것만 대상으로 표시
+   */
+  _renderTargetPicker() {
+    if (!this.showTargetPicker) return ''
+
+    // 미피킹 항목의 미스캔 할당 바코드를 대상 목록으로 수집
+    const targets = []
+    for (const item of this.orderItems) {
+      if (item._picked) continue
+      const barcodes = this._getAllocBarcodes(item)
+      const scanned = item._scannedBarcodes || []
+      for (const bcd of barcodes) {
+        if (scanned.includes(bcd)) continue
+        targets.push({
+          barcode: bcd,
+          skuCd: item.sku_cd,
+          skuNm: item.sku_nm,
+          loc: this._getLocForBarcode(item, bcd),
+          qty: this._getAllocQtyForBarcode(item, bcd)
+        })
+      }
+    }
+
+    return html`
+      <div class="picker-backdrop" @click="${() => { this.showTargetPicker = false }}">
+        <div class="picker-sheet" @click="${e => e.stopPropagation()}">
+          <div class="picker-handle"></div>
+          <div class="picker-title">대상 선택 (${targets.length})</div>
+          ${targets.length === 0
+        ? html`<div class="picker-empty">미스캔 대상 없음</div>`
+        : targets.map(t => html`
+              <div class="picker-item" @click="${() => this._pickTarget(t.barcode)}">
+                <div class="p-nm">${t.skuNm || t.skuCd}</div>
+                <div class="p-sub">${t.skuCd}${t.loc ? ` · ${t.loc}` : ''} · 수량 ${t.qty}EA · ${t.barcode}</div>
+              </div>
+            `)}
+          <button class="picker-cancel" @click="${() => { this.showTargetPicker = false }}">
+            취소
+          </button>
+        </div>
+      </div>
+    `
+  }
+
+  /**
+   * 팝업에서 대상 선택 — 바코드 스캔과 완전히 동일하게 처리
+   * @param {string} barcode - 선택된 할당 바코드
+   */
+  _pickTarget(barcode) {
+    this.showTargetPicker = false
+    this._onInventoryBarcodeScan(barcode)
   }
 
   /** 자재 피킹 체크리스트 렌더링 — 항목별 토글 버튼 + 재고 상세 패널 */
@@ -1120,7 +1269,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
                 ${item._picked ? '\u2713' : idx === this.currentItemIndex ? '\u2192' : '\u2610'}
               </div>
               <div class="sku-info">
-                <div class="sku-name">${item.sku_cd} - ${item.sku_nm}</div>
+                <div class="sku-name">${item.sku_nm} - ${item.sku_cd}</div>
                 <div class="qty">
                   ${item.picked_qty || 0} / ${item.alloc_qty || item.req_qty || 0} EA
                   ${item.src_loc_cd ? html` | <strong>${item.src_loc_cd}</strong>` : ''}
@@ -1205,64 +1354,36 @@ class VasPdaPick extends localize(i18next)(PageView) {
     // 현재 아이템의 바코드를 모두 스캔했는지 (피킹 확인 버튼 유도 조건)
     const allBarcodesScanned = barcodes.length > 0 && scanned.length >= barcodes.length
 
-    // 주문 전체 바코드(m개)가 모두 스캔됐는지 ('스캔 완료' 표시 조건)
-    const totalOrderBarcodes = this.orderItems.reduce(
-      (sum, oi) => sum + this._getAllocBarcodes(oi).length, 0
-    )
-    const totalScanned = this.orderItems.reduce((sum, oi) => {
-      // 이미 피킹 확인된 아이템은 모든 바코드가 스캔된 것으로 처리
-      if (oi._picked) return sum + this._getAllocBarcodes(oi).length
-      return sum + (oi._scannedBarcodes || []).length
-    }, 0)
-    const allOrderBarcodesScanned = totalOrderBarcodes > 0 && totalScanned >= totalOrderBarcodes
-
-    // 현재 아이템 내 다음 미스캔 바코드의 로케이션
+    // 현재 아이템 내 다음 미스캔 바코드의 로케이션 (스캔 전 안내용)
     const nextUnscannedIdx = barcodes.findIndex(b => !scanned.includes(b))
     const currentItemNextLoc = nextUnscannedIdx >= 0
       ? (locs[nextUnscannedIdx] || item.src_loc_cd || '미지정')
-      : null
-
-    // 주문 전체 기준 다음 미스캔 바코드의 로케이션
-    // — 현재 아이템이 완료된 경우 다음 아이템의 위치를 안내
-    let globalNextLoc = currentItemNextLoc
-    if (!globalNextLoc) {
-      for (const oi of this.orderItems) {
-        if (oi._picked) continue
-        const oiBarcodes = this._getAllocBarcodes(oi)
-        const oiLocs = (oi.inv_loc_cds || oi.src_loc_cd || '').split(',').filter(Boolean)
-        const oiScanned = oi._scannedBarcodes || []
-        const unscannedIdx = oiBarcodes.findIndex(b => !oiScanned.includes(b))
-        if (unscannedIdx >= 0) {
-          globalNextLoc = oiLocs[unscannedIdx] || oi.src_loc_cd || '미지정'
-          break
-        }
-      }
-    }
+      : (item.src_loc_cd || '미지정')
 
     // 멀티 바코드인 경우에만 스캔 진행 표시
     const scanProgress = barcodes.length > 1
       ? html`<div class="scan-progress">${scanned.length} / ${barcodes.length} 바코드 스캔</div>`
       : ''
 
-    // 로케이션 안내 문구
-    // - 현재 아이템 스캔 완료 → 피킹 확인 버튼 유도 (다음 자재 위치도 함께 표시)
-    // - 주문 전체 스캔 완료 → '스캔 완료' 표시 + 초록 박스
-    // - 진행 중 → 다음 위치 안내
+    // 로케이션 안내
+    // - 아직 미스캔 → 현재 아이템의 스캔할 로케이션 안내
+    // - 스캔 직후 → 방금 스캔한 바코드의 로케이션을 표시 (다음으로 넘어가지 않음)
+    // - 현재 아이템 전량 스캔 → 피킹 확인 유도 (확인 시 다음 아이템/로케이션으로 이동)
+    const lastScanned = scanned.length > 0 ? scanned[scanned.length - 1] : null
     const locLabel = allBarcodesScanned
-      ? '바코드 스캔 완료 — 피킹 확인을 눌러주세요'
-      : '다음 피킹 로케이션'
-    const locValue = allOrderBarcodesScanned
-      ? '✓ 스캔 완료'
-      : (globalNextLoc || '미지정')
+      ? '피킹 확인을 눌러주세요'
+      : '피킹 로케이션'
+    const locValue = lastScanned
+      ? (this._getLocForBarcode(item, lastScanned) || '미지정')
+      : currentItemNextLoc
 
     return html`
       <div class="current-item-form">
-        <div class="title">\u{1F4E6} ${item.sku_cd} (${item.sku_nm})</div>
+        <div class="title">\u{1F4E6} ${item.sku_nm} (${item.sku_cd})</div>
 
-        <div class="location-guide ${allOrderBarcodesScanned ? 'all-scanned' : ''}">
+        <div class="location-guide ${allBarcodesScanned ? 'all-scanned' : ''}">
           <div class="loc-label">${locLabel}</div>
           <div class="loc-value">${locValue}</div>
-          ${item.lot_no ? html`<div class="lot-info">LOT: ${item.lot_no}</div>` : ''}
           ${scanProgress}
         </div>
 

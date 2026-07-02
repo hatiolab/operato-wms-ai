@@ -395,17 +395,15 @@ class VasHome extends localize(i18next)(PageView) {
     this._chart = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: ['세트 구성', '세트 해체', '재포장', '라벨링'],
+        labels: ['세트 구성', '세트 해체'],
         datasets: [
           {
             label: '작업 건수',
             data: [
               this.typeStats.SET_ASSEMBLY || 0,
-              this.typeStats.DISASSEMBLY || 0,
-              this.typeStats.REPACK || 0,
-              this.typeStats.LABEL || 0
+              this.typeStats.DISASSEMBLY || 0
             ],
-            backgroundColor: ['#2196F3', '#4CAF50', '#FF9800', '#9C27B0'],
+            backgroundColor: ['#2196F3', '#4CAF50'],
             borderRadius: 8
           }
         ]
