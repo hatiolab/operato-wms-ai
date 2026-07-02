@@ -84,6 +84,12 @@ public class VasResult extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private Double defectQty;
 
 	/**
+	 * 누락 수량 - 해체 시 예상 산출수량 대비 실제 산출수량 부족분 (예상 30, 실제 29 → 누락 1). 재고는 생성되지 않음
+	 */
+	@Column(name = "missing_qty")
+	private Double missingQty;
+
+	/**
 	 * 적치 로케이션 (완성품 보관 위치)
 	 */
 	@Column(name = "dest_loc_cd", length = 20)
@@ -196,6 +202,14 @@ public class VasResult extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setDefectQty(Double defectQty) {
 		this.defectQty = defectQty;
+	}
+
+	public Double getMissingQty() {
+		return missingQty;
+	}
+
+	public void setMissingQty(Double missingQty) {
+		this.missingQty = missingQty;
 	}
 
 	public String getDestLocCd() {

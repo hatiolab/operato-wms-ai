@@ -2,6 +2,7 @@ package operato.wms.vas.service;
 
 import java.time.LocalDate;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -2000,7 +2001,8 @@ public class VasTransactionService extends AbstractQueryService {
 	 * @return 완료된 작업 지시
 	 */
 	@Transactional
-	public VasOrder completeDisassembly(String vasOrderId, List<Map<String, Object>> outputs, String destLocCd) {
+	public VasOrder completeDisassembly(String vasOrderId, List<Map<String, Object>> outputs, String destLocCd,
+			List<Map<String, Object>> shortages) {
 		VasOrder vasOrder = this.queryManager.select(VasOrder.class, vasOrderId);
 		if (vasOrder == null) {
 			throw new ElidomValidationException("작업 지시를 찾을 수 없습니다. ID: " + vasOrderId);
@@ -2032,14 +2034,15 @@ public class VasTransactionService extends AbstractQueryService {
 		// 세트 상품 구성품들의 할당 원재고(세트 상품) 소비
 		this.consumeVasAllocatedInventoriesIfNeeded(vasOrder);
 
-		// 산출 행별 개별 재고 및 실적 생성
+		// 산출 행별 개별 재고 및 실적 생성 (구성품별 마지막 실적을 보관하여 누락수량 반영)
+		Map<String, VasResult> lastResultBySku = new HashMap<String, VasResult>();
 		for (Map<String, Object> output : outputs) {
 			String skuCd = (String) output.get("skuCd");
 			String skuNm = (String) output.get("skuNm");
 			double qty = ((Number) output.get("qty")).doubleValue();
 			String expiryDate = (String) output.get("expiryDate");
 
-			// 세트 구성품 재고 생성
+			// 세트 구성품 재고 생성 (실제 산출된 수량만 생성 — 누락 수량은 재고를 만들지 않음)
 			InvTransaction newInv = new InvTransaction();
 			newInv.setComCd(vasOrder.getComCd());
 			newInv.setWhCd(vasOrder.getWhCd());
@@ -2063,14 +2066,49 @@ public class VasTransactionService extends AbstractQueryService {
 			result.setDestLocCd(finalLocCd);
 			result.setRemarks(ValueUtil.isEmpty(expiryDate) ? null : "유통기한: " + expiryDate);
 			this.queryManager.insert(result);
+			lastResultBySku.put(skuCd, result);
 		}
 
-		// 완료 처리
+		// 누락 수량 반영 — 구성품별 누락(예상 − 실제)을 실적(vas_results.short_qty)에 기록. 재고는 생성하지 않음
+		boolean hasShort = false;
+		if (shortages != null) {
+			for (Map<String, Object> shortage : shortages) {
+				Object sq = shortage.get("shortQty");
+				double shortQty = sq != null ? ((Number) sq).doubleValue() : 0d;
+				if (shortQty <= 0) {
+					continue;
+				}
+				hasShort = true;
+				String skuCd = (String) shortage.get("skuCd");
+				VasResult target = lastResultBySku.get(skuCd);
+				if (target != null) {
+					// 해당 구성품의 실적 행에 누락수량 기록
+					target.setMissingQty(shortQty);
+					this.queryManager.update(target, "missingQty");
+				} else {
+					// 산출이 0이라 실적 행이 없으면 누락 전용 실적 생성
+					VasResult shortResult = new VasResult();
+					shortResult.setDomainId(vasOrder.getDomainId());
+					shortResult.setVasOrderId(vasOrderId);
+					shortResult.setVasNo(vasOrder.getVasNo());
+					shortResult.setResultType(WmsVasConstants.RESULT_TYPE_DISASSEMBLY);
+					shortResult.setSetSkuCd(skuCd);
+					shortResult.setSetSkuNm((String) shortage.get("skuNm"));
+					shortResult.setResultQty(0d);
+					shortResult.setMissingQty(shortQty);
+					shortResult.setRemarks("누락");
+					this.queryManager.insert(shortResult);
+				}
+			}
+		}
+
+		// 완료 처리 (누락 발생 시 마스터 누락여부 플래그 true)
 		vasOrder.setStatus(WmsVasConstants.STATUS_COMPLETED);
 		vasOrder.setCompletedAt(new Date());
 		vasOrder.setCompletedQty(vasOrder.getPlanQty());
 		vasOrder.setVasEndDate(DateUtil.todayStr());
-		this.queryManager.update(vasOrder, "status", "completedAt", "completedQty", "vasEndDate");
+		vasOrder.setMissingFlag(hasShort);
+		this.queryManager.update(vasOrder, "status", "completedAt", "completedQty", "vasEndDate", "missingFlag");
 
 		// 상세 항목 상태 업데이트
 		String sql = "UPDATE vas_order_items SET status = :itemStatus " +

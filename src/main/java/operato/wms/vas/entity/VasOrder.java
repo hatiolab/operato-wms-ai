@@ -123,6 +123,12 @@ public class VasOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private Double completedQty;
 
 	/**
+	 * 누락여부 - true이면 해체 완료 시 예상 산출수량 대비 실제 산출이 부족한(누락) 구성품이 하나 이상 존재함
+	 */
+	@Column(name = "missing_flag", length = 50)
+	private Boolean missingFlag;
+
+	/**
 	 * 담당자 ID
 	 */
 	@Column(name = "mgr_id", length = 32)
@@ -334,6 +340,14 @@ public class VasOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setCompletedQty(Double completedQty) {
 		this.completedQty = completedQty;
+	}
+
+	public Boolean getMissingFlag() {
+		return missingFlag;
+	}
+
+	public void setMissingFlag(Boolean missingFlag) {
+		this.missingFlag = missingFlag;
 	}
 
 	public String getMgrId() {

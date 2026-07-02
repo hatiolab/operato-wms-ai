@@ -292,7 +292,8 @@ public class VasTransactionController {
 
 		List<Map<String, Object>> outputs = (List<Map<String, Object>>) body.get("outputs");
 		String destLocCd = (String) body.get("destLocCd");
-		return this.vasService.completeDisassembly(id, outputs, destLocCd);
+		List<Map<String, Object>> shortages = (List<Map<String, Object>>) body.get("shortages");
+		return this.vasService.completeDisassembly(id, outputs, destLocCd, shortages);
 	}
 
 	/**

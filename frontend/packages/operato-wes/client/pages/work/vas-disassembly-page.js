@@ -7,6 +7,7 @@ import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-clien
 
 import { HardwareScannerService } from './hardware-scanner-service.js'
 import { voiceService } from './voice-service.js'
+import '../../component/numeric-keypad-input.js'
 
 /**
  * VAS 해체 PDA 작업 화면
@@ -65,9 +66,9 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
           justify-content: center;
         }
 
-        /* 컨텐츠 영역 (작업 화면용) */
+        /* 컨텐츠 영역 (작업 화면용) — 초타이트 */
         .pda-content {
-          padding: 16px;
+          padding: 8px 10px;
           flex: 1;
         }
 
@@ -181,27 +182,27 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
           color: #4CAF50;
         }
 
-        /* 주문 정보 카드 */
+        /* 주문 정보 카드 — 타이트 */
         .order-info-card {
           background: #fff;
-          border-radius: 12px;
-          padding: 16px;
-          margin-bottom: 16px;
+          border-radius: 8px;
+          padding: 6px 8px;
+          margin-bottom: 6px;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
         .order-info-card .title {
-          font-size: 16px;
+          font-size: 12px;
           font-weight: 700;
           color: var(--md-sys-color-on-surface, #333);
-          margin-bottom: 8px;
+          margin-bottom: 3px;
         }
 
         .order-info-card .detail-row {
           display: flex;
           justify-content: space-between;
-          font-size: 14px;
-          padding: 4px 0;
+          font-size: 11px;
+          padding: 1px 0;
           color: var(--md-sys-color-on-surface-variant, #666);
         }
 
@@ -210,17 +211,17 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface, #333);
         }
 
-        /* 자재 피킹 리스트 (Step 1) */
+        /* 자재 피킹 리스트 (Step 1) — 타이트 */
         .pick-list {
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 6px;
         }
 
         .pick-item {
           background: #fff;
-          border-radius: 12px;
-          padding: 16px;
+          border-radius: 8px;
+          padding: 8px;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
           transition: all 0.2s ease;
         }
@@ -236,15 +237,15 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
         }
 
         .pick-item .sku-name {
-          font-size: 16px;
+          font-size: 13px;
           font-weight: 700;
           color: var(--md-sys-color-on-surface, #333);
         }
 
         .pick-item .sku-info {
-          font-size: 13px;
+          font-size: 11px;
           color: var(--md-sys-color-on-surface-variant, #666);
-          margin-top: 4px;
+          margin-top: 1px;
         }
 
         .pick-item .pick-input-row {
@@ -326,15 +327,15 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
           margin-top: 4px;
         }
 
-        /* PDA 버튼 (44x44px 최소) */
+        /* PDA 버튼 — 초타이트 */
         .pda-btn {
-          min-height: 52px;
+          min-height: 36px;
           border: none;
-          border-radius: 12px;
-          font-size: 18px;
+          border-radius: 10px;
+          font-size: 13px;
           font-weight: 700;
           cursor: pointer;
-          padding: 14px 24px;
+          padding: 8px 12px;
           transition: all 0.15s ease;
           width: 100%;
         }
@@ -374,12 +375,12 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
           pointer-events: none;
         }
 
-        /* 하단 버튼 바 */
+        /* 하단 버튼 바 — 초타이트 */
         .bottom-actions {
           display: flex;
-          gap: 12px;
-          margin-top: 24px;
-          padding-bottom: 24px;
+          gap: 8px;
+          margin-top: 8px;
+          padding-bottom: 8px;
         }
 
         .bottom-actions .pda-btn {
@@ -581,13 +582,13 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
 
         .add-row-btn {
           flex-shrink: 0;
-          min-width: 44px;
-          min-height: 44px;
+          min-width: 40px;
+          min-height: 32px;
           background: var(--md-sys-color-primary, #1976D2);
           color: #fff;
           border: none;
           border-radius: 8px;
-          font-size: 22px;
+          font-size: 18px;
           font-weight: 700;
           cursor: pointer;
           display: flex;
@@ -605,8 +606,8 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
         .output-rows {
           display: flex;
           flex-direction: column;
-          gap: 8px;
-          margin-top: 12px;
+          gap: 6px;
+          margin-top: 8px;
         }
 
         .output-row {
@@ -615,7 +616,7 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
           gap: 8px;
           background: var(--md-sys-color-surface-variant, #f5f5f5);
           border-radius: 8px;
-          padding: 5px 10px;
+          padding: 4px 8px;
         }
 
         .output-row.confirmed {
@@ -639,10 +640,10 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
         }
 
         .output-row .row-field-label {
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 600;
           color: var(--md-sys-color-on-surface-variant, #666);
-          width: 47px;
+          width: 42px;
           flex-shrink: 0;
         }
 
@@ -678,10 +679,10 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
 
         .output-row .row-date-input {
           width: 100%;
-          padding: 5px 36px 5px 12px;
+          padding: 4px 34px 4px 10px;
           border: 2px solid var(--md-sys-color-outline, #ccc);
           border-radius: 8px;
-          font-size: 15px;
+          font-size: 13px;
           background: #fff;
           box-sizing: border-box;
           appearance: none;
@@ -731,11 +732,11 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
         }
 
         .output-row .confirm-row-btn {
-          min-width: 47px;
-          min-height: 31px;
+          min-width: 44px;
+          min-height: 26px;
           border: none;
           border-radius: 8px;
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 700;
           cursor: pointer;
           background: var(--md-sys-color-primary, #1976D2);
@@ -758,11 +759,11 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
         }
 
         .output-row .remove-row-btn {
-          min-width: 47px;
-          min-height: 27px;
+          min-width: 44px;
+          min-height: 24px;
           border: 1px solid currentColor;
           border-radius: 8px;
-          font-size: 14px;
+          font-size: 13px;
           cursor: pointer;
           background: transparent;
           color: var(--md-sys-color-error, #d32f2f);
@@ -782,15 +783,21 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
 
         /* 수량 합계 표시 */
         .qty-summary {
-          font-size: 12px;
+          font-size: 11px;
           color: var(--md-sys-color-on-surface-variant, #666);
-          margin-top: 6px;
+          margin-top: 4px;
           text-align: right;
         }
 
         .qty-summary.over {
           color: var(--md-sys-color-error, #d32f2f);
           font-weight: 700;
+        }
+
+        /* 수량 키패드 컴포넌트 — 행 내에서 라벨 옆 확장 */
+        .output-row .row-field-item numeric-keypad-input {
+          flex: 1;
+          min-width: 0;
         }
       `
     ]
@@ -976,7 +983,7 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
     const isReadOnly = ['COMPLETED', 'CLOSED'].includes(this.selectedOrder?.status)
 
     return html`
-      <h3 style="margin: 0 0 12px; font-size: 16px;">해체 산출 품목</h3>
+      <h3 style="margin: 0 0 4px; font-size: 12px;">해체 산출 품목</h3>
 
       <!-- 품목 목록 -->
       <div class="pick-list">
@@ -992,8 +999,8 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
                   <div class="item-info">
                     <div class="sku-name">${item.sku_cd} / ${item.sku_nm}</div>
                     <div class="sku-info">세트 1개당: ${item.component_qty || 0} ${item.unit || 'EA'}</div>
-                    <div class="pick-input-row" style="margin-top: 8px;">
-                      <span class="req-qty" style="font-size: 20px; font-weight: 700; color: var(--md-sys-color-on-surface, #333);">
+                    <div class="pick-input-row" style="margin-top: 4px;">
+                      <span class="req-qty" style="font-size: 16px; font-weight: 700; color: var(--md-sys-color-on-surface, #333);">
                         ${totalQty} ${item.unit || 'EA'}
                       </span>
                     </div>
@@ -1011,16 +1018,14 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
                         <div class="row-fields">
                           <div class="row-field-item">
                             <span class="row-field-label">수량</span>
-                            <input
-                              class="row-qty-input"
-                              type="number"
-                              inputmode="numeric"
-                              min="1"
-                              placeholder="수량 입력"
-                              .value="${row.qty}"
+                            <numeric-keypad-input
+                              class="row-qty-kpad"
+                              .value="${row.qty || 0}"
+                              .min="${1}"
+                              placeholder="수량"
                               ?disabled="${row.confirmed}"
-                              @input="${e => this._updateRow(itemIdx, rowIdx, 'qty', e.target.value)}"
-                            />
+                              @change="${e => this._updateRow(itemIdx, rowIdx, 'qty', e.detail.value)}"
+                            ></numeric-keypad-input>
                           </div>
                           <div class="row-field-item">
                             <span class="row-field-label">유통기한</span>
@@ -1419,23 +1424,33 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
     }
 
     // 3. 산출 행 목록 구성 [{skuCd, skuNm, qty, expiryDate}] — 확정 행만
+    // 산출 행(실제) + 구성품별 누락수량(예상 − 실제 합계) 계산
     const outputs = []
+    const shortages = []
     for (const item of this.bomItems) {
+      const expected = (item.component_qty || 0) * planQty
+      let actualSum = 0
       for (const row of item._rows) {
         if (!row.confirmed) continue
+        const qtyNum = Number(row.qty)
         outputs.push({
           skuCd: item.sku_cd,
           skuNm: item.sku_nm,
-          qty: Number(row.qty),
+          qty: qtyNum,
           expiryDate: row.expiry || null
         })
+        actualSum += qtyNum
+      }
+      const shortQty = Math.max(0, expected - actualSum)
+      if (shortQty > 0) {
+        shortages.push({ skuCd: item.sku_cd, skuNm: item.sku_nm, shortQty })
       }
     }
 
     try {
       await ServiceUtil.restPost(
         `vas_trx/vas_orders/${this.selectedOrder.id}/complete_disassembly`,
-        { outputs, destLocCd: this.putawayLoc || null }
+        { outputs, destLocCd: this.putawayLoc || null, shortages }
       )
       this._showFeedback('해체 작업이 완료되었습니다', 'success')
       voiceService.success('작업 완료')
