@@ -1045,14 +1045,16 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
       return html`<div class="loading-overlay">${TermsUtil.tLabel('loading') || '로딩 중...'}</div>`
     }
 
+    // 입고요청일(rcv_req_date) 내림차순 — 최신 요청일이 상단 (빈 값은 뒤로)
+    const byReqDateDesc = (a, b) => (b.rcv_req_date || '').localeCompare(a.rcv_req_date || '')
     // 입고주문 단위 분류 (재고 건수가 아닌 입고주문 개수 기준)
-    const waitingList = this.receivingList.filter(r => r.putaway_status === 'WAITING')
-    const putawayList = this.receivingList.filter(r => r.putaway_status === 'PUTAWAY')
+    const waitingList = this.receivingList.filter(r => r.putaway_status === 'WAITING').sort(byReqDateDesc)
+    const putawayList = this.receivingList.filter(r => r.putaway_status === 'PUTAWAY').sort(byReqDateDesc)
     // ALL은 대기 + 작업중만 표시 (완료 DONE 입고는 목록에서 제외)
     const filteredList =
       this.listFilter === 'WAITING' ? waitingList
         : this.listFilter === 'PUTAWAY' ? putawayList
-          : [...waitingList, ...putawayList]
+          : [...waitingList, ...putawayList].sort(byReqDateDesc)
 
     return html`
       <div class="summary-cards">
@@ -1762,18 +1764,16 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
   }
 
   /**
-   * 적치 작업 완료 처리 — 미완료 항목이 있으면 확인 후 complete 모드 전환
+   * 적치 작업 완료 처리 — 적치는 미완료 항목을 모두 완료해야 마감 가능.
+   * 미완료가 남아있으면 안내(확인 버튼만)만 하고 마감을 진행하지 않는다.
    * 입고 주문 상태를 PUTAWAY → END로 업데이트
    */
   async _closeWork() {
     const remaining = this.workItems.filter(i => i.status === 'WAITING')
     if (remaining.length > 0) {
-      const confirmed = await UiUtil.showAlertPopup(
-        'label.confirm',
-        `미완료 항목 ${remaining.length}건이 있습니다. 작업을 완료하시겠습니까?`,
-        'question', 'confirm', 'cancel'
-      )
-      if (!confirmed) return
+      // 미완료가 남아있으면 마감 불가 — 안내만 하고 종료 (확인 버튼으로 팝업만 닫힘)
+      await this._alertDialog(`미완료 항목이 ${remaining.length}건 남아있습니다.`)
+      return
     }
 
     // 완료 처리 성공 시에만 complete 모드 전환 (실패 시 주문 상태가 안 바뀌므로 완료로 표시하지 않음)
@@ -1786,11 +1786,7 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
    * 입고 주문 상태를 PUTAWAY → END로 업데이트
    */
   async _onAllItemsCompleted() {
-    const confirmed = await UiUtil.showAlertPopup(
-      'label.confirm',
-      `모든 항목(${this.doneItems.length}건) 적치 완료.\n마감 처리하시겠습니까?`,
-      'question', 'confirm', 'cancel'
-    )
+    const confirmed = await this._confirmDialog(`모든 항목(${this.doneItems.length}건) 적치 완료.\n마감 처리하시겠습니까?`)
     if (!confirmed) return
     const ok = await this._completePutaway()
     if (ok) this.mode = 'complete'
@@ -1954,6 +1950,47 @@ export class PdaInboundPutaway extends connect(store)(PageView) {
    */
   _showFeedback(message, type) {
     this.lastFeedback = { type, message }
+  }
+
+  /** 스캔 일시정지 — 팝업/포커스 입력 중 스캔 오인식 및 모달 포커스 가로채기 방지 */
+  _pauseScan() {
+    document.dispatchEvent(new CustomEvent('barcode-listener-pause'))
+  }
+
+  /** 스캔 재개 */
+  _resumeScan() {
+    document.dispatchEvent(new CustomEvent('barcode-listener-resume'))
+  }
+
+  /**
+   * 확인 팝업(확인/취소) — 팝업이 떠 있는 동안 스캔을 일시정지하여
+   * barcode-listener가 모달 포커스를 가로채 팝업이 즉시 닫히는 충돌을 방지한다.
+   * @param {string} message - 확인 메시지
+   * @returns {Promise<boolean>} 사용자가 확인했으면 true
+   */
+  async _confirmDialog(message) {
+    this._pauseScan()
+    try {
+      return await UiUtil.showAlertPopup('label.confirm', message, 'question', 'confirm', 'cancel')
+    } finally {
+      setTimeout(() => this._resumeScan(), 100)
+    }
+  }
+
+  /**
+   * 안내 팝업(확인 버튼만) — 스캔 일시정지로 팝업이 즉시 닫히는 충돌을 방지한다.
+   * 확인을 누르면 팝업만 닫힌다.
+   * @param {string} message - 안내 메시지
+   */
+  async _alertDialog(message) {
+    this._pauseScan()
+    try {
+      // 버튼 코드에 '확인'을 직접 전달 — button 용어에 없으면 tButton이 원문을 그대로 반환하므로
+      // 도메인 용어(button.confirm='확정')와 무관하게 항상 "확인"으로 표시된다.
+      await UiUtil.showAlertPopup('알림', message, 'info', '확인')
+    } finally {
+      setTimeout(() => this._resumeScan(), 100)
+    }
   }
 
   /**
