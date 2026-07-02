@@ -930,11 +930,6 @@ class VasPdaPick extends localize(i18next)(PageView) {
 
   render() {
     return html`
-      <button
-        class="voice-toggle ${this.voiceEnabled ? 'on' : 'off'}"
-        @click="${this._toggleVoice}"
-        title="음성 안내 ${this.voiceEnabled ? 'ON' : 'OFF'}"
-      >${this.voiceEnabled ? '\u{1F50A}' : '\u{1F507}'}</button>
 
       ${this.screen === 'order-select'
         ? this._renderOrderSelect()

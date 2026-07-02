@@ -7,6 +7,7 @@ import { ServiceUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 
 import { HardwareScannerService } from './hardware-scanner-service.js'
 import { voiceService } from './voice-service.js'
+import '../../component/numeric-keypad-input.js'
 
 /**
  * VAS PDA 작업 화면
@@ -67,9 +68,9 @@ class VasWorkPage extends localize(i18next)(PageView) {
           justify-content: center;
         }
 
-        /* 컨텐츠 영역 (작업 화면용) */
+        /* 컨텐츠 영역 (작업 화면용) — 타이트 */
         .pda-content {
-          padding: 16px;
+          padding: 10px 12px;
           flex: 1;
         }
 
@@ -87,7 +88,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
         }
 
         .scan-input-group label {
-          font-size: 14px;
+          font-size: 12px;
           font-weight: 600;
           color: var(--md-sys-color-on-surface-variant, #666);
         }
@@ -99,8 +100,8 @@ class VasWorkPage extends localize(i18next)(PageView) {
 
         .scan-input ox-input-barcode {
           flex: 1;
-          --barcodescan-input-font-size: 18px;
-          --barcodescan-input-padding: 14px 16px;
+          --barcodescan-input-font-size: 15px;
+          --barcodescan-input-padding: 8px 12px;
           --barcodescan-input-border-radius: 8px;
         }
 
@@ -183,23 +184,23 @@ class VasWorkPage extends localize(i18next)(PageView) {
           color: #4CAF50;
         }
 
-        /* 스텝 인디케이터 */
+        /* 스텝 인디케이터 — 타이트 */
         .step-indicator {
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 0;
-          padding: 16px 0;
+          padding: 6px 0;
         }
 
         .step-dot {
-          width: 36px;
-          height: 36px;
+          width: 26px;
+          height: 26px;
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 14px;
+          font-size: 13px;
           font-weight: 700;
           color: #fff;
           background: var(--md-sys-color-outline, #bbb);
@@ -216,8 +217,8 @@ class VasWorkPage extends localize(i18next)(PageView) {
         }
 
         .step-line {
-          width: 40px;
-          height: 3px;
+          width: 32px;
+          height: 2px;
           background: var(--md-sys-color-outline, #ddd);
           transition: all 0.3s ease;
         }
@@ -226,27 +227,27 @@ class VasWorkPage extends localize(i18next)(PageView) {
           background: #4CAF50;
         }
 
-        /* 주문 정보 카드 */
+        /* 주문 정보 카드 — 타이트 */
         .order-info-card {
           background: #fff;
-          border-radius: 12px;
-          padding: 16px;
-          margin-bottom: 16px;
+          border-radius: 8px;
+          padding: 8px 10px;
+          margin-bottom: 8px;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
         .order-info-card .title {
-          font-size: 16px;
+          font-size: 13px;
           font-weight: 700;
           color: var(--md-sys-color-on-surface, #333);
-          margin-bottom: 8px;
+          margin-bottom: 4px;
         }
 
         .order-info-card .detail-row {
           display: flex;
           justify-content: space-between;
-          font-size: 14px;
-          padding: 4px 0;
+          font-size: 12px;
+          padding: 1px 0;
           color: var(--md-sys-color-on-surface-variant, #666);
         }
 
@@ -255,17 +256,17 @@ class VasWorkPage extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface, #333);
         }
 
-        /* 자재 피킹 리스트 (Step 1) */
+        /* 자재 피킹 리스트 (Step 1) — 타이트 */
         .pick-list {
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 6px;
         }
 
         .pick-item {
           background: #fff;
-          border-radius: 12px;
-          padding: 16px;
+          border-radius: 8px;
+          padding: 8px 10px;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
           transition: all 0.2s ease;
         }
@@ -281,30 +282,30 @@ class VasWorkPage extends localize(i18next)(PageView) {
         }
 
         .pick-item .sku-name {
-          font-size: 16px;
+          font-size: 13px;
           font-weight: 700;
           color: var(--md-sys-color-on-surface, #333);
         }
 
         .pick-item .sku-info {
-          font-size: 13px;
+          font-size: 12px;
           color: var(--md-sys-color-on-surface-variant, #666);
-          margin-top: 4px;
+          margin-top: 2px;
         }
 
         .pick-item .pick-input-row {
           display: flex;
           align-items: center;
           gap: 8px;
-          margin-top: 12px;
+          margin-top: 6px;
         }
 
         .pick-item .pick-input-row input {
-          width: 80px;
-          padding: 10px 12px;
+          width: 64px;
+          padding: 6px 8px;
           border: 2px solid var(--md-sys-color-outline, #ccc);
           border-radius: 8px;
-          font-size: 18px;
+          font-size: 15px;
           font-weight: 700;
           text-align: center;
         }
@@ -315,20 +316,20 @@ class VasWorkPage extends localize(i18next)(PageView) {
         }
 
         .pick-item .pick-input-row .req-qty {
-          font-size: 16px;
+          font-size: 13px;
           color: var(--md-sys-color-on-surface-variant, #666);
         }
 
         .pick-item .pick-confirm-btn {
           min-width: 44px;
-          min-height: 44px;
+          min-height: 36px;
           border: none;
           border-radius: 8px;
-          font-size: 18px;
+          font-size: 14px;
           cursor: pointer;
           background: var(--md-sys-color-primary, #1976D2);
           color: #fff;
-          padding: 8px 16px;
+          padding: 6px 14px;
           font-weight: 600;
         }
 
@@ -340,15 +341,15 @@ class VasWorkPage extends localize(i18next)(PageView) {
           transform: scale(0.95);
         }
 
-        /* 진행률 */
+        /* 진행률 — 타이트 */
         .progress-section {
-          margin: 16px 0;
+          margin: 8px 0;
         }
 
         .progress-bar-container {
           background: var(--md-sys-color-surface-variant, #e0e0e0);
           border-radius: 8px;
-          height: 12px;
+          height: 8px;
           overflow: hidden;
         }
 
@@ -366,39 +367,39 @@ class VasWorkPage extends localize(i18next)(PageView) {
         .progress-label {
           display: flex;
           justify-content: space-between;
-          font-size: 13px;
+          font-size: 11px;
           color: var(--md-sys-color-on-surface-variant, #666);
-          margin-top: 4px;
+          margin-top: 2px;
         }
 
-        /* 작업 수행 (Step 2) */
+        /* 작업 수행 (Step 2) — 타이트 */
         .work-section {
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: 8px;
         }
 
         .work-input-group {
           background: var(--md-sys-color-surface, #fff);
-          border-radius: 12px;
-          padding: 16px;
+          border-radius: 8px;
+          padding: 8px 10px;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
         .work-input-group label {
           display: block;
-          font-size: 14px;
+          font-size: 12px;
           font-weight: 600;
           color: var(--md-sys-color-on-surface-variant, #666);
-          margin-bottom: 8px;
+          margin-bottom: 4px;
         }
 
         .work-input-group input {
           width: 100%;
-          padding: 14px 16px;
+          padding: 8px 10px;
           border: 2px solid var(--md-sys-color-outline, #ccc);
           border-radius: 8px;
-          font-size: 24px;
+          font-size: 18px;
           font-weight: 700;
           text-align: center;
           box-sizing: border-box;
@@ -411,32 +412,32 @@ class VasWorkPage extends localize(i18next)(PageView) {
 
         .work-input-group .unit {
           text-align: center;
-          font-size: 14px;
+          font-size: 12px;
           color: var(--md-sys-color-on-surface-variant, #666);
-          margin-top: 4px;
+          margin-top: 2px;
         }
 
-        /* 적치 (Step 3) */
+        /* 적치 (Step 3) — 타이트 */
         .putaway-section {
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: 8px;
         }
 
         .putaway-loc {
           background: #fff;
-          border-radius: 12px;
-          padding: 24px 16px;
+          border-radius: 8px;
+          padding: 10px 12px;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
           text-align: center;
         }
 
         .putaway-loc .scanned-loc {
-          font-size: 28px;
+          font-size: 20px;
           font-weight: 700;
           color: var(--md-sys-color-primary, #1976D2);
-          margin-top: 8px;
-          min-height: 40px;
+          margin-top: 4px;
+          min-height: 26px;
         }
 
         .expiry-card {
@@ -500,15 +501,15 @@ class VasWorkPage extends localize(i18next)(PageView) {
           cursor: pointer;
         }
 
-        /* PDA 버튼 (44x44px 최소) */
+        /* PDA 버튼 — 타이트 */
         .pda-btn {
-          min-height: 52px;
+          min-height: 42px;
           border: none;
-          border-radius: 12px;
-          font-size: 18px;
+          border-radius: 10px;
+          font-size: 15px;
           font-weight: 700;
           cursor: pointer;
-          padding: 14px 24px;
+          padding: 10px 16px;
           transition: all 0.15s ease;
           width: 100%;
         }
@@ -548,12 +549,12 @@ class VasWorkPage extends localize(i18next)(PageView) {
           pointer-events: none;
         }
 
-        /* 하단 버튼 바 */
+        /* 하단 버튼 바 — 타이트 */
         .bottom-actions {
           display: flex;
-          gap: 12px;
-          margin-top: 24px;
-          padding-bottom: 24px;
+          gap: 10px;
+          margin-top: 12px;
+          padding-bottom: 12px;
         }
 
         .bottom-actions .pda-btn {
@@ -801,11 +802,6 @@ class VasWorkPage extends localize(i18next)(PageView) {
   /** 화면 렌더링 - 주문 선택 또는 3단계 작업 화면 분기 */
   render() {
     return html`
-      <button
-        class="voice-toggle ${this.voiceEnabled ? 'on' : 'off'}"
-        @click="${this._toggleVoice}"
-        title="${this.voiceEnabled ? '음성 안내 ON' : '음성 안내 OFF'}"
-      >${this.voiceEnabled ? '\u{1F50A}' : '\u{1F507}'}</button>
       ${this.screen === 'order-select' ? this._renderOrderSelect() : this._renderWorkScreen()}
       ${this.feedbackMsg
         ? html`<div class="feedback-toast ${this.feedbackType}">${this.feedbackMsg}</div>`
@@ -974,7 +970,7 @@ class VasWorkPage extends localize(i18next)(PageView) {
     const progressPct = totalCount > 0 ? Math.round((pickedCount / totalCount) * 100) : 0
 
     return html`
-      <h3 style="margin: 0 0 12px; font-size: 16px;">1단계: 자재 투입</h3>
+      <h3 style="margin: 0 0 6px; font-size: 14px;">1단계: 자재 투입</h3>
 
       <!-- 진행률 -->
       <div class="progress-section">
@@ -1030,30 +1026,28 @@ class VasWorkPage extends localize(i18next)(PageView) {
     const planQty = this.selectedOrder?.plan_qty || 0
 
     return html`
-      <h3 style="margin: 0 0 12px; font-size: 16px;">2단계: 작업 수행</h3>
+      <h3 style="margin: 0 0 6px; font-size: 14px;">2단계: 작업 수행</h3>
 
       <div class="work-section">
         <div class="work-input-group">
           <label>완성 수량</label>
-          <input
-            type="number"
-            inputmode="numeric"
+          <numeric-keypad-input
+            .value="${this.completedQty || 0}"
+            .min="${0}"
             placeholder="0"
-            .value="${this.completedQty || ''}"
-            @input="${e => { this.completedQty = parseFloat(e.target.value) || 0 }}"
-          />
+            @change="${e => { this.completedQty = e.detail.value }}"
+          ></numeric-keypad-input>
           <div class="unit">계획: ${planQty} EA</div>
         </div>
 
         <div class="work-input-group">
           <label>불량 수량</label>
-          <input
-            type="number"
-            inputmode="numeric"
+          <numeric-keypad-input
+            .value="${this.defectQty || 0}"
+            .min="${0}"
             placeholder="0"
-            .value="${this.defectQty || ''}"
-            @input="${e => { this.defectQty = parseFloat(e.target.value) || 0 }}"
-          />
+            @change="${e => { this.defectQty = e.detail.value }}"
+          ></numeric-keypad-input>
           <div class="unit">EA</div>
         </div>
 
@@ -1075,11 +1069,11 @@ class VasWorkPage extends localize(i18next)(PageView) {
     const isReadOnly = ['COMPLETED', 'CLOSED'].includes(this.selectedOrder?.status)
 
     return html`
-      <h3 style="margin: 0 0 12px; font-size: 16px;">3단계: 적치${isReadOnly ? html` <span style="font-size:12px; color:#4CAF50; font-weight:400;">(완료됨)</span>` : ''}</h3>
+      <h3 style="margin: 0 0 6px; font-size: 14px;">3단계: 적치${isReadOnly ? html` <span style="font-size:12px; color:#4CAF50; font-weight:400;">(완료됨)</span>` : ''}</h3>
 
       <div class="putaway-section">
         <div class="putaway-loc">
-          <label style="font-size: 14px; color: var(--md-sys-color-on-surface-variant, #666);">
+          <label style="font-size: 12px; color: var(--md-sys-color-on-surface-variant, #666);">
             적치 로케이션
           </label>
           <div class="scanned-loc">${this.putawayLoc || '-'}</div>

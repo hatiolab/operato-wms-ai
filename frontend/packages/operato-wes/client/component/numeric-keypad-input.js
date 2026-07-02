@@ -331,10 +331,10 @@ export class NumericKeypadInput extends LitElement {
     }
   }
 
-  /** 표시 필드 탭 — 키패드 열기, 현재 값을 입력 버퍼로 복사. 스캔 일시정지 */
+  /** 표시 필드 탭 — 키패드를 항상 빈 값으로 열어 새로 입력받는다(오입력 후 재입력 편의). 스캔 일시정지 */
   _openKeypad() {
     if (this.disabled) return
-    this._draft = this.value ? String(this.value) : ''
+    this._draft = ''
     this._open = true
     document.dispatchEvent(new CustomEvent('barcode-listener-pause'))
   }
@@ -370,6 +370,11 @@ export class NumericKeypadInput extends LitElement {
 
   /** 확인 — min/max 보정 후 값 확정, change 이벤트 발생 */
   _confirm() {
+    // 입력이 전혀 없으면(빈 값) 기존 값 유지 — 실수로 열고 확인 시 0으로 초기화되는 것 방지
+    if (this._draft === '' || this._draft === null || this._draft === undefined) {
+      this._closeKeypad()
+      return
+    }
     let next = parseInt(this._draft, 10)
     if (isNaN(next)) next = this.min ?? 0
     next = this._clampValue(next)

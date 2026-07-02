@@ -844,11 +844,6 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
   /** 화면 렌더링 - 주문 선택 또는 작업 화면 분기 */
   render() {
     return html`
-      <button
-        class="voice-toggle ${this.voiceEnabled ? 'on' : 'off'}"
-        @click="${this._toggleVoice}"
-        title="${this.voiceEnabled ? '음성 안내 ON' : '음성 안내 OFF'}"
-      >${this.voiceEnabled ? '\u{1F50A}' : '\u{1F507}'}</button>
       ${this.screen === 'order-select' ? this._renderOrderSelect() : this._renderWorkScreen()}
       ${this.feedbackMsg
         ? html`<div class="feedback-toast ${this.feedbackType}">${this.feedbackMsg}</div>`
