@@ -38,27 +38,51 @@ class VasPdaPick extends localize(i18next)(PageView) {
           flex-direction: column;
           background: var(--md-sys-color-surface, #fafafa);
           height: 100%;
-          overflow-y: auto;
+          overflow: hidden;
           font-family: var(--md-sys-typescale-body-large-font, sans-serif);
         }
 
-        /* 컨텐츠 (작업 화면용) */
-        .pda-content {
-          padding: 16px;
+        /* 작업 화면 3존 레이아웃 — 상단 고정 / 중앙 리스트 스크롤 / 하단 고정 */
+        .work-view {
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          min-height: 0;
+        }
+
+        /* 상단 고정존: 주문정보 · 진행률 · 스캔 · 현재자재(로케이션/수량/피킹확인) */
+        .work-fixed-top {
+          flex-shrink: 0;
+          padding: 6px 12px 4px;
+        }
+
+        /* 중앙 스크롤존: 자재 체크리스트만 스크롤 (전체 화면 스크롤 방지) */
+        .work-scroll {
           flex: 1;
+          min-height: 0;
+          overflow-y: auto;
+          padding: 0 12px;
+        }
+
+        /* 하단 고정존: 완료 · 목록 버튼 */
+        .work-fixed-bottom {
+          flex-shrink: 0;
+          padding: 8px 12px;
+          border-top: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
+          background: var(--md-sys-color-surface, #fafafa);
         }
 
         /* 스캔 입력 */
         .scan-input-group {
-          margin-bottom: 16px;
+          margin-bottom: 6px;
         }
 
         .scan-input-group label {
           display: block;
-          font-size: 14px;
+          font-size: 12px;
           font-weight: 600;
           color: var(--md-sys-color-on-surface-variant, #666);
-          margin-bottom: 8px;
+          margin-bottom: 3px;
         }
 
         .scan-input {
@@ -68,8 +92,8 @@ class VasPdaPick extends localize(i18next)(PageView) {
 
         .scan-input ox-input-barcode {
           flex: 1;
-          --barcodescan-input-font-size: 18px;
-          --barcodescan-input-padding: 14px 16px;
+          --barcodescan-input-font-size: 15px;
+          --barcodescan-input-padding: 8px 12px;
           --barcodescan-input-border-radius: 8px;
         }
 
@@ -244,16 +268,16 @@ class VasPdaPick extends localize(i18next)(PageView) {
 
         /* 진행률 바 */
         .progress-section {
-          margin-bottom: 16px;
+          margin-bottom: 6px;
         }
 
         .progress-bar-container {
           width: 100%;
-          height: 12px;
+          height: 8px;
           background: var(--md-sys-color-surface-variant, #e0e0e0);
           border-radius: 8px;
           overflow: hidden;
-          margin-bottom: 8px;
+          margin-bottom: 4px;
         }
 
         .progress-bar-fill {
@@ -270,12 +294,50 @@ class VasPdaPick extends localize(i18next)(PageView) {
         .progress-label {
           display: flex;
           justify-content: space-between;
-          font-size: 14px;
+          font-size: 12px;
           font-weight: 600;
           color: var(--md-sys-color-on-surface, #333);
         }
 
-        /* 주문 정보 카드 */
+        /* 주문 정보 — 타이트 1줄 헤더 */
+        .order-info-bar {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 2px 6px;
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #eee);
+          margin-bottom: 6px;
+          white-space: nowrap;
+          overflow: hidden;
+        }
+        .order-info-bar .back-btn {
+          flex-shrink: 0;
+          border: none;
+          background: none;
+          color: var(--md-sys-color-primary, #1976D2);
+          font-size: 18px;
+          line-height: 1;
+          padding: 2px 6px 2px 2px;
+          cursor: pointer;
+        }
+        .order-info-bar .back-btn:active {
+          opacity: 0.6;
+        }
+        .order-info-bar .oi-no {
+          font-size: 15px;
+          font-weight: 700;
+          color: var(--md-sys-color-on-surface, #222);
+          flex-shrink: 0;
+        }
+        .order-info-bar .oi-sub {
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .order-info-bar .oi-sub strong { color: #E65100; }
+
+        /* 주문 정보 카드 (미사용 — 하위호환 보존) */
         .order-info-card {
           background: #fff;
           border-radius: 12px;
@@ -303,19 +365,19 @@ class VasPdaPick extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface, #333);
         }
 
-        /* 항목 체크리스트 */
+        /* 항목 체크리스트 — 스크롤존 내부, 타이트 */
         .item-checklist {
           background: #fff;
-          border-radius: 12px;
-          padding: 16px;
-          margin-bottom: 16px;
+          border-radius: 10px;
+          padding: 8px 12px;
+          margin: 6px 0 8px;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
         .item-checklist .title {
-          font-size: 16px;
+          font-size: 14px;
           font-weight: 700;
-          margin-bottom: 12px;
+          margin-bottom: 6px;
         }
 
         /* 체크리스트 항목 래퍼 (항목 + 상세 패널) */
@@ -330,22 +392,22 @@ class VasPdaPick extends localize(i18next)(PageView) {
         .checklist-item {
           display: flex;
           align-items: center;
-          gap: 12px;
-          padding: 10px 0;
-          font-size: 14px;
+          gap: 8px;
+          padding: 5px 0;
+          font-size: 13px;
           cursor: pointer;
         }
 
         .checklist-item.active {
           background: #FFF3E0;
-          margin: 0 -16px;
-          padding: 10px 16px;
-          border-radius: 8px;
+          margin: 0 -12px;
+          padding: 5px 12px;
+          border-radius: 6px;
         }
 
         .checklist-item .icon {
-          font-size: 20px;
-          min-width: 24px;
+          font-size: 16px;
+          min-width: 18px;
           text-align: center;
         }
 
@@ -359,15 +421,21 @@ class VasPdaPick extends localize(i18next)(PageView) {
 
         .checklist-item .sku-info {
           flex: 1;
+          min-width: 0;
+          line-height: 1.25;
         }
 
         .checklist-item .sku-name {
           font-weight: 600;
+          font-size: 13px;
           color: var(--md-sys-color-on-surface, #333);
+          /* 긴 자재명은 줄바꿈하여 전체 표시 (자르지 않음) — 토글 버튼은 sku-info min-width:0 로 항상 유지 */
+          word-break: break-word;
+          overflow-wrap: anywhere;
         }
 
         .checklist-item .qty {
-          font-size: 13px;
+          font-size: 12px;
           color: var(--md-sys-color-on-surface-variant, #666);
         }
 
@@ -379,8 +447,8 @@ class VasPdaPick extends localize(i18next)(PageView) {
         /* 토글 버튼 */
         .toggle-detail-btn {
           flex-shrink: 0;
-          min-width: 32px;
-          min-height: 32px;
+          min-width: 26px;
+          min-height: 26px;
           border: 1px solid var(--md-sys-color-outline-variant, #ccc);
           border-radius: 6px;
           background: var(--md-sys-color-surface-variant, #f5f5f5);
@@ -403,9 +471,9 @@ class VasPdaPick extends localize(i18next)(PageView) {
           color: var(--md-sys-color-primary, #1976D2);
         }
 
-        /* 재고 상세 패널 */
+        /* 재고 상세 패널 — 타이트 */
         .inv-detail-panel {
-          margin: 0 0 8px 36px;
+          margin: 0 0 4px 26px;
           border-radius: 6px;
           overflow: hidden;
         }
@@ -414,17 +482,17 @@ class VasPdaPick extends localize(i18next)(PageView) {
         .alloc-card-list {
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 4px;
         }
 
         .alloc-card {
           background: #f8f9ff;
           border: 1px solid #dde3f5;
-          border-radius: 8px;
-          padding: 10px 12px;
+          border-radius: 6px;
+          padding: 5px 8px;
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 2px;
         }
 
         .alloc-card.scanned {
@@ -440,7 +508,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
         }
 
         .alloc-barcode {
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 700;
           color: #1a237e;
           word-break: break-all;
@@ -467,7 +535,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
         }
 
         .alloc-qty {
-          font-size: 13px;
+          font-size: 12px;
           color: #555;
         }
 
@@ -480,10 +548,11 @@ class VasPdaPick extends localize(i18next)(PageView) {
         }
 
         .alloc-badge {
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 700;
-          padding: 3px 8px;
-          border-radius: 10px;
+          padding: 2px 6px;
+          border-radius: 8px;
+          white-space: nowrap;
         }
 
         .alloc-badge.pending {
@@ -512,41 +581,44 @@ class VasPdaPick extends localize(i18next)(PageView) {
           color: var(--md-sys-color-primary, #1a73e8);
         }
 
-        /* 현재 항목 폼 */
+        /* 현재 항목 폼 — 타이트 */
         .current-item-form {
           background: var(--md-sys-color-surface, #fff);
-          border-radius: 12px;
-          padding: 16px;
-          margin-bottom: 16px;
+          border-radius: 8px;
+          padding: 8px;
+          margin-bottom: 0;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
         .current-item-form .title {
-          font-size: 16px;
+          font-size: 13px;
           font-weight: 700;
-          margin-bottom: 12px;
+          margin-bottom: 6px;
           color: #E65100;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
-        /* 로케이션 안내 */
+        /* 로케이션 안내 — 타이트 (박스 높이 추가 -20%) */
         .location-guide {
           background: #FFF3E0;
-          border: 2px solid #FF9800;
-          border-radius: 12px;
-          padding: 16px;
-          margin-bottom: 16px;
+          border: 1.5px solid #FF9800;
+          border-radius: 8px;
+          padding: 3px 8px;
+          margin-bottom: 6px;
           text-align: center;
         }
 
         .location-guide .loc-label {
-          font-size: 13px;
+          font-size: 11px;
           font-weight: 600;
           color: #E65100;
-          margin-bottom: 4px;
+          margin-bottom: 0;
         }
 
         .location-guide .loc-value {
-          font-size: 28px;
+          font-size: 15px;
           font-weight: 700;
           color: #E65100;
         }
@@ -559,24 +631,24 @@ class VasPdaPick extends localize(i18next)(PageView) {
 
         /* 폼 그룹 */
         .form-group {
-          margin-bottom: 16px;
+          margin-bottom: 6px;
         }
 
         .form-group label {
           display: block;
-          font-size: 13px;
+          font-size: 11px;
           font-weight: 600;
           color: var(--md-sys-color-on-surface-variant, #666);
-          margin-bottom: 6px;
+          margin-bottom: 3px;
         }
 
         .form-group input,
         .form-group select {
           width: 100%;
-          padding: 12px;
+          padding: 8px 10px;
           border: 2px solid var(--md-sys-color-outline, #ccc);
           border-radius: 8px;
-          font-size: 16px;
+          font-size: 15px;
           box-sizing: border-box;
           outline: none;
         }
@@ -593,20 +665,37 @@ class VasPdaPick extends localize(i18next)(PageView) {
 
         .qty-input-group input {
           flex: 1;
+          min-width: 0;
+        }
+
+        /* 수량 입력 옆 인라인 '확인' 버튼 — 입력창 높이에 맞춰 컴팩트 */
+        .qty-input-group .pda-btn {
+          flex-shrink: 0;
+          min-height: 38px;
+          padding: 0 18px;
+          font-size: 15px;
+          border-radius: 8px;
         }
 
         .qty-label {
-          font-size: 14px;
+          font-size: 13px;
           font-weight: 600;
           color: var(--md-sys-color-on-surface-variant, #666);
           white-space: nowrap;
         }
 
-        /* 폼 액션 버튼 */
+        /* 폼 액션 버튼 — 타이트 (기본 pda-btn보다 작게) */
         .form-actions {
           display: flex;
           gap: 12px;
-          margin-top: 16px;
+          margin-top: 6px;
+        }
+
+        .form-actions .pda-btn {
+          min-height: 42px;
+          padding: 8px 16px;
+          font-size: 16px;
+          border-radius: 8px;
         }
 
         .form-actions .pda-btn {
@@ -658,17 +747,18 @@ class VasPdaPick extends localize(i18next)(PageView) {
           pointer-events: none;
         }
 
-        /* 하단 액션 */
+        /* 하단 액션 — 고정존, 가로 배치로 1행 압축 */
         .bottom-actions {
           display: flex;
-          flex-direction: column;
-          gap: 12px;
-          margin-top: 24px;
-          padding-bottom: 24px;
+          flex-direction: row;
+          gap: 8px;
         }
 
         .bottom-actions .pda-btn {
-          width: 100%;
+          flex: 1;
+          min-height: 46px;
+          padding: 10px 16px;
+          font-size: 16px;
         }
 
         /* 피드백 토스트 */
@@ -758,19 +848,19 @@ class VasPdaPick extends localize(i18next)(PageView) {
           color: var(--md-sys-color-on-surface-variant, #666);
         }
 
-        /* 피킹 완료 메시지 */
+        /* 피킹 완료 메시지 — 타이트 */
         .completion-card {
           text-align: center;
           background: #E8F5E9;
           border: 2px solid #4CAF50;
-          border-radius: 12px;
-          padding: 24px 16px;
-          margin-bottom: 16px;
+          border-radius: 10px;
+          padding: 10px 12px;
+          margin-bottom: 4px;
         }
 
         .completion-card .icon {
-          font-size: 48px;
-          margin-bottom: 12px;
+          font-size: 32px;
+          margin-bottom: 4px;
         }
 
         .completion-card .message {
@@ -946,14 +1036,27 @@ class VasPdaPick extends localize(i18next)(PageView) {
     const allPicked = pickedCount === totalCount && totalCount > 0
 
     return html`
-      <div class="pda-content">
-        ${this._renderOrderSummary()}
-        ${this._renderProgressBar(pickedCount, totalCount, progressPct)}
-        ${!allPicked ? this._renderBarcodeScanner() : ''}
-        ${allPicked ? this._renderCompletionMessage() : ''}
-        ${this._renderItemChecklist()}
-        ${this.currentItemIndex >= 0 ? this._renderPickForm() : ''}
-        ${this._renderBottomActions(allPicked)}
+      <div class="work-view">
+        <!-- 상단 고정: 주문정보 · 진행률 · 스캔 · 현재 자재(로케이션/수량/피킹확인) -->
+        <div class="work-fixed-top">
+          ${this._renderOrderSummary()}
+          ${this._renderProgressBar(pickedCount, totalCount, progressPct)}
+          ${!allPicked ? this._renderBarcodeScanner() : ''}
+          ${!allPicked && this.currentItemIndex >= 0 ? this._renderPickForm() : ''}
+          ${allPicked ? this._renderCompletionMessage() : ''}
+        </div>
+
+        <!-- 중앙 스크롤: 자재 체크리스트만 스크롤 -->
+        <div class="work-scroll">
+          ${this._renderItemChecklist()}
+        </div>
+
+        <!-- 하단 고정: 전량 완료 시에만 '피킹 작업 완료' 표시 (목록 이동은 상단 ◀ 버튼) -->
+        ${allPicked ? html`
+          <div class="work-fixed-bottom">
+            ${this._renderBottomActions(allPicked)}
+          </div>
+        ` : ''}
       </div>
     `
   }
@@ -962,21 +1065,16 @@ class VasPdaPick extends localize(i18next)(PageView) {
     const order = this.selectedOrder
     const bom = this.bomMap[order.vas_bom_id]
 
+    // 타이트 UI — 3줄 카드 대신 1줄 압축 헤더 (◀ 뒤로 + 주문번호 + 세트상품 · VAS유형 · 계획수량)
     return html`
-      <div class="order-info-card">
-        <div class="title">${order.vas_no}</div>
-        <div class="detail-row">
-          <span>세트상품</span>
-          <span class="value">${bom?.set_sku_cd || '-'} / ${bom?.set_sku_nm || '-'}</span>
-        </div>
-        <div class="detail-row">
-          <span>VAS유형</span>
-          <span class="value">${this._vasTypeLabel(order.vas_type)}</span>
-        </div>
-        <div class="detail-row">
-          <span>계획수량</span>
-          <span class="value">${order.plan_qty || 0} EA</span>
-        </div>
+      <div class="order-info-bar">
+        <button class="back-btn" @click="${this._backToOrderSelect}" title="주문 목록으로">◀</button>
+        <span class="oi-no">${order.vas_no}</span>
+        <span class="oi-sub">
+          ${bom?.set_sku_nm || bom?.set_sku_cd || '-'}
+          · ${this._vasTypeLabel(order.vas_type)}
+          · 계획 <strong>${order.plan_qty || 0}</strong> EA
+        </span>
       </div>
     `
   }
@@ -1016,7 +1114,6 @@ class VasPdaPick extends localize(i18next)(PageView) {
   _renderItemChecklist() {
     return html`
       <div class="item-checklist">
-        <div class="title">자재 피킹 체크리스트</div>
         ${this.orderItems.map((item, idx) => html`
           <div class="checklist-item-wrapper">
             <!-- 항목 행 -->
@@ -1185,14 +1282,10 @@ class VasPdaPick extends localize(i18next)(PageView) {
               @input="${e => { this.pickQty = parseInt(e.target.value) || 0 }}"
             />
             <span class="qty-label">/ ${reqQty} EA</span>
+            <button class="pda-btn primary" ?disabled="${this.picking}" @click="${this._confirmPick}">
+              ${this.picking ? '처리 중...' : '확인'}
+            </button>
           </div>
-        </div>
-
-        <div class="form-actions">
-          <button class="pda-btn primary" ?disabled="${this.picking}" @click="${this._confirmPick}">
-            ${this.picking ? '처리 중...' : '피킹 확인'}
-          </button>
-          <button class="pda-btn outline" ?disabled="${this.picking}" @click="${this._skipItem}">스킵</button>
         </div>
       </div>
     `
@@ -1208,13 +1301,11 @@ class VasPdaPick extends localize(i18next)(PageView) {
     `
   }
 
-  _renderBottomActions(allPicked) {
+  _renderBottomActions() {
+    // 전량 완료 시 '피킹 작업 완료'만 표시 (목록 이동은 상단 ◀ 버튼으로 대체)
     return html`
       <div class="bottom-actions">
-        ${allPicked
-          ? html`<button class="pda-btn success" @click="${this._completeAllPick}">피킹 작업 완료</button>`
-          : ''}
-        <button class="pda-btn warning" @click="${this._backToOrderSelect}">주문 목록으로</button>
+        <button class="pda-btn success" @click="${this._completeAllPick}">피킹 작업 완료</button>
       </div>
     `
   }
@@ -1555,10 +1646,6 @@ class VasPdaPick extends localize(i18next)(PageView) {
     }
     this.currentItemIndex = idx
     this._initPickForm()
-  }
-
-  _skipItem() {
-    this._moveToNextItem()
   }
 
   _moveToNextItem() {
