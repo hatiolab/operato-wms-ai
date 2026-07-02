@@ -710,20 +710,32 @@ public class InboundTransactionService extends AbstractQueryService {
             }
         }
 
-        // 4. 입고 예정 상태 변경
-        // TODO 여기에 항목 중에 불량 상태의 항목이 있다면 불량 존재 플래그를 업데이트 해야함
+        // 4. 디테일에 불량(BAD)/미입고(SHORT) 유형이 하나라도 있는지 집계 (마스터 플래그 반영용)
+        boolean hasDefect = false;
+        boolean hasShort = false;
+        for (ReceivingItem item : receivingItems) {
+            if (ValueUtil.isEqual(item.getStatus(), WmsInboundConstants.STATUS_BAD)) {
+                hasDefect = true;
+            } else if (ValueUtil.isEqual(item.getStatus(), WmsInboundConstants.STATUS_SHORT)) {
+                hasShort = true;
+            }
+        }
+
+        // 5. 입고 예정 상태 변경 + 불량/미입고 존재 플래그 반영
         receiving.setStatus(WmsInboundConstants.STATUS_END);
         receiving.setRcvEndDate(rcvDate);
-        this.queryManager.update(receiving, "status", "rcvEndDate", "updatedAt");
+        receiving.setDefectFlag(hasDefect);
+        receiving.setShortFlag(hasShort);
+        this.queryManager.update(receiving, "status", "rcvEndDate", "defectFlag", "shortFlag", "updatedAt");
 
-        // 5. 입고 상세 상태 변경
+        // 6. 입고 상세 상태 변경
         this.queryManager.updateBatch(receivingItems, "status", "rcvDate", "updatedAt");
 
-        // 6. 재고 정보 생성
+        // 7. 재고 정보 생성
         // 2026-06-26 수정 : 재고 생성 시점을 입고 항목 완료 시점으로 변경
         // this.createInventoriesByReceivingOrder(receiving, receivingItems);
 
-        // 7. 입고 정보 리턴
+        // 8. 입고 정보 리턴
         return receiving;
     }
 

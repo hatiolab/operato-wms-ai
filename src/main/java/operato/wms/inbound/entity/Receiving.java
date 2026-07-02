@@ -127,6 +127,18 @@ public class Receiving extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private Boolean labelFlag;
 
 	/**
+	 * 불량여부 - true이면 입고지시 디테일(receiving_items) 중 불량(BAD) 유형이 하나 이상 존재함
+	 */
+	@Column(name = "defect_flag", length = 50)
+	private Boolean defectFlag;
+
+	/**
+	 * 미입고여부 - true이면 입고지시 디테일(receiving_items) 중 미입고(SHORT) 유형이 하나 이상 존재함
+	 */
+	@Column(name = "short_flag", length = 50)
+	private Boolean shortFlag;
+
+	/**
 	 * 입고차량번호 - 상품을 운반한 차량의 번호판
 	 */
 	@Column(name = "car_no", length = 30)
@@ -314,6 +326,22 @@ public class Receiving extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setLabelFlag(Boolean labelFlag) {
 		this.labelFlag = labelFlag;
+	}
+
+	public Boolean getDefectFlag() {
+		return defectFlag;
+	}
+
+	public void setDefectFlag(Boolean defectFlag) {
+		this.defectFlag = defectFlag;
+	}
+
+	public Boolean getShortFlag() {
+		return shortFlag;
+	}
+
+	public void setShortFlag(Boolean shortFlag) {
+		this.shortFlag = shortFlag;
 	}
 
 	public String getCarNo() {
