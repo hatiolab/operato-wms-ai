@@ -178,7 +178,7 @@
 ### 3-2. [OMS] 웨이브 자동 할당 완성
 
 | # | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
-|---|--------|------|------|------|--------|------|------|
+|---|--------|------|------|------|--------|------|------|------|
 | 1 | W23-WA-1 | 자동 웨이브 그루핑 룰 | 배송유형·거래처·화주사 조건으로 주문 자동 그루핑 | `OmsWaveService` | 2026-04-25 | 100% | ☑ | `createAutoWaves()`에 `wh_cd`/`com_cd` 필터 추가, `buildGroupKey()`에 `com_cd`/`dlv_type`/`ship_by_date` 케이스 추가 |
 | 2 | W23-WA-2 | 자동 웨이브 생성 스케줄러 | 특정 시각 자동 웨이브 생성 스케줄러 (Quartz) | `OmsWaveJob` (신규) | 2026-04-28 | 100% | ☑ | `OmsWaveJob extends AbstractJob` 신규 (handler_type=static), `WmsOmsConfigConstants`에 설정 상수 6개 추가. 트리거는 otarepo-core Quartz 프레임워크가 담당 — jobs 테이블에 handler=`operato.wms.oms.job.OmsWaveJob` 등록으로 활성화 |
 | 3 | W23-WA-3 | B2C 웨이브 확정 팝업 연동 | 피킹 유형, 배송 유형, 택배사 코드, 검수 여부, 포장 스테이션, 작업자 수 처리 | `FulfillmentTransactionController` | 2026-06-23 | 100% | ☑ | |
@@ -187,7 +187,7 @@
 ### 3-3. [OMS] 보충 지시
 
 | # | 작업번호 | 항목 | 내용 | 파일 | 예정일 | 진행율 | 완료 | 비고 |
-|---|--------|------|------|--------|--------|------|------|
+|---|--------|------|------|--------|--------|------|------|-------|
 | 1 | W23-RE-1 | 보충 지시 생성 | 피킹존 재고 부족 감지 → `ReplenishOrder` 자동 생성 | `OmsReplenishOrderService` | 2026-04-28 | 100% | ☑ | 재고 할당 시 BACK_ORDER 발생 → 자동 생성. 수동 생성 API(create_from_order/orders) 추가. start/complete/cancel 엔드포인트를 OmsReplenishOrderService에서 ReplenishOrderController로 노출 |
 | 2 | W23-RE-2 | 보충 작업 처리 | PDA 보충 작업 → 재고 이동 트랜잭션 연결 | `InvTransactionController` | 2026-04-29 | 100% | ☑ | `OmsReplenishOrderService.completeReplenishItem()` 신규 (result_qty 기록 + 전체 완료 시 헤더 자동 COMPLETED). PDA 화면 `pda-oms-replenish.js` 신규: 보충번호 스캔 → 바코드 스캔 → move_inventory → complete 연속 처리 |
 
