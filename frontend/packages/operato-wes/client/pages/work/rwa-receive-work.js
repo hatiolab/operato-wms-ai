@@ -5,6 +5,9 @@ import { OxInputBarcode } from '@operato/input'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import { voiceService } from './voice-service.js'
 import '../../component/entity-label.js'
+import '../../component/sku-barcode-input.js'
+import '../../component/barcode-listener.js'
+import '../../component/numeric-keypad-input.js'
 
 /**
  * RWA 반품 통합 PDA 작업 화면
@@ -191,8 +194,8 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
         .work-header {
           display: flex;
           align-items: center;
-          gap: 12px;
-          padding: 12px 16px;
+          gap: 10px;
+          padding: 8px 12px;
           background: var(--md-sys-color-surface, #fff);
           border-bottom: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
           flex-shrink: 0;
@@ -224,7 +227,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
           align-items: center;
           justify-content: center;
           gap: 0;
-          padding: 14px 0;
+          padding: 8px 0;
           flex-shrink: 0;
           background: var(--md-sys-color-surface, #fff);
           border-bottom: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
@@ -276,10 +279,147 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
         .work-body {
           flex: 1;
           overflow-y: auto;
-          padding: 16px;
+          padding: 10px 12px;
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 8px;
+        }
+
+        /* 상품 바코드 스캔 바 (상품 목록 화면) */
+        .scan-bar {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          padding: 8px 12px;
+          background: var(--md-sys-color-surface, #fff);
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
+          flex-shrink: 0;
+        }
+        .scan-bar .scan-input {
+          flex: 1;
+          min-width: 0;
+        }
+        .scan-bar .btn-picker {
+          flex-shrink: 0;
+          width: 40px;
+          height: 40px;
+          border: 1px solid var(--md-sys-color-primary, #1976D2);
+          border-radius: 8px;
+          background: var(--md-sys-color-surface, #fff);
+          font-size: 18px;
+          cursor: pointer;
+        }
+        .scan-bar .btn-picker:active { background: rgba(25,118,210,.1); }
+
+        /* 상품 카드 목록 (상품별 구분) */
+        .item-cards {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .item-card-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 12px;
+          background: var(--md-sys-color-surface, #fff);
+          border: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
+          border-left: 4px solid var(--md-sys-color-outline, #bbb);
+          border-radius: 10px;
+          box-shadow: 0 1px 3px rgba(0,0,0,.06);
+        }
+        .item-card-row.receive { border-left-color: #FB8C00; }
+        .item-card-row.inspect { border-left-color: #1976D2; }
+        .item-card-row.done    { border-left-color: #4CAF50; opacity: .85; }
+        .item-card-row .ic-main { min-width: 0; }
+        .item-card-row .ic-sku {
+          font-size: 14px;
+          font-weight: 700;
+          color: var(--md-sys-color-on-surface, #222);
+          margin-right: 6px;
+        }
+        .item-card-row .ic-nm {
+          font-size: 13px;
+          color: var(--md-sys-color-on-surface-variant, #666);
+        }
+        .item-card-row .ic-side {
+          flex-shrink: 0;
+          text-align: right;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .item-card-row .ic-qty { font-size: 13px; font-weight: 600; color: var(--md-sys-color-on-surface, #333); }
+        .item-card-row .ic-stage { font-size: 12px; font-weight: 700; }
+        .item-card-row .ic-stage.receive { color: #FB8C00; }
+        .item-card-row .ic-stage.inspect { color: #1976D2; }
+        .item-card-row .ic-stage.done    { color: #4CAF50; }
+
+        /* 입고 화면 — 고정 로케이션 안내 */
+        .loc-note {
+          font-size: 13px;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          padding: 2px 2px;
+        }
+        .loc-note strong { color: var(--md-sys-color-on-surface, #222); }
+
+        /* 상품 선택 팝업 (바텀 시트) */
+        .picker-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,.45);
+          z-index: 1000;
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+        }
+        .picker-sheet {
+          background: var(--md-sys-color-surface, #fff);
+          border-radius: 16px 16px 0 0;
+          width: 100%;
+          max-height: 70vh;
+          overflow-y: auto;
+          padding: 12px 12px env(safe-area-inset-bottom, 16px);
+          box-shadow: 0 -4px 20px rgba(0,0,0,.2);
+        }
+        .picker-handle {
+          width: 40px;
+          height: 4px;
+          background: var(--md-sys-color-outline, #ccc);
+          border-radius: 2px;
+          margin: 0 auto 12px;
+        }
+        .picker-title {
+          font-size: 15px;
+          font-weight: 600;
+          padding: 0 4px 10px;
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #eee);
+        }
+        .picker-empty { text-align: center; padding: 24px; color: #999; }
+        .picker-item {
+          padding: 10px 8px;
+          border-bottom: 1px solid var(--md-sys-color-outline-variant, #f0f0f0);
+          cursor: pointer;
+        }
+        .picker-item:active { background: var(--md-sys-color-surface-variant, #f0f0f0); }
+        .picker-item .pi-nm { font-size: 14px; font-weight: 600; color: var(--md-sys-color-on-surface, #222); }
+        .picker-item .pi-sub { font-size: 12px; color: var(--md-sys-color-on-surface-variant, #777); margin-top: 2px; }
+        .picker-cancel {
+          width: 100%;
+          margin-top: 10px;
+          padding: 12px;
+          border: 1px solid var(--md-sys-color-outline, #ccc);
+          border-radius: 8px;
+          background: transparent;
+          font-size: 14px;
+          color: var(--md-sys-color-on-surface-variant, #555);
+          cursor: pointer;
+        }
+        @media (min-width: 768px) {
+          .picker-backdrop { align-items: center; }
+          .picker-sheet { border-radius: 12px; width: 420px; max-width: 90vw; }
+          .picker-handle { display: none; }
         }
 
         .info-card {
@@ -302,16 +442,16 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
 
         .item-card {
           background: var(--md-sys-color-surface, #fff);
-          border-radius: 12px;
-          padding: 14px 16px;
-          box-shadow: 0 1px 4px rgba(0,0,0,.08);
+          border-radius: 8px;
+          padding: 10px 12px;
+          box-shadow: 0 1px 3px rgba(0,0,0,.06);
           border-left: 4px solid var(--md-sys-color-primary, #1976D2);
         }
 
         .item-card .sku-info {
-          font-size: 15px;
+          font-size: 14px;
           font-weight: 700;
-          margin-bottom: 4px;
+          margin-bottom: 2px;
         }
 
         .item-card .qty-info {
@@ -408,10 +548,26 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
           border-color: var(--md-sys-color-primary, #1976D2);
         }
 
+        /* 불량 유형/상세/비고 등 일반 입력 — 타이트하게 (수량 number 입력 제외) */
+        .form-group select,
+        .form-group input:not([type='number']),
+        .form-group textarea {
+          padding: 7px 10px;
+          font-size: 14px;
+        }
+
         .form-group input[type='number'] {
-          font-size: 22px;
+          font-size: 20px;
           font-weight: 700;
           text-align: center;
+        }
+
+        /* 양품 수량 표시 — 불량 수량 키패드 컴포넌트와 높이 맞춤 */
+        .form-group input[type='number'].good-qty-field {
+          min-height: 32px;
+          padding: 0 8px;
+          font-size: 18px;
+          background: var(--md-sys-color-surface-variant, #eee);
         }
 
         .qty-row {
@@ -434,8 +590,8 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
 
         .btn-confirm-inline {
           flex-shrink: 0;
-          height: 52px;
-          padding: 0 20px;
+          height: 46px;
+          padding: 0 18px;
           border: none;
           border-radius: 10px;
           background: var(--md-sys-color-primary, #1976D2);
@@ -454,20 +610,20 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
          * 하단 액션 버튼
          * ====================================== */
         .action-bar {
-          padding: 12px 16px;
+          padding: 8px 12px;
           background: var(--md-sys-color-surface, #fff);
           border-top: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
           display: flex;
-          gap: 10px;
+          gap: 8px;
           flex-shrink: 0;
         }
 
         .action-btn {
           flex: 1;
-          min-height: 52px;
+          min-height: 44px;
           border: none;
-          border-radius: 12px;
-          font-size: 17px;
+          border-radius: 10px;
+          font-size: 15px;
           font-weight: 700;
           cursor: pointer;
           transition: all .15s;
@@ -646,10 +802,10 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
         }
 
         .section-title {
-          font-size: 15px;
+          font-size: 13px;
           font-weight: 700;
           color: var(--md-sys-color-on-surface, #222);
-          margin: 0 0 4px;
+          margin: 0 0 2px;
         }
 
         .warn-text {
@@ -692,7 +848,9 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
       // Step 2 에서 선택된 아이템 ID
       selectedInspItemId:   { type: String },
       // 주문 진입 시점의 초기 상태 (isDone 판단용 — 작업 중 상태 변경과 구분)
-      enteredOrderStatus:   { type: String }
+      enteredOrderStatus:   { type: String },
+      // 상품 목록 화면 — 상품 선택 팝업 표시 여부
+      showItemPicker:       { type: Boolean }
     }
   }
 
@@ -714,6 +872,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     this.selectedOrderItemId = ''
     this.selectedInspItemId = ''
     this.enteredOrderStatus = ''
+    this.showItemPicker = false
     this._resetForms()
   }
 
@@ -757,6 +916,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
   render() {
     return html`
       ${this.screen === 'order-select' ? this._renderOrderSelect()
+        : this.screen === 'item-list'  ? this._renderItemList()
         : this.screen === 'complete'   ? this._renderCompleteScreen()
         : this._renderWorkScreen()}
       ${this.feedbackMsg
@@ -866,17 +1026,210 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
    * ============================================================ */
 
   /** 작업 화면 전체 레이아웃 */
-  _renderWorkScreen() {
+  /* ============================================================
+   * 상품 목록(허브) 화면 — 상품 단위 작업의 시작점
+   * ============================================================ */
+
+  /** 상품별 작업 단계 판단 — 'RECEIVE'(입고 필요) | 'INSPECT'(검수 필요) | 'DONE'(완료) */
+  _itemStage(item) {
+    const received = ['RECEIVED', 'INSPECTING', 'INSPECTED', 'DISPOSED', 'COMPLETED'].includes(item.status)
+    const inspected = ['INSPECTED', 'DISPOSED', 'COMPLETED'].includes(item.status)
+    if (!received) return 'RECEIVE'
+    if (!inspected) return 'INSPECT'
+    return 'DONE'
+  }
+
+  /** 상품 목록 화면 — 개별 상품을 선택해 입고→검수 진행 */
+  _renderItemList() {
     const order = this.selectedOrder
-    // 진입 시점 상태 기준으로 판단 — 작업 중 상태 변경(COMPLETED)과 구분
-    const isDone = ['COMPLETED', 'CANCELLED', 'REJECTED'].includes(this.enteredOrderStatus)
+    const doneCount = this.orderItems.filter(i => this._itemStage(i) === 'DONE').length
+    const allCompleted = this.orderItems.length > 0 && this.orderItems.every(i => i.status === 'COMPLETED')
 
     return html`
+      <!-- 포커스 없이도 스캔 가능 (전역 키 입력 수신) -->
+      <barcode-listener @barcode-scanned="${e => this._onItemListScan(e.detail.barcode)}"></barcode-listener>
+
       <div class="work-screen">
         <!-- 헤더 -->
         <div class="work-header">
           <button class="back-btn" @click="${this._backToOrderSelect}">←</button>
           <div class="work-title">${order?.rwa_no || order?.rwa_req_no || '-'}</div>
+          <span class="order-badge ${order?.status}">${this._statusLabel(order?.status)}</span>
+        </div>
+
+        <!-- 상품 바코드 스캔 -->
+        <div class="scan-bar">
+          <sku-barcode-input
+            class="scan-input"
+            .comCd="${order?.com_cd || ''}"
+            placeholder="상품코드 / 바코드 스캔"
+            skipInventory
+            @sku-select="${e => this._onItemSkuSelect(e.detail)}"
+          ></sku-barcode-input>
+          <button class="btn-picker" title="상품 선택" @click="${() => { this.showItemPicker = true }}">📋</button>
+        </div>
+
+        <!-- 상품 목록 -->
+        <div class="work-body">
+          <p class="section-title">반품 상품 (완료 ${doneCount} / 전체 ${this.orderItems.length})</p>
+          <div class="item-cards">
+            ${this.orderItems.map(item => {
+      const stage = this._itemStage(item)
+      const label = stage === 'DONE'
+        ? `✓ 완료 · 양품 ${item.good_qty || 0} / 불량 ${item.defect_qty || 0}`
+        : stage === 'INSPECT' ? '검수 필요' : '입고 필요'
+      const cls = stage === 'DONE' ? 'done' : stage === 'INSPECT' ? 'inspect' : 'receive'
+      return html`
+                <div class="item-card-row ${cls}">
+                  <div class="ic-main">
+                    <span class="ic-sku">${item.sku_cd}</span>
+                    <span class="ic-nm">${item.sku_nm || '-'}</span>
+                  </div>
+                  <div class="ic-side">
+                    <span class="ic-qty">${item.rwa_req_qty || item.rwa_qty || 0} EA</span>
+                    <span class="ic-stage ${cls}">${label}</span>
+                  </div>
+                </div>
+              `
+    })}
+          </div>
+        </div>
+
+        <!-- 하단 버튼 -->
+        <div class="action-bar">
+          <button class="action-btn secondary" @click="${this._backToOrderSelect}">주문 목록</button>
+          <button class="action-btn success"
+            ?disabled="${!allCompleted || this.actionLoading}"
+            @click="${this._finishWork}">
+            ${this.actionLoading ? '처리중...' : '반품 완료'}
+          </button>
+        </div>
+      </div>
+
+      ${this._renderItemPicker()}
+    `
+  }
+
+  /** 상품 선택 팝업 — 목록에서 직접 선택해 작업 진입 */
+  _renderItemPicker() {
+    if (!this.showItemPicker) return ''
+    return html`
+      <div class="picker-backdrop" @click="${() => { this.showItemPicker = false }}">
+        <div class="picker-sheet" @click="${e => e.stopPropagation()}">
+          <div class="picker-handle"></div>
+          <div class="picker-title">상품 선택 (${this.orderItems.length})</div>
+          ${this.orderItems.length === 0
+        ? html`<div class="picker-empty">항목 없음</div>`
+        : this.orderItems.map(item => {
+          const stage = this._itemStage(item)
+          const label = stage === 'DONE' ? '완료' : stage === 'INSPECT' ? '검수 필요' : '입고 필요'
+          return html`
+                <div class="picker-item" @click="${() => { this.showItemPicker = false; this._openItemWork(item) }}">
+                  <div class="pi-nm">${item.sku_cd} · ${item.sku_nm || '-'}</div>
+                  <div class="pi-sub">${item.rwa_req_qty || item.rwa_qty || 0} EA · ${label}</div>
+                </div>
+              `
+        })}
+          <button class="picker-cancel" @click="${() => { this.showItemPicker = false }}">취소</button>
+        </div>
+      </div>
+    `
+  }
+
+  /** 상품 바코드 스캔(sku-barcode-input) 결과 → 해당 상품 작업 진입 */
+  _onItemSkuSelect(detail) {
+    const skuCd = detail?.sku_cd
+    const item = this.orderItems.find(i => i.sku_cd === skuCd)
+    if (!item) {
+      this._showFeedback(`[${skuCd || '?'}] 반품 항목에 없는 상품입니다`, 'error')
+      voiceService.error('반품 항목에 없는 상품입니다')
+      return
+    }
+    this._openItemWork(item)
+  }
+
+  /** barcode-listener 스캔 → sku-barcode-input과 동일한 해석 경로로 처리 (88바코드 대응) */
+  _onItemListScan(barcode) {
+    const el = this.renderRoot?.querySelector('sku-barcode-input')
+    if (el) el._onScan(barcode)
+  }
+
+  /** 상품 목록으로 복귀 */
+  _goToItemList() {
+    this.selectedOrderItemId = ''
+    this.selectedInspItemId = ''
+    this._resetForms()
+    this.step = 1
+    this.screen = 'item-list'
+  }
+
+  /** 상품 선택 → 작업 화면 진입 (미입고면 입고 단계, 입고완료면 검수 단계) */
+  _openItemWork(item) {
+    this.selectedOrderItemId = item.id
+    this.selectedInspItemId = item.id
+    const stage = this._itemStage(item)
+    if (stage === 'RECEIVE') {
+      this.step = 1
+      this.rcvQty = item.rwa_req_qty || item.rwa_qty || 0
+      this.locCd = item.loc_cd || this.returnLocCd || ''
+    } else {
+      this._enterInspectForItem(item)
+    }
+    this.screen = 'work'
+    this.requestUpdate()
+  }
+
+  /** 검수 단계 진입 — 해당 상품의 양품/불량 폼 초기화 */
+  _enterInspectForItem(item) {
+    this.selectedOrderItemId = item.id
+    this.selectedInspItemId = item.id
+    const total = item.rwa_qty || 0
+    if (['INSPECTED', 'DISPOSED', 'COMPLETED'].includes(item.status)) {
+      this.defectQty = item.defect_qty || 0
+      this.goodQty = (item.good_qty != null) ? item.good_qty : Math.max(0, total - this.defectQty)
+    } else {
+      this.defectQty = 0
+      this.goodQty = total
+    }
+    this.defectType = ''
+    this.defectDesc = ''
+    this.inspRemarks = ''
+    this.step = 2
+  }
+
+  /** 작업 화면에서 입고 단계로 이동 (같은 상품) */
+  _workToReceive() {
+    const item = this.orderItems.find(i => i.id === (this.selectedInspItemId || this.selectedOrderItemId))
+    if (!item) return
+    this.selectedOrderItemId = item.id
+    this.rcvQty = item.rwa_qty || item.rwa_req_qty || 0
+    this.locCd = item.loc_cd || this.returnLocCd || ''
+    this.step = 1
+  }
+
+  /** 작업 화면에서 검수 단계로 이동 (같은 상품, 이미 입고된 경우) */
+  _workToInspect() {
+    const item = this.orderItems.find(i => i.id === (this.selectedOrderItemId || this.selectedInspItemId))
+    if (!item) return
+    this._enterInspectForItem(item)
+  }
+
+  /* ============================================================
+   * 작업 화면 (단일 상품: 입고 / 검수)
+   * ============================================================ */
+
+  _renderWorkScreen() {
+    const order = this.selectedOrder
+    const currentItem = this.orderItems.find(
+      i => i.id === (this.step === 1 ? this.selectedOrderItemId : this.selectedInspItemId)
+    )
+
+    return html`
+      <div class="work-screen">
+        <!-- 헤더 -->
+        <div class="work-header">
+          <button class="back-btn" @click="${this._goToItemList}">←</button>
+          <div class="work-title">${currentItem?.sku_cd || order?.rwa_no || '-'}</div>
           <span class="order-badge ${order?.status}">${this._statusLabel(order?.status)}</span>
         </div>
 
@@ -889,11 +1242,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
         </div>
 
         <!-- 하단 버튼 -->
-        ${isDone ? html`
-          <div class="action-bar">
-            <button class="action-btn outline" @click="${this._backToOrderSelect}">목록으로</button>
-          </div>
-        ` : this._renderActionBar()}
+        ${this._renderActionBar()}
       </div>
     `
   }
@@ -918,36 +1267,33 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     `
   }
 
-  /** 하단 액션 버튼 */
+  /** 하단 액션 버튼 (단일 상품 작업 — 확인은 폼 내부 인라인 버튼) */
   _renderActionBar() {
-    // ── Step 1 전용 액션바: 확인은 인라인, 하단은 "다음" 버튼 ──
+    const currentItem = this.orderItems.find(
+      i => i.id === (this.selectedOrderItemId || this.selectedInspItemId)
+    )
+    const received = currentItem &&
+      ['RECEIVED', 'INSPECTING', 'INSPECTED', 'DISPOSED', 'COMPLETED'].includes(currentItem.status)
+
+    // ── Step 1: [목록] · [검수 →](입고완료 상품만) ──
     if (this.step === 1) {
-      const doneStatuses = ['RECEIVED', 'INSPECTING', 'INSPECTED', 'DISPOSED', 'COMPLETED']
-      const allReceived = this.orderItems.length > 0 &&
-        this.orderItems.every(i => doneStatuses.includes(i.status))
       return html`
         <div class="action-bar">
-          <button class="action-btn secondary" @click="${this._backToOrderSelect}">목록</button>
+          <button class="action-btn secondary" @click="${this._goToItemList}">목록</button>
           <button class="action-btn primary"
-            ?disabled="${!allReceived}"
-            @click="${this._nextStep}">
-            다음 →
+            ?disabled="${!received}"
+            @click="${this._workToInspect}">
+            검수 →
           </button>
         </div>
       `
     }
 
-    // ── Step 2 액션바: 확인은 인라인, 전체 완료 시 "반품 완료" 버튼 활성화 ──
-    const allInspected = this.orderItems.length > 0 &&
-      this.orderItems.every(i => i.status === 'COMPLETED')
+    // ── Step 2: [← 입고] · [목록] ──
     return html`
       <div class="action-bar">
-        <button class="action-btn secondary" @click="${this._prevStep}">← 이전</button>
-        <button class="action-btn success"
-          ?disabled="${!allInspected || this.actionLoading}"
-          @click="${this._finishWork}">
-          ${this.actionLoading ? '처리중...' : '반품 완료'}
-        </button>
+        <button class="action-btn secondary" @click="${this._workToReceive}">← 입고</button>
+        <button class="action-btn secondary" @click="${this._goToItemList}">목록</button>
       </div>
     `
   }
@@ -993,22 +1339,13 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
           </button>
         </div>
 
-        <div class="form-group">
-          <label>보관 로케이션</label>
-          <ox-input-barcode
-            placeholder="${this.returnLocCd || 'RWA-01-01'}"
-            .value="${this.locCd}"
-            @change="${e => { this.locCd = e.target.value }}"
-          ></ox-input-barcode>
-        </div>
+        <div class="loc-note">📍 보관 로케이션: <strong>${this.returnLocCd || '반품대기존'}</strong> (자동)</div>
       ` : html`
         <div class="empty-state">
           <span class="empty-icon">📦</span>
           <span class="empty-text">입고할 항목이 없습니다</span>
         </div>
       `}
-
-      ${this._renderItemsProgressStep1()}
     `
   }
 
@@ -1044,26 +1381,23 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
               type="number"
               readonly
               tabindex="-1"
+              class="good-qty-field"
               .value="${this.goodQty != null ? this.goodQty : ''}"
-              style="background:var(--md-sys-color-surface-variant,#eee);"
             />
           </div>
           <div class="form-group">
             <label>불량 수량</label>
-            <input
-              type="number"
-              inputmode="numeric"
-              min="0"
-              max="${totalQty}"
-              .value="${this.defectQty != null ? this.defectQty : ''}"
+            <numeric-keypad-input
+              .value="${this.defectQty != null ? this.defectQty : 0}"
+              .min="${0}"
+              .max="${totalQty}"
               placeholder="0"
-              @input="${e => {
-                const v = e.target.value
-                const d = v === '' ? 0 : Math.max(0, Math.min(totalQty, Number(v)))
+              @change="${e => {
+                const d = Math.max(0, Math.min(totalQty, e.detail.value || 0))
                 this.defectQty = d
                 this.goodQty = Math.max(0, totalQty - d)
               }}"
-            />
+            ></numeric-keypad-input>
           </div>
         </div>
         <button class="btn-confirm-inline"
@@ -1105,8 +1439,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
           @input="${e => { this.inspRemarks = e.target.value }}"
         />
       </div>
-
-      ${this._renderItemsProgressStep2()}
     `
   }
 
@@ -1172,7 +1504,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     this.filterStatus = this.filterStatus === status ? null : status
   }
 
-  /** 주문 선택 → 작업 화면 전환, 주문 상태에 따라 적절한 step으로 이동 */
+  /** 주문 선택 → 상품 목록(허브) 화면으로 전환 */
   async _selectOrder(order) {
     this.selectedOrder = order
     this.enteredOrderStatus = order.status  // 진입 시점 상태 저장
@@ -1186,11 +1518,9 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
       return
     }
 
-    this.screen = 'work'
-    this.step = this._getStartStep(order.status)
-    this.currentItemIndex = 0
-    if (this.step === 1) this._initStep1Selection()
-    if (this.step === 2) this._initStep2Selection()
+    // 상품 단위 작업: 상품 목록 화면에서 개별 상품을 선택해 입고→검수 진행
+    this.screen = 'item-list'
+    this.step = 1
     this.requestUpdate()
   }
 
@@ -1216,23 +1546,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     this._fetchOrders()
   }
 
-  /** 이전 단계 */
-  _prevStep() {
-    this.step = Math.max(this.step - 1, 1)
-    this.currentItemIndex = 0
-    this._resetForms()
-    if (this.step === 1) this._initStep1Selection()
-    if (this.step === 2) this._initStep2Selection()
-  }
-
-  /** 다음 단계 */
-  _nextStep() {
-    this.step = Math.min(this.step + 1, 2)
-    this.currentItemIndex = 0
-    this._resetForms()
-    if (this.step === 2) this._initStep2Selection()
-  }
-
   /* ============================================================
    * 각 단계별 처리 로직
    * ============================================================ */
@@ -1250,19 +1563,15 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
       voiceService.error('입고 수량을 입력하세요')
       return
     }
-    if (!this.locCd) {
-      this._showFeedback('로케이션을 입력하세요', 'error')
-      voiceService.error('로케이션을 입력하세요')
-      return
-    }
+    // 반품 입고는 항상 반품대기존(returnLocCd)으로 자동 입고
+    const locCd = this.returnLocCd || this.locCd || ''
 
-    // 완료 항목 수정 시 변경 여부 체크
+    // 완료 항목 수정 시 변경 여부 체크 (수량만)
     const doneStatuses = ['RECEIVED', 'INSPECTING', 'INSPECTED', 'DISPOSED', 'COMPLETED']
     const isAlreadyReceived = doneStatuses.includes(item.status)
     if (isAlreadyReceived) {
       const sameQty = Number(this.rcvQty) === Number(item.rwa_qty)
-      const sameLoc = (this.locCd || '') === (item.loc_cd || '')
-      if (sameQty && sameLoc) {
+      if (sameQty) {
         this._showFeedback('변경된 값이 없습니다', 'warning')
         return
       }
@@ -1272,7 +1581,7 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     try {
       await ServiceUtil.restPost(
         `rwa_trx/rwa_orders/${this.selectedOrder.id}/items/${item.id}/receive`,
-        { rwaQty: this.rcvQty, locCd: this.locCd }
+        { rwaQty: this.rcvQty, locCd }
       )
       this._showFeedback(
         isAlreadyReceived
@@ -1282,7 +1591,9 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
       )
       voiceService.success(isAlreadyReceived ? '수정 완료' : '입고 완료')
       await this._refreshOrder()
-      this._advanceItemStep1(isAlreadyReceived)
+      // 입고 완료 → 같은 상품의 검수 단계로 자동 전환
+      const refreshed = this.orderItems.find(i => i.id === item.id) || item
+      this._enterInspectForItem(refreshed)
     } catch (err) {
       this._showFeedback(err.message || '입고 처리 실패', 'error')
       voiceService.error('입고 실패')
@@ -1349,7 +1660,8 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
       this.defectDesc = ''
       this.inspRemarks = ''
       await this._refreshOrder()
-      this._advanceItemStep2(isAlreadyInspected)
+      // 검수 완료 → 상품 목록으로 복귀
+      this._goToItemList()
     } catch (err) {
       // 검수 기록은 저장됐으나 완료 처리가 실패한 경우와 일반 실패를 구분
       await this._refreshOrder()
@@ -1465,57 +1777,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     return []
   }
 
-  /**
-   * Step 1 진입 시 선택 항목 초기화
-   * - 미처리 항목이 있으면 첫 번째 미처리 항목 선택
-   * - 전체 완료 상태면 첫 번째 항목 선택 (수정 가능)
-   */
-  _initStep1Selection() {
-    const stepItems = this._getCurrentStepItems()
-    if (stepItems.length > 0) {
-      this.selectedOrderItemId = stepItems[0].id
-      this.rcvQty = 0
-      this.locCd = this.returnLocCd || ''
-    } else if (this.orderItems.length > 0) {
-      const first = this.orderItems[0]
-      this.selectedOrderItemId = first.id
-      this.rcvQty = first.rwa_qty || 0
-      this.locCd = first.loc_cd || this.returnLocCd || ''
-    }
-  }
-
-  /**
-   * Step 1 처리 후 다음 항목 이동 로직
-   * - 자동 Step 전환 없음: 사용자가 하단 "다음" 버튼으로 직접 이동
-   * @param {boolean} wasEdit - 수정(완료 항목 재처리) 여부
-   */
-  _advanceItemStep1(wasEdit) {
-    if (wasEdit) {
-      // 수정 완료 후에는 현재 선택 유지
-      this.requestUpdate()
-      return
-    }
-    // 신규 처리 완료 → 다음 미처리 항목으로 이동
-    const stepItems = this._getCurrentStepItems()
-    if (stepItems.length > 0) {
-      this.selectedOrderItemId = stepItems[0].id
-      this.rcvQty = 0
-      this.locCd = this.returnLocCd || ''
-    }
-    // 모든 항목 완료 시 하단 "다음" 버튼이 활성화됨
-    this.requestUpdate()
-  }
-
-  /**
-   * 주문 상태 → 시작 step 결정
-   *   APPROVED, RECEIVING                          → Step 1 (입고)
-   *   RECEIVED, INSPECTING, COMPLETED 등           → Step 2 (검수)
-   */
-  _getStartStep(status) {
-    if (['RECEIVED', 'INSPECTING', 'COMPLETED', 'CANCELLED', 'REJECTED'].includes(status)) return 2
-    return 1
-  }
-
   /** 상태 코드 → 한국어 */
   _statusLabel(status) {
     const labels = {
@@ -1533,99 +1794,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
       DEFECT_RETURN: '불량품 반품', STOCK_ADJUST: '재고 조정', EXPIRED_RETURN: '유통기한 임박'
     }
     return labels[type] || type || '-'
-  }
-
-  /**
-   * Step 2 진입 시 선택 항목 초기화
-   * - 미검수 항목이 있으면 첫 번째 선택, 전체 완료면 첫 번째 항목 선택
-   */
-  _initStep2Selection() {
-    const stepItems = this.orderItems.filter(i =>
-      ['RECEIVED', 'INSPECTING'].includes(i.status)
-    )
-    if (stepItems.length > 0) {
-      const first = stepItems[0]
-      this.selectedInspItemId = first.id
-      this.defectQty = 0
-      this.goodQty = first.rwa_qty || 0
-    } else if (this.orderItems.length > 0) {
-      const first = this.orderItems[0]
-      this.selectedInspItemId = first.id
-      this.defectQty = first.defect_qty || 0
-      this.goodQty = (first.good_qty != null) ? first.good_qty : Math.max(0, (first.rwa_qty || 0) - (first.defect_qty || 0))
-    }
-  }
-
-  /**
-   * Step 2 항목 선택 (완료 항목 포함)
-   * @param {Object} item - orderItems 내 아이템
-   */
-  _selectInspItem(item) {
-    this.selectedInspItemId = item.id
-    const inspDoneStatuses = ['INSPECTED', 'DISPOSED', 'COMPLETED']
-    const total = item.rwa_qty || 0
-    if (inspDoneStatuses.includes(item.status)) {
-      this.defectQty = item.defect_qty || 0
-      this.goodQty = (item.good_qty != null) ? item.good_qty : Math.max(0, total - this.defectQty)
-    } else {
-      this.defectQty = 0
-      this.goodQty = total
-    }
-    this.defectType = ''
-    this.defectDesc = ''
-    this.inspRemarks = ''
-  }
-
-  /**
-   * Step 2 처리 후 다음 항목 이동
-   * @param {boolean} wasEdit - 수정(완료 항목 재처리) 여부
-   */
-  _advanceItemStep2(wasEdit) {
-    if (wasEdit) {
-      this.requestUpdate()
-      return
-    }
-    const stepItems = this.orderItems.filter(i =>
-      ['RECEIVED', 'INSPECTING'].includes(i.status)
-    )
-    if (stepItems.length > 0) {
-      const next = stepItems[0]
-      this.selectedInspItemId = next.id
-      this.defectQty = 0
-      this.goodQty = next.rwa_qty || 0
-    }
-    this.requestUpdate()
-  }
-
-  /**
-   * Step 2 전용 항목 현황 — 완료 항목 포함 전체 클릭으로 선택 가능
-   */
-  _renderItemsProgressStep2() {
-    const inspDoneStatuses = ['INSPECTED', 'DISPOSED', 'COMPLETED']
-
-    return html`
-      <div class="items-progress">
-        <div class="progress-title">항목 현황 (${this.orderItems.length}건)</div>
-        ${this.orderItems.map(item => {
-          const isDone = inspDoneStatuses.includes(item.status)
-          const isSelected = item.id === this.selectedInspItemId
-
-          return html`
-            <div
-              class="progress-item selectable ${isSelected ? 'current-item' : ''}"
-              @click="${() => this._selectInspItem(item)}"
-            >
-              <span class="sku">${item.sku_cd} · ${item.rwa_qty || 0} EA</span>
-              <span class="${isDone ? 'status-done' : isSelected ? 'status-current' : 'status-todo'}">
-                ${isDone
-                  ? `✓ 양품 ${item.good_qty || 0} / 불량 ${item.defect_qty || 0}`
-                  : isSelected ? '▶ 작업중' : '대기'}
-              </span>
-            </div>
-          `
-        })}
-      </div>
-    `
   }
 
   /**
@@ -1649,54 +1817,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     } catch (err) {
       console.error('RETURN 로케이션 조회 실패:', err)
     }
-  }
-
-  /**
-   * 항목 현황에서 아이템 선택 (완료 항목 포함)
-   * - 미처리 항목: 폼 초기화
-   * - 완료 항목: 기존 입고 수량/로케이션 pre-fill
-   * @param {Object} item - orderItems 내 아이템 객체
-   */
-  _selectItem(item) {
-    this.selectedOrderItemId = item.id
-    const doneStatuses = ['RECEIVED', 'INSPECTING', 'INSPECTED', 'DISPOSED', 'COMPLETED']
-    if (doneStatuses.includes(item.status)) {
-      this.rcvQty = item.rwa_qty || 0
-      this.locCd = item.loc_cd || this.returnLocCd || ''
-    } else {
-      this.rcvQty = 0
-      this.locCd = this.returnLocCd || ''
-    }
-  }
-
-  /**
-   * Step 1 전용 항목 현황 — 완료 항목 포함 전체 항목 클릭으로 선택 가능
-   * 완료 항목 선택 시 기존 수량/로케이션 pre-fill 후 수정 가능
-   */
-  _renderItemsProgressStep1() {
-    const doneStatuses = ['RECEIVED', 'INSPECTING', 'INSPECTED', 'DISPOSED', 'COMPLETED']
-
-    return html`
-      <div class="items-progress">
-        <div class="progress-title">항목 현황 (${this.orderItems.length}건)</div>
-        ${this.orderItems.map(item => {
-          const isDone = doneStatuses.includes(item.status)
-          const isSelected = item.id === this.selectedOrderItemId
-
-          return html`
-            <div
-              class="progress-item selectable ${isSelected ? 'current-item' : ''}"
-              @click="${() => this._selectItem(item)}"
-            >
-              <span class="sku">${item.sku_cd} · ${item.rwa_req_qty || item.rwa_qty || 0} EA</span>
-              <span class="${isDone ? 'status-done' : isSelected ? 'status-current' : 'status-todo'}">
-                ${isDone ? '✓ 완료' : isSelected ? '▶ 작업중' : '대기'}
-              </span>
-            </div>
-          `
-        })}
-      </div>
-    `
   }
 
   /** 피드백 토스트 표시 (2초 후 소멸) */
