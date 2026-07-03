@@ -3,6 +3,7 @@ import { i18next, localize } from '@operato/i18n'
 import { ServiceUtil, UiUtil, TermsUtil } from '@operato-app/metapage/dist-client'
 import './rwa-sku-search-popup.js'
 import './rwa-shipment-import-popup.js'
+import './rwa-shipment-search-popup.js'
 
 /**
  * 반품 요청 등록 팝업
@@ -139,7 +140,7 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
         }
 
         .form-field textarea {
-          min-height: 60px;
+          min-height: 40px;
           resize: vertical;
         }
 
@@ -160,7 +161,7 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 16px;
+          margin-bottom: 10px;
         }
 
         .items-header h3 {
@@ -200,10 +201,10 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
 
         th,
         td {
-          padding: 10px 12px;
+          padding: 4px 12px;
           text-align: left;
           border-bottom: 1px solid var(--md-sys-color-outline-variant);
-          font-size: 14px;
+          font-size: 13px;
         }
 
         th {
@@ -214,7 +215,7 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
         td input,
         td select {
           width: 100%;
-          padding: 6px 8px;
+          padding: 3px 8px;
           border: 1px solid var(--md-sys-color-outline-variant);
           border-radius: 6px;
           font-size: 13px;
@@ -235,13 +236,13 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
         }
 
         .delete-btn {
-          width: 32px;
-          height: 32px;
+          width: 26px;
+          height: 26px;
           border: none;
           border-radius: 6px;
           background: transparent;
           color: #C62828;
-          font-size: 18px;
+          font-size: 16px;
           cursor: pointer;
           display: flex;
           align-items: center;
@@ -475,6 +476,25 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
           cursor: not-allowed;
         }
 
+        .shipment-search-btn {
+          flex-shrink: 0;
+          padding: 10px 16px;
+          border: 1px solid var(--md-sys-color-primary);
+          border-radius: 8px;
+          background: var(--md-sys-color-primary);
+          color: var(--md-sys-color-on-primary);
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: background 0.2s;
+        }
+
+        .shipment-search-btn:hover {
+          background: var(--md-sys-color-primary-container);
+          color: var(--md-sys-color-on-primary-container);
+        }
+
         .shipment-excel-btn {
           flex-shrink: 0;
           padding: 10px 14px;
@@ -491,6 +511,29 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
 
         .shipment-excel-btn:hover {
           background: var(--md-sys-color-surface-container-highest);
+        }
+
+        /* 출고주문 연동 라벨 행 (라벨 + 전체 삭제 버튼) */
+        .shipment-label-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        .shipment-clear-btn {
+          padding: 3px 10px;
+          border: 1px solid #ef9a9a;
+          border-radius: 6px;
+          background: transparent;
+          color: #C62828;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+
+        .shipment-clear-btn:hover {
+          background: #FFEBEE;
         }
 
         .shipment-chips {
@@ -537,9 +580,9 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
         .group-header-row td {
           background: var(--md-sys-color-surface-variant);
           font-weight: 600;
-          font-size: 13px;
+          font-size: 12px;
           color: var(--md-sys-color-on-surface);
-          padding: 8px 12px;
+          padding: 4px 12px;
           border-bottom: 2px solid var(--md-sys-color-outline-variant);
         }
 
@@ -831,13 +874,24 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
           </div>
         </div>
 
+        <div class="form-field">
+          <label>비고</label>
+          <input type="text" placeholder="비고" .value="${this.rwaOrder.remarks}" @input="${e => this._updateOrder('remarks', e.target.value)}" />
+        </div>
+
         <!-- 원 주문번호: 미사용으로 숨김 처리 (추후 활성화 예정) -->
 
         <!-- 검수 필요 / 품질검사 필요 체크박스: 미사용으로 숨김 처리 (추후 활성화 예정) -->
 
         <!-- 출고주문 연동 -->
         <div class="form-field full-width">
-          <label>출고주문 연동</label>
+          <div class="shipment-label-row">
+            <label>출고주문 연동</label>
+            ${this.shipmentOrders.length > 0 ? html`
+              <button class="shipment-clear-btn" title="연동된 출고주문 전체 삭제"
+                @click="${this._clearShipmentOrders}">✕ 전체 삭제 (${this.shipmentOrders.length})</button>
+            ` : ''}
+          </div>
           <div class="shipment-order-wrap">
             <input
               type="text"
@@ -852,6 +906,11 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
               ?disabled="${!this.shipmentOrderInput || this.shipmentOrderLoading}"
               @click="${this._addShipmentOrder}"
             >${this.shipmentOrderLoading ? '조회 중...' : '+ 추가'}</button>
+            <button
+              class="shipment-search-btn"
+              title="출하완료된 출고주문을 검색하여 선택합니다"
+              @click="${this._openShipmentSearchPopup}"
+            >🔍 검색</button>
             <button
               class="shipment-excel-btn"
               title="엑셀 파일로 출고주문을 일괄 등록합니다"
@@ -870,10 +929,6 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
           ` : ''}
         </div>
 
-        <div class="form-field full-width">
-          <label>비고</label>
-          <textarea placeholder="비고" .value="${this.rwaOrder.remarks}" @input="${e => this._updateOrder('remarks', e.target.value)}"></textarea>
-        </div>
       </div>
     `
   }
@@ -1338,31 +1393,54 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
   }
 
   /**
+   * 연동된 출고주문 일괄 삭제 — 모든 출고주문 칩과 해당 출고주문에서 온 항목 제거
+   * (수동 추가 항목은 유지)
+   */
+  _clearShipmentOrders() {
+    const nos = new Set(this.shipmentOrders.map(so => so.shipment_no))
+    this.items = this.items.filter(item => !nos.has(item.sourceNo))
+    this.shipmentOrders = []
+  }
+
+  /**
    * 출고주문 엑셀 일괄 등록 팝업 열기
    * 팝업에서 'shipment-orders-imported' 이벤트를 수신하면 주문/상품을 일괄 반영
    */
   _openShipmentImportPopup() {
     const popup = document.createElement('rwa-shipment-import-popup')
-
-    popup.addEventListener('shipment-orders-imported', e => {
-      const { orders, items } = e.detail
-
-      // 이미 추가된 주문 제외하고 신규만 병합
-      const existingNos = new Set(this.shipmentOrders.map(so => so.shipment_no))
-      const newOrders = orders.filter(o => !existingNos.has(o.shipment_no))
-      const newItems = items.filter(item => !existingNos.has(item.sourceNo))
-
-      if (newOrders.length === 0) {
-        UiUtil.showToast('warning', '새로 추가된 출고주문이 없습니다 (이미 등록된 주문 제외)')
-        return
-      }
-
-      this.shipmentOrders = [...this.shipmentOrders, ...newOrders]
-      this.items = [...this.items, ...newItems]
-      UiUtil.showToast('success', `출고주문 ${newOrders.length}건 일괄 등록 완료`)
-    })
-
+    popup.addEventListener('shipment-orders-imported', e => this._mergeImportedShipmentOrders(e.detail))
     UiUtil.openPopupByElement('출고주문 엑셀 일괄 등록', 'large', popup, true)
+  }
+
+  /**
+   * 출고주문 검색 팝업 열기
+   * 출하완료 출고주문을 검색/멀티선택하여 연동 (엑셀 임포트와 동일한 이벤트 사용)
+   */
+  _openShipmentSearchPopup() {
+    const popup = document.createElement('rwa-shipment-search-popup')
+    // 이미 연동된 출고주문은 검색화면 후보에서 제외 (재추가 시도 자체를 방지)
+    popup.linkedShipmentNos = this.shipmentOrders.map(so => so.shipment_no)
+    popup.addEventListener('shipment-orders-imported', e => this._mergeImportedShipmentOrders(e.detail))
+    UiUtil.openPopupByElement('출고주문 검색', 'large', popup, true)
+  }
+
+  /**
+   * 검색/엑셀 팝업에서 전달된 출고주문/상품을 병합
+   * 이미 추가된 주문은 제외하고 신규만 반영
+   */
+  _mergeImportedShipmentOrders({ orders, items }) {
+    const existingNos = new Set(this.shipmentOrders.map(so => so.shipment_no))
+    const newOrders = orders.filter(o => !existingNos.has(o.shipment_no))
+    const newItems = items.filter(item => !existingNos.has(item.sourceNo))
+
+    if (newOrders.length === 0) {
+      UiUtil.showToast('warning', '새로 추가된 출고주문이 없습니다 (이미 등록된 주문 제외)')
+      return
+    }
+
+    this.shipmentOrders = [...this.shipmentOrders, ...newOrders]
+    this.items = [...this.items, ...newItems]
+    UiUtil.showToast('success', `출고주문 ${newOrders.length}건 연동 완료`)
   }
 
   /**
