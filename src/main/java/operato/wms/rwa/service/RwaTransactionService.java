@@ -292,14 +292,43 @@ public class RwaTransactionService extends AbstractQueryService {
 					"입고 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
 		}
 
-		// 3. 입고 처리 — 아이템 단위 입고 완료
+		RwaOrder order = this.queryManager.select(RwaOrder.class, item.getRwaOrderId());
+		if (order == null) {
+			throw ThrowUtil.newValidationErrorWithNoLog("반품 지시를 찾을 수 없습니다.");
+		}
+
+		// 3. 반품대기존(RETURN) 로케이션 확인 — 없으면 입고 불가 (R2)
+		String returnLocCd = findLocCdByType(order.getDomainId(), order.getWhCd(), "RETURN");
+		if (ValueUtil.isEmpty(returnLocCd)) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+					"반품대기존(RETURN) 로케이션이 없습니다. 로케이션을 먼저 생성해주세요.");
+		}
+
+		// 4. 반품대기존에 실재고 생성 (재입고면 기존 대기존 재고 수량 갱신) (R3)
+		boolean updated = false;
+		if (ValueUtil.isNotEmpty(item.getBarcode())) {
+			String updSql = "UPDATE inventories SET inv_qty = :qty, loc_cd = :locCd, updated_at = now() " +
+					"WHERE domain_id = :domainId AND barcode = :barcode AND last_tran_cd = 'RWA_RECEIVE'";
+			int cnt = this.queryManager.executeBySql(updSql, ValueUtil.newMap(
+					"qty,locCd,domainId,barcode", rwaQty, returnLocCd, order.getDomainId(), item.getBarcode()));
+			updated = cnt > 0;
+		}
+		if (!updated) {
+			Inventory inv = buildReturnInventory(item, order, null, rwaQty,
+					returnLocCd, Inventory.STATUS_STORED, "RWA_RECEIVE");
+			inv.setRemarks("RWA 반품 입고 대기 - " + order.getRwaNo());
+			this.queryManager.insert(inv);
+			item.setBarcode(inv.getBarcode()); // 대기존 배치 바코드 기록 (검수 시 이동 기준)
+			recordRwaTran(inv, order);
+		}
+
+		// 5. 입고 처리 — 아이템 단위 입고 완료 (로케이션은 반품대기존 고정)
 		item.setRwaQty(rwaQty);
-		item.setLocCd(locCd);
+		item.setLocCd(returnLocCd);
 		item.setStatus(WmsRwaConstants.STATUS_RECEIVED);
+		this.queryManager.update(item, "rwaQty", "locCd", "status", "barcode");
 
-		this.queryManager.update(item, "rwaQty", "locCd", "status");
-
-		// 4. 헤더 상태 업데이트
+		// 6. 헤더 상태 업데이트
 		this.updateRwaOrderStatus(item.getRwaOrderId());
 
 		return item;
@@ -406,10 +435,27 @@ public class RwaTransactionService extends AbstractQueryService {
 	}
 
 	/**
-	 * 검수 완료 시 재고를 RETURN-GOOD / RETURN-DEF 로케이션으로 분류 등록
+	 * 반품 검수 + 완료 원자 처리 (R4)
+	 *
+	 * 검수기록 저장(inspectRwaItem)과 완료/재고이동(completeInspection)을
+	 * 하나의 트랜잭션으로 묶어, 중간 실패 시 전체 롤백되도록 한다.
+	 * (예: 양품/불량 로케이션 미존재로 완료가 실패하면 검수기록 저장도 함께 롤백)
+	 *
+	 * @param rwaOrderItemId 반품 상세 ID
+	 * @param inspection     검수 정보
+	 * @return 완료된 반품 상세
+	 */
+	@Transactional
+	public RwaOrderItem inspectAndComplete(String rwaOrderItemId, RwaInspection inspection) {
+		this.inspectRwaItem(rwaOrderItemId, inspection);
+		return this.completeInspection(rwaOrderItemId);
+	}
+
+	/**
+	 * 검수 완료 시 반품대기존 재고를 RETURN-GOOD / RETURN-DEF 로케이션으로 이동(분할)
 	 *
 	 * 흐름:
-	 * 1. 입고(receive) 단계에서 생성된 RETURN 위치 임시 재고 삭제
+	 * 1. 입고(receive) 단계에서 반품대기존에 생성된 재고 삭제 (대기존 → 이동 소진)
 	 * 2. 양품 수량 > 0 → loc_type=RETURN-GOOD 로케이션에 재고 생성
 	 * 3. 불량 수량 > 0 → loc_type=RETURN-DEF  로케이션에 재고 생성
 	 *
@@ -424,19 +470,25 @@ public class RwaTransactionService extends AbstractQueryService {
 			return;
 		}
 
-		// 1. 입고 단계 RETURN 임시 재고 삭제
+		// 2. RETURN-GOOD / RETURN-DEF 로케이션 조회 — 필요한데 없으면 완료 불가 (R2)
+		String goodLocCd = findLocCdByType(order.getDomainId(), order.getWhCd(), "RETURN-GOOD");
+		String defectLocCd = findLocCdByType(order.getDomainId(), order.getWhCd(), "RETURN-DEF");
+
+		if (goodQty > 0 && ValueUtil.isEmpty(goodLocCd)) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+					"반품양품 로케이션(RETURN-GOOD)이 없습니다. 로케이션을 먼저 생성해주세요.");
+		}
+		if (defectQty > 0 && ValueUtil.isEmpty(defectLocCd)) {
+			throw ThrowUtil.newValidationErrorWithNoLog(
+					"반품불량 로케이션(RETURN-DEF)이 없습니다. 로케이션을 먼저 생성해주세요.");
+		}
+
+		// 1. 반품대기존 재고 삭제 (대기존 → 양품/불량존 이동 소진)
 		if (ValueUtil.isNotEmpty(item.getBarcode())) {
 			String delSql = "DELETE FROM inventories WHERE domain_id = :domainId AND barcode = :barcode";
 			this.queryManager.executeBySql(delSql,
 					ValueUtil.newMap("domainId,barcode", order.getDomainId(), item.getBarcode()));
 		}
-
-		// 2. RETURN-GOOD / RETURN-DEF 로케이션 조회
-		String goodLocCd = findLocCdByType(order.getDomainId(), order.getWhCd(), "RETURN-GOOD");
-		String defectLocCd = findLocCdByType(order.getDomainId(), order.getWhCd(), "RETURN-DEF");
-
-		if (ValueUtil.isEmpty(goodLocCd))   goodLocCd   = "RETURN-GOOD";
-		if (ValueUtil.isEmpty(defectLocCd)) defectLocCd = "RETURN-DEF";
 
 		String goodBarcode = null;
 		String defectBarcode = null;
@@ -1339,6 +1391,155 @@ public class RwaTransactionService extends AbstractQueryService {
 		}
 
 		return alerts;
+	}
+
+	/********************************************************************************************************
+	 * 9. 반품 모니터링 (일/주/월 종합 집계)
+	 ********************************************************************************************************/
+
+	/**
+	 * 반품 프로세스 모니터링 종합 집계
+	 *
+	 * 기준일: rwa_orders.rwa_req_date (반품 요청일)
+	 *
+	 * @param comCd     화주사 코드 (optional)
+	 * @param whCd       창고 코드 (optional)
+	 * @param startDate 시작일 (기본: 오늘)
+	 * @param endDate   종료일 (기본: 오늘)
+	 * @return 종합 집계 Map (summary/statusCounts/typeStats/dailyTrend/defectByType/topCustomers/inProgress)
+	 */
+	public Map<String, Object> getMonitoringData(String comCd, String whCd, String startDate, String endDate) {
+		String start = ValueUtil.isNotEmpty(startDate) ? startDate : DateUtil.todayStr();
+		String end = ValueUtil.isNotEmpty(endDate) ? endDate : DateUtil.todayStr();
+		Long domainId = Domain.currentDomainId();
+
+		// 공통 필터 조각 (rwa_orders 별칭 o 기준)
+		StringBuilder filter = new StringBuilder(" AND o.rwa_req_date >= :startDate AND o.rwa_req_date <= :endDate ");
+		Map<String, Object> params = ValueUtil.newMap("domainId,startDate,endDate", domainId, start, end);
+		if (ValueUtil.isNotEmpty(comCd)) { filter.append(" AND o.com_cd = :comCd "); params.put("comCd", comCd); }
+		if (ValueUtil.isNotEmpty(whCd)) { filter.append(" AND o.wh_cd = :whCd "); params.put("whCd", whCd); }
+		String f = filter.toString();
+
+		Map<String, Object> result = new java.util.LinkedHashMap<>();
+		result.put("startDate", start);
+		result.put("endDate", end);
+
+		// 1. 상태별 건수
+		Map<String, Object> statusCounts = new java.util.LinkedHashMap<>();
+		for (String st : new String[] { "REQUEST", "APPROVED", "RECEIVING", "RECEIVED",
+				"INSPECTING", "INSPECTED", "DISPOSING", "COMPLETED", "REJECTED", "CANCELLED" }) {
+			statusCounts.put(st, 0);
+		}
+		for (Map<String, Object> row : selectList(
+				"SELECT o.status, COUNT(*) AS cnt FROM rwa_orders o WHERE o.domain_id = :domainId" + f + " GROUP BY o.status",
+				params)) {
+			statusCounts.put((String) row.get("status"), row.get("cnt"));
+		}
+		result.put("statusCounts", statusCounts);
+
+		// 2. 유형별 건수
+		Map<String, Object> typeStats = new java.util.LinkedHashMap<>();
+		for (Map<String, Object> row : selectList(
+				"SELECT o.rwa_type, COUNT(*) AS cnt FROM rwa_orders o WHERE o.domain_id = :domainId" + f + " GROUP BY o.rwa_type",
+				params)) {
+			if (ValueUtil.isNotEmpty(row.get("rwa_type"))) typeStats.put((String) row.get("rwa_type"), row.get("cnt"));
+		}
+		result.put("typeStats", typeStats);
+
+		// 3. 수량 합계 (item 조인) — 요청/입고/양품/불량
+		String qtySql = "SELECT " +
+				"COALESCE(SUM(i.rwa_req_qty),0) AS req_qty, " +
+				"COALESCE(SUM(i.rwa_qty),0) AS rcv_qty, " +
+				"COALESCE(SUM(i.good_qty),0) AS good_qty, " +
+				"COALESCE(SUM(i.defect_qty),0) AS defect_qty, " +
+				"COUNT(DISTINCT i.id) AS item_cnt " +
+				"FROM rwa_order_items i JOIN rwa_orders o ON o.id = i.rwa_order_id AND o.domain_id = i.domain_id " +
+				"WHERE o.domain_id = :domainId" + f;
+		List<Map<String, Object>> qtyRows = selectList(qtySql, params);
+		Map<String, Object> qty = qtyRows.isEmpty() ? new java.util.HashMap<>() : qtyRows.get(0);
+		double reqQty = toDouble(qty.get("req_qty"));
+		double rcvQty = toDouble(qty.get("rcv_qty"));
+		double goodQty = toDouble(qty.get("good_qty"));
+		double defectQty = toDouble(qty.get("defect_qty"));
+		double inspectedQty = goodQty + defectQty;
+
+		// 4. 요약
+		int totalOrders = 0;
+		for (Object v : statusCounts.values()) totalOrders += toInt(v);
+		int completed = toInt(statusCounts.get("COMPLETED"));
+		int pending = toInt(statusCounts.get("REQUEST")) + toInt(statusCounts.get("APPROVED"));
+		int rejected = toInt(statusCounts.get("REJECTED"));
+		int cancelled = toInt(statusCounts.get("CANCELLED"));
+		int inProgress = totalOrders - completed - pending - rejected - cancelled;
+
+		Map<String, Object> summary = new java.util.LinkedHashMap<>();
+		summary.put("totalOrders", totalOrders);
+		summary.put("itemCount", toInt(qty.get("item_cnt")));
+		summary.put("pendingOrders", pending);
+		summary.put("inProgressOrders", inProgress);
+		summary.put("completedOrders", completed);
+		summary.put("rejectedOrders", rejected);
+		summary.put("cancelledOrders", cancelled);
+		summary.put("totalReqQty", reqQty);
+		summary.put("totalRcvQty", rcvQty);
+		summary.put("totalGoodQty", goodQty);
+		summary.put("totalDefectQty", defectQty);
+		summary.put("defectRate", inspectedQty > 0 ? Math.round(defectQty / inspectedQty * 1000.0) / 10.0 : 0.0);
+		summary.put("completionRate", totalOrders > 0 ? Math.round((double) completed / totalOrders * 1000.0) / 10.0 : 0.0);
+		result.put("summary", summary);
+
+		// 5. 일별 추세 (요청일 기준 건수 + 요청수량)
+		String trendSql = "SELECT o.rwa_req_date AS d, COUNT(DISTINCT o.id) AS order_cnt, " +
+				"COALESCE(SUM(i.rwa_req_qty),0) AS req_qty " +
+				"FROM rwa_orders o LEFT JOIN rwa_order_items i ON i.rwa_order_id = o.id AND i.domain_id = o.domain_id " +
+				"WHERE o.domain_id = :domainId" + f + " GROUP BY o.rwa_req_date ORDER BY o.rwa_req_date";
+		result.put("dailyTrend", selectList(trendSql, params));
+
+		// 6. 불량 유형별 수량 (검수 기록 조인)
+		String defectSql = "SELECT ins.defect_type AS defect_type, COALESCE(SUM(ins.defect_qty),0) AS qty " +
+				"FROM rwa_inspections ins " +
+				"JOIN rwa_order_items i ON i.id = ins.rwa_order_item_id AND i.domain_id = ins.domain_id " +
+				"JOIN rwa_orders o ON o.id = i.rwa_order_id AND o.domain_id = i.domain_id " +
+				"WHERE o.domain_id = :domainId AND ins.defect_type IS NOT NULL AND ins.defect_qty > 0" + f +
+				" GROUP BY ins.defect_type ORDER BY qty DESC";
+		result.put("defectByType", selectList(defectSql, params));
+
+		// 7. 거래처(고객) TOP 10 (건수 기준)
+		String custSql = "SELECT COALESCE(o.cust_nm, o.cust_cd, '미지정') AS cust, COUNT(*) AS cnt " +
+				"FROM rwa_orders o WHERE o.domain_id = :domainId" + f +
+				" GROUP BY COALESCE(o.cust_nm, o.cust_cd, '미지정') ORDER BY cnt DESC LIMIT 10";
+		result.put("topCustomers", selectList(custSql, params));
+
+		// 8. 진행중 주문 목록 (완료/거부/취소 제외, 최근순 최대 50건)
+		String progSql = "SELECT o.id, o.rwa_no, o.rwa_req_no, o.status, o.rwa_type, o.rwa_req_date, " +
+				"o.com_cd, COALESCE(o.cust_nm, o.cust_cd) AS cust_nm, " +
+				"(SELECT COUNT(*) FROM rwa_order_items i WHERE i.rwa_order_id = o.id AND i.domain_id = o.domain_id) AS item_cnt " +
+				"FROM rwa_orders o WHERE o.domain_id = :domainId" + f +
+				" AND o.status NOT IN ('COMPLETED','REJECTED','CANCELLED') " +
+				"ORDER BY o.rwa_req_date DESC, o.rwa_req_no DESC LIMIT 50";
+		result.put("inProgress", selectList(progSql, params));
+
+		return result;
+	}
+
+	/** selectListBySql 결과를 Map 리스트로 캐스팅하는 헬퍼 */
+	@SuppressWarnings("unchecked")
+	private List<Map<String, Object>> selectList(String sql, Map<String, Object> params) {
+		return (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+	}
+
+	/** Object → double 변환 (null 안전) */
+	private double toDouble(Object v) {
+		if (v == null) return 0.0;
+		if (v instanceof Number) return ((Number) v).doubleValue();
+		try { return Double.parseDouble(v.toString()); } catch (Exception e) { return 0.0; }
+	}
+
+	/** Object → int 변환 (null 안전) */
+	private int toInt(Object v) {
+		if (v == null) return 0;
+		if (v instanceof Number) return ((Number) v).intValue();
+		try { return Integer.parseInt(v.toString()); } catch (Exception e) { return 0; }
 	}
 
 	/**

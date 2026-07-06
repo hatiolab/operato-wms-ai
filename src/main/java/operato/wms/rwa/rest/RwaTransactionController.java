@@ -205,6 +205,26 @@ public class RwaTransactionController extends AbstractRestService {
 		return this.rwaService.completeInspection(itemId);
 	}
 
+	/**
+	 * 반품 검수 + 완료 원자 처리 (R4)
+	 *
+	 * POST /rest/rwa_trx/rwa_orders/{id}/items/{itemId}/inspect_complete
+	 * 검수기록 저장과 완료/재고이동을 하나의 트랜잭션으로 처리한다.
+	 *
+	 * @param id         반품 지시 ID (미사용, URL 일관성 유지)
+	 * @param itemId     반품 상세 ID
+	 * @param inspection 검수 정보
+	 * @return 완료된 반품 상세
+	 */
+	@PostMapping("/rwa_orders/{id}/items/{itemId}/inspect_complete")
+	@ApiDesc(description = "Inspect and Complete RWA Item in one transaction")
+	public RwaOrderItem inspectAndCompleteRwaItem(
+			@PathVariable("id") String id,
+			@PathVariable("itemId") String itemId,
+			@RequestBody RwaInspection inspection) {
+		return this.rwaService.inspectAndComplete(itemId, inspection);
+	}
+
 	/********************************************************************************************************
 	 * 4. 반품 처분
 	 ********************************************************************************************************/
@@ -459,5 +479,26 @@ public class RwaTransactionController extends AbstractRestService {
 			@RequestParam(name = "com_cd", required = false) String comCd,
 			@RequestParam(name = "wh_cd", required = false) String whCd) {
 		return this.rwaService.getDashboardAlerts(comCd, whCd);
+	}
+
+	/**
+	 * 반품 모니터링 - 기간별 종합 집계 조회
+	 *
+	 * GET /rest/rwa_trx/dashboard/monitoring?start_date=&end_date=&com_cd=&wh_cd=
+	 *
+	 * @param comCd     화주사 코드 (optional)
+	 * @param whCd      창고 코드 (optional)
+	 * @param startDate 시작일 (optional, 기본값: 오늘)
+	 * @param endDate   종료일 (optional, 기본값: 오늘)
+	 * @return 종합 집계 Map
+	 */
+	@GetMapping("/dashboard/monitoring")
+	@ApiDesc(description = "Get RWA Monitoring Aggregation")
+	public Map<String, Object> getMonitoringData(
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd", required = false) String whCd,
+			@RequestParam(name = "start_date", required = false) String startDate,
+			@RequestParam(name = "end_date", required = false) String endDate) {
+		return this.rwaService.getMonitoringData(comCd, whCd, startDate, endDate);
 	}
 }

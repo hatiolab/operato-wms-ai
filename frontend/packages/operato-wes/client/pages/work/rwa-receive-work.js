@@ -1632,10 +1632,11 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
     }
 
     this.actionLoading = true
-    let inspected = false
     try {
+      // 검수기록 저장 + 완료(대기존 → 양품/불량존 이동)를 하나의 트랜잭션으로 처리 (R4)
+      // 양품/불량 로케이션이 없으면 서버가 에러를 던지고 전체 롤백됨 (R2)
       await ServiceUtil.restPost(
-        `rwa_trx/rwa_orders/${this.selectedOrder.id}/items/${item.id}/inspect`,
+        `rwa_trx/rwa_orders/${this.selectedOrder.id}/items/${item.id}/inspect_complete`,
         {
           insp_type: 'VISUAL',
           insp_qty: total,
@@ -1646,10 +1647,6 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
           photo_url: null,
           remarks: this.inspRemarks || null
         }
-      )
-      inspected = true
-      await ServiceUtil.restPost(
-        `rwa_trx/rwa_orders/${this.selectedOrder.id}/items/${item.id}/complete_inspection`, {}
       )
       this._showFeedback(
         isAlreadyInspected ? `${item.sku_cd} 검수 정보 수정 완료` : `${item.sku_cd} 검수 완료`,
@@ -1663,17 +1660,25 @@ class RwaReceiveWork extends localize(i18next)(PageView) {
       // 검수 완료 → 상품 목록으로 복귀
       this._goToItemList()
     } catch (err) {
-      // 검수 기록은 저장됐으나 완료 처리가 실패한 경우와 일반 실패를 구분
+      // 로케이션 미존재 등으로 실패 시 — 전체 롤백되어 검수기록/완료 모두 반영 안 됨
       await this._refreshOrder()
-      this._showFeedback(
-        inspected
-          ? '검수는 저장됐으나 완료 처리에 실패했습니다. 다시 시도하세요.'
-          : (err.message || '검수 처리 실패'),
-        'error'
-      )
+      const msg = err.message || '검수 처리 실패'
+      this._alertError(msg)
       voiceService.error('검수 실패')
     } finally {
       this.actionLoading = false
+    }
+  }
+
+  /** 차단성 에러 안내 — 토스트 + 팝업(로케이션 미생성 등 조치가 필요한 경우) */
+  _alertError(msg) {
+    this._showFeedback(msg, 'error')
+    try {
+      UiUtil.showToast?.({ type: 'error', message: msg })
+    } catch (e) { /* noop */ }
+    // 로케이션 미생성처럼 조치가 필요한 오류는 확인을 강제하는 팝업으로도 안내
+    if (/로케이션/.test(msg)) {
+      window.alert(msg)
     }
   }
 
