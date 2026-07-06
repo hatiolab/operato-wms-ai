@@ -1,9 +1,11 @@
 package operato.wms.stock.entity;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 import operato.wms.base.entity.SKU;
 import xyz.anythings.sys.service.ICustomService;
+import xyz.anythings.sys.util.AnyValueUtil;
 import xyz.elidom.dbist.annotation.Column;
 import xyz.elidom.dbist.annotation.GenerationRule;
 import xyz.elidom.dbist.annotation.Index;
@@ -18,11 +20,11 @@ import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
 
 @Table(name = "inventories", idStrategy = GenerationRule.UUID, indexes = {
-		@Index(name = "ix_inventories_0", columnList = "domain_id,barcode,loc_cd", unique = true),
+		@Index(name = "ix_inventories_0", columnList = "domain_id,barcode,loc_cd,status,closed_at", unique = true),
 		@Index(name = "ix_inventories_1", columnList = "domain_id,wh_cd,com_cd"),
-		@Index(name = "ix_inventories_2", columnList = "domain_id,wh_cd,vend_cd,maker_cd"),
+		@Index(name = "ix_inventories_2", columnList = "domain_id,wh_cd,vend_cd"),
 		@Index(name = "ix_inventories_3", columnList = "domain_id,wh_cd,com_cd,loc_cd,sku_cd"),
-		@Index(name = "ix_inventories_4", columnList = "domain_id,wh_cd,invoice_no,lot_no,expired_date"),
+		@Index(name = "ix_inventories_4", columnList = "domain_id,wh_cd,lot_no,expired_date"),
 		@Index(name = "ix_inventories_5", columnList = "domain_id,wh_cd,last_tran_cd"),
 		@Index(name = "ix_inventories_6", columnList = "domain_id,wh_cd,rcv_no"),
 		@Index(name = "ix_inventories_7", columnList = "domain_id,wh_cd,updated_at"),
@@ -795,19 +797,15 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		// 유통기한 계산
 		this.calculateExpiryDate();
 
-		/*
-		 * if (this.invQty <= 0) {
-		 * // 재고 소진시 상태 : 비어있음
-		 * this.status = Inventory.STATUS_EMPTY;
-		 * this.delFlag = true;
-		 * this.closedAt = DateUtil.currentTimeStr();
-		 * } else {
-		 * // 상태 초기화 : 보관 중
-		 * this.status = (this.status == null) ? Inventory.STATUS_STORED : this.status;
-		 * }
-		 */
-
-		this.status = (this.status == null) ? Inventory.STATUS_STORED : this.status;
+		if (this.invQty <= 0) {
+			// 재고 소진시 상태 : 비어있음
+			this.status = Inventory.STATUS_EMPTY;
+			this.closedAt = DateUtil.currentTimeStr();
+			// this.delFlag = true;
+		} else {
+			// 상태 초기화 : 보관 중
+			this.status = (this.status == null) ? Inventory.STATUS_STORED : this.status;
+		}
 	}
 
 	/**
@@ -862,33 +860,172 @@ public class Inventory extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 		}
 	}
 
-	/*
-	 * @Override
-	 * public void afterCreate() {
-	 * super.afterCreate();
+	/**
+	 * 이동하려는 로케이션에 동일 상품, 동일 바코드, 보관 중 상태의 재고 조회
 	 * 
-	 * // 재고 생성 시 이력 저장
-	 * this.createInventoryHistory();
-	 * }
+	 * @param domainId
+	 * @param barcode
+	 * @param locCd
+	 * @param skuCd
+	 * @param status
+	 * @return
 	 */
-
-	/*
-	 * @Override
-	 * public void afterUpdate() {
-	 * super.afterUpdate();
-	 * 
-	 * // 재고 업데이트 시 이력 저장
-	 * this.createInventoryHistory();
-	 * }
-	 */
+	public static Inventory findInventory(Long domainId, String barcode, String locCd, String skuCd, String status) {
+		Map<String, Object> params = ValueUtil.newMap("domainId,barcode,skuCd,locCd,status", domainId, barcode, skuCd,
+				locCd, status);
+		return BeanUtil.get(IQueryManager.class).selectByCondition(Inventory.class, params);
+	}
 
 	/**
-	 * 재고 이력 생성 - 재고 트랜잭션은 반드시 개별 재고 정보 조회 후 처리해야 이력에 남는다. (insert, update 쿼리로 처리하면
-	 * 이력에 남지 않는다.)
+	 * 재고 전체 이동 (Validation은 완료 된 상태에서 처리)
+	 * 이동 로케이션에 동일 상품, 동일 소비기한의 보관 중 상태의 재고가 있다면 병합 처리하고 자신은 소진 처리
+	 * 이동 로케이션에 동일 바코드의 보관 중 상태의 재고가 있다면 병합 처리하고 자신은 소진 처리
+	 * 
+	 * @param toLocCd
+	 * @param reasonCd
+	 * @param reason
+	 * @param remarks
+	 * @return
 	 */
-	/*
-	 * private void createInventoryHistory() {
-	 * new InventoryHist().create(true, this);
-	 * }
+	public Inventory move(String toLocCd, String reasonCd, String reason, String remarks) {
+		// 1. 트랜잭션 그룹 ID 생성
+		IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
+		String groupId = AnyValueUtil.newUuid32();
+		String fromLocCd = this.locCd;
+
+		// 2. MOVE-OUT 트랜잭션 이력 처리
+		InventoryTran.createMoveOutTransactionHistory(this, fromLocCd, toLocCd, this.invQty, groupId,
+				reasonCd, reason, remarks);
+
+		// 3. 이동하려는 로케이션에 동일 상품, 동일 바코드, 보관 중 상태의 재고 조회 - 병합 여부 판단
+		Inventory legacyInv = Inventory.findInventory(this.domainId, this.barcode, toLocCd, this.skuCd,
+				Inventory.STATUS_STORED);
+
+		// 4. 기존 재고가 있다면 기존 재고와 병합 처리
+		if (legacyInv != null) {
+			// 4-1. 이동할 로케이션에 동일 상품, 동일 바코드, 보관 중 상태의 재고가 있다면 병합 처리로 이동 처리
+			return legacyInv.merge(this, groupId, reasonCd, reason, remarks);
+
+			// 5. 기존 재고가 없다면 전체 이동 처리
+		} else {
+			// 5-1. 전체 이동 처리
+			this.setLocCd(toLocCd);
+			this.setLastTranCd(Inventory.TRANSACTION_MOVE);
+			if (ValueUtil.isNotEmpty(remarks)) {
+				this.setRemarks(remarks);
+			}
+			queryMgr.update(this);
+
+			// 5-2. MOVE-IN 트랜잭션 이력 처리
+			InventoryTran.createMoveInTransactionHistory(this, fromLocCd, toLocCd, this.invQty, groupId, reasonCd,
+					reason, remarks);
+			return this;
+		}
+	}
+
+	/**
+	 * 병합 처리 - 자신(this)의 재고를 mainInv에 병합 처리 후 mergedInv는 소진 처리
+	 * 
+	 * @param mergedInv
+	 * @param groupId
+	 * @param reasonCd
+	 * @param reason
+	 * @param remarks
 	 */
+	public Inventory merge(Inventory mergedInv, String groupId, String reasonCd, String reason, String remarks) {
+		// 1. 쿼리 매니저
+		IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
+		String fromLocCd = mergedInv.getLocCd();
+		String toLocCd = this.locCd;
+		double mergeQty = mergedInv.getInvQty();
+
+		// 2. 메인 재고 병합 처리 - 기존 재고에 재고 수량만 추가하고
+		this.setInvQty(this.getInvQty() + mergeQty);
+		this.setRemarks("바코드[" + mergedInv.getBarcode() + "], 로케이션[" + fromLocCd + "]와 수량[" + mergeQty + "] 병합");
+		queryMgr.update(this, "invQty", "remarks");
+
+		// 3. 병합 재고 소진 처리
+		mergedInv.setLocCd(toLocCd);
+		mergedInv.setInvQty(0.0);
+		mergedInv.setRemarks("바코드[" + this.getBarcode() + "], 로케이션[" + toLocCd + "]와 수량[" + mergeQty + "] 병합된 후 소진");
+		queryMgr.upsert(mergedInv);
+
+		// 4. mergedInv 재고 MOVE-IN 트랜잭션 이력 처리
+		InventoryTran.createMoveInTransactionHistory(mergedInv, fromLocCd, toLocCd, mergeQty, groupId,
+				reasonCd, reason, remarks);
+
+		// 5. 메인 재고 MERGE 트랜잭션 이력 처리
+		InventoryTran.createMergeTransactionHistory(this, mergeQty, groupId, reasonCd, reason, remarks);
+
+		// 6. 병합 재고 MERGE-OUT (소진) 트랜잭션 이력 처리
+		InventoryTran.createMergedOutTransactionHistory(mergedInv, mergeQty, groupId, reasonCd, reason, remarks);
+
+		// 7. 병합 재고 리턴
+		return this;
+	}
+
+	/**
+	 * 분할 (재고 부분 이동) (Validation은 완료 된 상태에서 처리)
+	 * 
+	 * @param toLocCd
+	 * @param splitQty
+	 * @param reasonCd
+	 * @param reason
+	 * @param remarks
+	 * @return
+	 */
+	public Inventory split(String toLocCd, double splitQty, String reasonCd, String reason,
+			String remarks) {
+		// 1. 쿼리 매니저
+		IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
+		String groupId = AnyValueUtil.newUuid32();
+		String fromLocCd = this.locCd;
+
+		// 2. 메인 재고는 수량 차감만 (이동 안 함)
+		this.setInvQty(this.invQty - splitQty);
+		if (ValueUtil.isNotEmpty(remarks)) {
+			this.setRemarks(this.remarks);
+		}
+		this.setLastTranCd(Inventory.TRANSACTION_SPLIT);
+		queryMgr.update(this);
+
+		// 3. 메인 재고 SPLIT 트랜잭션 이력 처리
+		InventoryTran.createSplitTransactionHistory(this, splitQty, groupId, reasonCd, reason, remarks);
+
+		// 4. 분할되는 재고는 이동 수량 만큼 신규 재고 생성 및 이동 처리
+		Inventory movingInv = ValueUtil.populate(this, new Inventory());
+		movingInv.setId(null);
+		movingInv.setLastTranCd(Inventory.TRANSACTION_MOVE);
+		movingInv.setInvQty(splitQty);
+		movingInv.setReservedQty(0.0);
+		movingInv.setRemarks(remarks);
+		movingInv.setCreatedAt(null);
+		// movingInv.setLocCd(toLocCd) -> 병합 시에는 병합 처리 코드에서 설정하고 병합이 아닐 시 7-1 에서 처리한다.
+		// 지금 저장하면 안 됨. 이동 처리 시에 이동할 로케이션에 동일 바코드가 있는지 체크 후 이동 처리 필요
+
+		// 5. 이동하려는 로케이션에 동일 상품, 동일 바코드, 보관 중 상태의 재고 조회 - 병합 여부 판단
+		Inventory legacyInv = Inventory.findInventory(this.domainId, this.barcode, toLocCd, this.skuCd,
+				Inventory.STATUS_STORED);
+
+		// 6. 병합 처리 - legacyInv에 movingInv가 병합 처리
+		if (legacyInv != null) {
+			legacyInv.merge(movingInv, groupId, reasonCd, reason, remarks);
+
+			// 7. movingInv 단순 이동 처리
+		} else {
+			// 7-1. movingInv 이동 처리
+			movingInv.setLocCd(toLocCd);
+			queryMgr.insert(movingInv);
+			// 7-2. 재고 이동 트랜잭션 이력 처리
+			InventoryTran.createMoveInTransactionHistory(movingInv, fromLocCd, toLocCd, splitQty, groupId, reasonCd,
+					reason, remarks);
+		}
+
+		// 8. 분할로 분리된 재고 MOVE-OUT 트랜잭션 이력 처리
+		InventoryTran.createSplitMoveOutTransactionHistory(movingInv, fromLocCd, splitQty, groupId, reasonCd, reason,
+				remarks);
+
+		// 9. 분할 재고 리턴
+		return movingInv;
+	}
 }

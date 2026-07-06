@@ -650,7 +650,7 @@ public class InvTransactionController extends AbstractRestService {
     }
 
     /**
-     * 피킹 처리
+     * 피킹 처리 (임시 API)
      *
      * POST /rest/inventory_trx/{id}/pick_inventory
      *

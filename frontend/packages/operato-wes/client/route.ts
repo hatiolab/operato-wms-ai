@@ -36,7 +36,7 @@ import './pages/inventory/inventory-form-element'
 import './pages/inventory/inventory-lock'
 import './pages/inventory/inventory-releases'
 import './pages/inventory/inventory-transaction-list'
-import './pages/inventory/inventory-product-change'
+import './pages/inventory/inventory-move-tracker'
 
 import './pages/rwa/rwa-home'
 import './pages/rwa/rwa-order-new'  // 팝업으로 사용

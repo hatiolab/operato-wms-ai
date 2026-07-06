@@ -65,6 +65,7 @@ export class PdaStockInquiryTemp extends connect(store)(PageView) {
     lot_no: '',
     expired_date: '',
     reason_cd: '',
+    reason: '',
     remarks: ''
   }
   /** 창고 목록 (select 옵션용) */
@@ -1070,7 +1071,10 @@ export class PdaStockInquiryTemp extends connect(store)(PageView) {
           <code-select
             code-name="INV_NEW_REASON"
             .value=${this.addForm.reason_cd}
-            @change=${e => this._updateAddForm('reason_cd', e.detail.value)}>
+            @change=${e => {
+              this._updateAddForm('reason_cd', e.detail.value)
+              this._updateAddForm('reason', e.detail.label || '')
+            }}>
           </code-select>
         </div>
 
@@ -1771,6 +1775,7 @@ export class PdaStockInquiryTemp extends connect(store)(PageView) {
       lot_no: '',
       expired_date: '',
       reason_cd: 'ADJUST',
+      reason: '',
       remarks: ''
     }
     this.lastFeedback = null
@@ -1834,6 +1839,7 @@ export class PdaStockInquiryTemp extends connect(store)(PageView) {
         lot_no: this.addForm.lot_no || null,
         expired_date: this.addForm.expired_date || null,
         reason_cd: this.addForm.reason_cd || null,
+        reason: this.addForm.reason || null,
         remarks: this.addForm.remarks || null
       }, null, null,
         () => { success = true },

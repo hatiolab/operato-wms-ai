@@ -27,7 +27,8 @@ import xyz.elidom.util.ValueUtil;
 		@Index(name = "ix_inv_trn_3", columnList = "domain_id,barcode,tran_at"),
 		@Index(name = "ix_inv_trn_4", columnList = "domain_id,ref_doc_type,ref_doc_no"),
 		@Index(name = "ix_inv_trn_5", columnList = "domain_id,tran_type,tran_date"),
-		@Index(name = "ix_inv_trn_6", columnList = "domain_id,worker_id,tran_date")
+		@Index(name = "ix_inv_trn_6", columnList = "domain_id,worker_id,tran_date"),
+		@Index(name = "ix_inv_trn_7", columnList = "domain_id,group_id")
 })
 public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStampHook {
 	/**
@@ -285,6 +286,13 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 	@Column(name = "remarks", length = 500)
 	private String remarks;
 
+	/**
+	 * 이동 작업 그룹 ID — 하나의 이동 작업(moveInventory)에서 발생하는
+	 * MOVE_OUT / MOVE_IN / SPLIT / SPLIT_NEW / MERGE / MERGE_OUT 트랜잭션을 묶는 식별자
+	 */
+	@Column(name = "group_id", length = 40)
+	private String groupId;
+
 	public String getId() {
 		return id;
 	}
@@ -501,6 +509,14 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 		this.remarks = remarks;
 	}
 
+	public String getGroupId() {
+		return groupId;
+	}
+
+	public void setGroupId(String groupId) {
+		this.groupId = groupId;
+	}
+
 	@Override
 	public void beforeCreate() {
 		super.beforeCreate();
@@ -681,7 +697,7 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 		this.toLocCd = inventory.getLocCd();
 		this.tranDate = DateUtil.todayStr();
 		this.tranAt = new Date();
-		this.workerId = inventory.getCreatorId();
+		this.workerId = inventory.getUpdaterId();
 		this.createTransaction();
 
 		// 재고 정보 반환
@@ -689,201 +705,222 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 	}
 
 	/**
-	 * 이동 트랜잭션 생성
-	 * (각종 Validation은 끝난 상태에서 호출되는 Method)
+	 * 로케이션으로 MOVE-IN 트랜잭션 이력 생성
 	 * 
 	 * @param inventory
+	 * @param fromLocCd
+	 * @param toLocCd
+	 * @param moveInQty
+	 * @param groupId
+	 * @param reasonCd
+	 * @param reason
+	 * @param remarks
 	 * @return
 	 */
-	public Inventory createMoveTransaction(Inventory inventory) {
-		// 기존 로케이션 정보
-		this.locCd = inventory.getLocCd();
-		this.beforeQty = inventory.getInvQty();
-		this.afterQty = this.beforeQty - this.tranQty;
-
-		// 재고 이동 처리
-		inventory.setLocCd(this.toLocCd);
-		inventory.setLastTranCd(Inventory.TRANSACTION_MOVE);
-		if (ValueUtil.isNotEmpty(this.remarks)) {
-			inventory.setRemarks(this.remarks);
-		}
-		BeanUtil.get(IQueryManager.class).upsert(inventory);
-
-		ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd",
-				"skuCd", "skuNm", "lotNo", "serialNo", "expiredDate");
-
-		// MOVE OUT 트랜잭션 생성
-		this.inventoryId = inventory.getId();
-		this.tranType = InventoryTran.TRAN_TYPE_MOVE_OUT;
-		this.direction = InventoryTran.DIRECTION_OUT;
-		this.tranDate = DateUtil.todayStr();
-		this.tranAt = new Date();
-		this.workerId = inventory.getUpdaterId();
-		this.createTransaction();
-
-		// MOVE IN 트랜잭션 생성
-		InventoryTran moveInTran = ValueUtil.populate(this, new InventoryTran());
+	public static InventoryTran createMoveInTransactionHistory(Inventory inventory, String fromLocCd, String toLocCd,
+			double moveInQty, String groupId, String reasonCd, String reason, String remarks) {
+		InventoryTran moveInTran = ValueUtil.populate(inventory, new InventoryTran());
 		moveInTran.setId(null);
+		moveInTran.setInventoryId(inventory.getId());
 		moveInTran.setTranType(InventoryTran.TRAN_TYPE_MOVE_IN);
 		moveInTran.setDirection(InventoryTran.DIRECTION_IN);
-		moveInTran.setBeforeQty(0.0);
-		moveInTran.setTranQty(this.tranQty);
-		moveInTran.setAfterQty(this.tranQty);
 		moveInTran.setRefDocType(InventoryTran.REF_DOC_TYPE_MOVE);
-		moveInTran.setRefDocNo(this.id);
+		moveInTran.setBeforeQty(0.0);
+		moveInTran.setGroupId(groupId);
+		moveInTran.setTranQty(moveInQty);
+		moveInTran.setAfterQty(moveInQty);
+		moveInTran.setLocCd(fromLocCd);
+		moveInTran.setToLocCd(toLocCd);
+		moveInTran.setReasonCd(reasonCd);
+		moveInTran.setReason(reason);
+		moveInTran.setRemarks(remarks);
+		moveInTran.setWorkerId(inventory.getUpdaterId());
+		moveInTran.setCreatorId(inventory.getUpdaterId());
+		moveInTran.setCreatedAt(null);
 		BeanUtil.get(IQueryManager.class).insert(moveInTran);
-
-		// 재고 정보 리턴
-		return inventory;
+		return moveInTran;
 	}
 
 	/**
-	 * 병합 트랜잭션 생성
-	 * (각종 Validation은 끝난 상태에서 호출되는 Method)
-	 * 
-	 * @param mainInv
-	 * @param mergedInv
-	 * @return
-	 */
-	public Inventory createMergeTransaction(Inventory mainInv, Inventory mergedInv) {
-		// 1. 쿼리 매니저
-		IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
-
-		// 2. 트랜잭션 수량 설정
-		this.beforeQty = mainInv.getInvQty();
-		this.tranQty = mergedInv.getInvQty();
-		this.afterQty = this.beforeQty + this.tranQty;
-
-		// 3. 원본 재고 수량 업데이트
-		mainInv.setInvQty(this.afterQty);
-		mainInv.setLastTranCd(Inventory.TRANSACTION_MERGE);
-		mainInv.setRemarks(this.remarks);
-		queryMgr.update(mainInv, "lastTranCd", "invQty", "remarks", "updatedAt", "updaterId");
-
-		// 4. 원본 재고 병합 트랜잭션 이력 추가
-		ValueUtil.populate(mainInv, this, "domainId", "barcode", "whCd", "comCd",
-				"skuCd", "skuNm", "locCd", "lotNo", "serialNo", "expiredDate");
-
-		this.inventoryId = mainInv.getId();
-		this.direction = InventoryTran.DIRECTION_IN;
-		this.tranType = InventoryTran.TRAN_TYPE_MERGE;
-		this.tranDate = DateUtil.todayStr();
-		this.tranAt = new Date();
-		this.workerId = mainInv.getUpdaterId();
-		this.remarks = ValueUtil.toString(this.remarks, SysConstants.EMPTY_STRING) + " : 병합된 재고 바코드 : "
-				+ mergedInv.getId();
-		this.createTransaction();
-
-		// 5. 병합 대상 트랜잭션 생성
-		InventoryTran mergedTran = ValueUtil.populate(this, new InventoryTran());
-		mergedTran.setId(null);
-		mergedTran.setBeforeQty(mergedInv.getInvQty());
-		mergedTran.setTranQty(mergedInv.getInvQty());
-		mergedTran.setAfterQty(0.0);
-		mergedTran.setLocCd(mergedInv.getLocCd());
-		mergedTran.setToLocCd(mainInv.getLocCd());
-
-		// 6. 병합된 재고 수량 0 처리하여 재고 이력에 남김
-		mergedInv.setLastTranCd(Inventory.TRANSACTION_MERGED);
-		// Soft Delete의 경우 키 중복이 발생할 수 있어서 이 부분 회피를 위해서 LocCd를 변경함. TODO 개선 방안 고려 필요 ->
-		// 동일 정보가 있는지 체크해서 있으면 _MERGED 뒤에 숫자를 붙이는 방향으로 ...
-		mergedInv.setLocCd(mergedInv.getLocCd() + "_MERGED");
-		mergedInv.setInvQty(0.0);
-		mergedInv.setDelFlag(true);
-		mergedInv.setClosedAt(DateUtil.currentTimeStr());
-		mergedInv.setRemarks(ValueUtil.toString(this.remarks, SysConstants.EMPTY_STRING) + " : 병합 재고 바코드 : "
-				+ mainInv.getId());
-		queryMgr.update(mergedInv);
-
-		// 7. 병합 대상 재고 병합 트랜잭션 이력 추가
-		mergedTran.setInventoryId(mergedInv.getId());
-		mergedTran.setDirection(InventoryTran.DIRECTION_OUT);
-		mergedTran.setTranType(InventoryTran.TRAN_TYPE_MERGE_OUT);
-		mergedTran.setRefDocType("MERGE");
-		mergedTran.setRefDocNo(this.id);
-		queryMgr.insert(mergedTran);
-
-		// 8. 메인 재고 리턴
-		return mainInv;
-	}
-
-	/**
-	 * 분할 트랜잭션 생성
+	 * 로케이션으로 MOVE-OUT 트랜잭션 이력 생성
 	 * 
 	 * @param inventory
+	 * @param fromLocCd
+	 * @param toLocCd
+	 * @param oriQty
+	 * @param moveOutQty
+	 * @param groupId
+	 * @param reasonCd
+	 * @param reason
+	 * @param remarks
 	 * @return
 	 */
-	public Inventory createSplitTransaction(Inventory inventory) {
-		// 1. 쿼리 매니저
-		IQueryManager queryMgr = BeanUtil.get(IQueryManager.class);
-		String oriToLocCd = this.toLocCd;
+	public static InventoryTran createMoveOutTransactionHistory(Inventory inventory, String fromLocCd, String toLocCd,
+			double moveOutQty, String groupId, String reasonCd, String reason, String remarks) {
+		InventoryTran moveOutTran = ValueUtil.populate(inventory, new InventoryTran(),
+				"domainId", "barcode", "whCd", "comCd", "skuCd", "skuNm", "lotNo", "serialNo", "expiredDate");
+		moveOutTran.setId(null);
+		moveOutTran.setInventoryId(inventory.getId());
+		moveOutTran.setTranType(InventoryTran.TRAN_TYPE_MOVE_OUT);
+		moveOutTran.setDirection(InventoryTran.DIRECTION_OUT);
+		moveOutTran.setRefDocType(InventoryTran.REF_DOC_TYPE_MOVE);
+		moveOutTran.setGroupId(groupId);
+		moveOutTran.setTranQty(moveOutQty);
+		moveOutTran.setBeforeQty(moveOutQty);
+		moveOutTran.setAfterQty(0.0);
+		moveOutTran.setLocCd(fromLocCd);
+		moveOutTran.setToLocCd(toLocCd);
+		moveOutTran.setReasonCd(reasonCd);
+		moveOutTran.setReason(reason);
+		moveOutTran.setRemarks(remarks);
+		moveOutTran.setWorkerId(inventory.getUpdaterId());
+		moveOutTran.setCreatorId(inventory.getUpdaterId());
+		moveOutTran.setCreatedAt(null);
+		BeanUtil.get(IQueryManager.class).insert(moveOutTran);
+		return moveOutTran;
+	}
 
-		// 2. 트랜잭션 수량 설정
-		this.beforeQty = inventory.getInvQty();
-		this.afterQty = this.beforeQty - this.tranQty;
+	/**
+	 * 재고 분할 트랜잭션 이력 생성
+	 * 
+	 * @param inventory
+	 * @param splitQty
+	 * @param groupId
+	 * @param reasonCd
+	 * @param reason
+	 * @param remarks
+	 * @return
+	 */
+	public static InventoryTran createSplitTransactionHistory(Inventory inventory,
+			double splitQty, String groupId, String reasonCd, String reason, String remarks) {
+		InventoryTran splitTran = ValueUtil.populate(inventory, new InventoryTran(),
+				"domainId", "barcode", "whCd", "comCd", "skuCd", "skuNm", "lotNo", "serialNo", "expiredDate");
+		splitTran.setId(null);
+		splitTran.setInventoryId(inventory.getId());
+		splitTran.setTranType(InventoryTran.TRAN_TYPE_SPLIT);
+		splitTran.setDirection(InventoryTran.DIRECTION_OUT);
+		splitTran.setRefDocType(InventoryTran.REF_DOC_TYPE_MOVE);
+		splitTran.setGroupId(groupId);
+		splitTran.setTranQty(splitQty);
+		splitTran.setBeforeQty(inventory.getInvQty() + splitQty);
+		splitTran.setAfterQty(inventory.getInvQty());
+		splitTran.setLocCd(inventory.getLocCd());
+		splitTran.setToLocCd(inventory.getLocCd());
+		splitTran.setReasonCd(reasonCd);
+		splitTran.setReason(reason);
+		splitTran.setRemarks(remarks);
+		splitTran.setWorkerId(inventory.getUpdaterId());
+		splitTran.setCreatorId(inventory.getUpdaterId());
+		splitTran.setCreatedAt(null);
+		BeanUtil.get(IQueryManager.class).insert(splitTran);
+		return splitTran;
+	}
 
-		// 3. 재고 분할 트랜잭션 처리
-		inventory.setInvQty(this.afterQty);
-		inventory.setRemarks(this.remarks);
-		inventory.setLastTranCd(Inventory.TRANSACTION_SPLIT);
-		queryMgr.update(inventory);
+	/**
+	 * 재고 분할 후 생성 된 재고의 MOVE-OUT 트랜잭션 이력 생성
+	 * 
+	 * @param inventory
+	 * @param fromLocCd
+	 * @param splitQty
+	 * @param groupId
+	 * @param reasonCd
+	 * @param reason
+	 * @param remarks
+	 * @return
+	 */
+	public static InventoryTran createSplitMoveOutTransactionHistory(Inventory inventory,
+			String fromLocCd, double splitQty, String groupId, String reasonCd, String reason, String remarks) {
+		InventoryTran splitNewTran = ValueUtil.populate(inventory, new InventoryTran(),
+				"domainId", "barcode", "whCd", "comCd", "skuCd", "skuNm", "lotNo", "serialNo", "expiredDate");
+		splitNewTran.setId(null);
+		splitNewTran.setInventoryId(inventory.getId());
+		splitNewTran.setTranType(InventoryTran.TRAN_TYPE_MOVE_OUT);
+		splitNewTran.setDirection(InventoryTran.DIRECTION_OUT);
+		splitNewTran.setRefDocType(InventoryTran.REF_DOC_TYPE_MOVE);
+		splitNewTran.setGroupId(groupId);
+		splitNewTran.setTranQty(splitQty);
+		splitNewTran.setBeforeQty(splitQty);
+		splitNewTran.setAfterQty(0.0);
+		splitNewTran.setLocCd(fromLocCd);
+		splitNewTran.setToLocCd(inventory.getLocCd());
+		splitNewTran.setReasonCd(reasonCd);
+		splitNewTran.setReason(reason);
+		splitNewTran.setRemarks(remarks);
+		splitNewTran.setWorkerId(inventory.getUpdaterId());
+		splitNewTran.setCreatorId(inventory.getUpdaterId());
+		splitNewTran.setCreatedAt(null);
+		BeanUtil.get(IQueryManager.class).insert(splitNewTran);
+		return splitNewTran;
+	}
 
-		// 4. 원본 재고 분할 트랜잭션 이력 추가
-		ValueUtil.populate(inventory, this, "domainId", "barcode", "whCd", "comCd",
-				"skuCd", "skuNm", "locCd", "lotNo", "serialNo", "expiredDate");
+	/**
+	 * 재고 병합 처리 이후 재고 병합 트랜잭션 이력 생성
+	 * 
+	 * @param inventory
+	 * @param mergedQty
+	 * @param groupId
+	 * @param reasonCd
+	 * @param reason
+	 * @param remarks
+	 * @return
+	 */
+	public static InventoryTran createMergeTransactionHistory(Inventory inventory, double mergedQty, String groupId,
+			String reasonCd, String reason, String remarks) {
+		InventoryTran mergedTran = ValueUtil.populate(inventory, new InventoryTran());
+		mergedTran.setId(null);
+		mergedTran.setBeforeQty(inventory.getInvQty() - mergedQty);
+		mergedTran.setTranQty(mergedQty);
+		mergedTran.setAfterQty(inventory.getInvQty());
+		mergedTran.setLocCd(inventory.getLocCd());
+		mergedTran.setToLocCd(inventory.getLocCd());
+		mergedTran.setInventoryId(inventory.getId());
+		mergedTran.setDirection(InventoryTran.DIRECTION_IN);
+		mergedTran.setTranType(InventoryTran.TRAN_TYPE_MERGE);
+		mergedTran.setRefDocType(InventoryTran.REF_DOC_TYPE_MOVE);
+		mergedTran.setGroupId(groupId);
+		mergedTran.setReasonCd(reasonCd);
+		mergedTran.setReason(reason);
+		mergedTran.setRemarks(remarks);
+		mergedTran.setWorkerId(inventory.getUpdaterId());
+		mergedTran.setCreatorId(inventory.getUpdaterId());
+		mergedTran.setCreatedAt(null);
+		BeanUtil.get(IQueryManager.class).insert(mergedTran);
+		return mergedTran;
+	}
 
-		this.inventoryId = inventory.getId();
-		this.toLocCd = inventory.getLocCd();
-		this.direction = InventoryTran.DIRECTION_OUT;
-		this.tranType = InventoryTran.TRAN_TYPE_SPLIT;
-		this.tranDate = DateUtil.todayStr();
-		this.tranAt = new Date();
-		this.workerId = inventory.getUpdaterId();
-		this.createTransaction();
-
-		// 5. 이동하려는 로케이션 (oriToLocCd)에 이미 동일 바코드의 재고가 존재하는지 체크
-		Inventory prevInventory = queryMgr.selectByCondition(Inventory.class,
-				ValueUtil.newMap("domainId,barcode,locCd", this.domainId, inventory.getBarcode(), oriToLocCd));
-
-		// 6. 분할 재고 복사
-		InventoryTran splitInvTran = ValueUtil.populate(this, new InventoryTran());
-		splitInvTran.setId(null);
-		splitInvTran.setTranQty(this.tranQty);
-		splitInvTran.setBeforeQty(0.0);
-		splitInvTran.setAfterQty(this.tranQty);
-		splitInvTran.setLocCd(inventory.getLocCd());
-		splitInvTran.setToLocCd(oriToLocCd);
-		splitInvTran.setRefDocType(InventoryTran.TRAN_TYPE_SPLIT);
-		splitInvTran.setRefDocNo(this.id);
-
-		// 7. 분할 재고 생성
-		Inventory splitInv = ValueUtil.populate(inventory, new Inventory());
-		splitInv.setId(null);
-		splitInv.setLocCd(oriToLocCd);
-		splitInv.setLastTranCd(InventoryTran.TRAN_TYPE_SPLIT_NEW);
-		splitInv.setInvQty(this.tranQty);
-		splitInv.setReservedQty(0.0);
-		splitInv.setRemarks(this.remarks);
-		splitInv.setCreatedAt(null);
-		queryMgr.insert(splitInv);
-
-		// 8. 분할 트랜잭션 이력 추가
-		splitInvTran.inventoryId = splitInv.getId();
-		splitInvTran.direction = InventoryTran.DIRECTION_IN;
-		splitInvTran.tranType = InventoryTran.TRAN_TYPE_SPLIT_NEW;
-		queryMgr.insert(splitInvTran);
-
-		// 9. 이동하려는 로케이션 (oriToLocCd)에 동일 바코드의 재고가 존재하면 병합 처리
-		if (prevInventory != null) {
-			InventoryTran mergeTran = new InventoryTran();
-			mergeTran.setReasonCd(this.reasonCd);
-			mergeTran.setReason(this.reason);
-			mergeTran.setRemarks(this.remarks + " (분할로 인해 병합된 재고)");
-			return mergeTran.createMergeTransaction(prevInventory, splitInv);
-		}
-
-		// 10. 리턴
-		return splitInv;
+	/**
+	 * 병합 처리된 이후 소진된 트랜잭션 이력 생성
+	 * 
+	 * @param mergedOutInv
+	 * @param mergeOutQty
+	 * @param groupId
+	 * @param reasonCd
+	 * @param reason
+	 * @param remarks
+	 * @return
+	 */
+	public static InventoryTran createMergedOutTransactionHistory(Inventory mergedOutInv, double mergeOutQty,
+			String groupId, String reasonCd, String reason, String remarks) {
+		InventoryTran mergedOutTran = ValueUtil.populate(mergedOutInv, new InventoryTran());
+		mergedOutTran.setId(null);
+		mergedOutTran.setInventoryId(mergedOutInv.getId());
+		mergedOutTran.setBeforeQty(mergeOutQty);
+		mergedOutTran.setTranQty(mergeOutQty);
+		mergedOutTran.setAfterQty(0.0);
+		mergedOutTran.setLocCd(mergedOutInv.getLocCd());
+		mergedOutTran.setToLocCd(mergedOutInv.getLocCd());
+		mergedOutTran.setDirection(InventoryTran.DIRECTION_OUT);
+		mergedOutTran.setTranType(InventoryTran.TRAN_TYPE_MERGE_OUT);
+		mergedOutTran.setRefDocType(InventoryTran.REF_DOC_TYPE_MOVE);
+		mergedOutTran.setGroupId(groupId);
+		mergedOutTran.setReasonCd(reasonCd);
+		mergedOutTran.setReason(reason);
+		mergedOutTran.setRemarks(remarks);
+		mergedOutTran.setWorkerId(mergedOutInv.getUpdaterId());
+		mergedOutTran.setCreatorId(mergedOutInv.getUpdaterId());
+		mergedOutTran.setCreatedAt(null);
+		BeanUtil.get(IQueryManager.class).insert(mergedOutTran);
+		return mergedOutTran;
 	}
 
 	/**
