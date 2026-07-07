@@ -1,6 +1,7 @@
 import { css, html, LitElement } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { ServiceUtil, UiUtil } from '@operato-app/metapage/dist-client'
+import '../../component/entity-label.js'
 
 /**
  * SKU 검색 팝업
@@ -226,7 +227,8 @@ class RwaSkuSearchPopup extends localize(i18next)(LitElement) {
                           <td>${sku.sku_cd || ''}</td>
                           <td>${sku.sku_nm || ''}</td>
                           <td>${sku.sku_barcd || ''}</td>
-                          <td>${sku.com_cd || ''}</td>
+                          <td><entity-label table="companies" key-col="com_cd" display-col="com_nm"
+                            .value="${sku.com_cd || ''}" .fallback="${sku.com_cd || ''}"></entity-label></td>
                         </tr>
                       `
                     )}

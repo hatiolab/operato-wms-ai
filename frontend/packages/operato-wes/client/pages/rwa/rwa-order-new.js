@@ -254,6 +254,12 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
           background: #FFEBEE;
         }
 
+        /* 상품코드 선택 input — 읽기전용, 클릭 시 상품 검색 팝업 */
+        .sku-pick-input {
+          cursor: pointer;
+          background: var(--md-sys-color-surface) !important;
+        }
+
         .sku-input-wrap {
           display: flex;
           gap: 4px;
@@ -959,7 +965,7 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
               <thead>
                 <tr>
                   <th style="width:50px">순번</th>
-                  <th style="width:130px">SKU 코드</th>
+                  <th style="width:150px">상품 코드</th>
                   <th>상품명</th>
                   <th style="width:90px">반품 수량</th>
                   <th style="width:130px">반품 사유</th>
@@ -990,21 +996,14 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
                         ${item.sourceType === 'SHIPMENT' ? html`
                           <span class="cell-text">${item.skuCd}</span>
                         ` : html`
-                          <div class="sku-input-wrap">
-                            <input
-                              type="text"
-                              placeholder="SKU"
-                              .value="${item.skuCd}"
-                              @input="${e => this._updateItem(globalIdx, 'skuCd', e.target.value)}"
-                              @keydown="${e => e.key === 'Enter' && e.target.blur()}"
-                              @blur="${e => this._lookupSkuByCode(globalIdx, e.target.value)}"
-                            />
-                            <button
-                              class="sku-search-btn"
-                              title="${i18next.t('button.sku_search', { defaultValue: 'SKU 검색' })}"
-                              @click="${() => this._openSkuSearch(globalIdx)}"
-                            >🔍</button>
-                          </div>
+                          <input
+                            type="text"
+                            readonly
+                            class="sku-pick-input"
+                            placeholder="클릭하여 상품 검색"
+                            .value="${item.skuCd}"
+                            @click="${() => this._openSkuSearch(globalIdx)}"
+                          />
                         `}
                       </td>
                       <td>
@@ -1013,9 +1012,9 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
                         ` : html`
                           <input
                             type="text"
-                            placeholder="상품명"
+                            readonly
+                            placeholder="상품 선택 시 자동 입력"
                             .value="${item.skuNm}"
-                            @input="${e => this._updateItem(globalIdx, 'skuNm', e.target.value)}"
                           />
                         `}
                       </td>
@@ -1196,7 +1195,7 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
   _selectCompany(comCd) {
     const comp = this.companies.find(c => c.com_cd === comCd)
     if (comp) {
-      this.companyInput = `${comp.com_cd} - ${comp.com_nm || comp.name || comp.com_cd}`
+      this.companyInput = comp.com_nm || comp.name || comp.com_cd
       this.showCompanySuggestions = false
       this._onCompanySelect(comCd)
     }
@@ -1257,7 +1256,7 @@ class RwaOrderNew extends localize(i18next)(LitElement) {
       if (this.companies.length === 1) {
         const comp = this.companies[0]
         const comCd = comp.com_cd
-        this.companyInput = `${comp.com_cd} - ${comp.com_nm || comp.name || comp.com_cd}`
+        this.companyInput = comp.com_nm || comp.name || comp.com_cd
         this.rwaOrder = { ...this.rwaOrder, comCd }
         this._fetchCustomers(comCd)
       }

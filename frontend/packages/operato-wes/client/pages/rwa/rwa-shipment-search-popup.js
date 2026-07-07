@@ -44,11 +44,11 @@ class RwaShipmentSearchPopup extends LitElement {
           display: flex;
           flex-direction: column;
           gap: 3px;
-          flex: 1 1 200px;
+          flex: 1 1 150px;
         }
 
         .search-field.date-field {
-          flex: 2 1 360px;
+          flex: 1.6 1 270px;
         }
 
         .search-field label {
@@ -512,8 +512,9 @@ class RwaShipmentSearchPopup extends LitElement {
       fromDate: { type: String },
       toDate: { type: String },
       shipmentNo: { type: String },
-      waveNo: { type: String },
+      custCd: { type: String },
       custNm: { type: String },
+      invoiceNo: { type: String },
       orders: { type: Array },
       movedOrders: { type: Array },
       leftChecked: { type: Object },
@@ -532,12 +533,13 @@ class RwaShipmentSearchPopup extends LitElement {
     super()
     const today = this._formatDate(new Date())
     const from = new Date()
-    from.setDate(from.getDate() - 7)
+    from.setDate(from.getDate() - 30)
     this.fromDate = this._formatDate(from)
     this.toDate = today
     this.shipmentNo = ''
-    this.waveNo = ''
+    this.custCd = ''
     this.custNm = ''
+    this.invoiceNo = ''
     this.orders = []          // 좌측 검색 결과 (원본)
     this.movedOrders = []     // 우측 선택함으로 이동된 주문
     this.leftChecked = new Set()   // 좌측 그리드 체크 (→ 이동 대상)
@@ -556,6 +558,7 @@ class RwaShipmentSearchPopup extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback()
     document.removeEventListener('click', this._boundClosePopover, true)
+    clearTimeout(this._searchTimer)
   }
 
   /** 우측 선택함으로 이동된 id 집합 */
@@ -601,38 +604,40 @@ class RwaShipmentSearchPopup extends LitElement {
             <label>출고주문 요청일</label>
             <div class="date-range">
               <input type="date" .value="${this.fromDate}"
-                @input="${e => { this.fromDate = e.target.value }}" />
+                @change="${e => { this.fromDate = e.target.value; this._scheduleSearch() }}" />
               <span class="tilde">~</span>
               <input type="date" .value="${this.toDate}"
-                @input="${e => { this.toDate = e.target.value }}" />
+                @change="${e => { this.toDate = e.target.value; this._scheduleSearch() }}" />
             </div>
           </div>
           <div class="search-field">
             <label>출고주문번호</label>
             <input type="text" placeholder="출고주문번호 (부분 검색)"
               .value="${this.shipmentNo}"
-              @input="${e => { this.shipmentNo = e.target.value }}"
-              @keydown="${e => e.key === 'Enter' && this._onSearch()}" />
+              @change="${e => { this.shipmentNo = e.target.value; this._searchNow() }}"
+              @keydown="${e => { if (e.key === 'Enter') e.target.blur() }}" />
           </div>
           <div class="search-field">
-            <label>웨이브번호</label>
-            <input type="text" placeholder="웨이브번호 (부분 검색)"
-              .value="${this.waveNo}"
-              @input="${e => { this.waveNo = e.target.value }}"
-              @keydown="${e => e.key === 'Enter' && this._onSearch()}" />
+            <label>판매채널</label>
+            <input type="text" placeholder="판매채널 코드 (부분 검색)"
+              .value="${this.custCd}"
+              @change="${e => { this.custCd = e.target.value; this._searchNow() }}"
+              @keydown="${e => { if (e.key === 'Enter') e.target.blur() }}" />
           </div>
           <div class="search-field">
-            <label>거래처</label>
-            <input type="text" placeholder="거래처명 (부분 검색)"
+            <label>주문자명</label>
+            <input type="text" placeholder="주문자명 (부분 검색)"
               .value="${this.custNm}"
-              @input="${e => { this.custNm = e.target.value }}"
-              @keydown="${e => e.key === 'Enter' && this._onSearch()}" />
+              @change="${e => { this.custNm = e.target.value; this._searchNow() }}"
+              @keydown="${e => { if (e.key === 'Enter') e.target.blur() }}" />
           </div>
-        </div>
-        <div class="search-actions">
-          <button class="search-btn" ?disabled="${this.loading}" @click="${this._onSearch}">
-            🔍 ${this.loading ? '검색 중...' : '검색'}
-          </button>
+          <div class="search-field">
+            <label>송장번호</label>
+            <input type="text" placeholder="송장번호 (부분 검색)"
+              .value="${this.invoiceNo}"
+              @change="${e => { this.invoiceNo = e.target.value; this._searchNow() }}"
+              @keydown="${e => { if (e.key === 'Enter') e.target.blur() }}" />
+          </div>
         </div>
       </div>
 
@@ -662,8 +667,9 @@ class RwaShipmentSearchPopup extends LitElement {
                               @change="${this._toggleSelectAll}" />
                           </th>
                           <th>출고주문번호</th>
-                          <th>웨이브번호</th>
-                          <th>거래처</th>
+                          <th>판매채널</th>
+                          <th>주문자명</th>
+                          <th>송장번호</th>
                           <th>주문일자</th>
                           <th>상품수</th>
                         </tr>
@@ -683,8 +689,9 @@ class RwaShipmentSearchPopup extends LitElement {
                                 <span class="no-link" title="상품 미리보기"
                                   @click="${e => this._openItemPopover(e, o)}">${o.shipment_no || '-'}</span>
                               </td>
-                              <td>${o.wave_no || '-'}</td>
-                              <td>${o.cust_nm || o.cust_cd || '-'}</td>
+                              <td>${o.cust_cd || '-'}</td>
+                              <td>${o.cust_nm || '-'}</td>
+                              <td>${o.invoice_no || '-'}</td>
                               <td>${o.order_date || '-'}</td>
                               <td class="num">${o.total_item ?? '-'}</td>
                             </tr>
@@ -734,7 +741,7 @@ class RwaShipmentSearchPopup extends LitElement {
                         </div>
                         <div class="rc-sub">
                           ${o.cust_nm || o.cust_cd || '-'} · ${o.order_date || '-'}<br />
-                          ${o.wave_no ? `웨이브 ${o.wave_no} · ` : ''}상품 ${o.total_item ?? '-'} · 주문 ${o.total_order ?? '-'}
+                          상품 ${o.total_item ?? '-'} · 주문 ${o.total_order ?? '-'}
                         </div>
                       </div>
                     `
@@ -824,8 +831,18 @@ class RwaShipmentSearchPopup extends LitElement {
     document.removeEventListener('click', this._boundClosePopover, true)
   }
 
-  /** 검색 버튼/Enter — 1페이지부터 재검색 */
-  _onSearch() {
+  /** 검색 조건 변경 시 자동 검색 (디바운스 350ms, 1페이지부터) — 날짜 등 즉시성 낮은 조건용 */
+  _scheduleSearch() {
+    clearTimeout(this._searchTimer)
+    this._searchTimer = setTimeout(() => {
+      this.page = 1
+      this._search()
+    }, 350)
+  }
+
+  /** 즉시 검색 (Enter/포커스 아웃 시) — 텍스트 조건용 */
+  _searchNow() {
+    clearTimeout(this._searchTimer)
     this.page = 1
     this._search()
   }
@@ -858,11 +875,14 @@ class RwaShipmentSearchPopup extends LitElement {
       if (this.shipmentNo && this.shipmentNo.trim()) {
         filters.push({ name: 'shipment_no', operator: 'like', value: this.shipmentNo.trim() })
       }
-      if (this.waveNo && this.waveNo.trim()) {
-        filters.push({ name: 'wave_no', operator: 'like', value: this.waveNo.trim() })
+      if (this.custCd && this.custCd.trim()) {
+        filters.push({ name: 'cust_cd', operator: 'like', value: this.custCd.trim() })
       }
       if (this.custNm && this.custNm.trim()) {
         filters.push({ name: 'cust_nm', operator: 'like', value: this.custNm.trim() })
+      }
+      if (this.invoiceNo && this.invoiceNo.trim()) {
+        filters.push({ name: 'invoice_no', operator: 'like', value: this.invoiceNo.trim() })
       }
 
       const res = await ServiceUtil.searchByPagination(
