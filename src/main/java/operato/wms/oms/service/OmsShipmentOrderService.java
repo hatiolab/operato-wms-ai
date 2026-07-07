@@ -286,30 +286,13 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 
 					double allocQty = Math.min(needQty, availQty);
 
-					// StockAllocation 생성
-					/*
-					 * StockAllocation alloc = new StockAllocation();
-					 * alloc.setDomainId(domainId);
-					 * alloc.setShipmentOrderId(orderId);
-					 * alloc.setShipmentOrderItemId(item.getId());
-					 * alloc.setInventoryId(inv.getId());
-					 * alloc.setSkuCd(item.getSkuCd());
-					 * alloc.setBarcode(inv.getBarcode());
-					 * alloc.setLocCd(inv.getLocCd());
-					 * alloc.setLotNo(inv.getLotNo());
-					 * alloc.setExpiredDate(inv.getExpiredDate());
-					 * alloc.setAllocQty(allocQty);
-					 * alloc.setAllocType(StockAllocation.ALLOC_TYPE_SHIPMENT);
-					 * alloc.setAllocStrategy(policy.getReleaseStrategy());
-					 * alloc.setStatus(StockAllocation.STATUS_HARD);
-					 * alloc.setAllocatedAt(now);
-					 * this.queryManager.insert(alloc);
-					 */
-
-					// 재고 예약 처리
+					// 재고 예약 처리 (B2C: SOFT로 생성 후 웨이브 릴리즈 시 HARD 전환, B2B: 바로 HARD)
+					String allocStatus = order.getBizType() != null && order.getBizType().startsWith("B2C")
+							? StockAllocation.STATUS_SOFT
+							: StockAllocation.STATUS_HARD;
 					this.stockTransactionService.allocateInventory(inv, policy.getReleaseStrategy(), allocQty,
 							StockAllocation.ALLOC_TYPE_SHIPMENT,
-							order.getId(), order.getShipmentNo(), item.getId());
+							order.getId(), order.getShipmentNo(), item.getId(), allocStatus);
 
 					itemAllocQty += allocQty;
 					needQty -= allocQty;

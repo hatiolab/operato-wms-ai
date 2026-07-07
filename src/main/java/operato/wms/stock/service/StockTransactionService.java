@@ -368,8 +368,8 @@ public class StockTransactionService extends BaseStockService {
     }
 
     /**
-     * 재고 할당 처리
-     * 
+     * 재고 할당 처리 (기본: HARD 상태)
+     *
      * @param inv           재고
      * @param allocStrategy 할당 전략
      * @param allocateQty   할당 수량
@@ -380,8 +380,28 @@ public class StockTransactionService extends BaseStockService {
      */
     public Inventory allocateInventory(Inventory inv, String allocStrategy, double allocateQty, String allocType,
             String orderId, String orderNo, String orderItemId) {
+        return this.allocateInventory(inv, allocStrategy, allocateQty, allocType, orderId, orderNo, orderItemId,
+                StockAllocation.STATUS_HARD);
+    }
 
-        // 출고 혹은 유통가공 StockAllocation 생성 (HARD)
+    /**
+     * 재고 할당 처리 (초기 상태 지정 가능)
+     *
+     * B2C 주문은 SOFT로 생성 후 웨이브 릴리즈 시 HARD로 전환,
+     * B2B 및 VAS는 HARD로 직접 생성한다.
+     *
+     * @param inv           재고
+     * @param allocStrategy 할당 전략
+     * @param allocateQty   할당 수량
+     * @param allocType     할당 유형
+     * @param orderId       주문 아이디
+     * @param orderNo       주문 번호
+     * @param orderItemId   주문 아이템 아이디
+     * @param status        초기 할당 상태 (SOFT / HARD)
+     */
+    public Inventory allocateInventory(Inventory inv, String allocStrategy, double allocateQty, String allocType,
+            String orderId, String orderNo, String orderItemId, String status) {
+
         StockAllocation alloc = new StockAllocation();
         alloc.setDomainId(inv.getDomainId());
         alloc.setShipmentOrderId(orderId);
@@ -395,7 +415,7 @@ public class StockTransactionService extends BaseStockService {
         alloc.setAllocQty(allocateQty);
         alloc.setAllocType(allocType);
         alloc.setAllocStrategy(allocStrategy);
-        alloc.setStatus(StockAllocation.STATUS_HARD);
+        alloc.setStatus(status);
         alloc.setAllocatedAt(DateUtil.currentTimeStr());
         this.queryManager.insert(alloc);
 

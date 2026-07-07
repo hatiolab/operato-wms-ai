@@ -490,6 +490,15 @@ public class OmsWaveService extends AbstractQueryService {
 		sql = "UPDATE shipment_orders SET status = :status, released_at = :now, updated_at = now() WHERE domain_id = :domainId AND wave_no = :waveNo AND (status = :currentStatus OR status = :currentStatus2)";
 		this.queryManager.executeBySql(sql, queryParams);
 
+		// B2C 주문의 SOFT 할당 → HARD 로 전환 (웨이브 릴리즈 시점에 확정)
+		String softToHardSql = "UPDATE stock_allocations SET status = 'HARD', updated_at = now()" +
+				" WHERE domain_id = :domainId AND status = 'SOFT'" +
+				" AND shipment_order_id IN (" +
+				"   SELECT id FROM shipment_orders" +
+				"   WHERE domain_id = :domainId AND wave_no = :waveNo AND biz_type LIKE 'B2C%'" +
+				" )";
+		this.queryManager.executeBySql(softToHardSql, queryParams);
+
 		// 변경된 주문 건수 조회
 		sql = "SELECT COUNT(*) FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status";
 		int changedOrderCount = this.queryManager.selectBySql(sql, queryParams, Integer.class);
@@ -556,6 +565,15 @@ public class OmsWaveService extends AbstractQueryService {
 				java.util.Arrays.asList(ShipmentOrder.STATUS_RELEASED, ShipmentOrder.STATUS_PICKING),
 				ShipmentOrder.STATUS_WAVED);
 		this.queryManager.executeBySql(updOrdersSql, updOrdersParams);
+
+		// B2C 주문의 HARD 할당 → SOFT 로 복원 (웨이브 릴리즈 취소 시 SOFT 상태로 되돌림)
+		String hardToSoftSql = "UPDATE stock_allocations SET status = 'SOFT', updated_at = now()" +
+				" WHERE domain_id = :domainId AND status = 'HARD'" +
+				" AND shipment_order_id IN (" +
+				"   SELECT id FROM shipment_orders" +
+				"   WHERE domain_id = :domainId AND wave_no = :waveNo AND biz_type LIKE 'B2C%'" +
+				" )";
+		this.queryManager.executeBySql(hardToSoftSql, updOrdersParams);
 
 		// 6. ===== 이벤트 발행: Fulfillment 모듈에 피킹 지시 삭제 트리거 =====
 		WaveCancelledEvent event = new WaveCancelledEvent(domainId, id, wave.getWaveNo());
