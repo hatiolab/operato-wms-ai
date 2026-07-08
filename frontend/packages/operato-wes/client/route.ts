@@ -14,6 +14,7 @@ import './pages/oms/courier-booking-popup'         // 팝업으로 사용
 import './pages/oms/shipment-order-ready-popup'    // 팝업으로 사용
 
 import './pages/inbound/inbound-home'
+import './pages/inbound/supplier-shipment-new'  // 팝업으로 사용
 
 import './pages/fulfillment/fulfillment-home'
 import './pages/fulfillment/fulfillment-progress'
