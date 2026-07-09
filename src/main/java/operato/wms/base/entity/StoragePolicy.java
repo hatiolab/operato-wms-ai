@@ -206,6 +206,18 @@ public class StoragePolicy extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String b2cWaveGroupBy;
 
 	/**
+	 * B2B 출고 후 대기 로케이션 - B2B 출고 완료 후 출고 대기 재고를 임시 보관할 로케이션 코드
+	 */
+	@Column(name = "b2b_wait_ship_loc", length = 20)
+	private String b2bWaitShipLoc;
+
+	/**
+	 * B2C 출고 후 대기 로케이션 - B2C 출고 완료 후 출고 대기 재고를 임시 보관할 로케이션 코드
+	 */
+	@Column(name = "b2c_wait_ship_loc", length = 20)
+	private String b2cWaitShipLoc;
+
+	/**
 	 * 삭제 여부 - true이면 비활성화된 정책. 신규 재고 처리 시 적용 제외
 	 */
 	@Column(name = "del_flag")
@@ -415,6 +427,22 @@ public class StoragePolicy extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setB2cWaveGroupBy(String b2cWaveGroupBy) {
 		this.b2cWaveGroupBy = b2cWaveGroupBy;
+	}
+
+	public String getB2bWaitShipLoc() {
+		return b2bWaitShipLoc;
+	}
+
+	public void setB2bWaitShipLoc(String b2bWaitShipLoc) {
+		this.b2bWaitShipLoc = b2bWaitShipLoc;
+	}
+
+	public String getB2cWaitShipLoc() {
+		return b2cWaitShipLoc;
+	}
+
+	public void setB2cWaitShipLoc(String b2cWaitShipLoc) {
+		this.b2cWaitShipLoc = b2cWaitShipLoc;
 	}
 
 	public String getRemarks() {
