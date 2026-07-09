@@ -84,6 +84,7 @@ import './pages/pda/pda-wms-peer-to-peer-popup'
 import './pages/pda/pda-wms-shipment-barcode-manually'
 
 import './pages/pda/pda-inbound-receiving'
+import './pages/pda/pda-inbound-receiving-v2'
 import './pages/pda/pda-inbound-putaway'
 import './pages/pda/pda-stock-move'
 import './pages/pda/pda-stock-inquiry'

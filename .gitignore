@@ -61,3 +61,10 @@ frontend/packages/*/config/config.development.js
 # Docker
 scripts/operato-wms-docker
 velocity.log.1
+frontend/packages/operato-wes/config.development.js
+src/main/resources/application-dev.properties
+frontend/packages/operato-wes/config/config.development.js
+frontend/packages/operato-wes/config/config.development.js
+src/main/resources/logback-spring.xml
+frontend/packages/operato-wes/config/config.development.js
+src/main/resources/WEB-INF/logback-spring.xml

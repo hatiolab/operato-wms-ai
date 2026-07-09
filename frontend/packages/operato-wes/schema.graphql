@@ -201,6 +201,7 @@ type Attachment {
   refBy: String
   refType: String
   size: String!
+  tags: Object
   updatedAt: DateTimeISO!
   updater: User
 }
@@ -219,6 +220,7 @@ input AttachmentPatch {
   name: String
   refBy: String
   refType: String
+  tags: Object
 }
 
 """Entity for AttributeSet"""
@@ -747,7 +749,7 @@ scalar EmailAddress @specifiedBy(url: "https://html.spec.whatwg.org/multipage/in
 """Entity for Employee"""
 type Employee {
   active: Boolean
-  address: String!
+  address: String
   alias: String
   approvalLines: [ApprovalLine!]!
   contact: Contact
@@ -787,9 +789,10 @@ type EmployeeList {
 input EmployeePatch {
   active: Boolean
   alias: String
+  contact: ObjectRefForContact
   controlNo: String
   cuFlag: String
-  department: ObjectRef
+  department: ObjectRefForDepartment
   hiredOn: String
   id: ID
   jobPosition: String
@@ -1117,18 +1120,23 @@ type LiteMenu {
   active: Boolean
   appName: String
   board: Board
+
+  """Settings for help contents"""
   createdAt: DateTimeISO
   creator: User
   description: String
   domain: Domain!
+  help: String
   icon: String
   id: ID!
   label: String!
+
+  """Settings for multilingual titles"""
   labels: Object
   name: String!
   parent: String
-  privilege: PrivilegeObject
   rank: Int
+  role: Role
   type: String
   updatedAt: DateTimeISO
   updater: User
@@ -1144,12 +1152,13 @@ input LiteMenuPatch {
   active: Boolean
   appName: String
   description: String
+  help: String
   icon: String
   labels: Object
   name: String
   parent: String
-  privilege: PrivilegeInput
   rank: Int
+  role: ObjectRef
   type: String
   value: String
 }
@@ -1204,7 +1213,6 @@ type Menu {
   name: String
   pagination: Boolean
   parent: Menu
-  privilege: PrivilegeObject
   rank: Float
   resourceId: String
   resourceName: String
@@ -1526,7 +1534,6 @@ input MenuPatch {
   name: String
   pagination: Boolean
   parent: ObjectRef
-  privilege: PrivilegeInput
   rank: Int
   resourceId: String
   resourceName: String
@@ -1544,7 +1551,9 @@ type Mutation {
   """To activate user"""
   activateUser(userId: String!): Boolean!
 
-  """To attach a contact on Employee"""
+  """
+  Attaches an existing contact to an employee. The contact is identified by its ID and the employee is identified by their ID.
+  """
   attachContact(contactId: String!, id: String!): Employee!
   cancelInvitation(email: EmailAddress!, reference: String!, type: String!): Boolean!
 
@@ -1601,7 +1610,9 @@ type Mutation {
   """To create domain (Only superuser is granted this privilege.)"""
   createDomain(domainInput: DomainPatch!): Domain!
 
-  """To create new Employee"""
+  """
+  Creates a new employee record with the provided details. Optionally associates the employee with a supervisor, department, and system user. If a photo is provided, it will be attached to the employee record.
+  """
   createEmployee(employee: NewEmployee!): Employee!
 
   """To create new Entity"""
@@ -1773,10 +1784,14 @@ type Mutation {
   """To delete multiple domains (Only superuser is granted this privilege.)"""
   deleteDomains(names: [String!]!): Boolean!
 
-  """To delete Employee"""
+  """
+  Deletes an employee record identified by the given ID. Also deletes any attachments associated with the employee.
+  """
   deleteEmployee(id: String!): Boolean!
 
-  """To delete multiple Employees"""
+  """
+  Deletes multiple employee records identified by the given IDs. Also deletes any attachments associated with each employee.
+  """
   deleteEmployees(ids: [String!]!): Boolean!
 
   """To delete multiple Entities"""
@@ -1971,7 +1986,9 @@ type Mutation {
   """To delete some users"""
   deleteUsers(emails: [String!]!): Boolean!
 
-  """To detach a contact from Employee"""
+  """
+  Detaches an existing contact from an employee. The employee is identified by their ID.
+  """
   detachContact(id: String!): Employee!
 
   """To disconnect a connection"""
@@ -2013,7 +2030,9 @@ type Mutation {
   """To import multiple Departments"""
   importDepartments(departments: [DepartmentPatch!]!): Boolean!
 
-  """To import multiple Employees"""
+  """
+  Imports multiple employee records into the system. Each employee record must be provided in the EmployeePatch format.
+  """
   importEmployees(employees: [EmployeePatch!]!): Boolean!
 
   """To import multiple MenuButtons"""
@@ -2086,6 +2105,14 @@ type Mutation {
     """visibility of board template to be regiestered"""
     visibility: String!
   ): BoardTemplate!
+
+  """
+  Registers an existing employee as a system user, granting them access to the system. The employee is identified by their ID.
+  """
+  registerEmployeeAsSystemUser(
+    """Employee Id"""
+    employeeId: String!
+  ): Boolean!
 
   """To release a Board"""
   releaseBoard(id: String!): Board!
@@ -2170,7 +2197,9 @@ type Mutation {
   """To update multiple domains (Only superuser is granted this privilege.)"""
   updateDomains(patches: [DomainPatch!]!): Boolean!
 
-  """To modify Employee information"""
+  """
+  Updates the details of an existing employee identified by the given ID. Optionally updates the supervisor, department, system user, and photo associated with the employee.
+  """
   updateEmployee(id: String!, patch: EmployeePatch!): Employee!
 
   """To modify Entity' information"""
@@ -2228,7 +2257,9 @@ type Mutation {
   """To modify multiple Departments' information"""
   updateMultipleDepartment(patches: [DepartmentPatch!]!): [Department!]!
 
-  """To modify multiple Employees' information"""
+  """
+  Updates or creates multiple employee records based on the provided patches. New employees are created if the "cuFlag" is "+", and existing employees are updated if the "cuFlag" is "M".
+  """
   updateMultipleEmployee(patches: [EmployeePatch!]!): [Employee!]!
 
   """To modify multiple Entitys' information"""
@@ -2407,6 +2438,7 @@ input NewAttachment {
   file: Upload!
   refBy: String
   refType: String
+  tags: Object
 }
 
 input NewAttributeSet {
@@ -2491,8 +2523,9 @@ input NewDepartment {
 input NewEmployee {
   active: Boolean
   alias: String
+  contact: ObjectRefForContact
   controlNo: String!
-  department: ObjectRef
+  department: ObjectRefForDepartment
   extension: String
   hiredOn: String
   jobPosition: String
@@ -2586,12 +2619,13 @@ input NewLiteMenu {
   active: Boolean
   appName: String
   description: String
+  help: String
   icon: String
   labels: Object
   name: String!
   parent: String
-  privilege: PrivilegeInput
   rank: Int
+  role: ObjectRef
   type: String
   value: String
 }
@@ -2614,7 +2648,6 @@ input NewMenu {
   name: String!
   pagination: Boolean
   parent: ObjectRef
-  privilege: PrivilegeInput
   rank: Int
   resourceId: String
   resourceName: String
@@ -2862,7 +2895,7 @@ input NewScenario {
   active: Boolean
   description: String
   name: String!
-  privilege: PrivilegeInput
+  role: ObjectRef
   schedule: String
   timezone: String
   ttl: Float
@@ -3121,6 +3154,34 @@ input ObjectRefApprovalLineOwnerType {
   name: String
 }
 
+input ObjectRefForContact {
+  address: String
+
+  """Field description"""
+  description: String
+  email: EmailAddress
+
+  """Field id"""
+  id: ID!
+
+  """Field name"""
+  name: String
+  phone: String
+}
+
+input ObjectRefForDepartment {
+  controlNo: String
+
+  """Field description"""
+  description: String
+
+  """Field id"""
+  id: ID!
+
+  """Field name"""
+  name: String
+}
+
 input ObjectRefForEmployee {
   active: Boolean
   alias: String
@@ -3281,6 +3342,18 @@ input PartnerSettingPatch {
   value: String
 }
 
+type PasswordRule {
+  allowRepeat: Boolean
+  digit: Boolean
+  looseCharacterLength: Float
+  lowerCase: Boolean
+  specialCharacter: Boolean
+  tightCharacterLength: Float
+  upperCase: Boolean
+  useLoosePattern: Boolean
+  useTightPattern: Boolean
+}
+
 """Entity for PayloadLog"""
 type PayloadLog {
   createdAt: DateTimeISO
@@ -3400,13 +3473,6 @@ type Privilege {
   roles: [Role!]
   updatedAt: DateTimeISO
   updater: User
-}
-
-input PrivilegeInput {
-  category: String
-  owner: Boolean
-  privilege: String
-  super: Boolean
 }
 
 type PrivilegeList {
@@ -3529,19 +3595,25 @@ type Query {
   boardsCreatedByMe(filters: [Filter!], inherited: InheritedValueType, pagination: Pagination, sortings: [Sorting!]): BoardList!
   chatCompletion(input: ChatCompletionInput!): ChatCompletionOutput!
 
-  """To check if system would provide default password to create new user"""
+  """
+  Checks if the system is configured to provide a default password for new users.
+  """
   checkDefaultPassword: Boolean!
 
-  """To check if system would provide default password to create new user"""
+  """
+  Determines whether the system provides a default password when creating a new user.
+  """
   checkResettablePasswordToDefault: Boolean!
 
   """To fetch the preset of role for new user"""
   checkRolePreset: [Role!]!
 
-  """To check if current user is belongs to current domain"""
+  """
+  Checks if the current authenticated user belongs to the current domain.
+  """
   checkUserBelongsDomain: Boolean!
 
-  """..."""
+  """Checks if a user with the given email address exists in the system."""
   checkUserExistence(email: EmailAddress!): Boolean!
 
   """To fetch common approval lines"""
@@ -3601,10 +3673,14 @@ type Query {
   """To fetch multiple appliance"""
   edges(filters: [Filter!], inherited: InheritedValueType, pagination: Pagination, sortings: [Sorting!]): ApplianceList!
 
-  """To fetch a Employee"""
+  """
+  Fetches a specific employee by their unique ID. Returns the employee object if found, or null if not found.
+  """
   employee(id: String!): Employee
 
-  """To fetch multiple Employees"""
+  """
+  Fetches a list of employees based on provided query parameters. Supports searching by name, control number, and alias.
+  """
   employees(filters: [Filter!], inherited: InheritedValueType, pagination: Pagination, sortings: [Sorting!]): EmployeeList!
 
   """To fetch multiple Entities"""
@@ -3777,6 +3853,11 @@ type Query {
   partnerSettings(filters: [Filter!]!, pagination: Pagination!, partnerDomain: ObjectRef!, sortings: [Sorting!]!): PartnerSettingList!
   partners(filters: [Filter!], inherited: InheritedValueType, pagination: Pagination, sortings: [Sorting!]): PartnerList!
 
+  """
+  Retrieves the current password rule configuration for the system, such as required character types and minimum length.
+  """
+  passwordRule: PasswordRule!
+
   """To fetch a PayloadLog"""
   payloadLog(id: String!): PayloadLog!
 
@@ -3889,7 +3970,7 @@ type Query {
   """To fetch multiple Themes"""
   themes(filters: [Filter!], inherited: InheritedValueType, pagination: Pagination, sortings: [Sorting!]): ThemeList!
 
-  """To fetch user"""
+  """Fetches a user by their email address within the current domain."""
   user(email: EmailAddress!): User!
 
   """To fetch Menus by role"""
@@ -3898,7 +3979,9 @@ type Query {
   """To fetch roles of a user"""
   userRoles(userId: String!): [UserRole!]!
 
-  """To fetch multiple users"""
+  """
+  Fetches a list of users based on provided search parameters within the current domain.
+  """
   users(filters: [Filter!], inherited: InheritedValueType, pagination: Pagination, sortings: [Sorting!]): UserList!
   vendors: [Domain!]!
 }
@@ -4022,6 +4105,7 @@ type Scenario {
   """accessible and executable system-wide"""
   public: Boolean
   publishTags: [Connection!]!
+  role: Role
   schedule: String
   scheduleId: String
   state: String
@@ -4103,7 +4187,7 @@ input ScenarioPatch {
   description: String
   id: ID
   name: String
-  privilege: PrivilegeInput
+  role: ObjectRef
   schedule: String
   steps: [StepPatch!]
   timezone: String
