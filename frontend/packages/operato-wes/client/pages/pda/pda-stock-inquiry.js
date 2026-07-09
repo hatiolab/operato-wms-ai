@@ -2341,12 +2341,19 @@ export class PdaStockInquiry extends connect(store)(PageView) {
 
   /**
    * 메인 목록 화면으로 복귀
+   * 신규·이동·피킹·병합 등 처리 후 복귀할 때 이전 검색 결과가 그대로 남아 처리 내용이
+   * 반영되지 않던 문제가 있어, 검색 조건이 남아 있으면 최신 재고로 재조회한다.
    */
   _goList() {
     this.mode = 'list'
     this.selectedInventory = null
     this.historyItems = []
     this.lastFeedback = null
+
+    // 검색 조건이 있으면 처리 후 최신 재고로 갱신 (조건이 없으면 조회하지 않음)
+    if (this.searchBarcode || this.searchLocCd || this.searchSkuCd) {
+      this._search()
+    }
   }
 
   /**
