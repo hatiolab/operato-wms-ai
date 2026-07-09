@@ -55,4 +55,12 @@ public class InboundQueryStore extends AbstractQueryStore {
     public String getUpdateCancelFinishReceivingOrderLine() {
         return this.getQueryByPath("receiving/UpdateCancelFinishReceivingOrderLine");
     }
+    /**
+     * 공급처 입고예정 조회
+     *  
+     * @return
+     */
+    public String getSearchSupplierShipments() {
+        return this.getQueryByPath("supplier_shipment/SearchSupplierShipments");
+    }
 }

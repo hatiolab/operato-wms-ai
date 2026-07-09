@@ -178,7 +178,7 @@ public class StreamController extends AbstractRestService {
 
     /**
      * 재고 바코드 출력을 위한 PDF 다운로드
-     * 
+     *
      * @param req
      * @param res
      * @param id
@@ -191,6 +191,24 @@ public class StreamController extends AbstractRestService {
             @PathVariable("id") String id) {
 
         this.invCtrl.downloadInventoryBarcode(req, res, id);
+    }
+
+    /**
+     * 공급처 입고예정(ASN) 라벨 PDF 다운로드
+     * 예정수량/팔레트당수량으로 라벨 매수를 계산하여 팔레트별 재고 바코드 라벨을 출력한다.
+     *
+     * @param req
+     * @param res
+     * @param id 공급처 입고예정 ID
+     */
+    @RequestMapping(value = "/supplier_shipments/{id}/download_labels", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Download Supplier Shipment Labels")
+    public void downloadSupplierShipmentLabels(
+            HttpServletRequest req,
+            HttpServletResponse res,
+            @PathVariable("id") String id) {
+
+        this.inboundTrxCtrl.downloadSupplierShipmentLabels(req, res, id);
     }
 
     /**

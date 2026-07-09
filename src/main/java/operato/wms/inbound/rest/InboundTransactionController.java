@@ -1074,4 +1074,77 @@ public class InboundTransactionController extends AbstractRestService {
         this.printoutCtrl.showPdfByPrintTemplateName(req, res, "MULTI_BARCODE_SHEET",
                 ValueUtil.newMap("inventories", inventories));
     }
+
+    /**
+     * 공급처 입고예정(ASN) ID로 라벨 PDF 다운로드 (MULTI_BARCODE_SHEET 템플릿)
+     * 예정수량(exp_qty) 대비 팔레트당 수량(pallet_qty)으로 필요한 라벨 매수를 계산하여
+     * 각 팔레트(라벨)마다 한 페이지씩 재고 바코드 라벨을 출력한다.
+     * 팔레트당 수량이 없으면 1장만 출력한다.
+     *
+     * @param req
+     * @param res
+     * @param id  공급처 입고예정 ID
+     */
+    @RequestMapping(value = "supplier_shipments/{id}/download_labels", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Download Supplier Shipment Labels")
+    public void downloadSupplierShipmentLabels(
+            HttpServletRequest req,
+            HttpServletResponse res,
+            @PathVariable("id") String id) {
+
+        // 1. 공급처 입고예정 조회
+        operato.wms.inbound.entity.SupplierShipment ss = this.queryManager.select(operato.wms.inbound.entity.SupplierShipment.class, id);
+        if (ss == null) {
+            throw new xyz.elidom.exception.server.ElidomRuntimeException("공급처 입고예정 정보를 찾을 수 없습니다.");
+        }
+
+        // 1-1. 라벨 출력 플래그 업데이트
+        if (ss.getLabelFlag() == null || !ss.getLabelFlag()) {
+            ss.setLabelFlag(Boolean.TRUE);
+            this.queryManager.update(ss);
+        }
+
+        // 1-1. /stream/ 요청은 인증 필터에서 현재 도메인이 강제로 변경되므로(임시 코드),
+        //      프린트 템플릿 조회가 올바른 도메인에서 이뤄지도록 예정건의 실제 도메인으로 복원한다.
+        xyz.elidom.sys.entity.Domain rowDomain = this.queryManager.select(xyz.elidom.sys.entity.Domain.class, ss.getDomainId());
+        if (rowDomain != null) {
+            xyz.elidom.sys.util.SessionUtil.setAttribute(xyz.elidom.sys.SysConstants.CURRENT_DOMAIN, rowDomain);
+        }
+
+        // 2. 라벨 매수 계산 = ceil(예정수량 / 팔레트당수량), 팔레트당수량 미설정 시 1장
+        int total = (ss.getExpQty() == null) ? 0 : (int) Math.ceil(ss.getExpQty());
+        int palletQty = (ss.getPalletQty() == null || ss.getPalletQty() <= 0) ? 0 : ss.getPalletQty();
+        int labelCount = (palletQty > 0 && total > 0) ? (int) Math.ceil((double) total / palletQty) : 1;
+
+        // 3. 팔레트(라벨)별 재고 바코드 라벨 객체 생성 — 예정건의 재고 바코드를 공유
+        java.util.List<Inventory> labels = new java.util.ArrayList<Inventory>();
+        for (int i = 0; i < labelCount; i++) {
+            int qty = (palletQty > 0) ? Math.min(palletQty, total - (i * palletQty)) : total;
+            if (qty < 0) {
+                qty = 0;
+            }
+
+            Inventory inv = new Inventory();
+            inv.setDomainId(ss.getDomainId());
+            inv.setBarcode(ss.getBarcode());
+            inv.setComCd(ss.getComCd());
+            inv.setWhCd(ss.getWhCd());
+            inv.setLocCd(ss.getLocCd());
+            inv.setSkuCd(ss.getSkuCd());
+            inv.setSkuNm(ss.getSkuNm());
+            inv.setLotNo(ss.getLotNo());
+            inv.setExpiredDate(ss.getExpiredDate());
+            inv.setInvQty((double) qty);
+            if (palletQty > 0) {
+                inv.setPalletQty(palletQty);
+            }
+            inv.setVendCd(ss.getVendCd());
+            labels.add(inv);
+        }
+
+        // 4. 전용 라벨 템플릿(SUPPLIER_SHIPMENT_LABEL)으로 라벨 PDF 다운로드
+        //    (MULTI_BARCODE_SHEET는 SKU 마스터 기준 분할이라, ASN 스냅샷 기준으로 컨트롤러에서 분할 후 1:1 렌더링)
+        this.printoutCtrl.showPdfByPrintTemplateName(req, res, "SUPPLIER_SHIPMENT_LABEL",
+                ValueUtil.newMap("inventories", labels));
+    }
 }
