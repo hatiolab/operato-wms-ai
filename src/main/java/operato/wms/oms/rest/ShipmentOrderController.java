@@ -205,6 +205,17 @@ public class ShipmentOrderController extends AbstractRestService {
 	@RequestMapping(value = "import/b2b", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Import B2B shipment orders from Excel (validate and register)")
 	public Map<String, Object> importB2bExcel(@RequestBody List<ImportShipmentOrder> list) {
+		// 0. B2B 출고주문 생성 화면 전용 기본값 강제
+		//    (해당 컬럼들은 화면에서 입력받지 않으므로 서버에서 고정 세팅한다)
+		//    - biz_type : B2B 진입점이므로 B2B_OUT 고정
+		//    - ship_type: 현재 정책상 NORMAL 고정 (추후 정책 확정 시 변경)
+		//    - wh_cd    : 창고 선택 UI 정비 전까지 WH001 고정
+		for (ImportShipmentOrder row : list) {
+			row.setBizType(WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT);
+			row.setShipType("NORMAL");
+			row.setWhCd("WH001");
+		}
+
 		// 1. 데이터 검증
 		Map<String, Object> validationResult = this.importService.validateImportData(list, "B2B_OUT");
 
