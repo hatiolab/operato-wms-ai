@@ -810,6 +810,19 @@ public class StockTransactionService extends BaseStockService {
      */
     public List<Inventory> searchAvailableInventory(Long domainId, String comCd, String whCd, String skuCd,
             double needQty, String allocPolicy) {
+        return this.searchAvailableInventory(domainId, comCd, whCd, skuCd, needQty, allocPolicy, null);
+    }
+
+    /**
+     * 가용 재고 조회 (제외 재고 지정 가능) — 결품 재할당용
+     *
+     * excludeInventoryIds 에 지정된 재고(결품이 확인된 재고)는 탐색에서 제외한다.
+     * 이 제외가 없으면 방금 결품 처리한 재고를 다시 선택하여 무한 결품이 발생할 수 있다.
+     *
+     * @param excludeInventoryIds 제외할 재고 ID 목록 (null/빈 목록이면 제외 없음)
+     */
+    public List<Inventory> searchAvailableInventory(Long domainId, String comCd, String whCd, String skuCd,
+            double needQty, String allocPolicy, java.util.List<String> excludeInventoryIds) {
 
         // 1. 전략 기본값 처리
         if (ValueUtil.isEmpty(allocPolicy)) {
@@ -855,6 +868,8 @@ public class StockTransactionService extends BaseStockService {
                 "    AND (i.del_flag IS NULL OR i.del_flag = false) " +
                 "    AND i.expire_status IN (:expireNormal, :expireImminent) " +
                 "    AND (i.inv_qty - COALESCE(i.reserved_qty, 0)) > 0 " +
+                ((excludeInventoryIds != null && !excludeInventoryIds.isEmpty())
+                        ? "    AND i.id NOT IN (:excludeIds) " : "") +
                 ") ranked " +
                 "WHERE running_before < :needQty " +
                 "ORDER BY " + orderBy;
@@ -866,6 +881,10 @@ public class StockTransactionService extends BaseStockService {
                 Inventory.EXPIRE_STATUS_NORMAL,
                 Inventory.EXPIRE_STATUS_IMMINENT,
                 needQty);
+
+        if (excludeInventoryIds != null && !excludeInventoryIds.isEmpty()) {
+            invParams.put("excludeIds", excludeInventoryIds);
+        }
 
         return this.queryManager.selectListBySql(invSql, invParams, Inventory.class, 0, 0);
     }

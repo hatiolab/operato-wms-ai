@@ -1404,14 +1404,28 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
     }
   }
 
-  /** 부족 처리 — 현재 항목을 SHORT 상태로 변경 */
+  /**
+   * 부족(결품) 처리 — 실제 집은 수량만큼만 피킹하고, 부족분은 결품 처리한다.
+   * 입력한 수량(pickQty)을 실제 피킹 수량으로 보고, (지시수량 - 피킹수량)을 결품 수량으로 넘긴다.
+   * 서버는 결품분을 예약 해제한 뒤 다른 PICKABLE 재고에서 재할당하여 새 피킹 라인(RUN)을 추가하므로,
+   * 처리 후 목록을 재조회하여 재할당된 라인을 즉시 노출한다.
+   */
   async _shortCurrentItem() {
     const item = this.currentItemIndex >= 0 ? this.taskItems[this.currentItemIndex] : null
     if (!item) return
 
+    const orderQty = item.order_qty || 0
+    const pickedQty = this.pickQty || 0 // 실제 집은 수량 (수량 입력 필드값, 0이면 전량 결품)
+    const shortQty = orderQty - pickedQty
+
+    if (shortQty <= 0) {
+      this._showFeedback('부족 수량이 없습니다. 전량 피킹이면 [확정]을 눌러주세요', 'warning')
+      return
+    }
+
     const confirmed = await UiUtil.showAlertPopup(
       'label.confirm',
-      `${item.sku_cd} (${item.from_loc_cd})\n현재 항목을 부족 처리하시겠습니까?`,
+      `${item.sku_cd} (${item.from_loc_cd})\n피킹 ${pickedQty} / 결품 ${shortQty}\n결품 수량은 다른 재고에서 재할당됩니다.`,
       'question', 'confirm', 'cancel'
     )
     if (!confirmed) return
@@ -1420,20 +1434,21 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
     try {
       await ServiceUtil.restPost(
         `ful_trx/picking_tasks/${this.currentTask.id}/items/${item.id}/short`,
-        { short_qty: item.order_qty, pick_qty: 0 }, null, null, (res) => {
-          this.taskItems = this.taskItems.map((it, idx) =>
-            idx === this.currentItemIndex
-              ? { ...it, status: 'SHORT', short_qty: item.order_qty, pick_qty: 0 }
-              : it
-          )
-          this.completedCount = this.taskItems.filter(i => i.status === 'PICKED' || i.status === 'SHORT').length
-          this._showFeedback(`부족 처리 (${this.completedCount}/${this.totalCount})`, 'warning')
+        { short_qty: shortQty, pick_qty: pickedQty }, null, null, async (res) => {
+          // 재할당으로 새 피킹 라인이 추가됐을 수 있으므로 서버에서 목록 재조회
+          await this._loadTaskItems(this.currentTask.id)
+          this._setInitialPickQty()
+
+          const reallocated = res?.reallocated_qty || 0
+          const remain = res?.short_remain_qty || 0
+          let msg = `피킹 ${pickedQty} / 결품 ${shortQty}`
+          if (reallocated > 0) msg += ` · ${reallocated}개 재할당`
+          if (remain > 0) msg += ` · ${remain}개 재고부족`
+          this._showFeedback(msg, remain > 0 ? 'warning' : 'info')
 
           if (this.completedCount >= this.totalCount) {
             this._onAllItemsCompleted()
           } else {
-            this._moveToNextItem()
-            this._setInitialPickQty()
             setTimeout(() => this._focusBarcodeInput(), 200)
           }
 

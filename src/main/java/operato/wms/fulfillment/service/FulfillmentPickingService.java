@@ -714,6 +714,15 @@ public class FulfillmentPickingService extends AbstractQueryService {
 			this.deallocateShortQty(domainId, item.getShipmentOrderItemId(), shortQty);
 		}
 
+		// 5-2. 결품 수량만큼 다른 PICKABLE 로케이션의 동일 SKU 가용 재고에서 재할당
+		//      성공분은 진행중 피킹 작업에 새 라인(RUN)으로 추가되어 즉시 피킹 가능하다.
+		if (shortQty > 0 && item.getShipmentOrderItemId() != null) {
+			double notReallocated = this.reallocateShortQty(item, shortQty);
+			result.put("reallocated_qty", shortQty - notReallocated);
+			result.put("short_remain_qty", notReallocated);
+			// TODO: notReallocated > 0 이면 창고 전체 재고 부족(진짜 결품) → 추후 결품 대시보드 알림 연동
+		}
+
 		// 6. auto_replenish=true이면
 		boolean autoReplenish = params.get("auto_replenish") != null
 				&& Boolean.parseBoolean(params.get("auto_replenish").toString());
@@ -781,6 +790,122 @@ public class FulfillmentPickingService extends AbstractQueryService {
 				remainToRelease = 0;
 			}
 		}
+	}
+
+	/**
+	 * 결품 수량 재할당
+	 *
+	 * 결품(short) 처리된 수량만큼 <b>다른 PICKABLE 로케이션</b>의 동일 SKU 가용 재고를 FEFO로 탐색하여
+	 * 재할당(stock_allocation 생성 + reserved_qty 증가)하고, 진행중인 피킹 작업에 새 피킹 라인을
+	 * status=RUN 으로 추가한다. (헤더 plan_item / plan_total 도 함께 증가)
+	 *
+	 * - 결품 난 재고(inventory_id)는 제외하여 무한 결품을 방지한다.
+	 * - 창고 전체에 여분 재고가 없으면 재할당하지 못한 잔여 수량을 반환한다(= 진짜 결품).
+	 *
+	 * @param shortLine 결품 처리된 원본 피킹 라인
+	 * @param shortQty  재할당할 결품 수량
+	 * @return 재할당하지 못한 잔여 수량 (0이면 전량 재할당 성공)
+	 */
+	private double reallocateShortQty(PickingTaskItem shortLine, double shortQty) {
+		Long domainId = shortLine.getDomainId();
+
+		// 1. 피킹 작업 헤더 조회 (화주사/창고)
+		PickingTask task = this.queryManager.select(PickingTask.class, shortLine.getPickTaskId());
+		if (task == null) {
+			return shortQty;
+		}
+		String comCd = task.getComCd();
+		String whCd = task.getWhCd();
+		String skuCd = shortLine.getSkuCd();
+
+		// 2. 출하 주문 조회 (배송번호/업무유형) — 업무유형으로 SOFT/HARD 결정 (B2C=SOFT, 그 외=HARD)
+		String orderId = shortLine.getShipmentOrderId();
+		String orderItemId = shortLine.getShipmentOrderItemId();
+		ShipmentOrder order = ValueUtil.isNotEmpty(orderId) ? this.queryManager.select(ShipmentOrder.class, orderId) : null;
+		String shipmentNo = order != null ? order.getShipmentNo() : null;
+		String bizType = order != null ? order.getBizType() : null;
+		String allocStatus = (bizType != null && bizType.startsWith("B2C"))
+				? StockAllocation.STATUS_SOFT : StockAllocation.STATUS_HARD;
+
+		// 3. 결품 난 재고를 제외하고 가용 재고 탐색 (FEFO)
+		java.util.List<String> excludeInvIds = new java.util.ArrayList<String>();
+		if (ValueUtil.isNotEmpty(shortLine.getInventoryId())) {
+			excludeInvIds.add(shortLine.getInventoryId());
+		}
+		List<Inventory> candidates = this.stockTransactionService.searchAvailableInventory(
+				domainId, comCd, whCd, skuCd, shortQty, StoragePolicy.RELEASE_STRATEGY_FEFO, excludeInvIds);
+
+		if (candidates == null || candidates.isEmpty()) {
+			return shortQty; // 재할당 가능한 재고 없음 → 전량 진짜 결품
+		}
+
+		// 4. 새 피킹 라인 rank 시작값 (기존 max + 1)
+		Integer maxRank = this.queryManager.selectBySql(
+				"SELECT COALESCE(MAX(rank), 0) FROM picking_task_items WHERE domain_id = :domainId AND pick_task_id = :pickTaskId",
+				ValueUtil.newMap("domainId,pickTaskId", domainId, task.getId()), Integer.class);
+		int nextRank = (maxRank == null ? 0 : maxRank) + 1;
+
+		double remain = shortQty;
+		int addedItems = 0;
+		double addedQty = 0;
+
+		// 5. 가용 재고별로 재할당 + 새 피킹 라인 생성
+		for (Inventory inv : candidates) {
+			if (remain <= 0) {
+				break;
+			}
+			double avail = ValueUtil.toDouble(inv.getInvQty(), 0.0) - ValueUtil.toDouble(inv.getReservedQty(), 0.0);
+			if (avail <= 0) {
+				continue;
+			}
+			double allocQty = Math.min(remain, avail);
+
+			// 5-1. 재고 할당 (stock_allocation 생성 + reserved_qty 증가)
+			this.stockTransactionService.allocateInventory(inv, StoragePolicy.RELEASE_STRATEGY_FEFO, allocQty,
+					StockAllocation.ALLOC_TYPE_SHIPMENT, orderId, shipmentNo, orderItemId, allocStatus);
+
+			// 5-2. 방금 생성된 할당 조회 (id 확보 — 피킹 라인 연결용)
+			List<StockAllocation> found = this.queryManager.selectListBySql(
+					"SELECT * FROM stock_allocations WHERE domain_id = :domainId AND inventory_id = :invId AND shipment_order_item_id = :itemId ORDER BY allocated_at DESC",
+					ValueUtil.newMap("domainId,invId,itemId", domainId, inv.getId(), orderItemId),
+					StockAllocation.class, 0, 0);
+			StockAllocation newAlloc = (found != null && !found.isEmpty()) ? found.get(0) : null;
+
+			// 5-3. 진행중 작업에 새 피킹 라인 추가 (RUN — 즉시 피킹 가능)
+			PickingTaskItem line = new PickingTaskItem();
+			line.setDomainId(domainId);
+			line.setPickTaskId(task.getId());
+			line.setShipmentOrderId(orderId);
+			line.setShipmentOrderItemId(orderItemId);
+			line.setStockAllocationId(newAlloc != null ? newAlloc.getId() : null);
+			line.setInventoryId(inv.getId());
+			line.setRank(nextRank++);
+			line.setSkuCd(inv.getSkuCd());
+			line.setSkuNm(shortLine.getSkuNm());
+			line.setBarcode(inv.getBarcode());
+			line.setFromLocCd(inv.getLocCd());
+			line.setLotNo(inv.getLotNo());
+			line.setExpiredDate(inv.getExpiredDate());
+			line.setOrderQty(allocQty);
+			line.setPickQty(0.0);
+			line.setShortQty(0.0);
+			line.setStatus(PickingTaskItem.STATUS_RUN);
+			this.queryManager.insert(line);
+
+			remain -= allocQty;
+			addedItems++;
+			addedQty += allocQty;
+		}
+
+		// 6. 피킹 작업 헤더 집계 갱신 (계획 아이템 수 / 계획 수량)
+		if (addedItems > 0) {
+			task.setPlanItem((task.getPlanItem() == null ? 0 : task.getPlanItem()) + addedItems);
+			task.setPlanTotal((task.getPlanTotal() == null ? 0.0 : task.getPlanTotal()) + addedQty);
+			this.queryManager.update(task, "planItem", "planTotal", "updatedAt", "updaterId");
+		}
+
+		// 7. 재할당하지 못한 잔여 수량 반환 (진짜 결품)
+		return remain;
 	}
 
 	/**
