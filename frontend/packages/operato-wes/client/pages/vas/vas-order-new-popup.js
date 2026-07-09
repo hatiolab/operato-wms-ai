@@ -458,8 +458,8 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     this.locations = []
     this.putawayLocations = []
     this.formData = {
-      comCd: '',
-      whCd: '',
+      comCd: 'GRAIN_ON',
+      whCd: 'WH001',
       vasBomId: '',
       vasReqDate: this._todayStr(),
       planQty: '',
@@ -561,6 +561,14 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
                 class="vas-type-btn ${this.vasTypeMode === 'DISASSEMBLY' ? 'active' : ''}"
                 @click="${() => this._onVasTypeToggle('DISASSEMBLY')}"
               >해체</button>
+              <button
+                class="vas-type-btn ${this.vasTypeMode === 'PREPACK' ? 'active' : ''}"
+                @click="${() => this._onVasTypeToggle('PREPACK')}"
+              >선포장</button>
+              <button
+                class="vas-type-btn ${this.vasTypeMode === 'PRESET' ? 'active' : ''}"
+                @click="${() => this._onVasTypeToggle('PRESET')}"
+              >선세트</button>
             </div>
           </div>
           <div class="bom-select-row">
@@ -620,43 +628,6 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
             @input="${e => this._updateField('planQty', e.target.value)}"
             placeholder="세트 수량"
           />
-        </div>
-
-        <div class="form-group">
-          <label>우선순위</label>
-          <select @change="${e => this._updateField('priority', e.target.value)}">
-            <option value="LOW" ?selected="${this.formData.priority === 'LOW'}">낮음</option>
-            <option value="NORMAL" ?selected="${this.formData.priority === 'NORMAL'}">보통</option>
-            <option value="HIGH" ?selected="${this.formData.priority === 'HIGH'}">높음</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>작업장 로케이션<span class="required">*</span></label>
-          <select @change="${e => this._updateField('workLocCd', e.target.value)}">
-            <option value="">-- 작업장 선택 --</option>
-            ${this.locations.map(
-              loc => html`
-                <option value="${loc.loc_cd}" ?selected="${this.formData.workLocCd === loc.loc_cd}">
-                  ${loc.loc_cd}${loc.loc_type ? ` (${loc.loc_type})` : ''}
-                </option>
-              `
-            )}
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>적치 로케이션</label>
-          <select @change="${e => this._updateField('putawayLocCd', e.target.value)}">
-            <option value="">-- 작업장과 동일 --</option>
-            ${this.putawayLocations.map(
-              loc => html`
-                <option value="${loc.loc_cd}" ?selected="${this.formData.putawayLocCd === loc.loc_cd}">
-                  ${loc.loc_cd}${loc.loc_nm ? ` - ${loc.loc_nm}` : ''}
-                </option>
-              `
-            )}
-          </select>
         </div>
 
         <div class="form-group full-width">
@@ -930,7 +901,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     }
   }
 
-  /** BOM 구성 품목별 재고 수량 조회 (SKU/창고 기준) */
+  /** BOM 구성 품목별 재고 수량 조회 (SKU/창고 기준 - 피킹 로케이션 대상, 삭제되지 않은 로케이션만) */
   async _fetchStockInfo() {
     this.stockInfo = {}
 
@@ -942,8 +913,28 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
         ]
         const data = await ServiceUtil.searchByPagination('inventories', filters, null, 1, 1000)
         const items = data?.items || []
+        
         if (items.length > 0) {
-          const totalQty = items.reduce((sum, inv) => sum + (inv.inv_qty || 0), 0)
+          const locCds = [...new Set(items.map(inv => inv.loc_cd).filter(Boolean))]
+          let validLocCds = []
+
+          if (locCds.length > 0) {
+            const locFilters = [
+              { name: 'loc_cd', operator: 'in', value: locCds.join(',') },
+              { name: 'loc_type', operator: 'eq', value: 'PICKABLE' }
+            ]
+            if (this.formData.whCd) {
+              locFilters.push({ name: 'wh_cd', operator: 'eq', value: this.formData.whCd })
+            }
+            const locData = await ServiceUtil.searchByPagination('locations', locFilters, null, 1, 1000)
+            validLocCds = (locData?.items || [])
+              .filter(loc => loc.del_flag !== true)
+              .map(loc => loc.loc_cd)
+          }
+
+          const validInventories = items.filter(inv => validLocCds.includes(inv.loc_cd))
+          const totalQty = validInventories.reduce((sum, inv) => sum + (inv.inv_qty || 0), 0)
+
           this.stockInfo = {
             ...this.stockInfo,
             [item.sku_cd]: totalQty
@@ -957,7 +948,7 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     this.requestUpdate()
   }
 
-  /** 세트 해체 유형: 세트 상품(set_sku_cd) 자체의 재고 목록 조회 */
+  /** 세트 해체 유형: 세트 상품(set_sku_cd) 자체의 재고 목록 조회 (피킹 로케이션 대상, 삭제되지 않은 로케이션만) */
   async _fetchSetSkuStock() {
     this.setSkuStockList = []
     this.loadingBomItems = true
@@ -975,7 +966,30 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
         ...(this.formData.comCd ? [{ name: 'com_cd', value: this.formData.comCd }] : [])
       ]
       const data = await ServiceUtil.searchByPagination('inventories', filters, null, 1, 1000)
-      this.setSkuStockList = (data?.items || []).filter(inv => inv.inv_qty > 0)
+      const items = data?.items || []
+
+      if (items.length > 0) {
+        const locCds = [...new Set(items.map(inv => inv.loc_cd).filter(Boolean))]
+        let validLocCds = []
+
+        if (locCds.length > 0) {
+          const locFilters = [
+            { name: 'loc_cd', operator: 'in', value: locCds.join(',') },
+            { name: 'loc_type', operator: 'eq', value: 'PICKABLE' }
+          ]
+          if (this.formData.whCd) {
+            locFilters.push({ name: 'wh_cd', operator: 'eq', value: this.formData.whCd })
+          }
+          const locData = await ServiceUtil.searchByPagination('locations', locFilters, null, 1, 1000)
+          validLocCds = (locData?.items || [])
+            .filter(loc => loc.del_flag !== true)
+            .map(loc => loc.loc_cd)
+        }
+
+        this.setSkuStockList = items
+          .filter(inv => validLocCds.includes(inv.loc_cd))
+          .filter(inv => inv.inv_qty > 0)
+      }
     } catch (err) {
       console.error('세트 상품 재고 조회 실패:', err)
       this.setSkuStockList = []
@@ -1131,7 +1145,6 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     if (!this.formData.planQty || parseFloat(this.formData.planQty) <= 0) {
       errors.push('계획 수량을 1 이상 입력해주세요.')
     }
-    if (!this.formData.workLocCd) errors.push('작업장 로케이션을 선택해주세요.')
     return errors
   }
 
@@ -1146,6 +1159,8 @@ class VasOrderNewPopup extends localize(i18next)(LitElement) {
     const labels = {
       SET_ASSEMBLY: '세트 구성',
       DISASSEMBLY: '세트 해체',
+      PREPACK: '선포장',
+      PRESET: '선세트',
       REPACK: '재포장',
       LABEL: '라벨링',
       CUSTOM: '기타'

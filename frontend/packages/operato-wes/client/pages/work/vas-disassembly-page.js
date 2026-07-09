@@ -1238,8 +1238,8 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
   async _selectOrder(order) {
     this.selectedOrder = order
     this.screen = 'work'
-    // 적치 로케이션 기본값: putaway_loc_cd → work_loc_cd 순으로 적용
-    this.putawayLoc = order.putaway_loc_cd || order.work_loc_cd || ''
+    // 적치 로케이션 기본값: putaway_loc_cd → work_loc_cd → vas_type별 존 PICKABLE 로케이션 순으로 적용
+    this._applyDefaultPutawayLoc(order.putaway_loc_cd || order.work_loc_cd, order.vas_type)
     await Promise.all([
       this._fetchOrderItems(order.id),
       this._fetchBomItems(order.vas_bom_id)
@@ -1260,6 +1260,37 @@ class VasDisassemblyPage extends localize(i18next)(PageView) {
     this.bomItems = []
     this.putawayLoc = ''
     this._fetchOrders()
+  }
+
+  /**
+   * 적치 로케이션 기본값 적용
+   * - locCd가 있으면 즉시 적용
+   * - 없으면 vas_type에 따라 존(zone_cd)를 결정하고 loc_type=PICKABLE 로케이션 조회
+   *   - PREPACK  : zone_cd = 'PREPACK'
+   *   - PRESET   : zone_cd = 'PRESET'
+   *   - 그 외 (DISASSEMBLY 등): zone_cd = 'VAS'
+   */
+  async _applyDefaultPutawayLoc(locCd, vasType) {
+    if (locCd) {
+      this.putawayLoc = locCd
+      return
+    }
+    try {
+      const zoneMap = { PREPACK: 'PREPACK', PRESET: 'PRESET' }
+      const zoneCd = zoneMap[vasType] || 'VAS'
+      const filters = [
+        { name: 'zone_cd', value: zoneCd },
+        { name: 'loc_type', value: 'PICKABLE' },
+        { name: 'del_flag', value: false }
+      ]
+      const data = await ServiceUtil.searchByPagination('locations', filters, [{ name: 'loc_cd', desc: false }], 1, 1)
+      const first = data?.items?.[0] || data?.list?.[0]
+      if (first?.loc_cd) {
+        this.putawayLoc = first.loc_cd
+      }
+    } catch (err) {
+      // 조회 실패 시 빈값 유지 (수동 스캔으로 입력)
+    }
   }
 
   /** 바코드/번호로 주문 검색 후 매칭 주문 자동 선택 */

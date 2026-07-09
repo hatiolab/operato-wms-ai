@@ -1317,8 +1317,8 @@ class VasWorkPage extends localize(i18next)(PageView) {
       this._fetchResultBarcodes(order.id)
       voiceService.guide(`주문 ${order.vas_no} 선택. 완료된 작업입니다`)
     } else if (this._shouldSkipResultInputStep(order)) {
-      // 적치 로케이션 기본값: putaway_loc_cd → work_loc_cd 순으로 적용
-      this.putawayLoc = order.putaway_loc_cd || order.work_loc_cd || ''
+      // 적치 로케이션 기본값: putaway_loc_cd → work_loc_cd → vas_type별 존 PICKABLE 로케이션 순으로 적용
+      this._applyDefaultPutawayLoc(order.putaway_loc_cd || order.work_loc_cd, order.vas_type)
       this.step = 3
       voiceService.guide(`주문 ${order.vas_no} 선택. 적치 로케이션을 스캔해주세요`)
     } else if (this._shouldSkipMaterialInputStep(order)) {
@@ -1563,15 +1563,46 @@ class VasWorkPage extends localize(i18next)(PageView) {
       voiceService.guide('완성 수량과 불량 수량을 입력해주세요')
     }
 
-    // 3단계 진입 시 적치 로케이션 기본값: putaway_loc_cd → work_loc_cd 순으로 적용
+    // 3단계 진입 시 적치 로케이션 기본값: putaway_loc_cd → work_loc_cd → vas_type별 존 PICKABLE 로케이션 순으로 적용
     if (this.step === 3 && !this.putawayLoc) {
-      this.putawayLoc = this.selectedOrder?.putaway_loc_cd || this.selectedOrder?.work_loc_cd || ''
+      this._applyDefaultPutawayLoc(this.selectedOrder?.putaway_loc_cd || this.selectedOrder?.work_loc_cd, this.selectedOrder?.vas_type)
     }
   }
 
   /** 이전 단계로 돌아가기 */
   _prevStep() {
     this.step = Math.max(this.step - 1, 1)
+  }
+
+  /**
+   * 적치 로케이션 기본값 적용
+   * - locCd가 있으면 즉시 적용
+   * - 없으면 vas_type에 따라 존(zone_cd)를 결정하고 loc_type=PICKABLE 로케이션 조회
+   *   - PREPACK  : zone_cd = 'PREPACK'
+   *   - PRESET   : zone_cd = 'PRESET'
+   *   - 그 외 (SET_ASSEMBLY, DISASSEMBLY 등): zone_cd = 'VAS'
+   */
+  async _applyDefaultPutawayLoc(locCd, vasType) {
+    if (locCd) {
+      this.putawayLoc = locCd
+      return
+    }
+    try {
+      const zoneMap = { PREPACK: 'PREPACK', PRESET: 'PRESET' }
+      const zoneCd = zoneMap[vasType] || 'VAS'
+      const filters = [
+        { name: 'zone_cd', value: zoneCd },
+        { name: 'loc_type', value: 'PICKABLE' },
+        { name: 'del_flag', value: false }
+      ]
+      const data = await ServiceUtil.searchByPagination('locations', filters, [{ name: 'loc_cd', desc: false }], 1, 1)
+      const first = data?.items?.[0] || data?.list?.[0]
+      if (first?.loc_cd) {
+        this.putawayLoc = first.loc_cd
+      }
+    } catch (err) {
+      // 조회 실패 시 빈값 유지 (수동 스캔으로 입력)
+    }
   }
 
   /* ============================================================

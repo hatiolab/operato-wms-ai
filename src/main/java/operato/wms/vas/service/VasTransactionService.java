@@ -352,20 +352,23 @@ public class VasTransactionService extends AbstractQueryService {
 
 		List<Inventory> candidates;
 		if (ValueUtil.isNotEmpty(srcLocCd)) {
-			// 특정 로케이션 지정 시 해당 로케이션의 재고만 조회 (loc_type 무관)
-			String locSql = "SELECT * FROM inventories " +
-					"WHERE domain_id = :domainId AND com_cd = :comCd AND sku_cd = :skuCd " +
-					"AND loc_cd = :locCd AND status = :status " +
-					"AND (del_flag IS NULL OR del_flag = false) " +
-					"AND (inv_qty - COALESCE(reserved_qty, 0)) > 0 " +
+			// 특정 로케이션 지정 시 해당 로케이션의 재고 조회
+			// 단, 삭제되지 않은(del_flag != true) PICKABLE 로케이션만 대상
+			String locSql = "SELECT i.* FROM inventories i " +
+					"JOIN locations l ON l.loc_cd = i.loc_cd AND l.domain_id = i.domain_id AND l.wh_cd = i.wh_cd " +
+					"WHERE i.domain_id = :domainId AND i.com_cd = :comCd AND i.sku_cd = :skuCd " +
+					"AND i.loc_cd = :locCd AND i.status = :status " +
+					"AND (i.del_flag IS NULL OR i.del_flag = false) " +
+					"AND (i.inv_qty - COALESCE(i.reserved_qty, 0)) > 0 " +
+					"AND l.loc_type = 'PICKABLE' AND (l.del_flag IS NULL OR l.del_flag = false) " +
 					minExpireFilter +
-					"ORDER BY CASE WHEN expired_date IS NULL THEN 1 ELSE 0 END, expired_date ASC, created_at ASC";
+					"ORDER BY CASE WHEN i.expired_date IS NULL THEN 0 ELSE 1 END, i.expired_date ASC, i.created_at ASC";
 			Map<String, Object> locParams = ValueUtil.newMap("domainId,comCd,skuCd,locCd,status",
 					item.getDomainId(), order.getComCd(), item.getSkuCd(), srcLocCd,
 					Inventory.STATUS_STORED);
 			if (ValueUtil.isNotEmpty(order.getWhCd())) {
-				locSql = locSql.replace("AND loc_cd = :locCd",
-						"AND wh_cd = :whCd AND loc_cd = :locCd");
+				locSql = locSql.replace("AND i.loc_cd = :locCd",
+						"AND i.wh_cd = :whCd AND i.loc_cd = :locCd");
 				locParams.put("whCd", order.getWhCd());
 			}
 			if (ValueUtil.isNotEmpty(minExpireDate)) {
@@ -373,20 +376,23 @@ public class VasTransactionService extends AbstractQueryService {
 			}
 			candidates = this.queryManager.selectListBySql(locSql, locParams, Inventory.class, 0, 0);
 		} else {
-			// 자동 배정: loc_type 제한 없이 STORED 재고 전체 대상 (출고용 searchAvailableInventory와 다름)
+			// 자동 배정: 삭제되지 않은(del_flag != true) PICKABLE 로케이션의 STORED 재고 대상
+			// 정렬: 유통기한 없는 것(null) 먼저 → 입고 빠른 순, 그 다음 유통기한 있는 것 → 임박순
 			// wh_cd가 비어있으면 창고 조건 없이 화주사 전체 재고에서 조회
-			String autoSql = "SELECT * FROM inventories " +
-					"WHERE domain_id = :domainId AND com_cd = :comCd AND sku_cd = :skuCd " +
-					"AND status = :status " +
-					"AND (del_flag IS NULL OR del_flag = false) " +
-					"AND (inv_qty - COALESCE(reserved_qty, 0)) > 0 " +
+			String autoSql = "SELECT i.* FROM inventories i " +
+					"JOIN locations l ON l.loc_cd = i.loc_cd AND l.domain_id = i.domain_id AND l.wh_cd = i.wh_cd " +
+					"WHERE i.domain_id = :domainId AND i.com_cd = :comCd AND i.sku_cd = :skuCd " +
+					"AND i.status = :status " +
+					"AND (i.del_flag IS NULL OR i.del_flag = false) " +
+					"AND (i.inv_qty - COALESCE(i.reserved_qty, 0)) > 0 " +
+					"AND l.loc_type = 'PICKABLE' AND (l.del_flag IS NULL OR l.del_flag = false) " +
 					minExpireFilter +
-					"ORDER BY CASE WHEN expired_date IS NULL THEN 1 ELSE 0 END, expired_date ASC, created_at ASC";
+					"ORDER BY CASE WHEN i.expired_date IS NULL THEN 0 ELSE 1 END, i.expired_date ASC, i.created_at ASC";
 			Map<String, Object> autoParams = ValueUtil.newMap("domainId,comCd,skuCd,status",
 					item.getDomainId(), order.getComCd(), item.getSkuCd(), Inventory.STATUS_STORED);
 			if (ValueUtil.isNotEmpty(order.getWhCd())) {
-				autoSql = autoSql.replace("AND status = :status",
-						"AND wh_cd = :whCd AND status = :status");
+				autoSql = autoSql.replace("AND i.status = :status",
+						"AND i.wh_cd = :whCd AND i.status = :status");
 				autoParams.put("whCd", order.getWhCd());
 			}
 			if (ValueUtil.isNotEmpty(minExpireDate)) {
