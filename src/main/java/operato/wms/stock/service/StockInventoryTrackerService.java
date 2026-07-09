@@ -31,8 +31,8 @@ public class StockInventoryTrackerService extends AbstractQueryService {
     public List<Map<String, Object>> getStockSummary(String comCd, String skuCd, String skuNm) {
         String sql = "SELECT com_cd, sku_cd, sku_nm," +
                 " SUM(inv_qty) AS inv_qty," +
-                " SUM(reserved_qty) AS reserved_qty," +
-                " SUM(inv_qty - reserved_qty) AS avail_qty" +
+                " SUM(COALESCE(reserved_qty, 0)) AS reserved_qty," +
+                " SUM(inv_qty - COALESCE(reserved_qty, 0)) AS avail_qty" +
                 " FROM inventories" +
                 " WHERE domain_id = :domainId" +
                 "   AND (del_flag IS NULL OR del_flag = false)";
@@ -67,7 +67,8 @@ public class StockInventoryTrackerService extends AbstractQueryService {
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getInventoryList(String comCd, String skuCd) {
         String sql = "SELECT id, barcode, loc_cd, expired_date, lot_no," +
-                " inv_qty, reserved_qty, (inv_qty - reserved_qty) AS avail_qty" +
+                " inv_qty, COALESCE(reserved_qty, 0) AS reserved_qty," +
+                " (inv_qty - COALESCE(reserved_qty, 0)) AS avail_qty" +
                 " FROM inventories" +
                 " WHERE domain_id = :domainId" +
                 "   AND (del_flag IS NULL OR del_flag = false)" +
