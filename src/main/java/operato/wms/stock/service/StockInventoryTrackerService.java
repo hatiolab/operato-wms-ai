@@ -71,7 +71,9 @@ public class StockInventoryTrackerService extends AbstractQueryService {
                 " (inv_qty - COALESCE(reserved_qty, 0)) AS avail_qty" +
                 " FROM inventories" +
                 " WHERE domain_id = :domainId" +
+                "   AND status not in ('EMPTY', 'BAD')" +
                 "   AND (del_flag IS NULL OR del_flag = false)" +
+                "   AND closed_at is null" +
                 "   AND com_cd = :comCd" +
                 "   AND sku_cd = :skuCd" +
                 " ORDER BY loc_cd, barcode";

@@ -364,8 +364,8 @@ public class OmsWaveService extends AbstractQueryService {
 		}
 
 		// 결과 리턴
-		Map<String, Object> result = ValueUtil.newMap("wave,wave_no,wave_seq", wave, wave.getWaveNo());
-		result.put("wave_seq", wave.getWaveSeq());
+		Map<String, Object> result = ValueUtil.newMap("wave,wave_no,wave_seq", wave, wave.getWaveNo(),
+				wave.getWaveSeq());
 		result.put("order_count", planOrderCnt);
 		result.put("sku_count", planItemCnt);
 		result.put("total_qty", planTotalQty);
