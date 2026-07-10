@@ -266,7 +266,11 @@ export const MetaFormMixin = superClass =>
         MetaApi.showToast('info', TermsUtil.tText('NOTHING_CHANGED'))
       } else {
         params = this.setParentIdFieldByElement(params)
-        await this.requestRestService('PUT', this.saveUrl, params, () => { MetaApi.closePopupBy(this) });
+        if (!this.is_popup) {
+          this.requestRestService('PUT', this.saveUrl, params)
+        } else {
+          await this.requestRestService('PUT', this.saveUrl, params, () => { MetaApi.closePopupBy(this) });
+        }
       }
     }
 

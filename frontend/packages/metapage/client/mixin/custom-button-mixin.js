@@ -237,19 +237,22 @@ export const CustomButtonMixin = superClass =>
             customLogic.logic = customLogic.logic.replace(':id', this.is_element ? this.parent_id : parameters.id)
           }
 
+          // 조회성이 아닌 트랜잭션 성인 경우 서비스 호출 성공 후 바로 팝업 닫기
+          let closerFunc = (customLogic.method && customLogic.method != 'GET' && customLogic.method != 'get' && this.is_popup) ? () => MetaApi.closePopupBy(this) : null;
+
           if (customLogic.param_data == 'form-param' || customLogic.param_data == 'form-param-all') {
-            return await this.requestRestService(customLogic.method, customLogic.logic + '?' + parameters)
+            return await this.requestRestService(customLogic.method, customLogic.logic + '?' + parameters, closerFunc)
           } else {
             if (customLogic.param_data == 'search-form') {
-              return await this.requestRestService(customLogic.method, customLogic.logic, { form: parameters })
+              return await this.requestRestService(customLogic.method, customLogic.logic, { form: parameters }, closerFunc)
             } else if (customLogic.param_data == 'list' || customLogic.param_data == 'changed') {
-              return await this.requestRestService(customLogic.method, customLogic.logic, { list: parameters })
+              return await this.requestRestService(customLogic.method, customLogic.logic, { list: parameters }, closerFunc)
             } else if (customLogic.param_data == 'selected') {
-              return await this.requestRestService(customLogic.method, customLogic.logic, { data: parameters })
+              return await this.requestRestService(customLogic.method, customLogic.logic, { data: parameters }, closerFunc)
             } else if (customLogic.param_data == 'selected-bare' || customLogic.param_data == 'changed-bare') {
-              return await this.requestRestService(customLogic.method, customLogic.logic, parameters)
+              return await this.requestRestService(customLogic.method, customLogic.logic, parameters, closerFunc)
             } else {
-              return await this.requestRestService(customLogic.method, customLogic.logic, parameters)
+              return await this.requestRestService(customLogic.method, customLogic.logic, parameters, closerFunc)
             }
           }
         }

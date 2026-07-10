@@ -19,7 +19,7 @@ import { MetaApi } from '../utils/meta-api'
  */
 export const BasicButtonMixin = superClass =>
   class extends MetaSetMixin(superClass) {
-    
+
     /**
      * @description 버튼 컨테이너 스타일
      ***********************************
@@ -51,7 +51,7 @@ export const BasicButtonMixin = superClass =>
               }
             }
 
-            if(e.name == 'template') {
+            if (e.name == 'template') {
               let btnStyle = CommonButtonStyles['download'] || {
                 icon: 'download',
                 emphasis: {
@@ -139,7 +139,7 @@ export const BasicButtonMixin = superClass =>
           resultParams.filters = await fetchParam.getQueryFilters()
         } else {
           // 두 가지가 모두 있는 경우 filter 조건은 searchForm을 기준으로 한다.
-          if(this.searchForm && this.searchForm.tagName.toLowerCase() == 'ox-search-form') {
+          if (this.searchForm && this.searchForm.tagName.toLowerCase() == 'ox-search-form') {
             fetchParam.filters = await this.searchForm.getQueryFilters()
           }
 
@@ -266,13 +266,13 @@ export const BasicButtonMixin = superClass =>
       let params = ValueUtil.isEmpty(filters)
         ? null
         : filters
-            .map(filter => {
-              return {
-                name: filter.name,
-                value: filter.value ? filter.value : null
-              }
-            })
-            .filter(item => item.value != null)
+          .map(filter => {
+            return {
+              name: filter.name,
+              value: filter.value ? filter.value : null
+            }
+          })
+          .filter(item => item.value != null)
       return await ServiceUtil.restGet(this.resourceUrl, params)
     }
 
@@ -326,11 +326,11 @@ export const BasicButtonMixin = superClass =>
           response = await this.fetchByResource(fetchParam)
         }
 
-      // 2. 메뉴 파라미터 설정에 search-field-param-type 값이 custom인 경우
-      } else if(this.menuParamValue('search-field-param-type', 'resource') == 'custom') {
+        // 2. 메뉴 파라미터 설정에 search-field-param-type 값이 custom인 경우
+      } else if (this.menuParamValue('search-field-param-type', 'resource') == 'custom') {
         response = await this.fetchByCustom(fetchParam)
 
-      // 3. 일반 리소스 호출
+        // 3. 일반 리소스 호출
       } else {
         response = await this.fetchByResource(fetchParam)
       }
@@ -342,7 +342,7 @@ export const BasicButtonMixin = superClass =>
       if (this.fetchResultSetCallback) {
         fetchResultSet = this.fetchResultSetCallback(response)
 
-      // 6. 그렇지 않다면 fetchResultSet을 기본으로 구성
+        // 6. 그렇지 않다면 fetchResultSet을 기본으로 구성
       } else {
         let records = response ? (this.menu.items_res_field ? response[this.menu.items_res_field] : response) : []
         let total = response && this.menu.total_res_field ? response[this.menu.total_res_field] : records.length
@@ -357,7 +357,7 @@ export const BasicButtonMixin = superClass =>
         this.fetch_callback(fetchResultSet, response)
         return fetchResultSet
 
-      // 8. fetchResultSet을 리턴
+        // 8. fetchResultSet을 리턴
       } else {
         return fetchResultSet
       }
@@ -371,6 +371,7 @@ export const BasicButtonMixin = superClass =>
       let patches = ServiceUtil.patchesForUpdateMultiple(this.grist)
       if (patches) {
         await this.requestCudMultiple(patches)
+
       }
     }
 
@@ -405,17 +406,17 @@ export const BasicButtonMixin = superClass =>
     /**
      * Refresh
      */
-    async refresh(){
-      if(this.parentFetch) {
+    async refresh() {
+      if (this.parentFetch) {
         this.parentFetch();
       }
-  
+
       if (this.grist) {
         this.grist.fetch();
       } else if (this.useSearchForm()) {
         this.searchForm.submit();
       } else {
-        if(this.fetchHandler) {
+        if (this.fetchHandler) {
           this.fetchHandler();
         }
       }
@@ -432,7 +433,7 @@ export const BasicButtonMixin = superClass =>
 
       let valiRes = ServiceUtil.validationBeforeSave(this.grist, patches)
 
-      if(!valiRes || valiRes == null){
+      if (!valiRes || valiRes == null) {
         return false
       }
 
@@ -452,7 +453,11 @@ export const BasicButtonMixin = superClass =>
       // cud 플래그 옵션 처리
       patches = this.changeCudFlagByOptions(patches)
       // 여러 건의 레코드에 대해서 insert / update 동시 요청
-      return await this.requestRestService('POST', this.saveUrl, patches)
+      if (this.is_popup) {
+        return await this.requestRestService('POST', this.saveUrl, patches, () => { MetaApi.closePopupBy(this) })
+      } else {
+        return await this.requestRestService('POST', this.saveUrl, patches)
+      }
     }
 
     /**
@@ -560,9 +565,9 @@ export const BasicButtonMixin = superClass =>
      **********************************************************************
      * @param {Array} action
      */
-    async template(action){
+    async template(action) {
       // 로직에 ID 가 없으면 리턴 
-      if(!action.logic)  return
+      if (!action.logic) return
       ServiceUtil.templateFileDownload(action.logic)
     }
   }

@@ -67,7 +67,7 @@ export const GristRenderMixin = superClass =>
       if (this.menu.use_pagination == false) {
         pagination = { infinite: true }
 
-      // 페이지 옵션이 menu_param에 설정됨
+        // 페이지 옵션이 menu_param에 설정됨
       } else if (paramPagination) {
         let pagesInts = paramPagination.split(',').map(page => { return parseInt(page) })
         pagination = { pages: pagesInts }
@@ -83,7 +83,7 @@ export const GristRenderMixin = superClass =>
 
       // Tree Grist
       let tree = this.menuParamValueToObject('grist-tree', undefined)
-     
+
       // 그리스트 설정 리턴
       let gristConf = {
         list: {
@@ -103,31 +103,31 @@ export const GristRenderMixin = superClass =>
         ]
       }
 
-      if(tree){
+      if (tree) {
         gristConf.columns.splice(2, 0, {
-          type : "tree",
-          name : tree.columnName? tree.columnName : "path",
-          label : true,
-          header : tree.columnName? tree.columnName : "path",
-          record : {
-            editable : false,
-            options : {
-              selectable : true
+          type: "tree",
+          name: tree.columnName ? tree.columnName : "path",
+          label: true,
+          header: tree.columnName ? tree.columnName : "path",
+          record: {
+            editable: false,
+            options: {
+              selectable: true
             }
           },
-          width : 120,
-          handlers : {
-            contextmenu : "contextmenu-tree-mutation"
+          width: 120,
+          handlers: {
+            contextmenu: "contextmenu-tree-mutation"
           }
         })
       }
 
       // 그리드 행 컬러 관련 설정 추출
       let rowColorConfig = JSON.parse(this.menuParamValue('row-color', '[]'))
-      if(rowColorConfig && rowColorConfig.length > 0) {
+      if (rowColorConfig && rowColorConfig.length > 0) {
         gristConf.rows.classifier = (record, rowIndex) => {
           // 조건에 따라 색상을 2개 배열로 리턴 [BACKGROUP_COLOR, FONT_COLOR] 순으로 ...
-          for(let idx = 0 ; idx < rowColorConfig.length ; idx++) {
+          for (let idx = 0; idx < rowColorConfig.length; idx++) {
             let rowColorConf = rowColorConfig[idx]
             let recordValue = record[rowColorConf.col_name]
 
@@ -150,7 +150,7 @@ export const GristRenderMixin = superClass =>
         }
       }
 
-      if(tree){
+      if (tree) {
         gristConf.tree = tree
       }
 
