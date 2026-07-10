@@ -54,9 +54,11 @@ public class OmsImportService extends AbstractQueryService {
 			List<String> errors = new ArrayList<String>();
 
 			// 1. 필수 필드 검증
-			if (ValueUtil.isEmpty(row.getRefOrderNo())) {
-				errors.add("참조 주문번호(ref_order_no)가 누락되었습니다");
-			}
+			/*
+			 * if (ValueUtil.isEmpty(row.getRefOrderNo())) {
+			 * errors.add("참조 주문번호(ref_order_no)가 누락되었습니다");
+			 * }
+			 */
 			if (ValueUtil.isEmpty(row.getSkuCd())) {
 				errors.add("상품코드(sku_cd)가 누락되었습니다");
 			}

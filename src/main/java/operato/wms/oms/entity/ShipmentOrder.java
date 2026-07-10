@@ -636,6 +636,11 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 					"diy-generate-shipment-no", ValueUtil.newMap("order", this));
 		}
 
+		// 외부 출고번호가 없다면 내부 출고번호로 셋팅
+		if (ValueUtil.isEmpty(this.refOrderNo)) {
+			this.refOrderNo = this.shipmentNo;
+		}
+
 		// 주문일이 없는 경우 당일 날짜 설정
 		if (this.orderDate == null) {
 			this.orderDate = DateUtil.todayStr();
