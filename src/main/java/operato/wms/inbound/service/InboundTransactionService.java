@@ -19,6 +19,7 @@ import operato.wms.inbound.WmsInboundConstants;
 import operato.wms.inbound.entity.ImportReceivingOrder;
 import operato.wms.inbound.entity.Receiving;
 import operato.wms.inbound.entity.ReceivingItem;
+import operato.wms.inbound.entity.SupplierShipment;
 import operato.wms.inbound.query.store.InboundQueryStore;
 import operato.wms.stock.entity.Inventory;
 import xyz.anythings.sys.event.EventPublisher;
@@ -214,6 +215,93 @@ public class InboundTransactionService extends AbstractQueryService {
 
         // 14. 생성된 입고 지시 리턴
         return receiving;
+    }
+
+    /**
+     * 공급처 입고예정(ASN) 목록으로부터 입고주문 일괄 생성
+     *
+     * "입고예정 접수 현황" 화면에서 멀티셀렉한 공급처 입고예정 행마다 입고주문(Receiving) 1건 +
+     * 입고상세(ReceivingItem) 1건을 생성한다. 이미 유효한(취소되지 않은) 입고주문이 연결된 행은
+     * 스킵하고, 연결된 입고주문이 없거나 취소(CANCEL)된 경우에는 재생성한다.
+     * 생성 시 supplier_shipment.barcode 를 그대로 receiving_item.barcode 로 전달하여 골든스레드를 유지한다.
+     *
+     * @param domainId    도메인 ID
+     * @param shipmentIds 선택된 공급처 입고예정 ID 목록
+     * @return 처리 결과 (created, skipped, details)
+     */
+    public Map<String, Object> createReceivingOrdersFromShipments(Long domainId, List<String> shipmentIds) {
+        int created = 0;
+        int skipped = 0;
+        List<Map<String, Object>> details = new ArrayList<>();
+
+        for (String ssId : shipmentIds) {
+            if (ValueUtil.isEmpty(ssId)) {
+                continue;
+            }
+
+            // 1. 공급처 입고예정 조회 (도메인 필수)
+            SupplierShipment ss = this.queryManager.selectByCondition(SupplierShipment.class,
+                    ValueUtil.newMap("domainId,id", domainId, ssId));
+            if (ss == null) {
+                skipped++;
+                details.add(ValueUtil.newMap("id,result,message", ssId, "SKIP", "공급처 입고예정을 찾을 수 없습니다."));
+                continue;
+            }
+
+            // 2. 재생성 가능 여부 판단 - 연결된 입고주문 상태 확인 (취소되지 않은 오더가 있으면 스킵)
+            if (ValueUtil.isNotEmpty(ss.getRcvNo())) {
+                Receiving exist = this.queryManager.selectByCondition(Receiving.class,
+                        ValueUtil.newMap("domainId,rcvNo,comCd", domainId, ss.getRcvNo(), ss.getComCd()));
+                if (exist != null && ValueUtil.isNotEqual(exist.getStatus(), WmsInboundConstants.STATUS_CANCEL)) {
+                    skipped++;
+                    details.add(ValueUtil.newMap("id,asn_no,result,message", ssId, ss.getAsnNo(), "SKIP",
+                            "이미 입고주문[" + ss.getRcvNo() + "]이 존재합니다."));
+                    continue;
+                }
+            }
+
+            // 3. 입고주문(Receiving) 생성 - rcv_no는 beforeCreate에서 자동 채번, status는 INWORK
+            Receiving receiving = new Receiving();
+            receiving.setWhCd(ss.getWhCd());
+            receiving.setComCd(ss.getComCd());
+            receiving.setVendCd(ss.getVendCd());
+            // 입고유형: 일반입고 공통코드 값 "1" (RECEIVING_TYPE_NORMAL 상수는 "NORMAL"이 아님에 주의)
+            receiving.setRcvType("1");
+            receiving.setRcvReqDate(ValueUtil.isNotEmpty(ss.getEta()) ? ss.getEta() : DateUtil.todayStr());
+            this.queryManager.insert(receiving);
+
+            // 4. 입고상세(ReceivingItem) 생성 - 골든스레드 barcode 그대로 전달
+            ReceivingItem item = new ReceivingItem();
+            item.setReceivingId(receiving.getId());
+            item.setRcvExpSeq(1);
+            item.setSkuCd(ss.getSkuCd());
+            item.setSkuNm(ss.getSkuNm());
+            item.setRcvExpDate(receiving.getRcvReqDate());
+            double qty = (ss.getExpQty() == null) ? 0.0 : ss.getExpQty().doubleValue();
+            item.setTotalExpQty(qty);
+            item.setRcvExpQty(qty);
+            item.setBarcode(ss.getBarcode());
+            item.setLotNo(ss.getLotNo());
+            item.setExpiredDate(ss.getExpiredDate());
+            item.setLocCd(ss.getLocCd());
+            this.queryManager.insert(item);
+
+            // 5. 공급처 입고예정 갱신 - 오더 생성 표시 (order_flag/rcv_no/ordered_at)
+            ss.setOrderFlag(Boolean.TRUE);
+            ss.setRcvNo(receiving.getRcvNo());
+            ss.setOrderedAt(new Date());
+            this.queryManager.update(ss, "orderFlag", "rcvNo", "orderedAt");
+
+            created++;
+            details.add(ValueUtil.newMap("id,asn_no,result,rcv_no", ssId, ss.getAsnNo(), "CREATED",
+                    receiving.getRcvNo()));
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("created", created);
+        result.put("skipped", skipped);
+        result.put("details", details);
+        return result;
     }
 
     /**
@@ -572,6 +660,80 @@ public class InboundTransactionService extends AbstractQueryService {
         }
 
         // 아이템 리턴
+        return item;
+    }
+
+    /**
+     * 입고 라인 완료 처리 (v2 — 공급처 라벨 재고바코드 기반)
+     *
+     * 기존 {@link #finishReceivingOrderLine} 과 동일한 검증·분할·유통기한 로직을 수행하되,
+     * item.barcode 에 공급처 라벨의 재고바코드가 주입돼 있으면 그 값을 그대로 재고(inventories.barcode)에
+     * 사용한다(골든 스레드). barcode 가 비어 있으면 기존과 동일하게 새로 채번하며, 재고 생성은 항상 수행한다.
+     *
+     * @param receiving
+     * @param item
+     * @param printerId
+     * @return
+     */
+    public ReceivingItem finishReceivingOrderLineByBarcode(Receiving receiving, ReceivingItem item, String printerId) {
+        // 상태 체크
+        if (ValueUtil.isNotEqual(item.getStatus(), WmsInboundConstants.STATUS_START)) {
+            throw new ElidomRuntimeException("입고 순번 [" + item.getRcvSeq() + "]은 작업 중인 상태가 아닙니다.");
+        }
+
+        if (item.getRcvQty() == null || item.getRcvQty() <= 0) {
+            throw new ElidomRuntimeException("입고 순번 [" + item.getRcvSeq() + "]은 입고 수량이 0보다 커야 합니다.");
+        }
+
+        if (receiving.getInspFlag()) {
+            if (ValueUtil.isEmpty(item.getItemType())) {
+                throw new ElidomRuntimeException("검수 결과 정보가 없습니다.");
+            } else if (ValueUtil.isNotEqual(item.getItemType(), WmsInboundConstants.INSP_STATUS_PASS)) {
+                throw new ElidomRuntimeException("검수 결과가 패스가 아닙니다.");
+            }
+            if (item.getInspQty() == 0 || item.getInspQty() < item.getRcvQty()) {
+                throw new ElidomRuntimeException("검수 수량이 입고 수량보다 작습니다.");
+            }
+        }
+
+        // 상품 조회
+        SKU sku = this.queryManager.selectByCondition(SKU.class,
+                new SKU(receiving.getDomainId(), receiving.getComCd(), item.getSkuCd()));
+
+        // lotFlag / serialFlag 필수 입력 검증
+        if (sku != null && Boolean.TRUE.equals(sku.getLotFlag()) && ValueUtil.isEmpty(item.getLotNo())) {
+            throw new ElidomRuntimeException("SKU [" + item.getSkuCd() + "]는 로트 추적 대상입니다. 로트 번호를 입력하세요.");
+        }
+        if (sku != null && Boolean.TRUE.equals(sku.getSerialFlag()) && ValueUtil.isEmpty(item.getSerialNo())) {
+            throw new ElidomRuntimeException("SKU [" + item.getSkuCd() + "]는 시리얼 추적 대상입니다. 시리얼 번호를 입력하세요.");
+        }
+
+        // 예정 수량과 입고 수량이 다르면 자동 분할 처리
+        double splitQty = item.getRcvExpQty() - item.getRcvQty();
+        if (splitQty > 0) {
+            // v2: 주입된 재고바코드가 잔여(미입고) 분할 라인으로 복사되지 않도록,
+            //     분할 동안만 바코드를 비웠다가 입고분에 복원한다. (분할 라인은 다음 입고 시 별도 라벨 사용)
+            String keepBarcode = item.getBarcode();
+            item.setBarcode(null);
+            item.split(splitQty, false, true);
+            item.setBarcode(keepBarcode);
+        }
+
+        // 유통기한 자동 계산
+        if (ValueUtil.isNotEmpty(item.getPrdDate()) && ValueUtil.isEmpty(item.getExpiredDate())) {
+            this.calculateExpiryDateForItem(receiving, item, sku);
+        }
+
+        item.setRcvDate(DateUtil.todayStr());
+        item.setStatus(WmsInboundConstants.STATUS_END);
+
+        // 입고 항목별 완료 처리 (v2)
+        // 공급처 라벨 재고바코드가 주입돼 있으면 그대로 사용(골든 스레드), 없으면 채번. 재고는 항상 생성한다.
+        if (ValueUtil.isEmpty(item.getBarcode())) {
+            item.setBarcode(Inventory.newBarcode());
+        }
+        this.createInventoryByItem(receiving, item);
+
         return item;
     }
 

@@ -1,5 +1,6 @@
 import '@things-factory/barcode-ui'
 import '../../component/sku-barcode-input.js'
+import '../../component/inventory-barcode-input.js'
 import '../../component/barcode-listener.js'
 import '../../component/numeric-keypad-input.js'
 import '../../component/code-select.js'
@@ -77,8 +78,10 @@ export class PdaInboundReceivingV2 extends connect(store)(PageView) {
   /** 완료된 주문 조회 전용 모드 — 버튼/탭 입력 비활성화 */
   @state() viewOnly = false
 
-  /** SKU 바코드 스캔 입력 컴포넌트 */
-  @query('sku-barcode-input') _skuBarcodeInput
+  /** 재고바코드 스캔 입력 컴포넌트 */
+  @query('inventory-barcode-input') _invBarcodeInput
+  /** 스캔한 재고바코드 — 입고완료 시 inventories.barcode로 그대로 주입 (골든 스레드) */
+  _scannedInvBarcode = ''
   /** 입고번호 스캔 입력 */
   @query('#rcvScanInput') _rcvScanInput
 
@@ -491,7 +494,7 @@ export class PdaInboundReceivingV2 extends connect(store)(PageView) {
           color: var(--md-sys-color-on-primary-container, #1565c0);
         }
 
-        .barcode-input sku-barcode-input {
+        .barcode-input inventory-barcode-input {
           flex: 1;
         }
 
@@ -1151,7 +1154,7 @@ export class PdaInboundReceivingV2 extends connect(store)(PageView) {
 
     return html`
       <barcode-listener
-        @barcode-scanned=${e => this._skuBarcodeInput?.scan(e.detail.barcode)}>
+        @barcode-scanned=${e => this._invBarcodeInput?.scan(e.detail.barcode)}>
       </barcode-listener>
 
       <div class="progress-section">
@@ -1205,14 +1208,12 @@ export class PdaInboundReceivingV2 extends connect(store)(PageView) {
           </div>
 
           <div class="barcode-input">
-            <label>${TermsUtil.tLabel('scan_barcode') || '상품 바코드 스캔'}</label>
-            <sku-barcode-input
-              .comCd=${this.currentReceiving?.com_cd || ''}
-              placeholder="${TermsUtil.tLabel('scan_barcode') || '상품 바코드 스캔'}"
+            <label>${TermsUtil.tLabel('scan_inventory_barcode') || '재고바코드 스캔'}</label>
+            <inventory-barcode-input
+              placeholder="${TermsUtil.tLabel('scan_inventory_barcode') || '재고바코드 스캔'}"
               ?disabled=${this.processing || this.viewOnly}
-              skipInventory
-              @sku-select=${e => this._onSkuSelect(e.detail)}>
-            </sku-barcode-input>
+              @inventory-scan=${e => this._onInventoryScan(e.detail)}>
+            </inventory-barcode-input>
             <button class="btn-item-picker" title="상품 선택"
               ?disabled=${this.viewOnly}
               @click=${() => { this._showItemPicker = true }}>📋</button>
@@ -1718,6 +1719,32 @@ export class PdaInboundReceivingV2 extends connect(store)(PageView) {
   }
 
   /**
+   * inventory-barcode-input에서 재고바코드 스캔 완료 시 —
+   * supplier_shipments 조회 결과(재고바코드/sku_cd/LOT/소비기한)를 받아 입고 항목을 매칭한다.
+   * 매칭에 성공하면 스캔한 재고바코드를 보관하여, 입고완료 시 inventories.barcode로 그대로 사용한다(골든 스레드).
+   * @param {{ barcode, sku_cd, sku_nm, lot_no, expired_date, com_cd, wh_cd, loc_cd }} detail
+   */
+  _onInventoryScan(detail) {
+    if (this.processing || !detail) return
+
+    const { sku_cd, barcode, lot_no, expired_date } = detail
+
+    // 매칭 성공 여부를 새로 판정하기 위해 초기화
+    this.barcodeScanned = false
+    this._scannedInvBarcode = ''
+
+    // sku_cd로 입고주문 항목 매칭 (기존 로직 재사용 — 주문에 없거나 이미 완료된 상품이면 경고)
+    this._onSkuSelect({ sku_cd })
+
+    // 매칭 성공 시에만 스캔한 재고바코드/LOT/소비기한 반영
+    if (this.barcodeScanned) {
+      this._scannedInvBarcode = barcode
+      if (lot_no) this.lotNo = lot_no
+      if (expired_date) this.expiredDate = expired_date
+    }
+  }
+
+  /**
    * sku-barcode-input에서 상품 선택 완료 시 — API가 이미 바코드를 sku_cd로 해석한 결과
    * @param {{ com_cd, sku_cd, sku_nm, barcode }} detail - 선택된 상품 정보
    */
@@ -1788,10 +1815,11 @@ export class PdaInboundReceivingV2 extends connect(store)(PageView) {
       // BAD 상태 + NG 로케이션 불량 재고를 생성한다. (defect_reason_code 가 있을 때)
       // 소비기한·LOT은 백엔드(finishReceivingOrderLine)가 그대로 저장한다.
       await ServiceUtil.restPost(
-        `inbound_trx/receiving_orders/line/${item.id}/finish`,
+        `inbound_trx/receiving_orders/line/${item.id}/finish_by_barcode`,
         {
           ...item,
           rcv_qty: qty,
+          barcode: this._scannedInvBarcode || item.barcode,
           expired_date: this.expiredDate || item.expired_date,
           lot_no: this.lotNo || item.lot_no
         },

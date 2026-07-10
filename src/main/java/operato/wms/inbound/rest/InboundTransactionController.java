@@ -550,6 +550,61 @@ public class InboundTransactionController extends AbstractRestService {
     }
 
     /**
+     * 입고 라인 완료 처리 (v2 — 공급처 라벨 재고바코드 기반)
+     * POST /rest/inbound_trx/receiving_orders/line/{id}/finish_by_barcode
+     *
+     * body.barcode 에 공급처 라벨의 재고바코드(= supplier_shipments.barcode)를 실어 보내면,
+     * 재고(inventories) 생성 시 새로 채번하지 않고 그 값을 그대로 사용한다(골든 스레드).
+     *
+     * @param id
+     * @param receivingItem
+     * @param printerId
+     * @return
+     */
+    @RequestMapping(value = "receiving_orders/line/{id}/finish_by_barcode", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Finish Receiving Order Line by Inventory Barcode")
+    public ReceivingItem finishReceivingOrderLineByBarcode(
+            @PathVariable("id") String id,
+            @RequestBody ReceivingItem receivingItem,
+            @RequestParam(name = "printerId", required = false) String printerId) {
+
+        // 1. 입고 예정 라인 처리
+        ReceivingItem itemToFinish = this.queryManager.select(ReceivingItem.class, id);
+        Receiving receiving = this.queryManager.select(Receiving.class, itemToFinish.getReceivingId());
+        itemToFinish = ValueUtil.populateOnlyNotNullValue(receivingItem, itemToFinish);
+
+        // 2. 전 처리 커스텀 서비스 호출
+        Map<String, Object> custSvcParams = ValueUtil.newMap("receiving,receivingItem", receiving, itemToFinish);
+        this.customSvc.doCustomService(receiving.getDomainId(), TRX_INB_PRE_LINE_FINISH_RECEIPT, custSvcParams);
+
+        // 3. 입고 예정 라인 입고 완료 처리 (v2 — 재고바코드 주입)
+        itemToFinish = this.inbTrxService.finishReceivingOrderLineByBarcode(receiving, itemToFinish, printerId);
+        this.queryManager.update(itemToFinish);
+
+        // 4. 입고가 모두 끝났다면 자동 완료 처리
+        String rcvAutoFlag = this.runtimeConfSvc.getRuntimeConfigValue(receiving.getComCd(), receiving.getWhCd(),
+                WmsInboundConfigConstants.RECEIPT_FINISH_AUTO_FLAG);
+        if (ValueUtil.toBoolean(rcvAutoFlag, true)) {
+            String sql = "select count(id) from receiving_items where domain_id = :domainId and receiving_id = :receivingId and (status != :cancelStatus and status != :endStatus and status != :rejectedStatus and status != :badStatus and status != :shortStatus)";
+            Map<String, Object> params = ValueUtil.newMap(
+                    "domainId,receivingId,cancelStatus,endStatus,rejectedStatus,badStatus,shortStatus",
+                    receiving.getDomainId(), receiving.getId(), WmsInboundConstants.STATUS_CANCEL,
+                    WmsInboundConstants.STATUS_END, WmsInboundConstants.STATUS_REJECTED,
+                    WmsInboundConstants.STATUS_BAD, WmsInboundConstants.STATUS_SHORT);
+            if (this.queryManager.selectBySql(sql, params, Integer.class) == 0) {
+                // 4.1 자동 마감 처리
+                this.closeReceivingOrder(receiving.getId());
+            }
+        }
+
+        // 5. 후 처리 커스텀 서비스 호출
+        this.customSvc.doCustomService(receiving.getDomainId(), TRX_INB_POST_LINE_FINISH_RECEIPT, custSvcParams);
+
+        // 6. 라인 정보 리턴
+        return itemToFinish;
+    }
+
+    /**
      * 입고 라인 불량 처리 (입고 라인별 완료 처리) (입고 상세 상태 : START -> BAD)
      * 
      * @param id

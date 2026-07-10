@@ -24,8 +24,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.ArrayList;
 
 import operato.wms.inbound.rest.InboundTransactionController;
+import operato.wms.inbound.service.InboundTransactionService;
 import operato.wms.inbound.query.store.InboundQueryStore;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.util.ValueUtil;
@@ -36,6 +38,8 @@ import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.sys.system.service.AbstractRestService;
 import xyz.elidom.dbist.dml.Page;
+import xyz.elidom.dbist.dml.Query;
+import xyz.elidom.dbist.dml.Filter;
 
 @RestController
 @Transactional
@@ -52,6 +56,12 @@ public class SupplierShipmentController extends AbstractRestService {
 
 	@Autowired
 	private InboundQueryStore inboundQueryStore;
+
+	/**
+	 * 입고 트랜잭션 서비스 (공급처 입고예정 → 입고주문 생성 위임용)
+	 */
+	@Autowired
+	private InboundTransactionService inboundTrxSvc;
 
 	/**
 	 * 목록 조회(index)에서 검색·정렬을 허용할 컬럼 화이트리스트 → 테이블 별칭 prefix.
@@ -188,6 +198,57 @@ public class SupplierShipmentController extends AbstractRestService {
 
 		Page<Map> result = this.queryManager.selectPageBySql(sqlBuilder.toString(), params, Map.class, page, limit);
 		return result;
+	}
+
+	/**
+	 * 재고바코드로 공급처 입고예정(ASN) 단건 조회
+	 *
+	 * 공급처가 부착한 라벨의 재고바코드를 스캔하여 어떤 상품(sku_cd)·LOT·소비기한인지 인식하기 위한 조회.
+	 * barcode + domain_id 는 unique 하므로 단건이 보장된다. 없으면 null.
+	 *
+	 * @param barcode 재고바코드 (라벨 스캔값)
+	 * @return 공급처 입고예정 단건 (없으면 null)
+	 */
+	@GetMapping(value="/find_by_barcode", produces=MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description="Find supplier shipment by inventory barcode")
+	public SupplierShipment findByBarcode(@RequestParam("barcode") String barcode) {
+		Query query = new Query();
+		query.addFilter(new Filter("domainId", Domain.currentDomainId()));
+		query.addFilter(new Filter("barcode", barcode));
+		return this.queryManager.selectByCondition(SupplierShipment.class, query);
+	}
+
+	/**
+	 * 선택된 공급처 입고예정 목록으로부터 입고주문 일괄 생성
+	 *
+	 * "입고예정 접수 현황" 그리드에서 멀티셀렉한 행(service-list 버튼)을 전달받아,
+	 * 행마다 입고주문(Receiving) 1건 + 입고상세(ReceivingItem) 1건을 생성한다.
+	 * 이미 유효한(취소되지 않은) 입고주문이 연결된 행은 스킵하고, 오더가 없거나 취소된 경우 재생성한다.
+	 *
+	 * POST /rest/supplier_shipments/create_receiving_orders
+	 * Body: { "list": [ { "id": "...", ... }, ... ] }
+	 *
+	 * @param body service-list 버튼이 전송하는 선택 행 목록 (list)
+	 * @return 처리 결과 (created, skipped, details)
+	 */
+	@PostMapping(value="/create_receiving_orders", consumes=MediaType.APPLICATION_JSON_VALUE, produces=MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description="Create receiving orders from selected supplier shipments")
+	public Map<String, Object> createReceivingOrders(@RequestBody Map<String, Object> body) {
+		Long domainId = Domain.currentDomainId();
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> list = (List<Map<String, Object>>) body.get("list");
+		List<String> ids = new ArrayList<>();
+		if (list != null) {
+			for (Map<String, Object> row : list) {
+				Object id = row.get("id");
+				if (id != null) {
+					ids.add(id.toString());
+				}
+			}
+		}
+
+		return this.inboundTrxSvc.createReceivingOrdersFromShipments(domainId, ids);
 	}
 
 	@GetMapping(value="/{id}", produces=MediaType.APPLICATION_JSON_VALUE)
