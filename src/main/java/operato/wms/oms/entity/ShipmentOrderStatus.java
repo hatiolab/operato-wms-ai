@@ -19,7 +19,7 @@ SELECT
     so.confirmed_at, so.allocated_at, so.released_at, so.shipped_at,
     si.line_no, si.sku_cd, si.sku_nm,
     si.order_qty, si.alloc_qty, si.shipped_qty, si.short_qty, si.cancel_qty,
-    si.barcode, si.expired_date, si.lot_no,
+    si.barcode, si.expired_date, si.lot_no, sd.orderer_nm,
     sd.receiver_nm, sd.receiver_phone, sd.receiver_zip_cd,
     sd.receiver_addr, sd.receiver_addr2, sd.delivery_memo,
     so.remarks,
@@ -263,6 +263,12 @@ public class ShipmentOrderStatus extends xyz.elidom.orm.entity.basic.DomainTimeS
 	 */
 	@Column(name = "lot_no", length = 50)
 	private String lotNo;
+
+	/**
+	 * 주문자명
+	 */
+	@Column(name = "orderer_nm", length = 100)
+	private String ordererNm;
 
 	/**
 	 * 수취인명
@@ -592,6 +598,14 @@ public class ShipmentOrderStatus extends xyz.elidom.orm.entity.basic.DomainTimeS
 
 	public void setExpiredDate(String expiredDate) {
 		this.expiredDate = expiredDate;
+	}
+
+	public String getOrdererNm() {
+		return ordererNm;
+	}
+
+	public void setOrdererNm(String ordererNm) {
+		this.ordererNm = ordererNm;
 	}
 
 	public String getLotNo() {

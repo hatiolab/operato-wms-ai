@@ -206,10 +206,10 @@ public class ShipmentOrderController extends AbstractRestService {
 	@ApiDesc(description = "Import B2B shipment orders from Excel (validate and register)")
 	public Map<String, Object> importB2bExcel(@RequestBody List<ImportShipmentOrder> list) {
 		// 0. B2B 출고주문 생성 화면 전용 기본값 강제
-		//    (해당 컬럼들은 화면에서 입력받지 않으므로 서버에서 고정 세팅한다)
-		//    - biz_type : B2B 진입점이므로 B2B_OUT 고정
-		//    - ship_type: 현재 정책상 NORMAL 고정 (추후 정책 확정 시 변경)
-		//    - wh_cd    : 창고 선택 UI 정비 전까지 WH001 고정
+		// (해당 컬럼들은 화면에서 입력받지 않으므로 서버에서 고정 세팅한다)
+		// - biz_type : B2B 진입점이므로 B2B_OUT 고정
+		// - ship_type: 현재 정책상 NORMAL 고정 (추후 정책 확정 시 변경)
+		// - wh_cd : 창고 선택 UI 정비 전까지 WH001 고정
 		for (ImportShipmentOrder row : list) {
 			row.setBizType(WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT);
 			row.setShipType("NORMAL");
@@ -280,6 +280,44 @@ public class ShipmentOrderController extends AbstractRestService {
 		Map<String, Object> params = ValueUtil.newMap("biz_type,list",
 				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT, list);
 		this.customSvc.doCustomService(Domain.currentDomainId(), "diy-validate-b2b-shipment-order", params);
+		return list;
+	}
+
+	/**
+	 * B2C 출하 주문 엑셀 임포트 - 커스텀 서비스에서 100% 구현
+	 *
+	 * POST import/b2c/by_custom/{order_type}
+	 *
+	 * @param list 엑셀에서 파싱된 임포트 데이터
+	 * @return 임포트 결과 { total_rows, order_count, item_count, delivery_count }
+	 */
+	@RequestMapping(value = "import/b2c/by_custom/{order_type}", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Import B2C shipment orders from by custom service")
+	public List<ImportShipmentOrder> importB2cByCustomService(@PathVariable("order_type") String orderType,
+			@RequestBody List<ImportShipmentOrder> list) {
+		Map<String, Object> params = ValueUtil.newMap("order_type,biz_type,list", orderType,
+				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2C_OUT, list);
+		String diyServiceUrl = "diy-import-b2c-so-" + orderType;
+		this.customSvc.doCustomService(Domain.currentDomainId(), diyServiceUrl, params);
+		return list;
+	}
+
+	/**
+	 * B2B 출하 주문 엑셀 임포트 - 커스텀 서비스에서 100% 구현
+	 *
+	 * POST import/b2b/by_custom/{order_type}
+	 *
+	 * @param list 엑셀에서 파싱된 임포트 데이터
+	 * @return 임포트 결과 { total_rows, order_count, item_count, delivery_count }
+	 */
+	@RequestMapping(value = "import/b2b/by_custom/{order_type}", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Import B2B shipment orders from by custom service")
+	public List<ImportShipmentOrder> importB2bByCustomService(@PathVariable("order_type") String orderType,
+			@RequestBody List<ImportShipmentOrder> list) {
+		Map<String, Object> params = ValueUtil.newMap("order_type,biz_type,list", orderType,
+				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT, list);
+		String diyServiceUrl = "diy-import-b2b-so-" + orderType;
+		this.customSvc.doCustomService(Domain.currentDomainId(), diyServiceUrl, params);
 		return list;
 	}
 
