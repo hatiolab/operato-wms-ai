@@ -210,6 +210,7 @@ public class ShipmentOrderController extends AbstractRestService {
 		// - biz_type : B2B 진입점이므로 B2B_OUT 고정
 		// - ship_type: 현재 정책상 NORMAL 고정 (추후 정책 확정 시 변경)
 		// - wh_cd : 창고 선택 UI 정비 전까지 WH001 고정
+		// TODO 수정 - 커스텀 서비스로 ...
 		for (ImportShipmentOrder row : list) {
 			row.setBizType(WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT);
 			row.setShipType("NORMAL");

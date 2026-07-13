@@ -291,9 +291,9 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
               <th>${TermsUtil.tLabel('shipment_no') || '출고번호'}</th>
               <th>${TermsUtil.tLabel('ref_order_no') || '원주문번호'}</th>
               <th>${TermsUtil.tLabel('invoice_no') || '송장번호'}</th>
-              <th>${TermsUtil.tLabel('com_cd') || '화주사'}</th>
-              <th>${TermsUtil.tLabel('cust_cd') || '거래처'}</th>
-              <th>${TermsUtil.tLabel('orderer_nm') || '고객명'}</th>
+              <th>${TermsUtil.tLabel('cust_nm') || '거래처'}</th>
+              <th>${TermsUtil.tLabel('orderer_nm') || '주문자'}</th>
+              <th>${TermsUtil.tLabel('receiver_nm') || '수취인'}</th>
               <th>${TermsUtil.tLabel('order_date') || '주문일'}</th>
               <th class="right">${TermsUtil.tLabel('order_qty') || '주문수량'}</th>
               <th class="center">${TermsUtil.tLabel('status') || '상태'}</th>
@@ -358,9 +358,9 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
         <td>${order.shipment_no || '-'}</td>
         <td>${order.ref_order_no || '-'}</td>
         <td>${order.invoice_no || '-'}</td>
-        <td>${order.com_cd || '-'}</td>
-        <td>${order.cust_cd || '-'}</td>
         <td>${order.cust_nm || '-'}</td>
+        <td>${order.orderer_nm || '-'}</td>
+        <td>${order.receiver_nm || '-'}</td>
         <td>${order.order_date || '-'}</td>
         <td class="right">${order.total_order}</td>
         <td class="center">

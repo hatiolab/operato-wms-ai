@@ -228,6 +228,8 @@ public class OmsImportService extends AbstractQueryService {
 			order.setComCd(firstRow.getComCd());
 			order.setCustCd(firstRow.getCustCd());
 			order.setCustNm(firstRow.getCustNm());
+			order.setOrdererNm(firstRow.getOrdererNm());
+			order.setReceiverNm(firstRow.getReceiverNm());
 			order.setWhCd(ValueUtil.isNotEmpty(firstRow.getWhCd()) ? firstRow.getWhCd() : "DEFAULT");
 			order.setBizType(firstRow.getBizType());
 			order.setShipType(firstRow.getShipType());

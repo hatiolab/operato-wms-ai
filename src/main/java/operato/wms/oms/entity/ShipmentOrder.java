@@ -145,6 +145,18 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String custNm;
 
 	/**
+	 * 주문자 명
+	 */
+	@Column(name = "orderer_nm", length = 50)
+	private String ordererNm;
+
+	/**
+	 * 수신자 명
+	 */
+	@Column(name = "receiver_nm", length = 50)
+	private String receiverNm;
+
+	/**
 	 * 창고 코드
 	 */
 	@Column(name = "wh_cd", nullable = false, length = 30)
@@ -405,6 +417,22 @@ public class ShipmentOrder extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setCustNm(String custNm) {
 		this.custNm = custNm;
+	}
+
+	public String getOrdererNm() {
+		return ordererNm;
+	}
+
+	public void setOrdererNm(String ordererNm) {
+		this.ordererNm = ordererNm;
+	}
+
+	public String getReceiverNm() {
+		return receiverNm;
+	}
+
+	public void setReceiverNm(String receiverNm) {
+		this.receiverNm = receiverNm;
 	}
 
 	public String getWhCd() {
