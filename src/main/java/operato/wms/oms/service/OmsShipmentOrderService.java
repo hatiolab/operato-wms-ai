@@ -137,19 +137,22 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 
 			// B2C 출고인 경우 -> 송장 채번 및 주소 정제 처리 ...
 			if ("B2C_OUT".equalsIgnoreCase(order.getBizType())) {
+				CourierContract contract = null;
+				CourierService cs = null;
+
 				if (ValueUtil.isNotEmpty(order.getCarrierCd())) {
-					CourierService cs = this.courierServiceDispatcher.get(order.getCarrierCd());
+					cs = this.courierServiceDispatcher.get(order.getCarrierCd());
 					if (cs != null) {
-						CourierContract contract = cs.getDefaultCourierContract(domainId);
-						if (contract != null) {
-							if (cs.readyShipment(domainId, contract.getContractNo(), order)) {
-								order.setStatus(ShipmentOrder.STATUS_CONFIRMED);
-								order.setConfirmedAt(now);
-								this.queryManager.update(order, "status", "confirmedAt", "updatedAt");
-								confirmedIds.add(id);
-							}
-						}
+						contract = cs.getDefaultCourierContract(domainId);
 					}
+				}
+
+				if (contract == null || (contract != null && cs != null
+						&& cs.readyShipment(domainId, contract.getContractNo(), order))) {
+					order.setStatus(ShipmentOrder.STATUS_CONFIRMED);
+					order.setConfirmedAt(now);
+					this.queryManager.update(order, "status", "confirmedAt", "updatedAt");
+					confirmedIds.add(id);
 				}
 				// B2B 출고인 경우
 			} else {

@@ -53,19 +53,12 @@ public class OmsImportService extends AbstractQueryService {
 			ImportShipmentOrder row = list.get(i);
 			List<String> errors = new ArrayList<String>();
 
-			// 1. 필수 필드 검증
-			/*
-			 * if (ValueUtil.isEmpty(row.getRefOrderNo())) {
-			 * errors.add("참조 주문번호(ref_order_no)가 누락되었습니다");
-			 * }
-			 */
+			// 1. 필수 주문 정보 검증
 			if (ValueUtil.isEmpty(row.getSkuCd())) {
 				errors.add("상품코드(sku_cd)가 누락되었습니다");
 			}
-			if (row.getOrderQty() == null) {
-				errors.add("주문 수량(order_qty)이 누락되었거나 숫자가 아닙니다");
-			} else if (row.getOrderQty() <= 0) {
-				errors.add("주문 수량은 0보다 커야 합니다 (입력값: " + row.getOrderQty() + ")");
+			if (row.getOrderQty() == null || row.getOrderQty() <= 0) {
+				errors.add("주문 수량이 누락되었거나 숫자가 아니거나 1보다 작습니다.");
 			}
 
 			// 2. SKU 존재 여부 검증
@@ -134,7 +127,7 @@ public class OmsImportService extends AbstractQueryService {
 				}
 			}
 
-			// 결과 행 구성
+			// 9. 결과 행 구성
 			Map<String, Object> resultRow = ValueUtil.newMap("row_no", i + 1);
 			resultRow.put("biz_type", ValueUtil.isNotEmpty(row.getBizType()) ? row.getBizType() : bizType);
 			resultRow.put("ref_order_no", row.getRefOrderNo());
@@ -145,6 +138,7 @@ public class OmsImportService extends AbstractQueryService {
 			resultRow.put("order_date", row.getOrderDate());
 			resultRow.put("ship_by_date", row.getShipByDate());
 			resultRow.put("cust_cd", row.getCustCd()); // B2C : 판매처 코드, B2B : 거래처 코드
+			resultRow.put("cust_nm", row.getCustNm()); // B2C : 판매처 명, B2B : 거래처 명
 			resultRow.put("wh_cd", row.getWhCd());
 			resultRow.put("com_cd", row.getComCd());
 			resultRow.put("dlv_type", row.getDlvType());
@@ -154,7 +148,6 @@ public class OmsImportService extends AbstractQueryService {
 			resultRow.put("remarks", row.getRemarks());
 
 			if (isB2C) {
-				resultRow.put("cust_nm", row.getOrdererNm()); // B2C : 주문자 명
 				resultRow.put("orderer_nm", row.getOrdererNm());
 				resultRow.put("receiver_nm", row.getReceiverNm());
 				resultRow.put("sender_nm", row.getSenderNm());
@@ -166,8 +159,6 @@ public class OmsImportService extends AbstractQueryService {
 				resultRow.put("receiver_addr", row.getReceiverAddr());
 				resultRow.put("receiver_addr2", row.getReceiverAddr2());
 				resultRow.put("delivery_memo", row.getDeliveryMemo());
-			} else {
-				resultRow.put("cust_nm", row.getCustNm()); // B2B : 거래처 명
 			}
 
 			if (errors.isEmpty()) {
