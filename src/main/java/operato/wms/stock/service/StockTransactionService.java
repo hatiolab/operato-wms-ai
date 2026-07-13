@@ -833,7 +833,8 @@ public class StockTransactionService extends BaseStockService {
         String orderBy;
         switch (allocPolicy) {
             case StoragePolicy.RELEASE_STRATEGY_FEFO:
-                orderBy = "expired_date ASC NULLS LAST, created_at ASC";
+                // 1순위: '0000-00-00' (유통기한 미관리), 2순위: null/빈 값, 3순위: 유통기한 임박순(ASC)
+                orderBy = "CASE WHEN expired_date = '0000-00-00' THEN 0 WHEN expired_date IS NULL OR expired_date = '' THEN 1 ELSE 2 END ASC, expired_date ASC, created_at ASC";
                 break;
             case StoragePolicy.RELEASE_STRATEGY_LIFO:
                 orderBy = "created_at DESC";
@@ -866,10 +867,13 @@ public class StockTransactionService extends BaseStockService {
                 "    AND i.loc_cd in (select loc_cd from locations where domain_id = :domainId and wh_cd = :whCd and loc_type = 'PICKABLE' and (restrict_type is null or restrict_type != 'OUT') and (del_flag is null or del_flag = false)) "
                 +
                 "    AND (i.del_flag IS NULL OR i.del_flag = false) " +
+                "    AND (i.closed_at IS NULL OR i.closed_at = '') " +
                 "    AND i.expire_status IN (:expireNormal, :expireImminent) " +
                 "    AND (i.inv_qty - COALESCE(i.reserved_qty, 0)) > 0 " +
                 ((excludeInventoryIds != null && !excludeInventoryIds.isEmpty())
-                        ? "    AND i.id NOT IN (:excludeIds) " : "") +
+                        ? "    AND i.id NOT IN (:excludeIds) "
+                        : "")
+                +
                 ") ranked " +
                 "WHERE running_before < :needQty " +
                 "ORDER BY " + orderBy;
