@@ -524,6 +524,24 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
           margin-bottom: 4px;
         }
 
+        .barcode-tap-btn {
+          display: inline-block;
+          padding: 1px 8px;
+          background: rgba(255, 255, 255, 0.6);
+          border: 1px dashed var(--md-sys-color-primary, #1976D2);
+          border-radius: 4px;
+          color: var(--md-sys-color-primary, #1565c0);
+          font-weight: bold;
+          cursor: pointer;
+          font-size: 13px;
+          user-select: none;
+        }
+
+        .barcode-tap-btn:active {
+          background: var(--md-sys-color-primary, #1976D2);
+          color: #fff;
+        }
+
         .current-item-section operato-input-barcode {
           width: 100%;
         }
@@ -1025,7 +1043,11 @@ export class PdaFulfillmentPicking extends connect(store)(PageView) {
           <div class="location-display">${currentItem.from_loc_cd}</div>
           <div class="item-info">
             <div class="sku">상품 : ${currentItem.sku_cd} ${currentItem.sku_nm ? `(${currentItem.sku_nm})` : ''} / 예정 수량 : ${currentItem.order_qty || 0} EA</div>
-            <div class="lot">재고 바코드 : ${currentItem.barcode || '-'}</div>
+            <div class="lot">재고 바코드 :
+              ${currentItem.barcode
+          ? html`<span class="barcode-tap-btn" @click=${() => this._onScanBarcode(currentItem.barcode)}>${currentItem.barcode}</span>`
+          : '-'}
+            </div>
             ${currentItem.lot_no ? html`<div class="lot">LOT: ${currentItem.lot_no} ${currentItem.expired_date ? `· ${currentItem.expired_date}` : ''}</div>` : ''}
           </div>
           <div class="barcode-input">

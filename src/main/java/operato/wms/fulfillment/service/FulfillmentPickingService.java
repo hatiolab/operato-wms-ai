@@ -1,5 +1,6 @@
 package operato.wms.fulfillment.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -708,20 +709,31 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		Map<String, Object> result = ValueUtil.newMap("success,item_id,sku_cd,pick_qty,short_qty,status", true, itemId,
 				item.getSkuCd(), pickQty, shortQty, newStatus);
 
-		// 5. SHORT 수량만큼 stock_allocations 해제 (reserved_qty 환원)
-		// 실 재고 없음이 확인된 수량은 즉시 예약을 풀어 다른 주문에 가용 재고로 반환한다
-		if (shortQty > 0 && item.getShipmentOrderItemId() != null) {
-			this.deallocateShortQty(domainId, item.getShipmentOrderItemId(), shortQty);
-		}
+		// 5. 피킹 지시가 개별 피킹인지 토털 피킹인지 체크
+		boolean isTotalPicking = ValueUtil.isEmpty(item.getShipmentOrderItemId());
+		double notReallocated = 0.0;
 
-		// 5-2. 결품 수량만큼 다른 PICKABLE 로케이션의 동일 SKU 가용 재고에서 재할당
-		//      성공분은 진행중 피킹 작업에 새 라인(RUN)으로 추가되어 즉시 피킹 가능하다.
-		if (shortQty > 0 && item.getShipmentOrderItemId() != null) {
-			double notReallocated = this.reallocateShortQty(item, shortQty);
-			result.put("reallocated_qty", shortQty - notReallocated);
-			result.put("short_remain_qty", notReallocated);
+		if (isTotalPicking) {
+			// 5-1-1. 토털 피킹인 경우 stock allocation 정보에서 결품 수량만큼 재고 할당 해제
+			// 어느 주문에서 얼마나 해제됐는지 breakdown을 반환받아 재할당 시 주문 연결에 활용
+			PickingTask task = this.findPickingTask(domainId, item.getPickTaskId());
+			List<Map<String, Object>> releasedBreakdown = this.deallocateShortQtyInTotalPicking(
+					domainId, task.getWaveNo(), item.getInventoryId(), shortQty);
+			// 5-1-2. 결품 수량만큼 다른 PICKABLE 로케이션의 동일 SKU 가용 재고에서 재할당
+			// 주문별 breakdown을 전달하여 shipment_order_id 연결이 유지된 할당을 생성한다.
+			notReallocated = this.reallocateShortQtyInTotalPicking(task, item, shortQty, releasedBreakdown);
+
+		} else {
+			// 5-2-1. 개별 피킹인 경우 피킹 아이템과 연관된 주문 아이템 정보로 재고 할당 해제
+			this.deallocateShortQty(domainId, item.getShipmentOrderItemId(), shortQty);
+			// 5-2-2. 결품 수량만큼 다른 PICKABLE 로케이션의 동일 SKU 가용 재고에서 재할당
+			// 재할당이 성공했다면 진행 중인 피킹 작업에 새 라인(RUN)으로 추가되어 즉시 피킹 가능하다.
+			notReallocated = this.reallocateShortQty(item, shortQty);
 			// TODO: notReallocated > 0 이면 창고 전체 재고 부족(진짜 결품) → 추후 결품 대시보드 알림 연동
 		}
+
+		result.put("reallocated_qty", shortQty - notReallocated);
+		result.put("short_remain_qty", notReallocated);
 
 		// 6. auto_replenish=true이면
 		boolean autoReplenish = params.get("auto_replenish") != null
@@ -745,7 +757,78 @@ public class FulfillmentPickingService extends AbstractQueryService {
 	}
 
 	/**
-	 * SHORT 수량에 해당하는 재고 할당 해제
+	 * 토털 피킹인 경우의 SHORT 수량에 해당하는 재고 할당 해제
+	 *
+	 * 해제된 주문별 수량 내역을 반환한다. 반환값은 재할당 시 shipment_order_id 연결을 복원하는 데 사용된다.
+	 *
+	 * @param domainId    도메인 ID
+	 * @param waveNo      웨이브 번호
+	 * @param inventoryId 결품 재고 ID
+	 * @param shortQty    해제할 수량
+	 * @return 주문별 해제 내역 [{order_id, order_item_id, shipment_no, biz_type,
+	 *         released_qty}, ...]
+	 */
+	@SuppressWarnings("rawtypes")
+	private List<Map<String, Object>> deallocateShortQtyInTotalPicking(Long domainId, String waveNo,
+			String inventoryId, double shortQty) {
+		List<Map<String, Object>> releasedBreakdown = new ArrayList<>();
+
+		if (shortQty <= 0 || waveNo == null || inventoryId == null)
+			return releasedBreakdown;
+
+		// 1. 재고 할당 정보 조회 — 주문 정보(shipment_no, biz_type) JOIN
+		String allocSql = "SELECT sa.id, sa.alloc_qty, sa.status, sa.shipment_order_id, sa.shipment_order_item_id,"
+				+ " so.shipment_no, so.biz_type"
+				+ " FROM stock_allocations sa"
+				+ " INNER JOIN shipment_orders so ON so.domain_id = sa.domain_id AND so.id = sa.shipment_order_id"
+				+ " WHERE sa.domain_id = :domainId AND sa.inventory_id = :inventoryId"
+				+ " AND so.wave_no = :waveNo AND sa.status IN (:s1, :s2)"
+				+ " ORDER BY sa.alloc_qty DESC";
+		Map<String, Object> allocParams = ValueUtil.newMap("domainId,waveNo,inventoryId,s1,s2",
+				domainId, waveNo, inventoryId, StockAllocation.STATUS_HARD, StockAllocation.STATUS_SOFT);
+		List<Map> allocRows = this.queryManager.selectListBySql(allocSql, allocParams, Map.class, 0, 0);
+
+		// 2. alloc_qty DESC 순으로 해제 처리하면서 주문별 해제 수량 기록
+		double remainToRelease = shortQty;
+
+		for (Map row : allocRows) {
+			if (remainToRelease <= 0)
+				break;
+
+			String allocId = row.get("id") != null ? row.get("id").toString() : null;
+			double allocQty = row.get("alloc_qty") != null ? Double.parseDouble(row.get("alloc_qty").toString()) : 0;
+			if (allocId == null || allocQty <= 0)
+				continue;
+
+			StockAllocation alloc = this.queryManager.select(StockAllocation.class, allocId);
+			if (alloc == null)
+				continue;
+
+			double releaseQty;
+			if (allocQty <= remainToRelease) {
+				releaseQty = allocQty;
+				this.stockTransactionService.deallocateInventory(alloc);
+				remainToRelease -= allocQty;
+			} else {
+				releaseQty = remainToRelease;
+				this.stockTransactionService.deallocatePartialInventory(alloc, releaseQty);
+				remainToRelease = 0;
+			}
+
+			// 해제된 주문별 내역 기록
+			releasedBreakdown.add(ValueUtil.newMap("order_id,order_item_id,shipment_no,biz_type,released_qty",
+					row.get("shipment_order_id") != null ? row.get("shipment_order_id").toString() : null,
+					row.get("shipment_order_item_id") != null ? row.get("shipment_order_item_id").toString() : null,
+					row.get("shipment_no") != null ? row.get("shipment_no").toString() : null,
+					row.get("biz_type") != null ? row.get("biz_type").toString() : null,
+					releaseQty));
+		}
+
+		return releasedBreakdown;
+	}
+
+	/**
+	 * 개별 피킹인 경우의 SHORT 수량에 해당하는 재고 할당 해제
 	 *
 	 * short_qty만큼 stock_allocations를 순서대로 해제하여 inventories.reserved_qty를 환원한다.
 	 * 할당 전체가 short_qty 이내이면 deallocateInventory()로 완전 삭제,
@@ -765,6 +848,19 @@ public class FulfillmentPickingService extends AbstractQueryService {
 				domainId, shipmentOrderItemId, StockAllocation.STATUS_HARD, StockAllocation.STATUS_SOFT);
 		List<StockAllocation> allocations = this.queryManager.selectListBySql(
 				allocSql, allocParams, StockAllocation.class, 0, 0);
+
+		// 2. 조회한 할당 정보로 부터 재고 할당 해제 처리
+		this.deallocateStockAllocations(allocations, shortQty);
+	}
+
+	/**
+	 * StockAllocations 리스트에서 shortQty 만큼 할당 해제 처리
+	 * 
+	 * @param allocations
+	 * @param shortQty
+	 */
+	private void deallocateStockAllocations(List<StockAllocation> allocations, double shortQty) {
+		// 1. 할당 해제 수량
 		double remainToRelease = shortQty;
 
 		// 2. 조회한 할당 정보로 부터 재고 할당 해제 처리
@@ -793,7 +889,7 @@ public class FulfillmentPickingService extends AbstractQueryService {
 	}
 
 	/**
-	 * 결품 수량 재할당
+	 * 개별 피킹의 경우 결품 수량 재할당
 	 *
 	 * 결품(short) 처리된 수량만큼 <b>다른 PICKABLE 로케이션</b>의 동일 SKU 가용 재고를 FEFO로 탐색하여
 	 * 재할당(stock_allocation 생성 + reserved_qty 증가)하고, 진행중인 피킹 작업에 새 피킹 라인을
@@ -821,11 +917,13 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		// 2. 출하 주문 조회 (배송번호/업무유형) — 업무유형으로 SOFT/HARD 결정 (B2C=SOFT, 그 외=HARD)
 		String orderId = shortLine.getShipmentOrderId();
 		String orderItemId = shortLine.getShipmentOrderItemId();
-		ShipmentOrder order = ValueUtil.isNotEmpty(orderId) ? this.queryManager.select(ShipmentOrder.class, orderId) : null;
+		ShipmentOrder order = ValueUtil.isNotEmpty(orderId) ? this.queryManager.select(ShipmentOrder.class, orderId)
+				: null;
 		String shipmentNo = order != null ? order.getShipmentNo() : null;
 		String bizType = order != null ? order.getBizType() : null;
 		String allocStatus = (bizType != null && bizType.startsWith("B2C"))
-				? StockAllocation.STATUS_SOFT : StockAllocation.STATUS_HARD;
+				? StockAllocation.STATUS_SOFT
+				: StockAllocation.STATUS_HARD;
 
 		// 3. 결품 난 재고를 제외하고 가용 재고 탐색 (FEFO)
 		java.util.List<String> excludeInvIds = new java.util.ArrayList<String>();
@@ -861,17 +959,11 @@ public class FulfillmentPickingService extends AbstractQueryService {
 			double allocQty = Math.min(remain, avail);
 
 			// 5-1. 재고 할당 (stock_allocation 생성 + reserved_qty 증가)
-			this.stockTransactionService.allocateInventory(inv, StoragePolicy.RELEASE_STRATEGY_FEFO, allocQty,
+			StockAllocation newAlloc = this.stockTransactionService.allocateInventory(inv,
+					StoragePolicy.RELEASE_STRATEGY_FEFO, allocQty,
 					StockAllocation.ALLOC_TYPE_SHIPMENT, orderId, shipmentNo, orderItemId, allocStatus);
 
-			// 5-2. 방금 생성된 할당 조회 (id 확보 — 피킹 라인 연결용)
-			List<StockAllocation> found = this.queryManager.selectListBySql(
-					"SELECT * FROM stock_allocations WHERE domain_id = :domainId AND inventory_id = :invId AND shipment_order_item_id = :itemId ORDER BY allocated_at DESC",
-					ValueUtil.newMap("domainId,invId,itemId", domainId, inv.getId(), orderItemId),
-					StockAllocation.class, 0, 0);
-			StockAllocation newAlloc = (found != null && !found.isEmpty()) ? found.get(0) : null;
-
-			// 5-3. 진행중 작업에 새 피킹 라인 추가 (RUN — 즉시 피킹 가능)
+			// 5-2. 진행중 작업에 새 피킹 라인 추가 (RUN — 즉시 피킹 가능)
 			PickingTaskItem line = new PickingTaskItem();
 			line.setDomainId(domainId);
 			line.setPickTaskId(task.getId());
@@ -905,6 +997,136 @@ public class FulfillmentPickingService extends AbstractQueryService {
 		}
 
 		// 7. 재할당하지 못한 잔여 수량 반환 (진짜 결품)
+		return remain;
+	}
+
+	/**
+	 * 토털 피킹 결품 수량 재할당 (주문별 StockAllocation 생성)
+	 *
+	 * deallocateShortQtyInTotalPicking()의 반환값(releasedBreakdown)을 받아,
+	 * 대체 재고를 주문별로 분산 할당하여 shipment_order_id 연결을 유지한다.
+	 * closeShipmentOrder() 호출 시 할당이 정상적으로 RELEASED 처리되도록 보장한다.
+	 *
+	 * PickingTaskItem은 재고(로케이션) 단위로 집계하여 1건만 추가하여 피킹 UX는 그대로 유지한다.
+	 *
+	 * @param task              피킹 작업 헤더
+	 * @param shortLine         결품 처리된 원본 피킹 라인
+	 * @param shortQty          재할당할 결품 수량
+	 * @param releasedBreakdown 주문별 해제 내역 [{order_id, order_item_id, shipment_no,
+	 *                          biz_type, released_qty}]
+	 * @return 재할당하지 못한 잔여 수량 (0이면 전량 재할당 성공)
+	 */
+	private double reallocateShortQtyInTotalPicking(PickingTask task, PickingTaskItem shortLine, double shortQty,
+			List<Map<String, Object>> releasedBreakdown) {
+		Long domainId = shortLine.getDomainId();
+		String comCd = task.getComCd();
+		String whCd = task.getWhCd();
+		String skuCd = shortLine.getSkuCd();
+
+		// 1. 결품 난 재고를 제외하고 가용 재고 탐색 (FEFO)
+		List<String> excludeInvIds = new ArrayList<>();
+		if (ValueUtil.isNotEmpty(shortLine.getInventoryId())) {
+			excludeInvIds.add(shortLine.getInventoryId());
+		}
+		List<Inventory> candidates = this.stockTransactionService.searchAvailableInventory(
+				domainId, comCd, whCd, skuCd, shortQty, StoragePolicy.RELEASE_STRATEGY_FEFO, excludeInvIds);
+
+		if (candidates == null || candidates.isEmpty()) {
+			return shortQty;
+		}
+
+		// 2. 주문별 잔여 재할당 수량 배열 초기화
+		double[] orderRemains = new double[releasedBreakdown.size()];
+		for (int i = 0; i < releasedBreakdown.size(); i++) {
+			orderRemains[i] = ValueUtil.toDouble(releasedBreakdown.get(i).get("released_qty"), 0.0);
+		}
+
+		// 3. 새 피킹 라인 rank 시작값 (기존 max + 1)
+		Integer maxRank = this.queryManager.selectBySql(
+				"SELECT COALESCE(MAX(rank), 0) FROM picking_task_items WHERE domain_id = :domainId AND pick_task_id = :pickTaskId",
+				ValueUtil.newMap("domainId,pickTaskId", domainId, task.getId()), Integer.class);
+		int nextRank = (maxRank == null ? 0 : maxRank) + 1;
+
+		double remain = shortQty;
+		int addedItems = 0;
+		double addedQty = 0;
+
+		// 4. 가용 재고별 처리: 재고 단위로 주문들에 분산 할당
+		for (Inventory inv : candidates) {
+			if (remain <= 0)
+				break;
+			double avail = ValueUtil.toDouble(inv.getInvQty(), 0.0) - ValueUtil.toDouble(inv.getReservedQty(), 0.0);
+			if (avail <= 0)
+				continue;
+
+			double invBudget = Math.min(remain, avail); // 이 재고에서 사용할 총량
+			double invRemain = invBudget;
+
+			// 4-1. 주문별로 StockAllocation 생성 (shipment_order_id 연결 유지)
+			for (int i = 0; i < releasedBreakdown.size(); i++) {
+				if (invRemain <= 0)
+					break;
+				if (orderRemains[i] <= 0)
+					continue;
+
+				Map<String, Object> entry = releasedBreakdown.get(i);
+				String orderId = entry.get("order_id") != null ? entry.get("order_id").toString() : null;
+				String orderItemId = entry.get("order_item_id") != null ? entry.get("order_item_id").toString() : null;
+				String shipmentNo = entry.get("shipment_no") != null ? entry.get("shipment_no").toString() : null;
+				String bizType = entry.get("biz_type") != null ? entry.get("biz_type").toString() : null;
+				String allocStatus = (bizType != null && bizType.startsWith("B2C"))
+						? StockAllocation.STATUS_SOFT
+						: StockAllocation.STATUS_HARD;
+
+				double orderAllocQty = Math.min(invRemain, orderRemains[i]);
+
+				this.stockTransactionService.allocateInventory(inv, StoragePolicy.RELEASE_STRATEGY_FEFO,
+						orderAllocQty, StockAllocation.ALLOC_TYPE_SHIPMENT,
+						orderId, shipmentNo, orderItemId, allocStatus);
+
+				invRemain -= orderAllocQty;
+				orderRemains[i] -= orderAllocQty;
+			}
+
+			double actualAllocated = invBudget - invRemain;
+			if (actualAllocated <= 0)
+				continue;
+
+			// 4-2. PickingTaskItem은 재고(로케이션) 단위로 집계하여 1건 추가 (피킹 UX 유지)
+			// 다건 주문 할당이 생성되므로 stockAllocationId는 null
+			PickingTaskItem line = new PickingTaskItem();
+			line.setDomainId(domainId);
+			line.setPickTaskId(task.getId());
+			line.setShipmentOrderId(null);
+			line.setShipmentOrderItemId(null);
+			line.setStockAllocationId(null);
+			line.setInventoryId(inv.getId());
+			line.setRank(nextRank++);
+			line.setSkuCd(inv.getSkuCd());
+			line.setSkuNm(shortLine.getSkuNm());
+			line.setBarcode(inv.getBarcode());
+			line.setFromLocCd(inv.getLocCd());
+			line.setLotNo(inv.getLotNo());
+			line.setExpiredDate(inv.getExpiredDate());
+			line.setOrderQty(actualAllocated);
+			line.setPickQty(0.0);
+			line.setShortQty(0.0);
+			line.setStatus(PickingTaskItem.STATUS_RUN);
+			this.queryManager.insert(line);
+
+			remain -= actualAllocated;
+			addedItems++;
+			addedQty += actualAllocated;
+		}
+
+		// 5. 피킹 작업 헤더 집계 갱신 (계획 아이템 수 / 계획 수량)
+		if (addedItems > 0) {
+			task.setPlanItem((task.getPlanItem() == null ? 0 : task.getPlanItem()) + addedItems);
+			task.setPlanTotal((task.getPlanTotal() == null ? 0.0 : task.getPlanTotal()) + addedQty);
+			this.queryManager.update(task, "planItem", "planTotal", "updatedAt", "updaterId");
+		}
+
+		// 6. 재할당하지 못한 잔여 수량 반환 (진짜 결품)
 		return remain;
 	}
 
