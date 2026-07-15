@@ -14,6 +14,7 @@ import operato.wms.oms.entity.StockAllocation;
 import operato.wms.stock.entity.Inventory;
 import operato.wms.stock.entity.InventoryTran;
 import operato.wms.stock.model.InvTransaction;
+import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.util.ThrowUtil;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
@@ -514,41 +515,36 @@ public class StockTransactionService extends BaseStockService {
     /**
      * 재고 최종 출고 마감 처리
      * 
-     * @param inventory
-     * @param outQty
-     * @param shipmentOrderNo
+     * @param inventory       재고
+     * @param outQty          출고 수량
+     * @param shipmentOrderNo 출고 오더 번호
+     * @param waitShipLocCd   출하 완료 후 이동할 출고 대기 로케이션
      * @return
      */
-    public Inventory closeShipmentInventory(Inventory inventory, double outQty, String shipmentOrderNo) {
-        /*
-         * inventory.setReservedQty(inventory.getReservedQty() - outQty);
-         * inventory.setInvQty(inventory.getInvQty() - outQty);
-         * inventory.setLastTranCd(Inventory.TRANSACTION_OUT);
-         * inventory.setRlsOrdNo(shipmentOrderNo);
-         * inventory.setUpdatedAt(new Date());
-         * this.queryManager.update(inventory);
-         * return inventory;
-         */
-
+    public Inventory closeShipmentInventory(Inventory inventory, double outQty, String shipmentOrderNo,
+            String waitShipLocCd) {
         // 출고 처리
         InventoryTran invTran = new InventoryTran();
         invTran.setTranQty(outQty);
         invTran.setRefDocType(InventoryTran.REF_DOC_TYPE_SHIP);
         invTran.setRefDocNo(shipmentOrderNo);
+        invTran.setToLocCd(waitShipLocCd);
         return invTran.createShipmentTransaction(inventory);
     }
 
     /**
      * 재고 최종 출고 마감 처리
      * 
-     * @param domainId
-     * @param inventoryId
-     * @param outQty
-     * @param shipmentOrderNo
+     * @param domainId        도메인
+     * @param inventoryId     재고 ID
+     * @param outQty          출고 수량
+     * @param shipmentOrderNo 출고 오더 번호
+     * @param waitShipLocCd   출하 완료 후 이동할 출고 대기 로케이션
      */
-    public Inventory closeShipmentInventory(Long domainId, String inventoryId, double outQty, String shipmentOrderNo) {
+    public Inventory closeShipmentInventory(Long domainId, String inventoryId, double outQty, String shipmentOrderNo,
+            String waitShipLocCd) {
         Inventory inv = this.findAndCheckInventory(domainId, inventoryId, Inventory.TRANSACTION_OUT);
-        return this.closeShipmentInventory(inv, outQty, shipmentOrderNo);
+        return this.closeShipmentInventory(inv, outQty, shipmentOrderNo, waitShipLocCd);
     }
 
     /**

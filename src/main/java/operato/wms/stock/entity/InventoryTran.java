@@ -1179,13 +1179,12 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 
 		// 4. 재고 트랜잭션 이력 추가
 		this.inventoryId = inventory.getId();
-		this.toLocCd = inventory.getLocCd();
+		if (ValueUtil.isEmpty(this.toLocCd)) {
+			this.toLocCd = inventory.getLocCd();
+		}
 		this.tranType = InventoryTran.TRAN_TYPE_OUT;
 		this.direction = InventoryTran.DIRECTION_OUT;
 		this.refDocType = InventoryTran.REF_DOC_TYPE_SHIP;
-		// this.refDocNo = inventory.getRlsOrdNo();
-		// this.refLineNo = inventory.getRlsLineNo() == null ? null :
-		// ValueUtil.toString(inventory.getRlsLineNo());
 		this.tranDate = DateUtil.todayStr();
 		this.tranAt = new Date();
 		this.workerId = inventory.getUpdaterId();

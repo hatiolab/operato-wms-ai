@@ -497,6 +497,12 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 		List<StockAllocation> allocations = this.queryManager.selectListBySql(allocSql, allocParams,
 				StockAllocation.class, 0, 0);
 
+		// 보관 정책에서 B2B / B2C 용 출고 대기 로케이션 설정 조회
+		StoragePolicy policy = this.wmsBaseService.findStoragePolicy(domainId, order.getComCd(), order.getWhCd());
+		String waitShipLocCd = policy == null ? null
+				: (ValueUtil.isEqualIgnoreCase(order.getShipByDate(), "B2C_OUT") ? policy.getB2cWaitShipLoc()
+						: policy.getB2bWaitShipLoc());
+
 		for (StockAllocation alloc : allocations) {
 			double allocQty = alloc.getAllocQty() != null ? alloc.getAllocQty() : 0;
 			if (allocQty <= 0 || alloc.getInventoryId() == null)
@@ -504,7 +510,7 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 
 			// inv_qty 차감 + reserved_qty 해제
 			this.stockTransactionService.closeShipmentInventory(alloc.getDomainId(), alloc.getInventoryId(), allocQty,
-					order.getShipmentNo());
+					order.getShipmentNo(), waitShipLocCd);
 
 			// stock_allocations 상태 RELEASED로 변경
 			String updAllocSql = "UPDATE stock_allocations SET status = :status, released_at = :now, updated_at = now() WHERE domain_id = :domainId AND id = :allocId";
