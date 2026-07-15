@@ -861,40 +861,6 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		// 2. 피킹 지시에서 wave_no, pick_type 조회
 		PickingTask task = this.findPickingTask(domainId, pickTaskId);
 
-		// 2-1. B2B_OUT 주문 여부 확인 — B2B는 패킹 없이 바로 출하완료 처리
-		/*
-		 * if (ValueUtil.isNotEmpty(task.getShipmentOrderId())) {
-		 * String bizTypeSql =
-		 * "SELECT biz_type FROM shipment_orders WHERE domain_id = :domainId AND id = :orderId"
-		 * ;
-		 * Map<String, Object> bizTypeParams = ValueUtil.newMap("domainId,orderId",
-		 * domainId, task.getShipmentOrderId());
-		 * String bizType = this.queryManager.selectBySql(bizTypeSql, bizTypeParams,
-		 * String.class);
-		 * 
-		 * if ("B2B_OUT".equals(bizType)) {
-		 * String now = DateUtil.currentTimeStr();
-		 * String updOrderSql =
-		 * "UPDATE shipment_orders SET status = :status, shipped_at = :now, updated_at = now()"
-		 * + " WHERE domain_id = :domainId AND id = :id";
-		 * Map<String, Object> updOrderParams =
-		 * ValueUtil.newMap("status,now,domainId,id",
-		 * ShipmentOrder.STATUS_SHIPPED, now, domainId, task.getShipmentOrderId());
-		 * this.queryManager.executeBySql(updOrderSql, updOrderParams);
-		 * 
-		 * result.put("packing_created", false);
-		 * result.put("order_status", ShipmentOrder.STATUS_SHIPPED);
-		 * 
-		 * this.logger.info(String.format(
-		 * "[Fulfillment] B2B 직접피킹 완료 → 출하완료(SHIPPED) 처리 - pick_task_no: %s, order_id: %s"
-		 * ,
-		 * task.getPickTaskNo(), task.getShipmentOrderId()));
-		 * 
-		 * return result;
-		 * }
-		 * }
-		 */
-
 		// 3. insp_flag 결정: 웨이브 있으면 웨이브 설정, 없으면 창고-화주사 환경설정 사용
 		boolean inspFlag = false;
 		if (ValueUtil.isNotEmpty(task.getWaveNo())) {
@@ -911,16 +877,17 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 		}
 
 		// 4. insp_flag가 true이면 포장 지시 자동 생성
+		boolean packingCreated = false;
 		if (inspFlag) {
 			try {
 				if ("INDIVIDUAL".equals(task.getPickType())) {
 					Map<String, Object> packResult = this.createPackingOrders(pickTaskId);
-					result.put("packing_created", true);
+					packingCreated = true;
 					result.put("pack_order_no", packResult.get("pack_order_no"));
 					result.put("pack_item_count", packResult.get("item_count"));
 				} else {
 					Map<String, Object> packResult = this.createPackingOrdersFromBatch(pickTaskId);
-					result.put("packing_created", true);
+					packingCreated = true;
 					result.put("pack_order_count", packResult.get("pack_order_count"));
 					result.put("pack_total_item_count", packResult.get("total_item_count"));
 				}
@@ -932,13 +899,13 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 				this.logger.error(String.format(
 						"[Fulfillment] 포장 지시 자동 생성 실패 - pick_task_no: %s, error: %s",
 						task.getPickTaskNo(), e.getMessage()));
-				result.put("packing_created", false);
 				result.put("packing_error", e.getMessage());
 			}
-		} else {
-			result.put("packing_created", false);
 		}
 
+		// 5. 결과 리턴
+		result.put("packing_created", packingCreated);
+		result.put("picking_task", task);
 		return result;
 	}
 
