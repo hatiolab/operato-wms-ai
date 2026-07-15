@@ -681,4 +681,13 @@ export class MetaApi {
   static getBasicFormHtml(pageView) {
     return MetaUiUtil.getBasicFormHtml(pageView)
   }
+
+  /**
+   * @description 첨부파일 ID로 파일 다운로드
+   **************************************
+   * @param {String} attachmentId 첨부파일 ID
+   */
+  static downloadAttachment(attachmentId) {
+    ServiceUtil.downloadAttachment(attachmentId);
+  }
 }

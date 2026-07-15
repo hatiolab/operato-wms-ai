@@ -678,10 +678,32 @@ export class ServiceUtil {
     return null
   }
 
+  /**
+   * @description 첨부파일 다운로드 (백엔드 서버로 요청)
+   ***********************************************
+   * @param {String} attachmentId Attachment ID 첨부파일 ID
+   */
+  static downloadAttachment(attachmentId) {
+    const link = document.createElement('a')
+    link.href = `/rest/attachments/${attachmentId}/download`
+    link.click()
+  }
+
+  /**
+   * @description 템플릿 파일 다운로드 (프론트엔드 (Node) 서버로 요청)
+   ***********************************************
+   * @param {String} templateFileId Template File ID 템플릿 파일 ID
+   */
   static async templateFileDownload(templateFileId) {
     ServiceUtil.fileDownload('template-file', templateFileId)
   }
 
+  /**
+   * @description 템플릿 파일 다운로드 (프론트엔드 (Node) 서버로 요청)
+   ***********************************************
+   * @param {String} refType Ref Type 참조 유형
+   * @param {String} refBy Ref By 참조 ID
+   */
   static async fileDownload(refType, refBy) {
     // TeamplteId 로 템플릿 조회
     const response = await client.query({
@@ -718,7 +740,7 @@ export class ServiceUtil {
     }
 
     if (total > 1) {
-      // 파일이 여러개
+      // 파일이 여러 개
       MetaApi.showToast('info', TermsUtil.tText('Multiple Attached Files'))
       return
     }
@@ -740,9 +762,11 @@ export class ServiceUtil {
   }
 
   /**
-   * export Excel
-   * @param {string} url 
-   * @param {*} params 
+   * @description 엑셀 파일 다운로드
+   *******************************
+   * @param {String} url 
+   * @param {Object} params
+   * @param {String} fileName
    */
   static async excelFileDownload(url, params, fileName) {
     let res = await operatoGet(url, params, false)
@@ -761,6 +785,5 @@ export class ServiceUtil {
     element.setAttribute('target', '_blank')
     element.click()
     URL.revokeObjectURL(href)
-
   }
 }

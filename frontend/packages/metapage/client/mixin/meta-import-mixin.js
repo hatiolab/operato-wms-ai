@@ -74,7 +74,7 @@ export const MetaImportMixin = superClass =>
 
       // 버튼 콘테이너 스타일 추가 (팝업으로 로드시 사용)  
       styles.push(...MetaUiUtil.getPopupButtonContainerStyles())
-
+      // 스타일 리턴
       return styles
     }
 
@@ -89,9 +89,9 @@ export const MetaImportMixin = superClass =>
       this.config = this.createGristConfig(gridConfig)
       this.set_parent_id(this.parent_id)
 
-      if(menuMeta.actions && menuMeta.actions.length > 0){
-        menuMeta.actions.forEach(x=>{
-          if(x.name == 'template') {
+      if (menuMeta.actions && menuMeta.actions.length > 0) {
+        menuMeta.actions.forEach(x => {
+          if (x.name == 'template') {
             this.templateId = x.logic
           }
         })
@@ -115,29 +115,29 @@ export const MetaImportMixin = superClass =>
 
         <div footer>
           ${this.templateId
-            ? html`
+          ? html`
                 <button
                   @click=${async () => {
-                    this.downloadTemplate()
-                  }}
+              this.downloadTemplate()
+            }}
                 >
                   <md-icon>cloud_download</md-icon>
                   <span>${TermsUtil.tButton('download_template')}</span>
                 </button>
               `
-            : html``}
+          : html``}
           <button
             @click=${async () => {
-              this.importXlsxFile()
-            }}
+          this.importXlsxFile()
+        }}
           >
             <md-icon>cloud_upload</md-icon>
             <span>${TermsUtil.tButton('import')}</span>
           </button>
           <button ok
             @click=${async () => {
-              this.saveData()
-            }}
+          this.saveData()
+        }}
           >
             <md-icon>save</md-icon>
             <span>${TermsUtil.tButton('save')}</span>
@@ -236,7 +236,7 @@ export const MetaImportMixin = superClass =>
         pagination: { infinite: true },
         rows: {
           selectable: { multiple: true },
-          appendable: false,
+          appendable: true,
           handlers: { click: 'select-row-toggle' }
         },
         sorters: [],
@@ -274,8 +274,9 @@ export const MetaImportMixin = superClass =>
      ********************************
      */
     async downloadTemplate() {
-      const tempalteId = this.templateId
-      ServiceUtil.templateFileDownload(tempalteId)
+      // const tempalteId = this.templateId
+      // ServiceUtil.templateFileDownload(tempalteId)
+      ServiceUtil.downloadAttachment(this.templateId)
     }
 
     /**
