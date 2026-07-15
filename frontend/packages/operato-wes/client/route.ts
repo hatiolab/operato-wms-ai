@@ -11,6 +11,7 @@ import './pages/oms/shipment-order-detail'         // 팝업으로 사용
 import './pages/oms/shipment-wave-detail'          // 팝업으로 사용
 import './pages/oms/manual-wave-create-popup'      // 팝업으로 사용
 import './pages/oms/wave-closing-popup'            // 팝업으로 사용
+import './pages/oms/backorder-reallocate-popup'    // 팝업으로 사용
 import './pages/oms/courier-booking-popup'         // 팝업으로 사용
 import './pages/oms/shipment-order-ready-popup'    // 팝업으로 사용
 

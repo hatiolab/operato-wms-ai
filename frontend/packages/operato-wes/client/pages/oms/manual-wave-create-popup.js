@@ -976,6 +976,7 @@ class ManualWaveCreatePopup extends localize(i18next)(LitElement) {
     this.orders = this.orders.filter(o => !this._selectedIds.has(o.id))
     this._ordersMap = new Map(this.orders.map(o => [o.id, o]))
     this._selectedIds.clear()
+    this.currentPage = 1
     this._tick++
   }
 
