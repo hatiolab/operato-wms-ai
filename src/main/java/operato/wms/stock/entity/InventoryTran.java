@@ -705,6 +705,89 @@ public class InventoryTran extends xyz.elidom.orm.entity.basic.DomainCreateStamp
 	}
 
 	/**
+	 * VAS 자재 할당 재고 소비 트랜잭션 생성 (피킹분/손실분 분리)
+	 *
+	 * alloc_qty 전량(pickedQty + lossQty)을 재고에서 차감하며,
+	 * 정상 소비분은 VAS_OUT, 현물 부족으로 미피킹된 잔량은 ADJUST 트랜잭션으로 각각 남긴다.
+	 *
+	 * @param inventory  할당 원재고
+	 * @param pickedQty  정상 소비 수량 (VAS_OUT)
+	 * @param lossQty    손실 청산 수량 (ADJUST)
+	 * @param releaseQty 예약 해소 수량
+	 * @return 갱신된 재고
+	 */
+	public Inventory createVasConsumeWithLossTransaction(Inventory inventory, double pickedQty, double lossQty,
+			double releaseQty) {
+		double invQty = inventory.getInvQty() != null ? inventory.getInvQty() : 0.0;
+		double totalConsume = pickedQty + lossQty;
+		double reservedQty = inventory.getReservedQty() != null ? inventory.getReservedQty() : 0.0;
+
+		if (totalConsume > invQty + 0.0001) {
+			throw new ElidomValidationException(
+					"할당 원재고 수량이 부족합니다. SKU: " + inventory.getSkuCd() +
+							", 재고: " + invQty + ", 차감: " + totalConsume);
+		}
+
+		double afterQty = Math.max(invQty - totalConsume, 0.0);
+
+		// 1. 재고/예약 수량 갱신 (alloc 전량 차감)
+		inventory.setInvQty(afterQty);
+		inventory.setReservedQty(Math.max(reservedQty - releaseQty, 0.0));
+		inventory.setLastTranCd(Inventory.TRANSACTION_VAS_OUT);
+		inventory.setUpdatedAt(new Date());
+		BeanUtil.get(IQueryManager.class).update(inventory);
+
+		String today = DateUtil.todayStr();
+		Date nowAt = new Date();
+		double runningBefore = invQty;
+
+		// 2. 정상 소비 트랜잭션 (VAS_OUT)
+		if (pickedQty > 0.0001) {
+			InventoryTran outTran = ValueUtil.populate(inventory, new InventoryTran(),
+					"domainId", "barcode", "whCd", "comCd", "skuCd", "skuNm", "lotNo", "serialNo", "expiredDate",
+					"remarks");
+			outTran.id = null;
+			outTran.inventoryId = inventory.getId();
+			outTran.tranType = InventoryTran.TRAN_TYPE_VAS_OUT;
+			outTran.direction = InventoryTran.DIRECTION_OUT;
+			outTran.tranQty = pickedQty;
+			outTran.beforeQty = runningBefore;
+			runningBefore -= pickedQty;
+			outTran.afterQty = runningBefore;
+			outTran.locCd = inventory.getLocCd();
+			outTran.toLocCd = inventory.getLocCd();
+			outTran.tranDate = today;
+			outTran.tranAt = nowAt;
+			outTran.workerId = inventory.getUpdaterId();
+			outTran.createTransaction();
+		}
+
+		// 3. 손실 청산 트랜잭션 (ADJUST) — 현물 부족으로 미피킹된 잔량
+		if (lossQty > 0.0001) {
+			InventoryTran adjTran = ValueUtil.populate(inventory, new InventoryTran(),
+					"domainId", "barcode", "whCd", "comCd", "skuCd", "skuNm", "lotNo", "serialNo", "expiredDate",
+					"remarks");
+			adjTran.id = null;
+			adjTran.inventoryId = inventory.getId();
+			adjTran.tranType = InventoryTran.TRAN_TYPE_ADJUST;
+			adjTran.direction = InventoryTran.DIRECTION_OUT;
+			adjTran.tranQty = lossQty;
+			adjTran.beforeQty = runningBefore;
+			runningBefore -= lossQty;
+			adjTran.afterQty = runningBefore;
+			adjTran.locCd = inventory.getLocCd();
+			adjTran.toLocCd = inventory.getLocCd();
+			adjTran.tranDate = today;
+			adjTran.tranAt = nowAt;
+			adjTran.workerId = inventory.getUpdaterId();
+			adjTran.reason = "현물 부족 손실 청산 (VAS 자재피킹)";
+			adjTran.createTransaction();
+		}
+
+		return inventory;
+	}
+
+	/**
 	 * 로케이션으로 MOVE-IN 트랜잭션 이력 생성
 	 * 
 	 * @param inventory

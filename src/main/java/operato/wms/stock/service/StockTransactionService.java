@@ -97,6 +97,24 @@ public class StockTransactionService extends BaseStockService {
     }
 
     /**
+     * VAS 자재 할당 재고 소비 (피킹분/손실분 분리)
+     *
+     * alloc_qty 전량(pickedQty + lossQty)을 재고에서 차감하되,
+     * 정상 소비분은 VAS_OUT, 현물 부족으로 미피킹된 잔량은 ADJUST 트랜잭션으로 분리 기록한다.
+     *
+     * @param inventory  할당 원재고
+     * @param pickedQty  정상 소비 수량 (VAS_OUT)
+     * @param lossQty    손실 청산 수량 (ADJUST)
+     * @param releaseQty 예약 해소 수량
+     * @return 갱신된 재고
+     */
+    public Inventory consumeVasAllocatedInventory(Inventory inventory, double pickedQty, double lossQty,
+            double releaseQty) {
+        InventoryTran consumeTran = new InventoryTran();
+        return consumeTran.createVasConsumeWithLossTransaction(inventory, pickedQty, lossQty, releaseQty);
+    }
+
+    /**
      * 세트 상품 해체 시 세트 상품 할당 재고로 부터 재고 차감
      * 
      * @param inventory
