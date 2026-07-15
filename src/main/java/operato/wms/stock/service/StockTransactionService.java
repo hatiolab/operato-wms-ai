@@ -396,7 +396,7 @@ public class StockTransactionService extends BaseStockService {
      * @param orderNo       주문 번호
      * @param orderItemId   주문 아이템 아이디
      */
-    public Inventory allocateInventory(Inventory inv, String allocStrategy, double allocateQty, String allocType,
+    public StockAllocation allocateInventory(Inventory inv, String allocStrategy, double allocateQty, String allocType,
             String orderId, String orderNo, String orderItemId) {
         return this.allocateInventory(inv, allocStrategy, allocateQty, allocType, orderId, orderNo, orderItemId,
                 StockAllocation.STATUS_HARD);
@@ -417,9 +417,10 @@ public class StockTransactionService extends BaseStockService {
      * @param orderItemId   주문 아이템 아이디
      * @param status        초기 할당 상태 (SOFT / HARD)
      */
-    public Inventory allocateInventory(Inventory inv, String allocStrategy, double allocateQty, String allocType,
+    public StockAllocation allocateInventory(Inventory inv, String allocStrategy, double allocateQty, String allocType,
             String orderId, String orderNo, String orderItemId, String status) {
 
+        // 재고 할당 정보 생성
         StockAllocation alloc = new StockAllocation();
         alloc.setDomainId(inv.getDomainId());
         alloc.setShipmentOrderId(orderId);
@@ -437,14 +438,17 @@ public class StockTransactionService extends BaseStockService {
         alloc.setAllocatedAt(DateUtil.currentTimeStr());
         this.queryManager.insert(alloc);
 
-        // 재고 할당
+        // 재고 할당 트랜잭션 처리
         InventoryTran invTran = new InventoryTran();
         invTran.setRefDocType(ValueUtil.isEqualIgnoreCase(StockAllocation.ALLOC_TYPE_SHIPMENT, allocType)
                 ? InventoryTran.REF_DOC_TYPE_SHIP
                 : InventoryTran.REF_DOC_TYPE_VAS);
         invTran.setRefDocNo(orderNo);
         invTran.setTranQty(allocateQty);
-        return invTran.createAllocateTransaction(inv);
+        invTran.createAllocateTransaction(inv);
+
+        // 재고 할당 정보 리턴
+        return alloc;
     }
 
     /**
@@ -465,7 +469,8 @@ public class StockTransactionService extends BaseStockService {
                 ValueUtil.isEqualIgnoreCase(stockAllocation.getAllocType(), StockAllocation.ALLOC_TYPE_SHIPMENT)
                         ? InventoryTran.REF_DOC_TYPE_SHIP
                         : InventoryTran.REF_DOC_TYPE_VAS);
-        invTran.setRefDocNo(stockAllocation.getShipmentOrderId());
+        invTran.setRefDocNo(stockAllocation.getShipmentOrderId()); // TODO B2C 주문인 경우에는 ShipmentOrderId가 없음 -> WaveNo.로
+                                                                   // 바꿔서 처리할 필요가 있음
         invTran.createDeallocateTransaction(inventory);
 
         // 재고 할당 삭제
@@ -494,7 +499,8 @@ public class StockTransactionService extends BaseStockService {
                 ValueUtil.isEqualIgnoreCase(stockAllocation.getAllocType(), StockAllocation.ALLOC_TYPE_SHIPMENT)
                         ? InventoryTran.REF_DOC_TYPE_SHIP
                         : InventoryTran.REF_DOC_TYPE_VAS);
-        invTran.setRefDocNo(stockAllocation.getShipmentOrderId());
+        invTran.setRefDocNo(stockAllocation.getShipmentOrderId()); // TODO B2C 주문인 경우에는 ShipmentOrderId가 없음 -> WaveNo.로
+                                                                   // 바꿔서 처리할 필요가 있음
         invTran.createDeallocateTransaction(inventory);
 
         // 3. 재고 할당 업데이트
