@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -158,6 +159,43 @@ public class VasTransactionController {
 		Double pickedQty = ValueUtil.toDouble(params.get("pickedQty"));
 
 		return this.vasService.pickMaterial(itemId, pickedQty);
+	}
+
+	/**
+	 * 자재 피킹 취소 — 피킹 실적을 되돌리고 ALLOCATED 상태로 복구
+	 *
+	 * @param itemId 작업 지시 상세 ID
+	 * @return 업데이트된 작업 지시 상세
+	 */
+	@PostMapping(value = "/vas_order_items/{itemId}/pick_cancel", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Cancel Pick for VAS")
+	public VasOrderItem cancelPick(@PathVariable("itemId") String itemId) {
+		return this.vasService.cancelPick(itemId);
+	}
+
+	/**
+	 * 재할당(가변 레이어) 아이템 삭제 — 할당 해제 후 아이템 제거
+	 *
+	 * @param itemId 재할당 자재 상세 ID
+	 * @return 처리 결과
+	 */
+	@DeleteMapping(value = "/vas_order_items/{itemId}/reallocation", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Delete Reallocation Item for VAS")
+	public Map<String, Object> deleteReallocation(@PathVariable("itemId") String itemId) {
+		this.vasService.deleteReallocation(itemId);
+		return ValueUtil.newMap("success", true);
+	}
+
+	/**
+	 * 재할당 로케이션 변경용 — 자재 상세와 동일 SKU의 가용 재고 후보 목록 (FEFO 정렬)
+	 *
+	 * @param itemId 자재 상세 ID
+	 * @return 가용 재고 목록
+	 */
+	@GetMapping(value = "/vas_order_items/{itemId}/available_inventories", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "List Available Inventories for VAS Reallocation")
+	public List<Map<String, Object>> availableInventories(@PathVariable("itemId") String itemId) {
+		return this.vasService.getAvailableInventoriesForItem(itemId);
 	}
 
 	/**

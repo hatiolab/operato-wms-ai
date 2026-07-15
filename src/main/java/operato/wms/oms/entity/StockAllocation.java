@@ -117,6 +117,13 @@ public class StockAllocation extends xyz.elidom.orm.entity.basic.ElidomStampHook
 	private Double allocQty;
 
 	/**
+	 * 피킹 수량 (이 할당분에 대해 실제 피킹 확정된 수량).
+	 * VAS 자재피킹에서 할당별 피킹 실적을 추적하여 재할당 삭제/피킹취소 가능 여부 판정에 사용.
+	 */
+	@Column (name = "picked_qty")
+	private Double pickedQty;
+
+	/**
 	 * 할당 유형 (SHIPMENT/VAS)
 	 */
 	@Column (name = "alloc_type", length = 20)
@@ -243,6 +250,14 @@ public class StockAllocation extends xyz.elidom.orm.entity.basic.ElidomStampHook
 
 	public void setAllocQty(Double allocQty) {
 		this.allocQty = allocQty;
+	}
+
+	public Double getPickedQty() {
+		return pickedQty;
+	}
+
+	public void setPickedQty(Double pickedQty) {
+		this.pickedQty = pickedQty;
 	}
 
 	public String getAllocType() {

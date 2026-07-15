@@ -101,6 +101,16 @@ public class WmsVasConstants {
 	public static final String VAS_TYPE_DISASSEMBLY = "DISASSEMBLY";
 
 	/**
+	 * 유통가공 유형: 선포장 (여러 상품을 취합해 1개 결과물 생성 — 구성과 동일 패턴)
+	 */
+	public static final String VAS_TYPE_PREPACK = "PREPACK";
+
+	/**
+	 * 유통가공 유형: 선세트 (여러 상품을 취합해 1개 결과물 생성 — 구성과 동일 패턴)
+	 */
+	public static final String VAS_TYPE_PRESET = "PRESET";
+
+	/**
 	 * 유통가공 유형: 재포장
 	 */
 	public static final String VAS_TYPE_REPACK = "REPACK";

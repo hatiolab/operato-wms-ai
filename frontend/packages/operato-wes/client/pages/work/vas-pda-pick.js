@@ -535,6 +535,52 @@ class VasPdaPick extends localize(i18next)(PageView) {
         }
 
         /* 토글 버튼 */
+        .realloc-badge {
+          display: inline-block;
+          margin-left: 6px;
+          padding: 1px 7px;
+          border-radius: 10px;
+          background: var(--md-sys-color-tertiary-container, #ffe0b2);
+          color: var(--md-sys-color-on-tertiary-container, #7a4f00);
+          font-size: 11px;
+          font-weight: 700;
+          vertical-align: middle;
+        }
+
+        .item-actions {
+          flex-shrink: 0;
+          display: flex;
+          gap: 4px;
+          margin-right: 4px;
+        }
+
+        .item-actions .act-btn {
+          min-width: 30px;
+          min-height: 30px;
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 6px;
+          background: var(--md-sys-color-surface, #fff);
+          font-size: 14px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .item-actions .act-btn.del {
+          color: var(--md-sys-color-error, #d32f2f);
+          border-color: var(--md-sys-color-error, #d32f2f);
+        }
+
+        .item-actions .act-btn.cancel {
+          color: var(--md-sys-color-primary, #1976d2);
+          border-color: var(--md-sys-color-primary, #1976d2);
+        }
+
+        .item-actions .act-btn:active {
+          background: var(--md-sys-color-surface-variant, #f0f0f0);
+        }
+
         .toggle-detail-btn {
           flex-shrink: 0;
           min-width: 26px;
@@ -985,7 +1031,10 @@ class VasPdaPick extends localize(i18next)(PageView) {
       feedbackType: String,
       voiceEnabled: Boolean,
       expandedItems: Object,
-      showTargetPicker: Boolean
+      showTargetPicker: Boolean,
+      showLocPicker: Boolean,
+      locCandidates: Array,
+      locPickerItem: Object
     }
   }
 
@@ -1007,6 +1056,9 @@ class VasPdaPick extends localize(i18next)(PageView) {
     this.voiceEnabled = voiceService.enabled
     this.expandedItems = {}
     this.showTargetPicker = false
+    this.showLocPicker = false
+    this.locCandidates = []
+    this.locPickerItem = null
     this._scannerService = null
   }
 
@@ -1030,6 +1082,7 @@ class VasPdaPick extends localize(i18next)(PageView) {
         ? html`<div class="feedback-toast ${this.feedbackType}">${this.feedbackMsg}</div>`
         : ''}
       ${this._renderTargetPicker()}
+      ${this._renderLocPicker()}
     `
   }
 
@@ -1254,6 +1307,124 @@ class VasPdaPick extends localize(i18next)(PageView) {
     this._onInventoryBarcodeScan(barcode)
   }
 
+  /** 아이템 액션 버튼 — 재할당(로케이션변경/삭제) 또는 피킹됨(피킹취소) */
+  _renderItemActions(item) {
+    const isRealloc = !!item.parent_item_id
+    const picked = !!item._picked
+    if (isRealloc && !picked) {
+      return html`
+        <div class="item-actions">
+          <button class="act-btn edit" @click="${e => this._onChangeLocation(item, e)}" title="로케이션 변경">✏️</button>
+          <button class="act-btn del" @click="${e => this._onDeleteReallocation(item, e)}" title="재할당 삭제">✕</button>
+        </div>`
+    }
+    if (picked) {
+      return html`
+        <div class="item-actions">
+          <button class="act-btn cancel" @click="${e => this._onCancelPick(item, e)}" title="피킹 취소">↩</button>
+        </div>`
+    }
+    return ''
+  }
+
+  /** 피킹 취소 — 실적을 되돌리고 목록 재조회 */
+  async _onCancelPick(item, e) {
+    if (e) e.stopPropagation()
+    if (this.picking) return
+    this.picking = true
+    try {
+      await ServiceUtil.restPost(`vas_trx/vas_order_items/${item.id}/pick_cancel`, {})
+      this._showFeedback('피킹 취소됨', 'success')
+      voiceService.success('피킹 취소됨')
+      await this._fetchOrderItems(this.selectedOrder.id)
+    } catch (err) {
+      this._showFeedback(err.message || '피킹 취소 실패', 'error')
+      voiceService.error('피킹 취소 실패')
+    } finally {
+      this.picking = false
+    }
+  }
+
+  /** 재할당 삭제 — 할당 해제 후 아이템 제거, 목록 재조회 */
+  async _onDeleteReallocation(item, e) {
+    if (e) e.stopPropagation()
+    if (this.picking) return
+    this.picking = true
+    try {
+      await ServiceUtil.restDelete(`vas_trx/vas_order_items/${item.id}/reallocation`, {})
+      this._showFeedback('재할당 삭제됨', 'success')
+      voiceService.success('재할당 삭제됨')
+      await this._fetchOrderItems(this.selectedOrder.id)
+    } catch (err) {
+      this._showFeedback(err.message || '재할당 삭제 실패', 'error')
+      voiceService.error('재할당 삭제 실패')
+    } finally {
+      this.picking = false
+    }
+  }
+
+  /** 재할당 로케이션 변경 — 가용 재고 후보 조회 후 팝업 오픈 */
+  async _onChangeLocation(item, e) {
+    if (e) e.stopPropagation()
+    try {
+      const data = await ServiceUtil.restGet(`vas_trx/vas_order_items/${item.id}/available_inventories`)
+      this.locCandidates = data || []
+      this.locPickerItem = item
+      this.showLocPicker = true
+    } catch (err) {
+      this._showFeedback(err.message || '가용 재고 조회 실패', 'error')
+    }
+  }
+
+  /** 선택한 로케이션으로 재할당 (기존 자재할당 로직 재사용) */
+  async _applyLocation(inv) {
+    const item = this.locPickerItem
+    this.showLocPicker = false
+    if (!item) return
+    this.picking = true
+    try {
+      await ServiceUtil.restPost(`vas_trx/vas_order_items/${item.id}/allocate`, {
+        allocQty: item.alloc_qty || item.req_qty,
+        srcLocCd: inv.loc_cd,
+        lotNo: inv.lot_no || ''
+      })
+      this._showFeedback(`${inv.loc_cd} 로 재할당됨`, 'success')
+      voiceService.success('로케이션 변경됨')
+      await this._fetchOrderItems(this.selectedOrder.id)
+    } catch (err) {
+      this._showFeedback(err.message || '로케이션 변경 실패', 'error')
+      voiceService.error('로케이션 변경 실패')
+    } finally {
+      this.picking = false
+    }
+  }
+
+  /** 재할당 로케이션 선택 팝업 — 유통기한 없음 먼저 → 임박순 */
+  _renderLocPicker() {
+    if (!this.showLocPicker) return ''
+    const item = this.locPickerItem
+    const need = item ? (item.alloc_qty || item.req_qty || 0) : 0
+    return html`
+      <div class="picker-backdrop" @click="${() => { this.showLocPicker = false }}">
+        <div class="picker-sheet" @click="${e => e.stopPropagation()}">
+          <div class="picker-handle"></div>
+          <div class="picker-title">로케이션 선택 (필요 ${need} EA · 유통기한 임박순)</div>
+          ${this.locCandidates.length === 0
+            ? html`<div class="picker-empty">가용 재고가 없습니다</div>`
+            : this.locCandidates.map(inv => html`
+                <div class="picker-item" @click="${() => this._applyLocation(inv)}">
+                  <div class="p-nm">${inv.loc_cd} · ${inv.barcode || '-'}</div>
+                  <div class="p-sub">
+                    가용 ${inv.avail_qty} EA${inv.lot_no ? ` · LOT ${inv.lot_no}` : ''} ·
+                    ${inv.expired_date ? `~${inv.expired_date}` : '유통기한 없음'}
+                  </div>
+                </div>
+              `)}
+          <button class="picker-cancel" @click="${() => { this.showLocPicker = false }}">취소</button>
+        </div>
+      </div>`
+  }
+
   /** 자재 피킹 체크리스트 렌더링 — 항목별 토글 버튼 + 재고 상세 패널 */
   _renderItemChecklist() {
     return html`
@@ -1269,12 +1440,17 @@ class VasPdaPick extends localize(i18next)(PageView) {
                 ${item._picked ? '\u2713' : idx === this.currentItemIndex ? '\u2192' : '\u2610'}
               </div>
               <div class="sku-info">
-                <div class="sku-name">${item.sku_nm} - ${item.sku_cd}</div>
+                <div class="sku-name">
+                  ${item.sku_nm} - ${item.sku_cd}
+                  ${item.parent_item_id ? html`<span class="realloc-badge">재할당</span>` : ''}
+                </div>
                 <div class="qty">
                   ${item.picked_qty || 0} / ${item.alloc_qty || item.req_qty || 0} EA
                   ${item.src_loc_cd ? html` | <strong>${item.src_loc_cd}</strong>` : ''}
                 </div>
               </div>
+              <!-- 재할당/피킹취소 액션 -->
+              ${this._renderItemActions(item)}
               <!-- 재고 상세 토글 버튼 -->
               <button
                 class="toggle-detail-btn ${this.expandedItems[idx] ? 'expanded' : ''}"
@@ -1306,11 +1482,6 @@ class VasPdaPick extends localize(i18next)(PageView) {
               <div class="alloc-card-top">
                 <span class="alloc-barcode">${bcd}</span>
                 <span class="alloc-loc">${loc}</span>
-              </div>
-              <div class="alloc-card-bottom">
-                <span class="alloc-qty">
-                  스캔: <strong>${scanned ? qty : 0}</strong> / ${qty} EA
-                </span>
                 <span class="alloc-badge ${scanned ? 'done' : 'pending'}">
                   ${scanned ? '✓ 스캔완료' : '미스캔'}
                 </span>
@@ -1322,11 +1493,6 @@ class VasPdaPick extends localize(i18next)(PageView) {
             <div class="alloc-card-top">
               <span class="alloc-barcode">-</span>
               <span class="alloc-loc">${item.src_loc_cd || '-'}</span>
-            </div>
-            <div class="alloc-card-bottom">
-              <span class="alloc-qty">
-                스캔: <strong>${item._picked ? (item.picked_qty || item._pickedQty || 0) : 0}</strong> / ${item.alloc_qty || item.req_qty || 0} EA
-              </span>
               <span class="alloc-badge ${item._picked ? 'done' : 'pending'}">
                 ${item._picked ? '✓ 스캔완료' : '미스캔'}
               </span>
@@ -1697,59 +1863,60 @@ class VasPdaPick extends localize(i18next)(PageView) {
     if (!item) return
 
     const reqQty = item.alloc_qty || item.req_qty || 0
-
-    // 멀티 로케이션 자재: 모든 할당 바코드를 스캔해야 확정 가능 (부분 스캔 후 수동 수량 입력 방지)
+    const pickQty = this.pickQty || 0
     const barcodes = this._getAllocBarcodes(item)
     const scanned = item._scannedBarcodes || []
-    if (barcodes.length > 0 && scanned.length < barcodes.length) {
-      this._showFeedback(`모든 재고 바코드를 스캔해주세요 (${scanned.length}/${barcodes.length})`, 'error')
-      voiceService.error('모든 재고 바코드를 스캔해주세요')
+
+    // 수량 검증 — 재고 0(현물 없음)이면 0 피킹 확정도 허용, 초과만 차단
+    if (pickQty < 0) {
+      this._showFeedback('수량은 0 이상이어야 합니다', 'error')
+      voiceService.error('수량을 확인해주세요')
       return
     }
-
-    if (!this.pickQty || this.pickQty <= 0) {
-      this._showFeedback('수량을 입력해주세요', 'error')
-      voiceService.error('수량을 입력해주세요')
-      return
-    }
-
-    if (this.pickQty < reqQty) {
-      this._showFeedback('자재를 모두 스캔해주세요', 'error')
-      voiceService.error('자재를 모두 스캔해주세요')
-      return
-    }
-
-    if (this.pickQty > reqQty) {
+    if (pickQty > reqQty) {
       this._showFeedback('요청 수량을 초과할 수 없습니다', 'error')
       voiceService.warning('요청 수량을 초과합니다')
+      return
+    }
+
+    // 현물이 할당보다 적으면 부족 확정 (부족분은 백엔드가 자동 FEFO 재할당)
+    const isShort = pickQty < reqQty
+
+    // 전량 피킹인 경우에만 모든 할당 바코드 스캔을 강제한다.
+    // 부족 확정은 수동 수량 입력으로 진행하므로 바코드 전량 스캔을 요구하지 않는다.
+    if (!isShort && barcodes.length > 0 && scanned.length < barcodes.length) {
+      this._showFeedback(`모든 재고 바코드를 스캔해주세요 (${scanned.length}/${barcodes.length})`, 'error')
+      voiceService.error('모든 재고 바코드를 스캔해주세요')
       return
     }
 
     this.picking = true  // 버튼 잠금
     try {
       await ServiceUtil.restPost(`vas_trx/vas_order_items/${item.id}/pick`, {
-        pickedQty: this.pickQty
+        pickedQty: pickQty
       })
 
-      const items = [...this.orderItems]
-      items[this.currentItemIndex] = {
-        ...items[this.currentItemIndex],
-        _picked: true,
-        _pickedQty: this.pickQty,
-        picked_qty: this.pickQty
+      if (isShort) {
+        this._showFeedback(`${pickQty}EA 피킹 · 부족 ${reqQty - pickQty}EA 자동 재할당`, 'success')
+        voiceService.success(`${pickQty}개 피킹, 부족분 재할당`)
+      } else {
+        this._showFeedback('피킹 완료', 'success')
+        voiceService.success('피킹 완료')
       }
-      this.orderItems = items
 
-      this._showFeedback('피킹 완료', 'success')
-      voiceService.success('피킹 완료')
+      // 부족 시 재할당 아이템이 새로 생성되므로 목록을 재조회하여 반영
+      await this._fetchOrderItems(this.selectedOrder.id)
 
       setTimeout(() => {
-        this._moveToNextItem()
-        this.picking = false  // 다음 아이템 이동 후 버튼 잠금 해제
+        this.picking = false
+        if (this.currentItemIndex < 0) {
+          this._showFeedback('모든 자재 피킹 완료!', 'success')
+        }
       }, 200)
     } catch (err) {
+      // 재고 소진 등으로 재할당 실패 시 백엔드 트랜잭션이 롤백되어 피킹이 확정되지 않는다.
       this._showFeedback(err.message || '피킹 실패', 'error')
-      voiceService.error('피킹 실패')
+      voiceService.error(err.message || '피킹 실패')
       this.picking = false  // 실패 시에도 즉시 잠금 해제
     }
   }

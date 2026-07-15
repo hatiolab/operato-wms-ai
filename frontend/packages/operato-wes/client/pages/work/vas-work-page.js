@@ -1198,9 +1198,11 @@ class VasWorkPage extends localize(i18next)(PageView) {
   async _fetchOrders() {
     try {
       this.loading = true
+      // 구성 화면은 여러 상품을 취합해 1개 결과물을 만드는 3종 유형을 함께 처리한다
+      // (세트 구성 / 선포장 / 선세트) — 해체(DISASSEMBLY)는 별도 화면 담당
       const data = await ServiceUtil.restGet('vas_trx/monitor/orders', {
         status: 'MATERIAL_READY,IN_PROGRESS,COMPLETED,CLOSED',
-        vasType: 'SET_ASSEMBLY'
+        vasType: 'SET_ASSEMBLY,PREPACK,PRESET'
       })
       this.orders = data || []
 
@@ -1368,10 +1370,10 @@ class VasWorkPage extends localize(i18next)(PageView) {
     try {
       const order = await ServiceUtil.restGet('vas_trx/vas_orders/find_by_no', { vas_no: value })
       if (order) {
-        // find_by_no는 vas_type 무관 조회 — 세트구성 작업 화면은 SET_ASSEMBLY만 허용
-        if (order.vas_type !== 'SET_ASSEMBLY') {
-          this._showFeedback('세트구성(SET_ASSEMBLY) 주문이 아닙니다', 'error')
-          voiceService.error('세트구성 주문이 아닙니다')
+        // find_by_no는 vas_type 무관 조회 — 구성 작업 화면은 구성/선포장/선세트 3종만 허용
+        if (!['SET_ASSEMBLY', 'PREPACK', 'PRESET'].includes(order.vas_type)) {
+          this._showFeedback('구성/선포장/선세트 주문이 아닙니다', 'error')
+          voiceService.error('구성 작업 대상 주문이 아닙니다')
           return
         }
         await this._fetchBomMap([order])

@@ -91,6 +91,13 @@ public class VasOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private Double lossQty;
 
 	/**
+	 * 부모 자재 상세 ID (재할당 아이템인 경우 원(불변) 아이템의 id).
+	 * null이면 원할당(불변 레이어), 값이 있으면 재할당(가변 레이어).
+	 */
+	@Column(name = "parent_item_id", length = 40)
+	private String parentItemId;
+
+	/**
 	 * 자재 피킹 로케이션
 	 */
 	@Column(name = "src_loc_cd", length = 20)
@@ -329,6 +336,14 @@ public class VasOrderItem extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setAttr05(String attr05) {
 		this.attr05 = attr05;
+	}
+
+	public String getParentItemId() {
+		return parentItemId;
+	}
+
+	public void setParentItemId(String parentItemId) {
+		this.parentItemId = parentItemId;
 	}
 
 	@Override
