@@ -937,6 +937,30 @@ public class OmsTransactionController extends AbstractRestService {
 		return result;
 	}
 
+	/**
+	 * 웨이브 마감
+	 *
+	 * POST /rest/oms_trx/waves/{id}/close
+	 *
+	 * @param id 웨이브 ID
+	 * @return { success, wave_no, closed_order_count }
+	 */
+	@RequestMapping(value = "waves/{id}/close", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Close wave (RELEASED → COMPLETED)")
+	public Map<String, Object> closeWave(@PathVariable("id") String id) {
+		Long domainId = Domain.currentDomainId();
+
+		Map<String, Object> params = ValueUtil.newMap("id", id);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_CLOSE_WAVE, params);
+
+		Map<String, Object> result = this.waveService.closeWave(id);
+
+		params.put("result", result);
+		this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_CLOSE_WAVE, params);
+
+		return result;
+	}
+
 	/*
 	 * ============================================================
 	 * 보충 지시 트랜잭션 API

@@ -864,8 +864,41 @@ public class OmsWaveService extends AbstractQueryService {
 	}
 
 	/**
+	 * 웨이브 마감 (RELEASED → COMPLETED)
+	 *
+	 * 모든 주문이 마감(CLOSED) 처리된 이후 웨이브 상태를 완료로 변경한다.
+	 *
+	 * @param id 웨이브 ID
+	 * @return { success, wave_no, closed_order_count }
+	 */
+	public Map<String, Object> closeWave(String id) {
+		// 1. 웨이브 조회
+		Long domainId = Domain.currentDomainId();
+		ShipmentWave wave = this.findWave(domainId, id, true);
+
+		// 2. 웨이브 상태 체크
+		if (!ShipmentWave.STATUS_RELEASED.equals(wave.getStatus())) {
+			throw new ElidomValidationException("웨이브 상태가 [" + wave.getStatus() + "]이므로 마감할 수 없습니다 (RELEASED 상태만 가능)");
+		}
+
+		// 3. 웨이브 상태, 완료 일시 업데이트
+		wave.setStatus(ShipmentWave.STATUS_COMPLETED);
+		wave.setCompletedAt(DateUtil.currentTimeStr());
+		this.queryManager.update(wave, "status", "updatedAt", "updaterId");
+
+		// 4. 웨이브 내 주문 중 완료 처리된 주문 수 조회
+		String sql = "SELECT COUNT(*) FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status";
+		Map<String, Object> params = ValueUtil.newMap("domainId,waveNo,status", domainId, wave.getWaveNo(),
+				ShipmentOrder.STATUS_CLOSED);
+		int closedOrderCount = this.queryManager.selectBySql(sql, params, Integer.class);
+
+		// 5. 결과 리턴
+		return ValueUtil.newMap("success,wave_no,closed_order_count", true, wave.getWaveNo(), closedOrderCount);
+	}
+
+	/**
 	 * 웨이브 단건 조회
-	 * 
+	 *
 	 * @param domainId
 	 * @param id
 	 * @param exceptionWhenEmpty 존재하지 않은 경우 예외 발생

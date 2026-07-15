@@ -96,6 +96,12 @@ public class WmsOmsConstants {
 	/** 커스텀 서비스 - 웨이브 취소 후 처리 */
 	public static final String TRX_OMS_POST_CANCEL_WAVE = "diy-oms-post-cancel-wave";
 
+	// === 웨이브 마감 ===
+	/** 커스텀 서비스 - 웨이브 마감 전 처리 */
+	public static final String TRX_OMS_PRE_CLOSE_WAVE = "diy-oms-pre-close-wave";
+	/** 커스텀 서비스 - 웨이브 마감 후 처리 */
+	public static final String TRX_OMS_POST_CLOSE_WAVE = "diy-oms-post-close-wave";
+
 	// === 보충 지시 생성 ===
 	/** 커스텀 서비스 - 보충 지시 생성 전 처리 */
 	public static final String TRX_OMS_PRE_CREATE_REPLENISH = "diy-oms-pre-create-replenish-order";

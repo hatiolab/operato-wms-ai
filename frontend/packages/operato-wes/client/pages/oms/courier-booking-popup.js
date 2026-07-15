@@ -314,9 +314,7 @@ class CourierBookingPopup extends localize(i18next)(LitElement) {
         <span class="label">${TermsUtil.tLabel('wave_no') || '웨이브번호'}</span>
         <span class="value">${this.waveNo || this.waveInfo?.wave_no || '-'}</span>
         <span class="label">${TermsUtil.tLabel('wave_date') || '웨이브 일자'}</span>
-        <span class="value">${this.waveInfo || this.waveInfo?.wave_date || '-'}</span>
-        <span class="label">${TermsUtil.tLabel('wave_seq') || '웨이브 차수'}</span>
-        <span class="value">${this.waveInfo || this.waveInfo?.wave_seq || '-'}</span>
+        <span class="value">${this.waveInfo?.wave_date || '-'} / ${this.waveInfo?.wave_seq != null ? this.waveInfo.wave_seq + '차' : '-'}</span>
         <span class="divider">|</span>
         <span class="label">총 주문</span>
         <span class="value">${total}건</span>
