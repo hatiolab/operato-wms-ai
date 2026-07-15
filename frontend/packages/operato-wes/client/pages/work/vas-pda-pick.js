@@ -547,6 +547,28 @@ class VasPdaPick extends localize(i18next)(PageView) {
           vertical-align: middle;
         }
 
+        /* 재고 부족 뱃지/행 강조 */
+        .oos-badge {
+          display: inline-block;
+          margin-left: 6px;
+          padding: 1px 7px;
+          border-radius: 10px;
+          background: #ffebee;
+          color: #c62828;
+          font-size: 11px;
+          font-weight: 700;
+          vertical-align: middle;
+        }
+
+        .checklist-item.out-of-stock {
+          background: #fff5f5;
+          border-left: 3px solid #e53935;
+        }
+
+        .checklist-item.out-of-stock .icon {
+          color: #e53935;
+        }
+
         .item-actions {
           flex-shrink: 0;
           display: flex;
@@ -1433,16 +1455,17 @@ class VasPdaPick extends localize(i18next)(PageView) {
           <div class="checklist-item-wrapper">
             <!-- 항목 행 -->
             <div
-              class="checklist-item ${item._picked ? 'completed' : ''} ${idx === this.currentItemIndex ? 'active' : ''}"
+              class="checklist-item ${item._outOfStock ? 'out-of-stock' : item._picked ? 'completed' : ''} ${idx === this.currentItemIndex ? 'active' : ''}"
               @click="${() => this._focusItem(idx)}"
             >
               <div class="icon">
-                ${item._picked ? '\u2713' : idx === this.currentItemIndex ? '\u2192' : '\u2610'}
+                ${item._outOfStock ? '\u26a0' : item._picked ? '\u2713' : idx === this.currentItemIndex ? '\u2192' : '\u2610'}
               </div>
               <div class="sku-info">
                 <div class="sku-name">
                   ${item.sku_nm} - ${item.sku_cd}
                   ${item.parent_item_id ? html`<span class="realloc-badge">재할당</span>` : ''}
+                  ${item._outOfStock ? html`<span class="oos-badge">재고부족</span>` : ''}
                 </div>
                 <div class="qty">
                   ${item.picked_qty || 0} / ${item.alloc_qty || item.req_qty || 0} EA
@@ -1691,6 +1714,8 @@ class VasPdaPick extends localize(i18next)(PageView) {
     try {
       const data = await ServiceUtil.restGet(`vas_trx/vas_orders/${orderId}/items`)
       this.orderItems = (data || []).map(item => {
+        // 재고 부족: 부족분을 채울 재고가 없어 부분 피킹 확정된 상태 (더 이상 피킹 대상 아님)
+        const isOutOfStock = item.status === 'OUT_OF_STOCK'
         const isPicked = item.pick_status === 'PICKED'
           || ['PICKED', 'IN_USE', 'COMPLETED'].includes(item.status)
           || (item.picked_qty > 0 && item.picked_qty >= (item.alloc_qty || item.req_qty))
@@ -1699,9 +1724,11 @@ class VasPdaPick extends localize(i18next)(PageView) {
           .split(',').filter(Boolean)
         return {
           ...item,
-          _picked: isPicked,
+          // 재고 부족 항목도 더 이상 피킹할 게 없으므로 활성 피킹 대상에서 제외한다
+          _picked: isPicked || isOutOfStock,
+          _outOfStock: isOutOfStock,
           _pickedQty: item.picked_qty || 0,
-          _scannedBarcodes: isPicked ? allBarcodes : []
+          _scannedBarcodes: (isPicked || isOutOfStock) ? allBarcodes : []
         }
       })
 

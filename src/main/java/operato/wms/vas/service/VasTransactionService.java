@@ -632,12 +632,23 @@ public class VasTransactionService extends AbstractQueryService {
 		// 5. 할당별 피킹 실적 기록 (stock_allocations.picked_qty)
 		this.recordAllocationPickedQty(item, picked);
 
-		// 6. 부족분 발생 시 → 신규 재할당 아이템(가변 레이어) 생성 + 자동 FEFO 재할당.
-		//    채울 재고가 전사적으로 없으면 allocateMaterial이 예외를 던지고,
-		//    본 트랜잭션 전체가 롤백되어 피킹이 확정되지 않는다("재고 소진" → 진행 차단).
+		// 6. 부족분 발생 시 처리 (현물이 할당보다 적음)
 		double shortage = allocQty - picked;
 		if (shortage > 0.0001) {
-			this.createReallocationItem(item, shortage);
+			// 원할당과 동일 (loc_cd, barcode)는 전산-실물 불일치 상태이므로 재할당 후보에서 제외한다.
+			List<String[]> excludeLocBarcodes = this.collectAllocLocBarcodes(item);
+			double reallocatable = this.sumAvailableForReallocation(item, excludeLocBarcodes);
+
+			if (reallocatable + 0.0001 >= shortage) {
+				// 6-1. 다른 재고로 부족분을 전량 채울 수 있음 → 신규 재할당 아이템 생성 + 자동 FEFO 재할당
+				this.createReallocationItem(item, shortage, excludeLocBarcodes);
+			} else {
+				// 6-2. 부족분을 채울 재고가 없음(재고 부족) → 피킹분은 그대로 확정하고 OUT_OF_STOCK로 표시.
+				//      상태가 PICKED가 아니므로 updateVasOrderStatus가 주문을 MATERIAL_READY로 전환하지 않아
+				//      해당 주문은 더 이상 진행되지 않는다(정체). 피킹 취소/재피킹은 이후 정상 동작한다.
+				item.setStatus(WmsVasConstants.ITEM_STATUS_OUT_OF_STOCK);
+				this.queryManager.update(item, "status");
+			}
 		}
 
 		// 7. 헤더 상태 자동 업데이트
@@ -683,7 +694,7 @@ public class VasTransactionService extends AbstractQueryService {
 	 * @param parent   원(불변) 자재 상세
 	 * @param shortage 부족 수량
 	 */
-	private void createReallocationItem(VasOrderItem parent, double shortage) {
+	private void createReallocationItem(VasOrderItem parent, double shortage, List<String[]> excludeLocBarcodes) {
 		VasOrderItem child = new VasOrderItem();
 		child.setDomainId(parent.getDomainId());
 		child.setVasOrderId(parent.getVasOrderId());
@@ -696,25 +707,75 @@ public class VasTransactionService extends AbstractQueryService {
 		child.setStatus(WmsVasConstants.ITEM_STATUS_PLANNED);
 		this.queryManager.insert(child); // beforeCreate에서 vas_seq 자동 채번
 
-		// 원(부모) 아이템이 할당받았던 (loc_cd, barcode) 목록 수집 → 재할당 후보에서 제외.
-		// 결품이 난 그 로케이션+바코드는 전산-실물 불일치 상태이므로 다시 채우면 재차 결품이 반복된다.
+		// 자동 FEFO 재할당 (srcLocCd=null → 자동배정). 원할당과 동일 loc_cd+barcode는 제외.
+		this.allocateMaterial(child.getId(), shortage, null, null, null, excludeLocBarcodes);
+	}
+
+	/**
+	 * 자재 상세에 걸린 HARD 할당의 (loc_cd, barcode) 목록 반환 — 재할당 시 제외 대상.
+	 * 결품이 난 로케이션+바코드는 전산-실물 불일치 상태라 다시 채우면 재차 결품이 반복되므로 제외한다.
+	 *
+	 * @param item 자재 상세
+	 * @return {loc_cd, barcode} 쌍 목록
+	 */
+	private List<String[]> collectAllocLocBarcodes(VasOrderItem item) {
 		String allocSql = "SELECT loc_cd, barcode FROM stock_allocations " +
 				"WHERE domain_id = :domainId AND shipment_order_item_id = :itemId " +
 				"AND alloc_type = :allocType AND status = :status";
 		@SuppressWarnings("unchecked")
-		List<Map<String, Object>> parentAllocs = (List<Map<String, Object>>) (List<?>) this.queryManager
+		List<Map<String, Object>> allocs = (List<Map<String, Object>>) (List<?>) this.queryManager
 				.selectListBySql(allocSql, ValueUtil.newMap("domainId,itemId,allocType,status",
-						parent.getDomainId(), parent.getId(),
+						item.getDomainId(), item.getId(),
 						StockAllocation.ALLOC_TYPE_VAS, StockAllocation.STATUS_HARD),
 						Map.class, 0, 0);
-		List<String[]> excludeLocBarcodes = new ArrayList<>();
-		for (Map<String, Object> a : parentAllocs) {
-			excludeLocBarcodes.add(new String[] {
-					(String) a.get("loc_cd"), (String) a.get("barcode") });
+		List<String[]> result = new ArrayList<>();
+		for (Map<String, Object> a : allocs) {
+			result.add(new String[] { (String) a.get("loc_cd"), (String) a.get("barcode") });
 		}
+		return result;
+	}
 
-		// 자동 FEFO 재할당 (srcLocCd=null → 자동배정). 원할당과 동일 loc_cd+barcode는 제외.
-		this.allocateMaterial(child.getId(), shortage, null, null, null, excludeLocBarcodes);
+	/**
+	 * 재할당 가능한 가용 재고 합계 반환 — 자재 상세 SKU에 대해 원할당(loc+barcode)을 제외한
+	 * PICKABLE·STORED·미삭제 재고의 (inv_qty - reserved_qty) 합. 부족분 재할당 가능 여부 판정에 사용.
+	 *
+	 * @param item               자재 상세
+	 * @param excludeLocBarcodes 제외할 (loc_cd, barcode) 쌍 목록
+	 * @return 재할당 가능한 가용 수량 합계
+	 */
+	private double sumAvailableForReallocation(VasOrderItem item, List<String[]> excludeLocBarcodes) {
+		VasOrder order = this.queryManager.select(VasOrder.class, item.getVasOrderId());
+		if (order == null) {
+			return 0.0;
+		}
+		StringBuilder excl = new StringBuilder();
+		if (excludeLocBarcodes != null) {
+			for (int ei = 0; ei < excludeLocBarcodes.size(); ei++) {
+				excl.append(" AND NOT (i.loc_cd = :exclLoc").append(ei)
+						.append(" AND i.barcode = :exclBcd").append(ei).append(")");
+			}
+		}
+		String sql = "SELECT COALESCE(SUM(i.inv_qty - COALESCE(i.reserved_qty, 0)), 0) FROM inventories i " +
+				"JOIN locations l ON l.loc_cd = i.loc_cd AND l.domain_id = i.domain_id AND l.wh_cd = i.wh_cd " +
+				"WHERE i.domain_id = :domainId AND i.com_cd = :comCd AND i.sku_cd = :skuCd " +
+				"AND i.status = :status AND (i.del_flag IS NULL OR i.del_flag = false) " +
+				"AND (i.inv_qty - COALESCE(i.reserved_qty, 0)) > 0 " +
+				"AND l.loc_type = 'PICKABLE' AND (l.del_flag IS NULL OR l.del_flag = false)" +
+				excl.toString();
+		Map<String, Object> params = ValueUtil.newMap("domainId,comCd,skuCd,status",
+				item.getDomainId(), order.getComCd(), item.getSkuCd(), Inventory.STATUS_STORED);
+		if (ValueUtil.isNotEmpty(order.getWhCd())) {
+			sql = sql.replace("AND i.status = :status", "AND i.wh_cd = :whCd AND i.status = :status");
+			params.put("whCd", order.getWhCd());
+		}
+		if (excludeLocBarcodes != null) {
+			for (int ei = 0; ei < excludeLocBarcodes.size(); ei++) {
+				params.put("exclLoc" + ei, excludeLocBarcodes.get(ei)[0]);
+				params.put("exclBcd" + ei, excludeLocBarcodes.get(ei)[1]);
+			}
+		}
+		Double sum = this.queryManager.selectBySql(sql, params, Double.class);
+		return sum != null ? sum : 0.0;
 	}
 
 	/**
@@ -732,7 +793,9 @@ public class VasTransactionService extends AbstractQueryService {
 		if (item == null) {
 			throw new ElidomValidationException("작업 지시 상세를 찾을 수 없습니다. ID: " + vasOrderItemId);
 		}
-		if (!WmsVasConstants.ITEM_STATUS_PICKED.equals(item.getStatus())) {
+		// PICKED 또는 OUT_OF_STOCK(재고 부족으로 부분 피킹 확정된) 상태만 취소 가능
+		if (!WmsVasConstants.ITEM_STATUS_PICKED.equals(item.getStatus())
+				&& !WmsVasConstants.ITEM_STATUS_OUT_OF_STOCK.equals(item.getStatus())) {
 			throw new ElidomValidationException("피킹 취소 가능한 상태가 아닙니다. 현재 상태: " + item.getStatus());
 		}
 

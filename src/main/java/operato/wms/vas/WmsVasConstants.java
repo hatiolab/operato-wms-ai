@@ -88,6 +88,15 @@ public class WmsVasConstants {
 	 */
 	public static final String ITEM_STATUS_COMPLETED = "COMPLETED";
 
+	/**
+	 * 상세 상태: 재고 부족
+	 *
+	 * 부족 피킹(현물 < 할당) 발생 후 부족분을 채울 재고가 다른 어디에도 없을 때 지정된다.
+	 * 피킹분은 그대로 확정되지만 이 상태는 PICKED가 아니므로 주문 헤더가 MATERIAL_READY로
+	 * 전환되지 않아 작업 진행이 정체된다(관리자 개입 필요). 피킹 취소/재피킹에는 영향을 주지 않는다.
+	 */
+	public static final String ITEM_STATUS_OUT_OF_STOCK = "OUT_OF_STOCK";
+
 	// ========== 유통가공 유형 (vas_orders.vas_type, vas_boms.vas_type) ==========
 
 	/**
