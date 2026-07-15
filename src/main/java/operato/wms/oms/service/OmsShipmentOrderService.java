@@ -500,7 +500,7 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 		// 보관 정책에서 B2B / B2C 용 출고 대기 로케이션 설정 조회
 		StoragePolicy policy = this.wmsBaseService.findStoragePolicy(domainId, order.getComCd(), order.getWhCd());
 		String waitShipLocCd = policy == null ? null
-				: (ValueUtil.isEqualIgnoreCase(order.getShipByDate(), "B2C_OUT") ? policy.getB2cWaitShipLoc()
+				: (ValueUtil.isEqualIgnoreCase(order.getBizType(), "B2C_OUT") ? policy.getB2cWaitShipLoc()
 						: policy.getB2bWaitShipLoc());
 
 		for (StockAllocation alloc : allocations) {
