@@ -9,7 +9,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import operato.wms.base.entity.StoragePolicy;
 import operato.wms.base.service.RuntimeConfigService;
+import operato.wms.base.service.WmsBaseService;
 import operato.wms.fulfillment.WmsFulfillmentConfigConstants;
 import operato.wms.fulfillment.entity.PackingOrder;
 import operato.wms.fulfillment.entity.PackingOrderItem;
@@ -44,30 +46,15 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 	@Autowired
 	private ICustomService customSvc;
 	/**
+	 * WMS 기본 서비스
+	 */
+	@Autowired
+	protected WmsBaseService wmsBaseSvc;
+	/**
 	 * Picking Transaction Service
 	 */
 	@Autowired
 	private FulfillmentPickingService pickingService;
-	/**
-	 * Packing Transaction Service
-	 */
-	// @Autowired
-	// private FulfillmentPackingService packingService;
-	/**
-	 * Shipping Transaction Service
-	 */
-	// @Autowired
-	// private FulfillmentShippingService shippingService;
-	/**
-	 * Dashboard Service
-	 */
-	// @Autowired
-	// private FulfillmentDashboardService dashboardService;
-	/**
-	 * 환경설정 서비스 (창고-화주사 별 설정 조회)
-	 */
-	@Autowired
-	private RuntimeConfigService runtimeConfSvc;
 
 	/**
 	 * 피킹 지시 생성 (OMS 웨이브 릴리스에서 호출)
@@ -869,11 +856,11 @@ public class FulfillmentTransactionService extends AbstractQueryService {
 			Boolean flag = this.queryManager.selectBySql(waveSql, waveParams, Boolean.class);
 			inspFlag = flag != null && flag;
 		} else {
-			// 직접 피킹(wave_no = null) — 창고-화주사 설정에서 포장 자동 생성 여부 조회
-			String configVal = this.runtimeConfSvc.getRuntimeConfigValue(
-					task.getComCd(), task.getWhCd(),
-					WmsFulfillmentConfigConstants.DIRECT_PICKING_INSP_FLAG);
-			inspFlag = ValueUtil.toBoolean(configVal, false);
+			// 직접 피킹(wave_no = null) — 보관 피킹 정책 설정에서 가져옴
+			StoragePolicy policy = this.wmsBaseSvc.findStoragePolicy(domainId, task.getComCd(), task.getWhCd());
+			if (policy != null) {
+				inspFlag = policy.getB2bInspFlag() == null ? false : policy.getB2bInspFlag();
+			}
 		}
 
 		// 4. insp_flag가 true이면 포장 지시 자동 생성

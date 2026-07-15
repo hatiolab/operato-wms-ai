@@ -41,11 +41,6 @@ import xyz.elidom.util.ValueUtil;
 @Component
 public class FulfillmentPickingService extends AbstractQueryService {
 	/**
-	 * 화주사 - 창고별 설정 조회 서비스
-	 */
-	@Autowired
-	protected RuntimeConfigService runtimeConfSvc;
-	/**
 	 * WMS 기본 서비스
 	 */
 	@Autowired

@@ -212,6 +212,13 @@ public class StoragePolicy extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 	private String b2bWaitShipLoc;
 
 	/**
+	 * B2B 출고 검수 여부 - true이면 B2B 피킹 완료 후 검수(포장 지시) 단계를 거침.
+	 * false이면 피킹 완료 즉시 출고 처리
+	 */
+	@Column(name = "b2b_insp_flag")
+	private Boolean b2bInspFlag = false;
+
+	/**
 	 * B2C 출고 후 대기 로케이션 - B2C 출고 완료 후 출고 대기 재고를 임시 보관할 로케이션 코드
 	 */
 	@Column(name = "b2c_wait_ship_loc", length = 20)
@@ -427,6 +434,14 @@ public class StoragePolicy extends xyz.elidom.orm.entity.basic.ElidomStampHook {
 
 	public void setB2cWaveGroupBy(String b2cWaveGroupBy) {
 		this.b2cWaveGroupBy = b2cWaveGroupBy;
+	}
+
+	public Boolean getB2bInspFlag() {
+		return b2bInspFlag;
+	}
+
+	public void setB2bInspFlag(Boolean b2bInspFlag) {
+		this.b2bInspFlag = b2bInspFlag;
 	}
 
 	public String getB2bWaitShipLoc() {
