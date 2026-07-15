@@ -38,6 +38,8 @@ export class PdaStockInquiry extends connect(store)(PageView) {
   @state() searchLocCd = ''
   /** 검색 조건: 상품 코드 또는 상품 바코드 */
   @state() searchSkuCd = ''
+  /** 마지막 조회에 실제 사용한 조건 스냅샷 (목록 복귀 시 재조회용) */
+  _lastSearchConditions = null
   /** 목록 로딩 중 */
   @state() loading = false
   /** API 처리 중 */
@@ -1690,6 +1692,10 @@ export class PdaStockInquiry extends connect(store)(PageView) {
       return
     }
 
+    // 목록 복귀 시 최신 재고 재조회를 위해 실제 조회 조건을 스냅샷으로 보관한다.
+    // (바코드 검색은 연속 스캔 대응으로 searchBarcode를 즉시 비우므로, 조건을 따로 저장해야 한다)
+    this._lastSearchConditions = conditions.length > 1 ? [...conditions] : null
+
     this.loading = true
     this.lastFeedback = null
     try {
@@ -2350,9 +2356,30 @@ export class PdaStockInquiry extends connect(store)(PageView) {
     this.historyItems = []
     this.lastFeedback = null
 
-    // 검색 조건이 있으면 처리 후 최신 재고로 갱신 (조건이 없으면 조회하지 않음)
-    if (this.searchBarcode || this.searchLocCd || this.searchSkuCd) {
-      this._search()
+    // 마지막 조회 조건으로 최신 재고를 재조회한다.
+    // (바코드는 검색 직후 비워지므로 this.search* 대신 스냅샷 조건을 사용해야 재조회가 동작한다)
+    this._refreshList()
+  }
+
+  /**
+   * 마지막 조회 조건(_lastSearchConditions) 스냅샷으로 재고 목록 재조회
+   */
+  async _refreshList() {
+    if (!this._lastSearchConditions) {
+      return
+    }
+    this.loading = true
+    try {
+      const query = JSON.stringify(this._lastSearchConditions)
+      const sort = JSON.stringify([{ name: 'created_at', desc: true }])
+      const result = await ServiceUtil.restGet(
+        `inventories?query=${encodeURIComponent(query)}&sort=${encodeURIComponent(sort)}&limit=100`
+      )
+      this.inventories = result?.items || result || []
+    } catch (error) {
+      this._updateErrorFeedback(error.message || '재고 재조회에 실패했습니다')
+    } finally {
+      this.loading = false
     }
   }
 
