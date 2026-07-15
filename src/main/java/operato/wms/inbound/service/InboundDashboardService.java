@@ -235,7 +235,7 @@ public class InboundDashboardService extends AbstractQueryService {
         Long domainId = Domain.currentDomainId();
         String today = DateUtil.todayStr();
 
-        // 1. 지연 입고 알림: rcv_req_date < today AND status != 'END' AND status != 'CANCEL'
+        // 1. 지연 입고 알림: rcv_req_date < today AND status != 'END' AND status != 'STORED' AND status != 'CANCEL'
         String sql1 = "SELECT COUNT(*) as count " +
                 "FROM receivings " +
                 "WHERE domain_id = :domainId " +
@@ -245,6 +245,7 @@ public class InboundDashboardService extends AbstractQueryService {
         Map<String, Object> params1 = ValueUtil.newMap("domainId,today", domainId, today);
         params1.put("completedStatuses", java.util.Arrays.asList(
                 WmsInboundConstants.STATUS_END,
+                WmsInboundConstants.STATUS_STORED,
                 WmsInboundConstants.STATUS_CANCEL));
 
         if (ValueUtil.isNotEmpty(comCd)) {

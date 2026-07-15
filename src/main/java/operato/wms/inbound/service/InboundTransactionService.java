@@ -98,9 +98,17 @@ public class InboundTransactionService extends AbstractQueryService {
                 throw new ElidomRuntimeException("SKU [" + order.getSkuCd() + "]의 예정수량은 0보다 커야 합니다.");
             }
 
+            // 날짜 필드 정규화 — 엑셀 날짜 셀이 "yyyy-MM-dd HH:mm:ss" 등으로 넘어와
+            // rcv_req_date/rcv_exp_date(varchar 10)를 초과하는 것을 방지
+            order.setRcvReqDate(this.normalizeDateStr(order.getRcvReqDate()));
+            order.setRcvExpDate(this.normalizeDateStr(order.getRcvExpDate()));
+
             // 요청일이 없다면 오늘 날짜로 입력
             if (ValueUtil.isEmpty(order.getRcvExpDate())) {
                 order.setRcvExpDate(DateUtil.todayStr());
+            }
+            if (ValueUtil.isEmpty(order.getRcvReqDate())) {
+                order.setRcvReqDate(order.getRcvExpDate());
             }
             // 요청 유형이 없다면 일반 입고
             if (ValueUtil.isEmpty(order.getRcvType())) {
@@ -136,6 +144,46 @@ public class InboundTransactionService extends AbstractQueryService {
 
         // 후처리 커스텀 서비스 호환을 위해 대표(첫) 입고주문을 리턴
         return firstRo;
+    }
+
+    /**
+     * 날짜 문자열을 yyyy-MM-dd(10자)로 정규화.
+     * 엑셀 날짜 셀이 "yyyy-MM-dd HH:mm:ss", "yyyy-MM-ddT..", "yyyy/M/d",
+     * JS Date.toString() 형식("Tue Jul 14 2026 09:00:00 GMT+0900 ...") 등으로 넘어와도
+     * 실제 날짜를 파싱하여 yyyy-MM-dd 로 변환한다. (varchar(10) 초과 방지)
+     *
+     * @param val 원본 날짜 문자열
+     * @return 정규화된 yyyy-MM-dd (파싱 불가 시 원본 유지, 명백한 초과만 절단)
+     */
+    private String normalizeDateStr(String val) {
+        if (ValueUtil.isEmpty(val)) {
+            return val;
+        }
+        String s = val.trim();
+        // 이미 yyyy-MM-dd 형식이면 그대로
+        if (s.matches("^\\d{4}-\\d{2}-\\d{2}$")) {
+            return s;
+        }
+        // yyyy-MM-dd / yyyy/MM/dd / yyyy.MM.dd 로 시작(뒤에 시분초 등) → 앞 날짜만 추출
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("^(\\d{4})[-/.](\\d{1,2})[-/.](\\d{1,2})").matcher(s);
+        if (m.find()) {
+            return String.format("%s-%02d-%02d",
+                    m.group(1), Integer.parseInt(m.group(2)), Integer.parseInt(m.group(3)));
+        }
+        // JS Date.toString() 등 다양한 형식 파싱 시도 (앞부분만 소비, 뒤는 무시)
+        String[] patterns = { "EEE MMM dd yyyy", "EEE MMM d yyyy", "MMM dd yyyy", "MM/dd/yyyy" };
+        for (String p : patterns) {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(p, java.util.Locale.ENGLISH);
+            sdf.setLenient(false);
+            java.text.ParsePosition pos = new java.text.ParsePosition(0);
+            java.util.Date d = sdf.parse(s, pos);
+            if (d != null && pos.getIndex() > 0) {
+                return new java.text.SimpleDateFormat("yyyy-MM-dd").format(d);
+            }
+        }
+        // 파싱 불가 — 잘못된 절단으로 쓰레기 값을 만들지 않도록 원본을 그대로 둔다.
+        return s;
     }
 
     /**
@@ -262,7 +310,9 @@ public class InboundTransactionService extends AbstractQueryService {
 
             // 3. 입고주문(Receiving) 생성 - rcv_no는 beforeCreate에서 자동 채번, status는 INWORK
             Receiving receiving = new Receiving();
-            receiving.setWhCd(ss.getWhCd());
+            // 실제 물리 입고 창고는 WH001 하나로 고정 (공급처 입고예정의 WH002는 공급처 가상창고이며 보관정책이 없음)
+            // TODO: 창고가 늘어나면 하드코딩 대신 보관정책/설정 기반으로 승격 필요
+            receiving.setWhCd("WH001");
             receiving.setComCd(ss.getComCd());
             receiving.setVendCd(ss.getVendCd());
             // 입고유형: 일반입고 공통코드 값 "1" (RECEIVING_TYPE_NORMAL 상수는 "NORMAL"이 아님에 주의)
@@ -283,7 +333,9 @@ public class InboundTransactionService extends AbstractQueryService {
             item.setBarcode(ss.getBarcode());
             item.setLotNo(ss.getLotNo());
             item.setExpiredDate(ss.getExpiredDate());
-            item.setLocCd(ss.getLocCd());
+            // 로케이션은 비움 - 공급처 입고예정의 VND-LOCATION은 WH002 전용이라 WH001 입고주문에 부적합.
+            // 실제 로케이션은 적치 단계에서 WH001 로케이션으로 지정한다.
+            item.setLocCd(null);
             this.queryManager.insert(item);
 
             // 5. 공급처 입고예정 갱신 - 오더 생성 표시 (order_flag/rcv_no/ordered_at)
@@ -969,6 +1021,10 @@ public class InboundTransactionService extends AbstractQueryService {
                     WmsInboundConstants.STATUS_START);
         }
 
+        // 1-1. 상품 입고 취소로 인해 이 라인으로 생성됐던 재고(inventories)를 논리 삭제 처리(del_flag=true).
+        //      (아래에서 receiving_item의 barcode가 초기화/삭제되기 전에 먼저 수행)
+        this.markInventoryDeletedByReceivingItem(receiving, item);
+
         // 2. 입고 예정 상태 변경
         receiving.setStatus(WmsInboundConstants.STATUS_START);
         this.queryManager.update(receiving, "status", "updatedAt");
@@ -1013,8 +1069,36 @@ public class InboundTransactionService extends AbstractQueryService {
     }
 
     /**
+     * 상품 입고 취소 시, 해당 입고 라인으로 생성됐던 재고(inventories)를 논리 삭제 처리(del_flag=true).
+     *
+     * 입고 완료 시 재고는 골든스레드 barcode로 생성되므로, 같은 barcode의 재고를 찾아 del_flag를 true로 설정한다.
+     * (물리 삭제가 아닌 논리 삭제 — 이력/추적 보존)
+     *
+     * @param receiving 입고 예정(헤더)
+     * @param item      취소 대상 입고 라인
+     */
+    private void markInventoryDeletedByReceivingItem(Receiving receiving, ReceivingItem item) {
+        if (ValueUtil.isEmpty(item.getBarcode())) {
+            return;
+        }
+
+        String sql = "SELECT * FROM inventories " +
+                "WHERE domain_id = :domainId AND barcode = :barcode " +
+                "AND (del_flag IS NULL OR del_flag = false)";
+        List<Inventory> inventories = this.queryManager.selectListBySql(sql,
+                ValueUtil.newMap("domainId,barcode", receiving.getDomainId(), item.getBarcode()),
+                Inventory.class, 0, 0);
+
+        for (Inventory inv : inventories) {
+            inv.setDelFlag(true);
+            inv.setUpdatedAt(new Date());
+            this.queryManager.update(inv, "delFlag", "updatedAt");
+        }
+    }
+
+    /**
      * 입고 작업 항목 별로 재고 생성
-     * 
+     *
      * @param receiving
      * @param item
      * @return
@@ -1200,8 +1284,9 @@ public class InboundTransactionService extends AbstractQueryService {
             throw new ElidomRuntimeException("입고 주문 번호 [" + rcvNo + "]로 입고 주문을 찾을 수 없습니다.");
         }
 
-        // 2. 입고 예정 정보 상태 체크
-        if (ValueUtil.isEqual(rcv.getStatus(), WmsInboundConstants.STATUS_END)) {
+        // 2. 입고 예정 정보 상태 체크 (입고완료/적치완료 상태면 더 이상 작업할 항목 없음)
+        if (ValueUtil.isEqual(rcv.getStatus(), WmsInboundConstants.STATUS_END)
+                || ValueUtil.isEqual(rcv.getStatus(), WmsInboundConstants.STATUS_STORED)) {
             return new ArrayList<ReceivingItem>(1);
         }
 
@@ -1416,7 +1501,7 @@ public class InboundTransactionService extends AbstractQueryService {
      * 다음 입고 주문을 반환한다.
      * <ul>
      * <li>대기/작업중: 상태가 APPROVED·PUTAWAY 이고 적치 대기(WAITING) 1건 이상</li>
-     * <li>완료: 상태가 END 이고 당일(rcv_end_date) 적치 완료되어 전 항목 STORED</li>
+     * <li>완료: 상태가 STORED(적치완료) 이고 당일(rcv_end_date) 적치 완료되어 전 항목 STORED</li>
      * </ul>
      * 각 입고 건마다 적치 진행 상태(putaway_status)를 재고 건수 기준으로 산출한다.
      * <ul>
@@ -1445,13 +1530,13 @@ public class InboundTransactionService extends AbstractQueryService {
                 " WHERE r.domain_id = :domainId" +
                 " AND (i.del_flag IS NULL OR i.del_flag = false)" +
                 " AND i.status IN ('WAITING', 'STORED')" +
-                " AND r.status IN ('APPROVED', 'PUTAWAY', 'END')" +
-                " AND (r.status <> 'END' OR r.rcv_end_date = :today)" +
+                " AND r.status IN ('APPROVED', 'PUTAWAY', 'STORED')" +
+                " AND (r.status <> 'STORED' OR r.rcv_end_date = :today)" +
                 " GROUP BY r.rcv_no, r.rcv_req_date, r.com_cd, r.vend_cd, r.status" +
                 " HAVING (" +
                 "    (r.status IN ('APPROVED', 'PUTAWAY')" +
                 "     AND COUNT(CASE WHEN i.status = 'WAITING' THEN 1 END) > 0)" +
-                "    OR (r.status = 'END'" +
+                "    OR (r.status = 'STORED'" +
                 "        AND COUNT(CASE WHEN i.status = 'WAITING' THEN 1 END) = 0" +
                 "        AND COUNT(CASE WHEN i.status = 'STORED' THEN 1 END) > 0)" +
                 " )" +
@@ -1747,8 +1832,8 @@ public class InboundTransactionService extends AbstractQueryService {
             throw new ElidomRuntimeException("입고 주문 번호 [" + rcvNo + "]로 입고 주문을 찾을 수 없습니다.");
         }
 
-        // 2. 이미 완료 상태이면 그대로 반환
-        if (ValueUtil.isEqual(rcv.getStatus(), WmsInboundConstants.STATUS_END)) {
+        // 2. 이미 적치완료 상태이면 그대로 반환 (멱등 처리)
+        if (ValueUtil.isEqual(rcv.getStatus(), WmsInboundConstants.STATUS_STORED)) {
             return rcv;
         }
 
@@ -1757,8 +1842,9 @@ public class InboundTransactionService extends AbstractQueryService {
             throw new ElidomRuntimeException("적치 완료 처리가 가능한 상태가 아닙니다. 현재 상태: " + rcv.getStatus());
         }
 
-        // 4. 입고 주문 상태를 END로 변경
-        rcv.setStatus(WmsInboundConstants.STATUS_END);
+        // 4. 입고 주문 상태를 적치완료(STORED)로 변경
+        //    (입고완료(END)는 검수승인 전 단계이며, 적치까지 끝난 상태는 별도 상태값으로 구분한다)
+        rcv.setStatus(WmsInboundConstants.STATUS_STORED);
         rcv.setRcvEndDate(DateUtil.todayStr());
         this.queryManager.update(rcv, "status", "rcvEndDate", "updatedAt");
 

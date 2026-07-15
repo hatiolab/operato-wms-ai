@@ -813,18 +813,29 @@ class ReceivingOrderImportPopup extends LitElement {
       return `${y}-${m}-${d}`
     }
     if (typeof val === 'string') {
+      const s = val.trim()
       // 이미 YYYY-MM-DD 형식이면 그대로
-      if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val
-      // Date.toString() 형식만 변환 (요일 약어로 시작: "Mon Tue Wed Thu Fri Sat Sun")
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+      // YYYY-MM-DD / YYYY/MM/DD / YYYY.MM.DD 로 시작 (뒤에 시분초 등이 붙은 경우 포함)
+      // 예: "2026-07-14 00:00:00", "2026-07-14T00:00:00.000Z", "2026/7/4"
+      // → 앞쪽 날짜만 추출하여 varchar(10) 초과 방지
+      const m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+      if (m) {
+        const y = m[1]
+        const mo = String(m[2]).padStart(2, '0')
+        const d = String(m[3]).padStart(2, '0')
+        return `${y}-${mo}-${d}`
+      }
+      // Date.toString() 형식 변환 (요일 약어로 시작: "Mon Tue Wed Thu Fri Sat Sun")
       // 예: "Tue May 19 2026 09:00:00 GMT+0900 (한국 표준시)"
       // "1", "GRAIN_ON" 같은 일반 값은 이 조건에 해당하지 않아 안전
-      if (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s/.test(val)) {
-        const parsed = new Date(val)
+      if (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s/.test(s)) {
+        const parsed = new Date(s)
         if (!isNaN(parsed.getTime())) {
           const y = parsed.getFullYear()
-          const m = String(parsed.getMonth() + 1).padStart(2, '0')
+          const mo = String(parsed.getMonth() + 1).padStart(2, '0')
           const d = String(parsed.getDate()).padStart(2, '0')
-          return `${y}-${m}-${d}`
+          return `${y}-${mo}-${d}`
         }
       }
     }
