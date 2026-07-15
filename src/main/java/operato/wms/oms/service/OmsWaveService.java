@@ -881,12 +881,22 @@ public class OmsWaveService extends AbstractQueryService {
 			throw new ElidomValidationException("웨이브 상태가 [" + wave.getStatus() + "]이므로 마감할 수 없습니다 (RELEASED 상태만 가능)");
 		}
 
-		// 3. 웨이브 상태, 완료 일시 업데이트
+		// 3. 미마감 주문 검증 — 프론트 호출 성공 여부가 아니라 실제 주문 상태를 기준으로 판정한다.
+		//    웨이브 내 주문이 모두 마감(CLOSED)/취소(CANCELLED)된 경우에만 완료 처리 가능하다.
+		String openSql = "SELECT COUNT(*) FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo AND status NOT IN ('CLOSED', 'CANCELLED')";
+		int openOrderCount = this.queryManager.selectBySql(openSql,
+				ValueUtil.newMap("domainId,waveNo", domainId, wave.getWaveNo()), Integer.class);
+		if (openOrderCount > 0) {
+			throw new ElidomValidationException(
+					"아직 마감되지 않은 주문이 " + openOrderCount + "건 있습니다. 모든 주문 마감 후 웨이브를 완료할 수 있습니다.");
+		}
+
+		// 4. 웨이브 상태, 완료 일시 업데이트 (completedAt 포함하여 저장)
 		wave.setStatus(ShipmentWave.STATUS_COMPLETED);
 		wave.setCompletedAt(DateUtil.currentTimeStr());
-		this.queryManager.update(wave, "status", "updatedAt", "updaterId");
+		this.queryManager.update(wave, "status", "completedAt", "updatedAt", "updaterId");
 
-		// 4. 웨이브 내 주문 중 완료 처리된 주문 수 조회
+		// 5. 웨이브 내 주문 중 완료 처리된 주문 수 조회
 		String sql = "SELECT COUNT(*) FROM shipment_orders WHERE domain_id = :domainId AND wave_no = :waveNo AND status = :status";
 		Map<String, Object> params = ValueUtil.newMap("domainId,waveNo,status", domainId, wave.getWaveNo(),
 				ShipmentOrder.STATUS_CLOSED);

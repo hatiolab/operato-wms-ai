@@ -1004,9 +1004,35 @@ class WaveClosingPopup extends localize(i18next)(LitElement) {
       `주문 마감 완료 — 성공: ${successCnt}건, 오류: ${errorCnt}건`
     )
 
-    // 모든 주문이 마감 완료되면 웨이브 마감 처리
+    // 백엔드 실제 주문 상태로 재동기화 — 응답 오류로 프론트 상태가 어긋나도(백엔드는 마감됨)
+    // 실제 상태를 기준으로 완료 여부를 판정한다.
+    await this._syncOrderStatuses()
+
+    // 모든 주문이 (실제로) 마감 완료되면 웨이브 마감 처리
     if (this._allClosed) {
       await this._closeWave()
+    }
+  }
+
+  /** 백엔드 실제 주문 상태 재동기화 — 프론트 호출 성공 여부가 아닌 실제 status 기준으로 보정 */
+  async _syncOrderStatuses() {
+    try {
+      const data = await ServiceUtil.restGet(`oms_trx/waves/${this.waveId}/orders`)
+      const prev = this._ordersMap
+      const items = (data || []).map(o => {
+        const p = prev?.get(o.id)
+        return {
+          ...o,
+          // 실제로 CLOSED면 CLOSED, 아니면 직전 에러 표시는 유지
+          _closeStatus: o.status === 'CLOSED' ? 'CLOSED' : (p?._closeStatus === 'ERROR' ? 'ERROR' : null),
+          _closeError: o.status === 'CLOSED' ? null : (p?._closeError || null)
+        }
+      })
+      this.orders = items
+      this._ordersMap = new Map(items.map(o => [o.id, o]))
+      this._tick++
+    } catch (e) {
+      console.error('주문 상태 재동기화 실패:', e)
     }
   }
 
