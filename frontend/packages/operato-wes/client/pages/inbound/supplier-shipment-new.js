@@ -277,7 +277,8 @@ class SupplierShipmentNew extends localize(i18next)(LitElement) {
 
   constructor() {
     super()
-    this.header = { vendCd: '', comCd: '', whCd: '', locCd: '' }
+    // 창고/로케이션은 공급처 입고 특성상 WH002 / VND-LOCATION 으로 고정 (변경 불가)
+    this.header = { vendCd: '', comCd: '', whCd: 'WH002', locCd: 'VND-LOCATION' }
     this.items = []
     this.vendors = []
     this.companies = []
@@ -297,6 +298,8 @@ class SupplierShipmentNew extends localize(i18next)(LitElement) {
     this._fetchVendors()
     this._fetchCompanies()
     this._fetchWarehouses()
+    // 창고가 WH002로 고정이므로 해당 창고의 로케이션 목록을 미리 로드 (VND-LOCATION 표시용)
+    this._fetchLocations(this.header.whCd)
   }
 
   /** 화면 렌더링 — 공통 헤더 + 상품 표시형 그리드 + 푸터 */
@@ -321,16 +324,14 @@ class SupplierShipmentNew extends localize(i18next)(LitElement) {
           </div>
           <div class="form-field">
             <label>창고 <span class="required">*</span></label>
-            <select .value="${this.header.whCd}" @change="${e => this._onWarehouseChange(e.target.value)}">
-              <option value="">선택</option>
+            <select .value="${this.header.whCd}" disabled>
               ${this.warehouses.map(w => html`<option value="${w.wh_cd}" ?selected="${this.header.whCd === w.wh_cd}">${w.wh_cd} - ${w.wh_nm || w.wh_cd}</option>`)}
             </select>
           </div>
           <div class="form-field">
             <label>로케이션</label>
-            <select .value="${this.header.locCd}" ?disabled="${!this.header.whCd}" @change="${e => this._updateHeader('locCd', e.target.value)}">
-              <option value="">선택</option>
-              ${this.locations.map(l => html`<option value="${l.loc_cd}" ?selected="${this.header.locCd === l.loc_cd}">${l.loc_cd}</option>`)}
+            <select disabled>
+              <option value="${this.header.locCd}" selected>${this.header.locCd}</option>
             </select>
           </div>
         </div>
@@ -469,8 +470,15 @@ class SupplierShipmentNew extends localize(i18next)(LitElement) {
    * 상품 입력 서브팝업 열기 — 작성 후 추가하면 그리드에 행 추가
    */
   _openAddItemPopup() {
+    // 공급처 미선택 시 상품 추가 불가 (SKU 검색이 선택된 공급처 기준으로 필터링되므로)
+    if (!this.header.vendCd) {
+      UiUtil.showToast('warning', '공급처를 먼저 선택해주세요')
+      return
+    }
     const element = document.createElement('supplier-shipment-item-new')
     element.comCd = this.header.comCd || ''
+    // 선택한 공급처를 서브팝업에 전달 → SKU 검색 팝업으로 이어져 공급처 기준 필터링
+    element.vendCd = this.header.vendCd || ''
     element.addEventListener('item-added', e => {
       this.items = [...this.items, e.detail.item]
     })
@@ -766,6 +774,7 @@ class SupplierShipmentItemNew extends localize(i18next)(LitElement) {
   static get properties() {
     return {
       comCd: String,
+      vendCd: String,
       item: Object
     }
   }
@@ -773,6 +782,7 @@ class SupplierShipmentItemNew extends localize(i18next)(LitElement) {
   constructor() {
     super()
     this.comCd = ''
+    this.vendCd = ''
     this.item = { skuCd: '', skuNm: '', expQty: '', expiredDate: '', lotNo: '', eta: '', boxInQty: '', pltInQty: '', remarks: '' }
   }
 
@@ -867,6 +877,8 @@ class SupplierShipmentItemNew extends localize(i18next)(LitElement) {
   _openSkuSearch() {
     const element = document.createElement('rwa-sku-search-popup')
     if (this.comCd) element.comCd = this.comCd
+    // 공급처를 SKU 검색 팝업에 전달하여 해당 공급처의 상품만 필터링
+    if (this.vendCd) element.vendCd = this.vendCd
     element.addEventListener('sku-selected', e => {
       const sku = e.detail.sku
       this.item = { ...this.item, skuCd: sku.sku_cd || '', skuNm: sku.sku_nm || '' }

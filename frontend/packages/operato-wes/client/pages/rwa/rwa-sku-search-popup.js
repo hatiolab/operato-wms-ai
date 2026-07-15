@@ -161,6 +161,7 @@ class RwaSkuSearchPopup extends localize(i18next)(LitElement) {
   static get properties() {
     return {
       comCd: String,
+      vendCd: String,
       skus: Array,
       loading: Boolean,
       keyword: String,
@@ -172,6 +173,7 @@ class RwaSkuSearchPopup extends localize(i18next)(LitElement) {
   constructor() {
     super()
     this.comCd = ''
+    this.vendCd = ''
     this.skus = []
     this.loading = false
     this.keyword = ''
@@ -284,6 +286,10 @@ class RwaSkuSearchPopup extends localize(i18next)(LitElement) {
       }
       if (this.comCd) {
         params.push(`com_cd=${encodeURIComponent(this.comCd)}`)
+      }
+      // 공급처 코드가 전달되면 상품마스터를 해당 공급처로 필터링
+      if (this.vendCd) {
+        params.push(`vend_cd=${encodeURIComponent(this.vendCd)}`)
       }
 
       const data = await ServiceUtil.restGet(`rwa_trx/sku/search?${params.join('&')}`)

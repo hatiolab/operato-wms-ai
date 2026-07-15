@@ -1551,9 +1551,9 @@ public class RwaTransactionService extends AbstractQueryService {
 	 * @param limit   페이지 크기
 	 * @return { items: [...], total: N }
 	 */
-	public Map<String, Object> searchSku(String keyword, String comCd, int page, int limit) {
+	public Map<String, Object> searchSku(String keyword, String comCd, String vendCd, int page, int limit) {
 		StringBuilder sql = new StringBuilder(
-				"SELECT sku_cd, sku_nm, sku_barcd, com_cd " +
+				"SELECT sku_cd, sku_nm, sku_barcd, com_cd, vend_cd " +
 				"FROM sku " +
 				"WHERE domain_id = :domainId " +
 				"AND del_flag = false"
@@ -1570,6 +1570,12 @@ public class RwaTransactionService extends AbstractQueryService {
 		if (ValueUtil.isNotEmpty(comCd)) {
 			sql.append(" AND com_cd = :comCd");
 			params.put("comCd", comCd);
+		}
+
+		// 공급처(vend_cd) 필터 (optional) - 공급처 입고예정 SKU 검색에서 사용
+		if (ValueUtil.isNotEmpty(vendCd)) {
+			sql.append(" AND vend_cd = :vendCd");
+			params.put("vendCd", vendCd);
 		}
 
 		// 전체 건수
