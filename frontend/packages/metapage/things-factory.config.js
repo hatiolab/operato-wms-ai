@@ -5,7 +5,8 @@ export default {
   route,
   routes: [
     { tagname: 'operato-home', page: 'operato-home' },
-    { tagname: 'template-file-list', page: 'template-files' }
+    { tagname: 'template-file-list', page: 'template-files' },
+    { tagname: 'excel-template-list', page: 'excel-templates' }
   ],
   bootstrap
 }
