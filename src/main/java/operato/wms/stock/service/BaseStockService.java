@@ -95,6 +95,9 @@ public class BaseStockService extends AbstractQueryService {
         // 화주사 데이터 체크
         ValueUtil.checkEmptyData(input.getComCd(), "label.com_cd");
 
+        // 창고 데이터 체크
+        ValueUtil.checkEmptyData(input.getWhCd(), "label.wh_cd");
+
         // 로케이션 데이터 체크
         ValueUtil.checkEmptyData(input.getLocCd(), "label.loc_cd");
 

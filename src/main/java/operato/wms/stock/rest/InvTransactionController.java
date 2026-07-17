@@ -25,7 +25,6 @@ import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
-import xyz.elidom.sys.SysConstants;
 import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.system.service.AbstractRestService;
 import xyz.elidom.sys.util.ThrowUtil;
@@ -274,7 +273,7 @@ public class InvTransactionController extends AbstractRestService {
      */
     @PostMapping(value = "/create_inventory", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiDesc(description = "Create Inventory")
-    public BaseResponse createInventory(@RequestBody InvTransaction input) {
+    public Inventory createInventory(@RequestBody InvTransaction input) {
         Long domainId = Domain.currentDomainId();
         input.setId(null);
 
@@ -288,12 +287,10 @@ public class InvTransactionController extends AbstractRestService {
             // 커스텀 서비스 후 처리
             this.customSvc.doCustomService(domainId, TRX_INV_POST_CREATE_INVENTORY,
                     ValueUtil.newMap("inventory", inventory));
-            // 리턴
-            return new BaseResponse(true, SysConstants.OK_STRING);
-
+            // 생성된 재고 리턴
+            return inventory;
         } else {
-            // 리턴
-            return new BaseResponse(true, SysConstants.OK_STRING);
+            return (Inventory) customResult;
         }
     }
 

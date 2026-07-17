@@ -326,7 +326,7 @@ public class WmsBaseService extends AbstractQueryService {
      *
      * @param domainId 도메인 ID
      * @param userId   사용자 로그인 ID
-     * @return 화주사 목록 [{ com_cd, com_nm, com_alias }]
+     * @return 화주사 목록 [{ name(com_cd), description (com_nm || com_alias) }]
      */
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getUserAccessibleCompanies(Long domainId, String userId) {

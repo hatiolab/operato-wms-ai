@@ -14,7 +14,6 @@ import operato.wms.oms.entity.StockAllocation;
 import operato.wms.stock.entity.Inventory;
 import operato.wms.stock.entity.InventoryTran;
 import operato.wms.stock.model.InvTransaction;
-import xyz.elidom.sys.entity.Domain;
 import xyz.elidom.sys.util.ThrowUtil;
 import xyz.elidom.util.DateUtil;
 import xyz.elidom.util.ValueUtil;
