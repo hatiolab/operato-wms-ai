@@ -105,6 +105,19 @@ class ExcelTemplateList extends localize(i18next)(LitElement) {
         }
         .btn-import:hover { background: #1565C0; }
         .btn-import:disabled { opacity: .4; cursor: not-allowed; }
+        .btn-download {
+          padding: 4px 10px;
+          border: 1px solid var(--md-sys-color-outline-variant, #ccc);
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          background: var(--md-sys-color-surface, #fff);
+          color: var(--md-sys-color-on-surface, #333);
+          white-space: nowrap;
+        }
+        .btn-download:hover { background: var(--md-sys-color-surface-variant, #f5f5f5); }
+        .btn-download:disabled { opacity: .4; cursor: not-allowed; }
       `
     ]
   }
@@ -147,6 +160,7 @@ class ExcelTemplateList extends localize(i18next)(LitElement) {
               <thead>
                 <tr>
                   <th class="chk-col"><input type="checkbox" @change=${this._onCheckAll}></th>
+                  <th style="width:70px;text-align:center">다운로드</th>
                   <th>${TermsUtil.tLabel('name') || '템플릿명'}</th>
                   <th>${TermsUtil.tLabel('description') || '설명'}</th>
                   <th class="url-col">${TermsUtil.tLabel('import_url') || '임포트 URL'}</th>
@@ -158,7 +172,7 @@ class ExcelTemplateList extends localize(i18next)(LitElement) {
               </thead>
               <tbody>
                 ${templates.length === 0
-            ? html`<tr class="empty-row"><td colspan="8">등록된 템플릿이 없습니다. [신규 등록]을 클릭하세요.</td></tr>`
+            ? html`<tr class="empty-row"><td colspan="9">등록된 템플릿이 없습니다. [신규 등록]을 클릭하세요.</td></tr>`
             : templates.map(t => html`
                     <tr
                       class=${this._selected.has(t.id) ? 'selected' : ''}
@@ -168,6 +182,12 @@ class ExcelTemplateList extends localize(i18next)(LitElement) {
                         <input type="checkbox"
                           .checked=${this._selected.has(t.id)}
                           @change=${e => this._onCheckRow(e, t.id)}>
+                      </td>
+                      <td style="text-align:center" @click=${e => e.stopPropagation()}>
+                        <button class="btn-download"
+                          ?disabled=${!t.template_attachment_id}
+                          title=${t.template_attachment_id ? '템플릿 xlsx 파일 다운로드' : '등록된 템플릿 파일이 없습니다'}
+                          @click=${() => this._onDownload(t)}>다운로드</button>
                       </td>
                       <td><strong>${t.name}</strong></td>
                       <td>${t.description || ''}</td>
@@ -204,6 +224,20 @@ class ExcelTemplateList extends localize(i18next)(LitElement) {
     } finally {
       this._loading = false
     }
+  }
+
+  /** 템플릿 xlsx 파일 다운로드 */
+  _onDownload(template) {
+    if (!template.template_attachment_id) {
+      UiUtil.showToast('warning', '등록된 템플릿 파일이 없습니다.')
+      return
+    }
+    const a = document.createElement('a')
+    a.href = `/rest/attachments/${template.template_attachment_id}/download`
+    a.download = ''
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
   }
 
   /** 임포트 버튼 → confirm_flag가 true인 경우에만 dynamic-excel-import-popup 팝업 */

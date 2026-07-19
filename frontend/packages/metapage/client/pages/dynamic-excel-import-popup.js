@@ -291,6 +291,7 @@ class DynamicExcelImportPopup extends localize(i18next)(LitElement) {
       _commonValues: Object, // 공통 파라미터 값 { col_key: value }
       _filterChip: String, // 'all'|'pending'|'ok'|'error'|'invalid'
       _apiOptions: Object, // { col_key: [{value, label}] } — api_select 옵션 캐시
+      _codeSelectMaps: Object, // { col_key: { labelValue → codeValue } } — code_select 역변환 맵
       _running: Boolean,
       _paused: Boolean,
       _processed: Number,
@@ -311,6 +312,7 @@ class DynamicExcelImportPopup extends localize(i18next)(LitElement) {
     this._commonValues = {}
     this._filterChip = 'all'
     this._apiOptions = {}
+    this._codeSelectMaps = {}
     this._running = false
     this._paused = false
     this._processed = 0
@@ -650,6 +652,9 @@ class DynamicExcelImportPopup extends localize(i18next)(LitElement) {
         // _selectMaps 빌드
         this._selectMaps = this._buildSelectMaps(this._columns)
 
+        // code_select 역변환 맵 비동기 로드 (select_label_key가 설정된 컬럼)
+        this._fetchCodeSelectMaps(this._columns)
+
         // api_select 파라미터 옵션 비동기 로드
         this._fetchApiSelectOptions(this._params)
       }
@@ -717,6 +722,47 @@ class DynamicExcelImportPopup extends localize(i18next)(LitElement) {
         }
       })
     return maps
+  }
+
+  /**
+   * code_select 컬럼 중 select_label_key가 설정된 것의 역변환 맵을 사전 로드.
+   * { col_key: { labelValue → codeValue } } 구조로 _codeSelectMaps에 저장.
+   * 임포트 시 엑셀 셀의 label값(description)을 code값(name)으로 치환하는 데 사용.
+   */
+  async _fetchCodeSelectMaps(columns) {
+    const targets = (columns || []).filter(
+      c => c.col_type === 'code_select' && c.select_label_key && c.select_source
+    )
+    if (!targets.length) return
+
+    const maps = { ...this._codeSelectMaps }
+    await Promise.all(targets.map(async col => {
+      try {
+        const codeQuery = encodeURIComponent(JSON.stringify([{ name: 'name', value: col.select_source, operator: 'eq' }]))
+        const codeResult = await ServiceUtil.restGet(`common_codes?query=${codeQuery}&limit=1`)
+        const codeGroup = codeResult?.items?.[0]
+        if (!codeGroup) return
+
+        const detailQuery = encodeURIComponent(JSON.stringify([{ name: 'parent_id', value: codeGroup.id, operator: 'eq' }]))
+        const detailSort = encodeURIComponent(JSON.stringify([{ field: 'rank', ascending: true }]))
+        const detailResult = await ServiceUtil.restGet(`common_code_details?query=${detailQuery}&sort=${detailSort}&limit=500`)
+        const details = detailResult?.items || []
+
+        const labelKey = col.select_label_key           // 엑셀에 표시된 필드 (예: description)
+        const valueKey = col.select_value_key || 'name' // 임포트 시 실제 전송할 필드 (예: name)
+        const map = {}
+        details.forEach(d => {
+          const label = d[labelKey]
+          const value = d[valueKey]
+          if (label != null && label !== '' && value != null) map[String(label)] = value
+        })
+        maps[col.col_key] = map
+      } catch (e) {
+        console.warn(`code_select 역변환 맵 로드 실패 (${col.col_key}):`, e)
+        maps[col.col_key] = {}
+      }
+    }))
+    this._codeSelectMaps = maps
   }
 
   /* ── 파일 선택 / 드래그앤드롭 ── */
@@ -950,15 +996,36 @@ class DynamicExcelImportPopup extends localize(i18next)(LitElement) {
   /** 임포트 바디 구성 — import_skip 컬럼 제외, 공통 파라미터 병합 */
   _buildImportBody(row) {
     const body = { ...this._commonValues }
-      ; (this._columns || []).forEach(col => {
-        if (!col.import_skip) {
-          let val = row[col.col_key]
-          if (val != null && val !== '') {
-            if (col.col_type === 'date') val = this._formatDate(val)
-            body[col.col_key] = val
-          }
-        }
-      })
+    const columns = this._columns || []
+
+    // 원본 셀값 스냅샷 — import_ref_col이 역변환 전 값을 참조하기 위해 먼저 캡처
+    const originalValues = {}
+    columns.forEach(col => { originalValues[col.col_key] = row[col.col_key] })
+
+    columns.forEach(col => {
+      if (col.import_skip) return
+
+      // import_ref_col: 참조 컬럼의 원본 셀값(역변환 전)을 이 컬럼 값으로 사용
+      if (col.import_ref_col) {
+        const refVal = originalValues[col.import_ref_col]
+        if (refVal != null && refVal !== '') body[col.col_key] = refVal
+        return
+      }
+
+      let val = row[col.col_key]
+      if (val == null || val === '') return
+
+      if (col.col_type === 'date') {
+        val = this._formatDate(val)
+      } else if (col.col_type === 'code_select' && col.select_label_key) {
+        // select_label_key 설정 시: 엑셀 셀의 label값을 code값으로 역변환
+        const codeMap = (this._codeSelectMaps || {})[col.col_key] || {}
+        val = codeMap[String(val)] ?? val
+      }
+
+      body[col.col_key] = val
+    })
+
     return body
   }
 

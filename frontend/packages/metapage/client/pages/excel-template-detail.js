@@ -502,7 +502,7 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
       ${expanded ? html`
         <tr class="detail-row">
           <td colspan="${colCount}" style="padding:8px 20px 10px">
-            <div style="display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:8px;align-items:end">
+            <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 2fr;gap:8px;align-items:end">
               <div>
                 <label>선택 소스</label>
                 <input .value=${col.select_source || ''}
@@ -510,19 +510,26 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
                   @input=${e => this._onColChange(col, 'select_source', e.target.value)}>
               </div>
               <div>
-                <label>값 키 (select_value_key)</label>
+                <label>값 키</label>
                 <input .value=${col.select_value_key || ''}
-                  placeholder="예: wh_cd"
+                  placeholder="예: name"
                   @input=${e => this._onColChange(col, 'select_value_key', e.target.value)}>
               </div>
               <div>
-                <label>표시 키 (select_label_key)</label>
+                <label>표시 키</label>
                 <input .value=${col.select_label_key || ''}
-                  placeholder="예: wh_nm"
+                  placeholder="예: description"
                   @input=${e => this._onColChange(col, 'select_label_key', e.target.value)}>
               </div>
               <div>
-                <label>컬럼 설명 (col_desc)</label>
+                <label>참조 컬럼</label>
+                <input .value=${col.import_ref_col || ''}
+                  placeholder="예: reason_cd"
+                  title="임포트 시 해당 컬럼의 원본 셀값(역변환 전)을 이 컬럼 값으로 사용"
+                  @input=${e => this._onColChange(col, 'import_ref_col', e.target.value)}>
+              </div>
+              <div>
+                <label>컬럼 설명</label>
                 <input .value=${col.col_desc || ''}
                   placeholder="작성 가이드에 표시될 컬럼 설명"
                   @input=${e => this._onColChange(col, 'col_desc', e.target.value)}>
@@ -541,7 +548,6 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
       const [tmpl, colResult] = await Promise.all([
         ServiceUtil.restGet(`excel_templates/${this.templateId}`),
         ServiceUtil.restGet(`excel_template_columns?query=${encodeURIComponent(JSON.stringify([{ name: 'template_id', operator: 'eq', value: this.templateId }]))}&limit=500&sort=${encodeURIComponent(JSON.stringify([{ field: 'col_role', ascending: true }, { field: 'col_order', ascending: true }]))}`)
-
       ])
       this._template = tmpl || {}
       this._columns = (colResult?.items || []).map(c => ({ ...c }))
