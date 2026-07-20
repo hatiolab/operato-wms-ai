@@ -209,7 +209,7 @@ export const CustomButtonMixin = superClass =>
           let parentIdVal =
             parameters && parameters.id
               ? parameters.id
-              : (popupConf && popupConf.parent_field ? popupConf.parent_field : undefined)
+              : (popupConf && popupConf.parent_field ? popupConf.parent_field : popupConf.popup_id)
           // 팝업 설정에 부모 화면 메뉴 ID 정보 추가
           popupConf.parent_menu_id = this.menu.id
           // 동적 팝업 오픈

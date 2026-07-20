@@ -2,8 +2,8 @@ import { css, html, LitElement } from 'lit-element'
 import { i18next, localize } from '@operato/i18n'
 import { store } from '@operato/shell'
 import { IMPORT } from '@things-factory/import-base'
-import { ServiceUtil } from '../utils/service-util'
-import { UiUtil } from '../utils/ui-util'
+import { ServiceUtil } from '../../utils/service-util'
+import { UiUtil } from '../../utils/ui-util'
 
 /**
  * 동적 엑셀 임포트 범용 팝업 (W23-FR-6).
@@ -278,6 +278,8 @@ class DynamicExcelImportPopup extends localize(i18next)(LitElement) {
     return {
       /** 템플릿 이름 (excel_templates.name) */
       templateName: String,
+      /** 부모 ID — 설정 시 templateName으로 할당 (templateName 미설정인 경우) */
+      parent_id: String,
       /** 완료 콜백 */
       onComplete: Object,
 
@@ -325,6 +327,9 @@ class DynamicExcelImportPopup extends localize(i18next)(LitElement) {
     this._totalPausedMs = 0
     this._updateTimer = null
 
+    if (!this.templateName && this.parent_id) {
+      this.templateName = this.parent_id
+    }
     if (this.templateName) {
       this._loadTemplate()
     }

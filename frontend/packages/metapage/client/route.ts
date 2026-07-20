@@ -1,4 +1,5 @@
 import './pages/operato-home'
+import './components/popup/dynamic-excel-import-popup'
 
 export default function route(page, module) {
   switch (page) {
@@ -10,7 +11,7 @@ export default function route(page, module) {
     case 'excel-templates':
       import('./pages/excel-template-list')
       import('./pages/excel-template-detail')
-      import('./pages/dynamic-excel-import-popup')
+      import('./components/popup/dynamic-excel-import-popup')
       return page
   }
 }
