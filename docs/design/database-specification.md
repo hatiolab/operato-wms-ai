@@ -863,6 +863,30 @@ DELETE FROM release_order_items WHERE domain_id = :domainId AND release_order_id
 
 ---
 
+### 5.9 shipment_product_mappings — 출고 상품 매칭 규칙 (oms)
+
+공급처(거래처)가 보낸 엑셀의 상품명 문자열을 우리 WMS의 상품코드/수량으로 매칭하기 위한 규칙 마스터.
+출고 주문 임포트 시 `(domain_id, com_cd, vend_cd, ext_prod_nm)` 조합이 정확히 일치하는 규칙을 찾아 상품/수량을 결정한다.
+예) 그레인온이 보낸 `"파로 유기농 파우더 15g 30포 * 2"` → `sku_cd=XXX`, `order_qty=2` 로 매칭.
+
+| Java Field | 컬럼 | 타입 | Null | 길이 | 설명 |
+|-----------|------|------|------|------|------|
+| id | id | VARCHAR | N | 40 | PK, UUID |
+| comCd | com_cd | VARCHAR | N | 20 | 화주사 코드 |
+| vendCd | vend_cd | VARCHAR | N | 30 | 공급처(거래처) 코드 |
+| extProdNm | ext_prod_nm | VARCHAR | N | 255 | 공급처가 보낸 상품명 (매칭 키, 전체 문자열) |
+| skuCd | sku_cd | VARCHAR | N | 30 | 우리 WMS 상품 코드 |
+| skuNm | sku_nm | VARCHAR | Y | 100 | 우리 WMS 상품명 |
+| orderQty | order_qty | DOUBLE | N | - | 발주수량 |
+| remarks | remarks | VARCHAR | Y | 255 | 비고 |
+
+**인덱스**:
+- `ix_shipment_product_mappings_0` (UNIQUE): `domain_id`, `com_cd`, `vend_cd`, `ext_prod_nm`
+- `ix_shipment_product_mappings_1`: `domain_id`, `vend_cd`
+- `ix_shipment_product_mappings_2`: `domain_id`, `sku_cd`
+
+---
+
 ## 6. 재고 관리 (stock)
 
 ### 6.1 inventories — 재고
