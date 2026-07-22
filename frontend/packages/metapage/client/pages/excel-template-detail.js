@@ -704,32 +704,58 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
     }
   }
 
-  /** 저장 */
+  /** 저장 — 현재 탭에 따라 기본 정보 또는 컬럼만 저장 */
   async _onSave() {
+    if (this._mainTab === 'info') {
+      await this._saveInfo()
+    } else {
+      await this._saveColumns()
+    }
+  }
+
+  /** 기본 정보 저장 */
+  async _saveInfo() {
     const t = this._template || {}
     if (!t.name || !t.name.trim()) { UiUtil.showToast('warning', '템플릿명은 필수입니다.'); return }
     if (!t.import_url || !t.import_url.trim()) { UiUtil.showToast('warning', '임포트 URL은 필수입니다.'); return }
 
     this._saving = true
     try {
-      let savedTemplate
+      let saved
       if (this.templateId) {
-        savedTemplate = await ServiceUtil.restPut(`excel_templates/${this.templateId}`, t)
+        saved = await ServiceUtil.restPut(`excel_templates/${this.templateId}`, t)
       } else {
-        savedTemplate = await ServiceUtil.restPost('excel_templates', t)
+        saved = await ServiceUtil.restPost('excel_templates', t)
+        this.templateId = saved?.id
       }
-      const savedId = savedTemplate?.id || this.templateId
+      UiUtil.showToast('success', '기본 정보가 저장되었습니다.')
+      if (this.onSaved) this.onSaved()
+      await this._fetchTemplate()
+    } catch (e) {
+      console.error('기본 정보 저장 실패:', e)
+      UiUtil.showToast('error', `저장에 실패했습니다: ${e.message || ''}`)
+    } finally {
+      this._saving = false
+    }
+  }
 
-      // 컬럼 저장 — update_multiple 사용
+  /** 컬럼 설정 저장 */
+  async _saveColumns() {
+    if (!this.templateId) {
+      UiUtil.showToast('warning', '기본 정보를 먼저 저장해주세요.')
+      this._mainTab = 'info'
+      return
+    }
+
+    this._saving = true
+    try {
       const toSave = (this._columns || []).map(c => {
         const col = { ...c }
-        // 내부 상태 필드 제거
         delete col._new
         delete col._modified
         delete col._checked
         delete col._deleted
-        if (!col.template_id) col.template_id = savedId
-        // _deleted 대응
+        if (!col.template_id) col.template_id = this.templateId
         if (c._deleted) col.cud_flag_ = 'd'
         else if (c._new) col.cud_flag_ = 'c'
         else col.cud_flag_ = 'u'
@@ -740,13 +766,11 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
         await ServiceUtil.restPost('excel_template_columns/update_multiple', toSave)
       }
 
-      UiUtil.showToast('success', '저장 완료')
+      UiUtil.showToast('success', '컬럼 설정이 저장되었습니다.')
       if (this.onSaved) this.onSaved()
-      // 저장 후 최신 데이터로 리프레시 (팝업 유지)
-      this.templateId = savedId
       await this._fetchTemplate()
     } catch (e) {
-      console.error('저장 실패:', e)
+      console.error('컬럼 저장 실패:', e)
       UiUtil.showToast('error', `저장에 실패했습니다: ${e.message || ''}`)
     } finally {
       this._saving = false
