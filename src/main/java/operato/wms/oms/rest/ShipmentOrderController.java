@@ -165,8 +165,12 @@ public class ShipmentOrderController extends AbstractRestService {
 		Map<String, Object> params = ValueUtil.newMap("order_type,biz_type,list", orderType,
 				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2C_OUT, list);
 		String diyServiceUrl = "diy-importone-b2c-so-" + orderType;
-		this.customSvc.doCustomService(Domain.currentDomainId(), diyServiceUrl, params);
-		return list;
+		Object result = this.customSvc.doCustomService(Domain.currentDomainId(), diyServiceUrl, params);
+		if (result != null && result instanceof List) {
+			return (List<ImportShipmentOrder>) result;
+		} else {
+			return list;
+		}
 	}
 
 	/**
@@ -184,8 +188,12 @@ public class ShipmentOrderController extends AbstractRestService {
 		Map<String, Object> params = ValueUtil.newMap("order_type,biz_type,list", orderType,
 				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT, list);
 		String diyServiceUrl = "diy-importone-b2b-so-" + orderType;
-		this.customSvc.doCustomService(Domain.currentDomainId(), diyServiceUrl, params);
-		return list;
+		Object result = this.customSvc.doCustomService(Domain.currentDomainId(), diyServiceUrl, params);
+		if (result != null && result instanceof List) {
+			return (List<ImportShipmentOrder>) result;
+		} else {
+			return list;
+		}
 	}
 
 	/**

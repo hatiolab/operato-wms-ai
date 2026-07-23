@@ -178,6 +178,7 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
         tr.group-row-ok td   { background: #E8F5E9; border-top-color: #a5d6a7; }
         tr.group-row-error td { background: #FFEBEE; border-top-color: #ef9a9a; }
         tr.group-row-invalid td { background: #FFF3E0; border-top-color: #ffcc80; }
+        tr.group-row-processing td { background: #E3F2FD; border-top-color: #90CAF9; }
 
         /* 아이템 행 상태 */
         tr.status-ok { background: #F9FBE7; }
@@ -281,6 +282,41 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
           color: var(--md-sys-color-on-surface-variant, #666);
           letter-spacing: 0.5px;
         }
+
+        /* 페이지네이션 */
+        .pagination {
+          flex-shrink: 0;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 16px;
+          border-top: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
+          background: var(--md-sys-color-surface-container, #f5f5f5);
+        }
+        .page-btn {
+          padding: 4px 12px;
+          border: 1px solid var(--md-sys-color-outline, #ccc);
+          background: var(--md-sys-color-surface, #fff);
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+          color: var(--md-sys-color-primary, #1976D2);
+        }
+        .page-btn:hover:not(:disabled) {
+          background: var(--md-sys-color-surface-container-highest, #efefef);
+        }
+        .page-btn:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+          color: var(--md-sys-color-on-surface-variant, #999);
+        }
+        .page-info {
+          font-size: 12px;
+          color: var(--md-sys-color-on-surface-variant, #666);
+          min-width: 200px;
+          text-align: center;
+        }
       `
     ]
   }
@@ -305,7 +341,9 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
       _processed: Number,
       _total: Number,
       _fileName: String,
-      _loadingTemplate: Boolean
+      _loadingTemplate: Boolean,
+      _groupPage: Number,
+      _processingRefOrderNo: String
     }
   }
 
@@ -327,6 +365,9 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
     this._total = 0
     this._fileName = ''
     this._loadingTemplate = false
+    this._groupPage = 0
+    this._processingRefOrderNo = null
+    this._lastScrolledRefOrderNo = undefined
     this._resumeResolve = null
     this._processStartTime = null
     this._pausedAt = null
@@ -414,20 +455,20 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
 
         <!-- 필터 칩 -->
         <div class="filter-bar">
-          <button class="chip ${this._filterChip === 'all' ? 'active' : ''}" @click=${() => this._filterChip = 'all'}>
+          <button class="chip ${this._filterChip === 'all' ? 'active' : ''}" @click=${() => { this._filterChip = 'all'; this._groupPage = 0 }}>
             전체 ${this._rows.length}건
           </button>
-          <button class="chip ${this._filterChip === 'pending' ? 'active' : ''}" @click=${() => this._filterChip = 'pending'}>
+          <button class="chip ${this._filterChip === 'pending' ? 'active' : ''}" @click=${() => { this._filterChip = 'pending'; this._groupPage = 0 }}>
             대기 ${counts.pending}
           </button>
-          <button class="chip ok ${this._filterChip === 'ok' ? 'active' : ''}" @click=${() => this._filterChip = 'ok'}>
+          <button class="chip ok ${this._filterChip === 'ok' ? 'active' : ''}" @click=${() => { this._filterChip = 'ok'; this._groupPage = 0 }}>
             완료 ${counts.ok}
           </button>
-          <button class="chip error ${this._filterChip === 'error' ? 'active' : ''}" @click=${() => this._filterChip = 'error'}>
+          <button class="chip error ${this._filterChip === 'error' ? 'active' : ''}" @click=${() => { this._filterChip = 'error'; this._groupPage = 0 }}>
             오류 ${counts.error}
           </button>
           ${counts.invalid > 0 ? html`
-            <button class="chip invalid ${this._filterChip === 'invalid' ? 'active' : ''}" @click=${() => this._filterChip = 'invalid'}>
+            <button class="chip invalid ${this._filterChip === 'invalid' ? 'active' : ''}" @click=${() => { this._filterChip = 'invalid'; this._groupPage = 0 }}>
               검증오류 ${counts.invalid}
             </button>
           ` : ''}
@@ -462,29 +503,58 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
         ` : ''}
 
         <!-- 데이터 그리드 (주문 그룹 헤더 + 아이템 행) -->
-        <div class="grid-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th style="width:40px">#</th>
-                <th style="width:80px">상태</th>
-                ${visibleCols.map(c => html`<th>${c.col_label || c.col_key}</th>`)}
-                <th style="min-width:160px">처리 결과</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${visibleRows.length === 0
-        ? html`<tr><td colspan="99" style="text-align:center;padding:30px;color:#999">데이터가 없습니다.</td></tr>`
-        : this._renderGroupedRows(visibleRows, visibleCols)
-      }
-            </tbody>
-          </table>
-        </div>
+        ${(() => {
+          const PAGE_SIZE = 100
+          const allFilteredGroups = this._buildGroups(visibleRows)
+          const totalPages = Math.max(1, Math.ceil(allFilteredGroups.length / PAGE_SIZE))
+          const safePage = Math.min(this._groupPage || 0, totalPages - 1)
+          const groupStartIndex = safePage * PAGE_SIZE
+          const pagedGroups = allFilteredGroups.slice(groupStartIndex, groupStartIndex + PAGE_SIZE)
+          const pagedRowCount = pagedGroups.reduce((s, g) => s + g.rows.length, 0)
+
+          return html`
+            <div class="grid-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width:40px">#</th>
+                    <th style="width:80px">상태</th>
+                    ${visibleCols.map(c => html`<th>${c.col_label || c.col_key}</th>`)}
+                    <th style="min-width:160px">처리 결과</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${pagedGroups.length === 0
+                    ? html`<tr><td colspan="99" style="text-align:center;padding:30px;color:#999">데이터가 없습니다.</td></tr>`
+                    : this._renderGroupedRows(pagedGroups, visibleCols, groupStartIndex)
+                  }
+                </tbody>
+              </table>
+            </div>
+            ${totalPages > 1 ? html`
+              <div class="pagination">
+                <button class="page-btn" ?disabled=${safePage === 0}
+                  @click=${() => { this._groupPage = 0 }}>«</button>
+                <button class="page-btn" ?disabled=${safePage === 0}
+                  @click=${() => { this._groupPage = safePage - 1 }}>‹</button>
+                <span class="page-info">
+                  ${safePage + 1} / ${totalPages} 페이지
+                  (주문 ${groupStartIndex + 1}–${groupStartIndex + pagedGroups.length} / ${allFilteredGroups.length}개,
+                  행 ${pagedRowCount}건)
+                </span>
+                <button class="page-btn" ?disabled=${safePage >= totalPages - 1}
+                  @click=${() => { this._groupPage = safePage + 1 }}>›</button>
+                <button class="page-btn" ?disabled=${safePage >= totalPages - 1}
+                  @click=${() => { this._groupPage = totalPages - 1 }}>»</button>
+              </div>
+            ` : ''}
+          `
+        })()}
 
         <!-- 하단 버튼 -->
         <div class="popup-footer">
           <button class="btn btn-outline" ?disabled=${this._running}
-            @click=${() => { this._phase = 'upload'; this._rows = []; this._fileName = '' }}>파일 재선택</button>
+            @click=${() => { this._phase = 'upload'; this._rows = []; this._fileName = ''; this._groupPage = 0 }}>파일 재선택</button>
           ${hasValidateUrl ? html`
             <button class="btn btn-outline" ?disabled=${this._running}
               @click=${this._onValidate}>검증</button>
@@ -514,19 +584,23 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
   /**
    * 주문 그룹별로 묶어 그리드 행 렌더링.
    * 각 그룹 앞에 주문 헤더 행(ref_order_no + 상태)을 삽입.
+   * @param {Array} pagedGroups - 현재 페이지에 표시할 그룹 배열
+   * @param {Array} visibleCols - 표시할 컬럼 배열
+   * @param {number} groupStartIndex - 전역 그룹 번호 오프셋 (0-based)
    */
-  _renderGroupedRows(visibleRows, visibleCols) {
-    const groups = this._buildGroups(visibleRows)
+  _renderGroupedRows(pagedGroups, visibleCols, groupStartIndex) {
     const dataColCount = visibleCols.length + 1  // data cols + 처리결과
 
-    return groups.map((group, groupIndex) => {
+    return pagedGroups.map((group, groupIndex) => {
+      const isProcessing = this._running && group.refOrderNo === this._processingRefOrderNo
       const groupStatus = this._resolveGroupStatus(group.rows)
-      const groupRowClass = `group-row${groupStatus === 'OK' ? ' group-row-ok' : groupStatus === 'ERROR' ? ' group-row-error' : groupStatus === 'INVALID' ? ' group-row-invalid' : ''}`
+      const groupRowClass = `group-row${isProcessing ? ' group-row-processing' : groupStatus === 'OK' ? ' group-row-ok' : groupStatus === 'ERROR' ? ' group-row-error' : groupStatus === 'INVALID' ? ' group-row-invalid' : ''}`
       const errorMsg = groupStatus === 'ERROR' ? (group.rows[0]?._errorMessage || '') : ''
+      const globalGroupNo = groupStartIndex + groupIndex + 1
 
       return html`
         <tr class="${groupRowClass}">
-          <td style="text-align:center;font-weight:700;font-size:12px;color:#1565C0">${groupIndex + 1}</td>
+          <td style="text-align:center;font-weight:700;font-size:12px;color:#1565C0">${globalGroupNo}</td>
           <td>
             <span style="font-weight:700;font-size:12px;color:#1565C0">📦 ${group.refOrderNo || '(참조번호 없음)'}</span>
             <span style="color:#999;font-size:11px;margin-left:6px">${group.rows.length}건</span>
@@ -661,7 +735,7 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
 
   /** 그룹 상태 배지 렌더링 */
   _groupStatusBadge(status) {
-    if (status === 'OK') return html`<span class="status-badge badge-ok">주문 완료</span>`
+    if (status === 'OK') return html`<span class="status-badge badge-ok">주문 등록 완료</span>`
     if (status === 'ERROR') return html`<span class="status-badge badge-error">주문 오류</span>`
     if (status === 'INVALID') return html`<span class="status-badge badge-invalid">검증오류</span>`
     return html`<span class="status-badge badge-pending">대기</span>`
@@ -992,6 +1066,7 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
   async _startImport(includeErrors) {
     const url = this._template?.import_url
     if (!url) { UiUtil.showToast('error', '임포트 URL이 설정되지 않았습니다.'); return }
+    this._groupPage = 0
 
     // 필수 공통 파라미터 검증
     const missingParams = (this._params || []).filter(p => {
@@ -1039,6 +1114,8 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
       }
       if (!this._running) break
 
+      this._processingRefOrderNo = group.refOrderNo
+
       const body = this._buildGroupImportBody(group)
       await ServiceUtil.restPost(url, body, null, null,
         (res) => {
@@ -1061,6 +1138,8 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
       this._processed++
     }
 
+    this._processingRefOrderNo = null
+    this._lastScrolledRefOrderNo = undefined
     this._stopTimer()
     this._running = false
     this._paused = false
@@ -1159,13 +1238,35 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
 
   _startTimer() {
     if (this._updateTimer) return
-    this._updateTimer = setInterval(() => { this.requestUpdate() }, 300)
+    this._updateTimer = setInterval(() => {
+      this._autoFollowProcessing()
+      this.requestUpdate()
+    }, 300)
   }
 
   _stopTimer() {
     if (!this._updateTimer) return
     clearInterval(this._updateTimer)
     this._updateTimer = null
+  }
+
+  /** 처리 중인 그룹을 따라 페이지 자동 이동 및 스크롤 */
+  _autoFollowProcessing() {
+    if (!this._running || this._paused || this._filterChip !== 'all' || this._processingRefOrderNo === null) return
+    const allGroups = this._buildGroups(this._filteredRows())
+    const idx = allGroups.findIndex(g => g.refOrderNo === this._processingRefOrderNo)
+    if (idx < 0) return
+    const PAGE_SIZE = 100
+    const targetPage = Math.floor(idx / PAGE_SIZE)
+    if (targetPage !== (this._groupPage || 0)) this._groupPage = targetPage
+
+    if (this._lastScrolledRefOrderNo !== this._processingRefOrderNo) {
+      this._lastScrolledRefOrderNo = this._processingRefOrderNo
+      this.updateComplete.then(() => {
+        const row = this.shadowRoot?.querySelector('tr.group-row-processing')
+        if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      })
+    }
   }
 
   _fmtElapsed() {
