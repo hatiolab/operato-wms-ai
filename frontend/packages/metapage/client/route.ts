@@ -1,5 +1,6 @@
 import './pages/operato-home'
 import './components/popup/dynamic-excel-import-popup'
+import './components/popup/dynamic-shipment-order-import-popup'
 
 export default function route(page, module) {
   switch (page) {

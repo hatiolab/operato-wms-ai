@@ -467,6 +467,42 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
           margin-bottom: 12px;
         }
 
+        /* 페이지네이션 */
+        .pagination {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 8px;
+          margin-top: 16px;
+        }
+
+        .page-btn {
+          padding: 5px 12px;
+          border: 1px solid var(--md-sys-color-outline);
+          background: var(--md-sys-color-surface);
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 13px;
+          color: var(--md-sys-color-primary);
+        }
+
+        .page-btn:hover:not(:disabled) {
+          background: var(--md-sys-color-surface-container-highest);
+        }
+
+        .page-btn:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+          color: var(--md-sys-color-on-surface-variant);
+        }
+
+        .page-info {
+          font-size: 13px;
+          color: var(--md-sys-color-on-surface-variant);
+          min-width: 140px;
+          text-align: center;
+        }
+
         /* 반응형 */
         @media screen and (max-width: 800px) {
           .stats-row {
@@ -502,7 +538,8 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
       orderStatusOptions: Array,
       ifStatusOptions: Array,
       replenishOptions: Array,
-      pickingTypeOptions: Array
+      pickingTypeOptions: Array,
+      _orderPage: Number
     }
   }
 
@@ -527,6 +564,8 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     this.ifStatusOptions = []
     this.replenishOptions = []
     this.picqkingTypeOptions = []
+    this._orderPage = 0
+    this._orderPageSize = 50
   }
 
   /** 속성 변경 시 parent_id를 waveId로 매핑 */
@@ -743,7 +782,13 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
    * 렌더링 — Tab 0: 주문 목록
    * ============================================================ */
 
-  /** 주문 목록 탭 렌더링 - 웨이브에 포함된 주문 테이블 및 합계 */
+  /** 현재 페이지에 표시할 주문 목록 반환 */
+  _getPagedOrders() {
+    const start = this._orderPage * this._orderPageSize
+    return (this.orders || []).slice(start, start + this._orderPageSize)
+  }
+
+  /** 주문 목록 탭 렌더링 - 웨이브에 포함된 주문 테이블, 합계, 페이지네이션 */
   _renderOrdersTab() {
     if (this.orders === null) {
       return html`<div class="loading">${i18next.t('label.loading', { defaultValue: '데이터 로딩 중...' })}</div>`
@@ -759,42 +804,55 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     }
 
     const isCreated = this.wave?.status === 'CREATED'
+    const pagedOrders = this._getPagedOrders()
+    const totalPages = Math.ceil(this.orders.length / this._orderPageSize)
+    const allPageSelected = pagedOrders.length > 0 && pagedOrders.every(o => this.selectedOrderIds.includes(o.id))
 
     return html`
       <table>
         <thead>
           <tr>
-            ${isCreated ? html`<th style="width:40px"><input type="checkbox" @change="${this._toggleAllOrders}" .checked="${this.selectedOrderIds.length > 0 && this.selectedOrderIds.length === this.orders.length}"></th>` : ''}
+            ${isCreated ? html`<th style="width:40px"><input type="checkbox" @change="${this._toggleAllOrders}" .checked="${allPageSelected}"></th>` : ''}
               <th>${TermsUtil.tLabel('shipment_no') || '출고번호'}</th>
               <th>${TermsUtil.tLabel('ref_order_no') || '원주문번호'}</th>
               <th>${TermsUtil.tLabel('invoice_no') || '송장번호'}</th>
-              <th>${TermsUtil.tLabel('com_cd') || '화주사'}</th>
+              <th>${TermsUtil.tLabel('order_date') || '주문일'}</th>
               <th>${TermsUtil.tLabel('cust_cd') || '거래처'}</th>
               <th>${TermsUtil.tLabel('orderer_nm') || '고객명'}</th>
-              <th>${TermsUtil.tLabel('order_date') || '주문일'}</th>
+              <th>${TermsUtil.tLabel('receiver_nm') || '수취인명'}</th>
               <th class="right">${TermsUtil.tLabel('order_qty') || '주문수량'}</th>
               <th class="center">${TermsUtil.tLabel('status') || '출고상태'}</th>
-              <th class="center">${TermsUtil.tButton('pickup') || '집하상태'}</th>
+              <!--th class="center">${TermsUtil.tButton('pickup') || '집하상태'}</th-->
           </tr>
         </thead>
         <tbody>
-          ${this.orders.map(o => html`
+          ${pagedOrders.map(o => html`
             <tr>
               ${isCreated ? html`<td><input type="checkbox" .checked="${this.selectedOrderIds.includes(o.id)}" @change="${e => this._toggleOrderSelection(o.id, e)}"></td>` : ''}
               <td>${o.shipment_no || '-'}</td>
               <td>${o.ref_order_no || '-'}</td>
               <td>${o.invoice_no || '-'}</td>
-              <td>${o.com_cd || '-'}</td>
-              <td>${o.cust_cd || '-'}</td>
-              <td>${o.cust_nm || '-'}</td>
               <td>${o.order_date || '-'}</td>
+              <td>${o.cust_cd || '-'}</td>
+              <td>${o.orderer_nm || '-'}</td>
+              <td>${o.receiver_nm || '-'}</td>
               <td class="right">${o.total_order ?? 0}</td>
               <td><span class="item-status ${o.status}">${this._orderStatusLabel(o.status)}</span></td>
-              <td class="center">${this._renderIfStatusBadge(o.if_status)}</td>
+              <!--td class="center">${this._renderIfStatusBadge(o.if_status)}</td-->
             </tr>
           `)}
         </tbody>
       </table>
+
+      ${totalPages > 1 ? html`
+        <div class="pagination">
+          <button class="page-btn" ?disabled="${this._orderPage === 0}" @click="${() => { this._orderPage = 0 }}">«</button>
+          <button class="page-btn" ?disabled="${this._orderPage === 0}" @click="${() => { this._orderPage -= 1 }}">‹</button>
+          <span class="page-info">${this._orderPage + 1} / ${totalPages} 페이지 (총 ${this.orders.length}건)</span>
+          <button class="page-btn" ?disabled="${this._orderPage >= totalPages - 1}" @click="${() => { this._orderPage += 1 }}">›</button>
+          <button class="page-btn" ?disabled="${this._orderPage >= totalPages - 1}" @click="${() => { this._orderPage = totalPages - 1 }}">»</button>
+        </div>
+      ` : ''}
 
       <div class="summary-row">
         <div class="summary-item">
@@ -805,6 +863,12 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
           <span class="label">${i18next.t('label.total_qty', { defaultValue: '총 수량' })}:</span>
           <span class="value">${this.orders.reduce((s, o) => s + (o.total_order || 0), 0)} EA</span>
         </div>
+        ${this.selectedOrderIds.length > 0 ? html`
+          <div class="summary-item">
+            <span class="label">${i18next.t('label.selected', { defaultValue: '선택' })}:</span>
+            <span class="value">${this.selectedOrderIds.length}${i18next.t('label.count_unit', { defaultValue: '건' })}</span>
+          </div>
+        ` : ''}
       </div>
     `
   }
@@ -975,6 +1039,7 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
       // 2) 주문 목록 조회 (트랜잭션 API)
       const orders = await ServiceUtil.restGet(`oms_trx/waves/${this.waveId}/orders`)
       this.orders = orders || []
+      this._orderPage = 0
 
       // 3) SKU 합산 조회 (트랜잭션 API)
       const skuSummary = await ServiceUtil.restGet(`oms_trx/waves/${this.waveId}/summary`)
@@ -1149,12 +1214,15 @@ class ShipmentWaveDetail extends localize(i18next)(LitElement) {
     }
   }
 
-  /** 주문 체크박스 전체 선택/해제 처리 */
+  /** 주문 체크박스 전체 선택/해제 처리 (현재 페이지 기준) */
   _toggleAllOrders(e) {
+    const pagedOrders = this._getPagedOrders()
+    const pageIds = new Set(pagedOrders.map(o => o.id))
     if (e.target.checked) {
-      this.selectedOrderIds = this.orders.map(o => o.id)
+      const others = this.selectedOrderIds.filter(id => !pageIds.has(id))
+      this.selectedOrderIds = [...others, ...pagedOrders.map(o => o.id)]
     } else {
-      this.selectedOrderIds = []
+      this.selectedOrderIds = this.selectedOrderIds.filter(id => !pageIds.has(id))
     }
   }
 

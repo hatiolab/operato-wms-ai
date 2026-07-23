@@ -155,18 +155,18 @@ public class ShipmentOrderController extends AbstractRestService {
 	 *
 	 * POST importone/b2c/by_custom/{order_type}
 	 *
-	 * @param order 출하주문 데이터
+	 * @param list 출하주문 데이터
 	 * @return 임포트 결과
 	 */
 	@RequestMapping(value = "import_one/b2c/by_custom/{order_type}", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Import B2C shipment orders from by custom service")
-	public ImportShipmentOrder importOneB2cByCustomService(@PathVariable("order_type") String orderType,
-			@RequestBody ImportShipmentOrder order) {
-		Map<String, Object> params = ValueUtil.newMap("order_type,biz_type,order", orderType,
-				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2C_OUT, order);
+	public List<ImportShipmentOrder> importOneB2cByCustomService(@PathVariable("order_type") String orderType,
+			@RequestBody List<ImportShipmentOrder> list) {
+		Map<String, Object> params = ValueUtil.newMap("order_type,biz_type,list", orderType,
+				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2C_OUT, list);
 		String diyServiceUrl = "diy-importone-b2c-so-" + orderType;
 		this.customSvc.doCustomService(Domain.currentDomainId(), diyServiceUrl, params);
-		return order;
+		return list;
 	}
 
 	/**
@@ -179,13 +179,13 @@ public class ShipmentOrderController extends AbstractRestService {
 	 */
 	@RequestMapping(value = "import_one/b2b/by_custom/{order_type}", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ApiDesc(description = "Import B2B shipment orders from by custom service")
-	public ImportShipmentOrder importOneB2bByCustomService(@PathVariable("order_type") String orderType,
-			@RequestBody ImportShipmentOrder order) {
-		Map<String, Object> params = ValueUtil.newMap("order_type,biz_type,order", orderType,
-				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT, order);
+	public List<ImportShipmentOrder> importOneB2bByCustomService(@PathVariable("order_type") String orderType,
+			@RequestBody List<ImportShipmentOrder> list) {
+		Map<String, Object> params = ValueUtil.newMap("order_type,biz_type,list", orderType,
+				WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT, list);
 		String diyServiceUrl = "diy-importone-b2b-so-" + orderType;
 		this.customSvc.doCustomService(Domain.currentDomainId(), diyServiceUrl, params);
-		return order;
+		return list;
 	}
 
 	/**
