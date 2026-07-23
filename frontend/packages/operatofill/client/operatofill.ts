@@ -426,6 +426,7 @@ export async function checkResponse(res, responseJson) {
       return errData
     } catch (err) {
       console.log(err)
+      return { status: res.status, message: res.statusText || '서버 응답을 읽지 못했습니다' }
     }
   } else {
     return responseJson === true && res.json ? await res.json() : res
