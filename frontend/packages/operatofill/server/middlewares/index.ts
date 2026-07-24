@@ -8,12 +8,14 @@ const operatoBaseUrl = config.get('operato/baseUrl')
 
 async function getRawBody(request) {
   return new Promise((resolve, reject) => {
-    let body = ''
+    // 청크별 toString() 은 멀티바이트(한글 등) 문자가 청크 경계에서 쪼개지면 깨져
+    // 본문 바이트 수가 틀어진다(→ 백엔드 JSON parse 오류). Buffer 로 모아 바이트를 그대로 보존한다.
+    const chunks: Buffer[] = []
     request.on('data', chunk => {
-      body += chunk.toString()
+      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk)
     })
     request.on('end', () => {
-      resolve(body)
+      resolve(Buffer.concat(chunks))
     })
     request.on('error', error => {
       reject(error)

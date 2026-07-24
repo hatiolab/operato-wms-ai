@@ -1107,35 +1107,56 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
     this._resumeResolve = null
     this._startTimer()
 
-    for (const group of groups) {
+    // 묶음(주문)을 CHUNK_GROUPS개씩 하나의 청크로 묶어 "한 요청"으로 처리한다.
+    // 백엔드(import_one/.../by_custom → importShipmentOrders)가 ref_order_no로 자동 그룹핑하므로,
+    // 여러 주문의 행을 한 배열로 보내도 주문별로 나뉘어 등록된다. (프론트 변경만으로 동작)
+    const CHUNK_GROUPS = 50
+    for (let gi = 0; gi < groups.length; gi += CHUNK_GROUPS) {
       // 일시정지 대기
       if (this._paused) {
         await new Promise(resolve => { this._resumeResolve = resolve })
       }
       if (!this._running) break
 
-      this._processingRefOrderNo = group.refOrderNo
+      const chunkGroups = groups.slice(gi, gi + CHUNK_GROUPS)
+      // 청크 내 모든 주문의 행을 순서대로 평탄화 (응답 배열과 1:1 매핑되도록 순서 유지)
+      const chunkRows = []
+      chunkGroups.forEach(g => g.rows.forEach(r => chunkRows.push(r)))
 
-      const body = this._buildGroupImportBody(group)
+      // 스크롤 따라가기용 — 이번 청크의 첫 주문
+      this._processingRefOrderNo = chunkGroups.length ? chunkGroups[0].refOrderNo : null
+
+      const body = chunkRows.map(r => this._buildRowBody(r))
       await ServiceUtil.restPost(url, body, null, null,
         (res) => {
           const resArray = Array.isArray(res) ? res : []
-          group.rows.forEach((r, i) => {
-            if (resArray[i] && typeof resArray[i] === 'object') Object.assign(r, resArray[i])
-            r._createStatus = 'OK'
-            r._errorMessage = null
+          chunkRows.forEach((r, i) => {
+            const out = resArray[i]
+            const rmk = out && out.remarks
+            if (rmk && String(rmk).indexOf('__IMP_ERR__:') === 0) {
+              // 서버(DIY)가 표시한 주문 단위 오류 — 해당 주문 행만 ERROR (에러 격리)
+              r._createStatus = 'ERROR'
+              r._errorMessage = String(rmk).substring('__IMP_ERR__:'.length)
+            } else {
+              if (out && typeof out === 'object') Object.assign(r, out)
+              r._createStatus = 'OK'
+              r._errorMessage = null
+            }
           })
         },
         (err) => {
+          // 청크 전체 실패(백엔드가 한 행이라도 오류면 throw) → 이 청크의 모든 행 ERROR
           const msg = err?.msg || this._extractErrorMessage(err)
-          group.rows.forEach(r => {
+          chunkRows.forEach(r => {
             r._createStatus = 'ERROR'
             r._errorMessage = msg
           })
         }
       )
 
-      this._processed++
+      // 진행률은 처리한 "주문(그룹)" 수 기준 (막대가 청크마다 최대 CHUNK_GROUPS씩 증가)
+      this._processed += chunkGroups.length
+      this.requestUpdate()
     }
 
     this._processingRefOrderNo = null
