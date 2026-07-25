@@ -18,6 +18,7 @@ import operato.wms.parcel.service.CourierServiceDispatcher;
 import operato.wms.stock.entity.Inventory;
 import operato.wms.stock.service.StockTransactionService;
 import xyz.anythings.sys.service.AbstractQueryService;
+import xyz.elidom.dbist.dml.Page;
 import xyz.elidom.exception.server.ElidomRuntimeException;
 import xyz.elidom.exception.server.ElidomValidationException;
 import xyz.elidom.sys.entity.Domain;
@@ -587,6 +588,154 @@ public class OmsShipmentOrderService extends AbstractQueryService {
 
 		// 결과 리턴
 		return ValueUtil.newMap("success,restored_count", true, allocations.size());
+	}
+
+	/**
+	 * 웨이브 소속 주문을 SKU 패턴 기준으로 소팅하여 반환
+	 *
+	 * 패턴은 주문에 포함된 SKU 코드를 알파벳 순으로 정렬·조합한 문자열이다.
+	 * 정렬 우선순위:
+	 * 1. SKU 종류 수 오름차순 (단품 → 다품목)
+	 * 2. 동일 패턴의 주문 수 오름차순 (적은 패턴부터)
+	 * 3. 패턴 키 알파벳 순
+	 * 4. 주문번호 순
+	 *
+	 * @param domainId 도메인 ID
+	 * @param waveNo   웨이브 번호
+	 * @return 패턴 소팅된 주문 목록 (pattern_key, sku_count, pattern_order_count 포함)
+	 */
+	/**
+	 * 웨이브 ID로 소속 주문을 SKU 패턴 기준으로 소팅하여 반환 (페이지네이션).
+	 * shipment_waves.id → wave_no를 조회한 뒤 {@link #getWavePatternSortedOrders} 에
+	 * 위임한다.
+	 *
+	 * @param domainId 도메인 ID
+	 * @param waveId   ShipmentWave UUID
+	 * @param page     페이지 번호 (1-based)
+	 * @param limit    페이지당 건수 (0이면 전체)
+	 * @return 패턴 소팅된 주문 페이지
+	 */
+	public Page<ShipmentOrder> getWavePatternSortedOrdersByWaveId(Long domainId, String waveId, int page, int limit) {
+		if (ValueUtil.isEmpty(waveId)) {
+			throw new ElidomValidationException("웨이브 ID는 필수입니다.");
+		}
+		String waveNo = this.queryManager.selectBySql(
+				"SELECT wave_no FROM shipment_waves WHERE domain_id = :domainId AND id = :waveId",
+				ValueUtil.newMap("domainId,waveId", domainId, waveId),
+				String.class);
+		if (ValueUtil.isEmpty(waveNo)) {
+			throw new ElidomValidationException("해당 웨이브를 찾을 수 없습니다. waveId=" + waveId);
+		}
+		return this.getWavePatternSortedOrders(domainId, waveNo, page, limit);
+	}
+
+	/**
+	 * 웨이브 소속 주문을 SKU 패턴 기준으로 소팅하여 반환 (페이지네이션).
+	 *
+	 * 정렬 우선순위:
+	 * 1. SKU 종류 수 오름차순
+	 * 2. 동일 패턴의 주문 수 오름차순
+	 * 3. 패턴 키 알파벳 순
+	 * 4. 주문번호 순
+	 *
+	 * @param domainId 도메인 ID
+	 * @param waveNo   웨이브 번호
+	 * @param page     페이지 번호 (1-based)
+	 * @param limit    페이지당 건수 (0이면 전체)
+	 * @return 패턴 소팅된 주문 페이지 (pattern_key, sku_count, pattern_order_count 포함)
+	 */
+	@SuppressWarnings("unchecked")
+	public Page<ShipmentOrder> getWavePatternSortedOrders(Long domainId, String waveNo, int page, int limit) {
+		if (ValueUtil.isEmpty(waveNo)) {
+			throw new ElidomValidationException("웨이브 번호는 필수입니다.");
+		}
+
+		Map<String, Object> params = ValueUtil.newMap("domainId,waveNo", domainId, waveNo);
+
+		// 전체 건수 조회
+		int total = ValueUtil.toInteger(this.queryManager.selectBySql(
+				"SELECT COUNT(DISTINCT so.id) FROM shipment_orders so WHERE so.domain_id = :domainId AND so.wave_no = :waveNo",
+				params, Integer.class), 0);
+
+		// 데이터 조회 (패턴 소팅 + 페이지네이션)
+		String sql = """
+				WITH order_patterns AS (
+				    SELECT
+				        so.id,
+				        so.shipment_no,
+						so.ref_order_no,
+						so.invoice_no,
+						so.order_date,
+						so.orderer_nm,
+						so.receiver_nm,
+				        so.status,
+				        so.total_item,
+				        so.total_order,
+				        so.cust_nm,
+				        so.cust_cd,
+				        so.wave_no,
+				        STRING_AGG(soi.sku_cd, '|' ORDER BY soi.sku_cd) AS pattern_key,
+				        COUNT(DISTINCT soi.sku_cd)                       AS sku_count
+				    FROM shipment_orders so
+				    JOIN shipment_order_items soi
+				         ON soi.shipment_order_id = so.id
+				        AND soi.domain_id          = so.domain_id
+				    WHERE so.domain_id = :domainId
+				      AND so.wave_no   = :waveNo
+				    GROUP BY so.id, so.shipment_no, so.ref_order_no, so.invoice_no,
+							 so.order_date, so.orderer_nm, so.receiver_nm,
+							 so.status, so.total_item, so.total_order,
+				             so.cust_nm, so.cust_cd, so.wave_no
+				),
+				pattern_stats AS (
+				    SELECT
+				        pattern_key,
+				        COUNT(*) AS pattern_order_count
+				    FROM order_patterns
+				    GROUP BY pattern_key
+				)
+				SELECT
+				    op.id,
+				    op.shipment_no,
+					op.ref_order_no,
+					op.invoice_no,
+					op.order_date,
+					op.orderer_nm,
+					op.receiver_nm,
+				    op.status,
+				    op.total_item,
+				    op.total_order,
+				    op.cust_nm,
+				    op.cust_cd,
+				    op.wave_no,
+				    op.pattern_key,
+				    op.sku_count,
+				    ps.pattern_order_count
+				FROM order_patterns op
+				JOIN pattern_stats ps ON ps.pattern_key = op.pattern_key
+				ORDER BY
+				    op.sku_count           ASC,
+				    ps.pattern_order_count ASC,
+				    op.pattern_key         ASC,
+				    op.shipment_no         ASC
+				""";
+
+		int safePage = (page < 1) ? 1 : page;
+		int safeLimit = (limit < 0) ? 0 : limit;
+		int firstIndex = (safeLimit > 0) ? (safePage - 1) * safeLimit : 0;
+
+		List<ShipmentOrder> items = (List<ShipmentOrder>) (List<?>) this.queryManager.selectListBySql(
+				sql, params, ShipmentOrder.class, firstIndex, safeLimit);
+
+		Page<ShipmentOrder> result = new Page<ShipmentOrder>();
+		result.setIndex(safePage);
+		result.setSize(items.size());
+		result.setTotalSize(total);
+		result.setFirstResultIndex(firstIndex);
+		result.setMaxResultSize(safeLimit);
+		result.setLastIndex(safeLimit > 0 ? (int) Math.ceil((double) total / safeLimit) : 1);
+		result.setList(items);
+		return result;
 	}
 
 	/*

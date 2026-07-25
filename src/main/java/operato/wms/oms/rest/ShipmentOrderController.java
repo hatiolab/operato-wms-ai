@@ -27,6 +27,7 @@ import operato.wms.oms.entity.ShipmentDelivery;
 import operato.wms.oms.entity.ShipmentOrder;
 import operato.wms.oms.entity.ShipmentOrderItem;
 import operato.wms.oms.service.OmsImportService;
+import operato.wms.oms.service.OmsShipmentOrderService;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.print.rest.PrintoutController;
@@ -56,6 +57,11 @@ public class ShipmentOrderController extends AbstractRestService {
 	 */
 	@Autowired
 	private OmsImportService importService;
+	/**
+	 * 출하 주문 서비스
+	 */
+	@Autowired
+	private OmsShipmentOrderService omsShipmentOrderService;
 	/**
 	 * 리포트 컨트롤러
 	 */
@@ -148,6 +154,44 @@ public class ShipmentOrderController extends AbstractRestService {
 		}
 
 		return this.cudMultipleData(ShipmentOrderItem.class, shipmentOrderItems);
+	}
+
+	/**
+	 * 웨이브 ID로 소속 주문을 SKU 패턴 기준으로 소팅하여 반환 (페이지네이션)
+	 *
+	 * GET /rest/shipment_orders/{id}/wave_pattern_sort?page=1&limit=50
+	 *
+	 * @param id    ShipmentWave UUID
+	 * @param page  페이지 번호 (1-based, 기본값 1)
+	 * @param limit 페이지당 건수 (기본값 50)
+	 * @return 패턴 소팅된 주문 페이지
+	 */
+	@GetMapping(value = "/{id}/wave_pattern_sort", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get wave orders sorted by SKU pattern using wave id (sku_count ASC, pattern_order_count ASC)")
+	public Page<?> getWavePatternSortById(
+			@PathVariable("id") String id,
+			@RequestParam(name = "page", required = false, defaultValue = "1") Integer page,
+			@RequestParam(name = "limit", required = false, defaultValue = "50") Integer limit) {
+		return this.omsShipmentOrderService.getWavePatternSortedOrdersByWaveId(Domain.currentDomainId(), id, page, limit);
+	}
+
+	/**
+	 * 웨이브 소속 주문을 SKU 패턴 기준으로 소팅하여 반환 (페이지네이션)
+	 *
+	 * GET /rest/shipment_orders/wave_pattern_sort?wave_no={waveNo}&page=1&limit=50
+	 *
+	 * @param waveNo 웨이브 번호
+	 * @param page   페이지 번호 (1-based, 기본값 1)
+	 * @param limit  페이지당 건수 (기본값 50)
+	 * @return 패턴 소팅된 주문 페이지
+	 */
+	@GetMapping(value = "/wave_pattern_sort", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get wave orders sorted by SKU pattern (sku_count ASC, pattern_order_count ASC)")
+	public Page<?> getWavePatternSort(
+			@RequestParam("wave_no") String waveNo,
+			@RequestParam(name = "page", required = false, defaultValue = "1") Integer page,
+			@RequestParam(name = "limit", required = false, defaultValue = "50") Integer limit) {
+		return this.omsShipmentOrderService.getWavePatternSortedOrders(Domain.currentDomainId(), waveNo, page, limit);
 	}
 
 	/**
