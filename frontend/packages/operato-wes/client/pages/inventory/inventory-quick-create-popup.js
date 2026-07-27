@@ -119,6 +119,43 @@ class InventoryQuickCreatePopup extends localize(i18next)(LitElement) {
           opacity: 0.5;
           cursor: default;
         }
+
+        /* 홀딩(자물쇠) 라벨 — 클릭하면 저장 시 값 유지 토글 */
+        .hold-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          width: fit-content;
+          cursor: pointer;
+          user-select: none;
+        }
+
+        .hold-label .lock-icon {
+          font-size: 12px;
+          line-height: 1;
+        }
+
+        .hold-label:hover .hold-text {
+          text-decoration: underline;
+        }
+
+        /* 홀딩된 항목 라벨 강조 (앰버) */
+        .hold-label.locked {
+          color: #e8820c;
+          font-weight: 700;
+        }
+
+        /* 홀딩된 입력창 표시 (앰버 배경/테두리) */
+        select.held,
+        input.held {
+          background: #fff8e1;
+          border-color: #f5a623;
+        }
+
+        select.held:focus,
+        input.held:focus {
+          border-color: #e8820c;
+        }
       `
     ]
   }
@@ -138,7 +175,8 @@ class InventoryQuickCreatePopup extends localize(i18next)(LitElement) {
       whOptions: { type: Array },
       comOptions: { type: Array },
       reasonOptions: { type: Array },
-      saving: { type: Boolean }
+      saving: { type: Boolean },
+      held: { type: Object }
     }
   }
 
@@ -158,6 +196,9 @@ class InventoryQuickCreatePopup extends localize(i18next)(LitElement) {
     this.comOptions = []
     this.reasonOptions = []
     this.saving = false
+    // 홀딩 상태 — true인 항목은 저장 후에도 값이 초기화되지 않는다.
+    // 창고/화주사는 기본 홀딩. 팝업을 새로 열면(=새 인스턴스) 이 기본값으로 초기화된다.
+    this.held = { wh_cd: true, com_cd: true }
   }
 
   /** lifecycle - 창고/화주사/사유 옵션 로드 */
@@ -192,8 +233,8 @@ class InventoryQuickCreatePopup extends localize(i18next)(LitElement) {
     return html`
       <div class="row">
         <div class="field">
-          <label>${TermsUtil.tLabel('wh_cd')}<span class="req">*</span></label>
-          <select @change=${e => (this.whCd = e.target.value)}>
+          ${this._renderHoldLabel('wh_cd', true)}
+          <select class=${this.held['wh_cd'] ? 'held' : ''} @change=${e => (this.whCd = e.target.value)}>
             <option value="">-</option>
             ${this.whOptions.map(
               w => html`<option value=${w.wh_cd} ?selected=${this.whCd === w.wh_cd}>${w.wh_nm} (${w.wh_cd})</option>`
@@ -201,8 +242,8 @@ class InventoryQuickCreatePopup extends localize(i18next)(LitElement) {
           </select>
         </div>
         <div class="field">
-          <label>${TermsUtil.tLabel('com_cd')}<span class="req">*</span></label>
-          <select @change=${e => (this.comCd = e.target.value)}>
+          ${this._renderHoldLabel('com_cd', true)}
+          <select class=${this.held['com_cd'] ? 'held' : ''} @change=${e => (this.comCd = e.target.value)}>
             <option value="">-</option>
             ${this.comOptions.map(
               c => html`<option value=${c.com_cd} ?selected=${this.comCd === c.com_cd}>${c.com_nm} (${c.com_cd})</option>`
@@ -210,10 +251,11 @@ class InventoryQuickCreatePopup extends localize(i18next)(LitElement) {
           </select>
         </div>
         <div class="field">
-          <label>${TermsUtil.tLabel('inv_qty')}<span class="req">*</span></label>
+          ${this._renderHoldLabel('inv_qty', true)}
           <input
             type="number"
             min="1"
+            class=${this.held['inv_qty'] ? 'held' : ''}
             .value=${this.invQty == null ? '' : String(this.invQty)}
             @input=${e => (this.invQty = e.target.value === '' ? null : Number(e.target.value))}
           />
@@ -222,38 +264,38 @@ class InventoryQuickCreatePopup extends localize(i18next)(LitElement) {
 
       <div class="row">
         <div class="field">
-          <label>${TermsUtil.tLabel('sku_cd')}<span class="req">*</span></label>
+          ${this._renderHoldLabel('sku_cd', true)}
           <div class="input-with-btn">
-            <input type="text" .value=${this.skuCd} @input=${e => (this.skuCd = e.target.value)} />
+            <input type="text" class=${this.held['sku_cd'] ? 'held' : ''} .value=${this.skuCd} @input=${e => (this.skuCd = e.target.value)} />
             <button class="icon-btn" title=${i18next.t('label.search', { defaultValue: '상품 선택' })} @click=${() => this._openSkuPicker()}>🔍</button>
           </div>
         </div>
         <div class="field">
-          <label>${TermsUtil.tLabel('loc_cd')}<span class="req">*</span></label>
-          <input type="text" .value=${this.locCd} @input=${e => (this.locCd = e.target.value)} />
+          ${this._renderHoldLabel('loc_cd', true)}
+          <input type="text" class=${this.held['loc_cd'] ? 'held' : ''} .value=${this.locCd} @input=${e => (this.locCd = e.target.value)} />
         </div>
         <div class="field">
-          <label>${TermsUtil.tLabel('expired_date')}</label>
-          <input type="date" .value=${this.expiredDate} @input=${e => (this.expiredDate = e.target.value)} />
+          ${this._renderHoldLabel('expired_date', false)}
+          <input type="date" class=${this.held['expired_date'] ? 'held' : ''} .value=${this.expiredDate} @input=${e => (this.expiredDate = e.target.value)} />
         </div>
       </div>
 
       <div class="row">
         <div class="field">
-          <label>${TermsUtil.tLabel('lot_no')}</label>
-          <input type="text" .value=${this.lotNo} @input=${e => (this.lotNo = e.target.value)} />
+          ${this._renderHoldLabel('lot_no', false)}
+          <input type="text" class=${this.held['lot_no'] ? 'held' : ''} .value=${this.lotNo} @input=${e => (this.lotNo = e.target.value)} />
         </div>
         <div class="field">
-          <label>${TermsUtil.tLabel('reason_cd')}</label>
-          <select @change=${e => (this.reasonCd = e.target.value)}>
+          ${this._renderHoldLabel('reason_cd', false)}
+          <select class=${this.held['reason_cd'] ? 'held' : ''} @change=${e => (this.reasonCd = e.target.value)}>
             ${this.reasonOptions.map(
               r => html`<option value=${r.value} ?selected=${this.reasonCd === r.value}>${r.display}</option>`
             )}
           </select>
         </div>
         <div class="field">
-          <label>${TermsUtil.tLabel('remarks')}</label>
-          <input type="text" .value=${this.remarks} @input=${e => (this.remarks = e.target.value)} />
+          ${this._renderHoldLabel('remarks', false)}
+          <input type="text" class=${this.held['remarks'] ? 'held' : ''} .value=${this.remarks} @input=${e => (this.remarks = e.target.value)} />
         </div>
       </div>
 
@@ -262,6 +304,34 @@ class InventoryQuickCreatePopup extends localize(i18next)(LitElement) {
         <button class="save" ?disabled=${this.saving} @click=${() => this._onSave()}>${TermsUtil.tButton('save')}</button>
       </div>
     `
+  }
+
+  /**
+   * 홀딩(자물쇠) 토글이 가능한 항목 라벨을 렌더한다.
+   * 라벨(자물쇠 아이콘 포함) 클릭 시 해당 항목의 홀딩 상태가 토글되며,
+   * 홀딩된 항목은 저장 후에도 값이 초기화되지 않는다. (값 변경은 언제든 가능)
+   * @param {string} key 항목 키(용어 키 겸용, 예: 'wh_cd')
+   * @param {boolean} required 필수 여부(빨간 * 표시)
+   */
+  _renderHoldLabel(key, required = false) {
+    const locked = !!this.held[key]
+    return html`
+      <label
+        class="hold-label ${locked ? 'locked' : ''}"
+        title=${locked
+          ? i18next.t('text.hold_locked', { defaultValue: '홀딩됨 — 클릭하면 해제 (저장 시 값 유지)' })
+          : i18next.t('text.hold_unlocked', { defaultValue: '클릭하면 홀딩 (저장 시 값 유지)' })}
+        @click=${() => this._toggleHold(key)}
+      >
+        <span class="lock-icon">${locked ? '🔒' : '🔓'}</span>
+        <span class="hold-text">${TermsUtil.tLabel(key)}</span>${required ? html`<span class="req">*</span>` : ''}
+      </label>
+    `
+  }
+
+  /** 항목의 홀딩 상태를 토글한다 (저장 시 값 유지 여부) */
+  _toggleHold(key) {
+    this.held = { ...this.held, [key]: !this.held[key] }
   }
 
   /** "닫기" - 팝업 닫기 */
@@ -321,19 +391,26 @@ class InventoryQuickCreatePopup extends localize(i18next)(LitElement) {
     this.saving = false
   }
 
-  /** 연속 등록을 위해 창고/화주사는 유지하고 나머지 입력을 초기화한다 */
+  /** 연속 등록을 위해 홀딩되지 않은 항목만 초기화한다 (홀딩된 항목은 값 유지) */
   _resetForNext() {
-    this.skuCd = ''
-    this.locCd = ''
-    this.invQty = null
-    this.lotNo = ''
-    this.expiredDate = ''
-    this.reasonCd = ''
-    this.remarks = ''
-    // 상품코드 입력란에 포커스
+    const resetters = {
+      wh_cd: () => (this.whCd = ''),
+      com_cd: () => (this.comCd = ''),
+      inv_qty: () => (this.invQty = null),
+      sku_cd: () => (this.skuCd = ''),
+      loc_cd: () => (this.locCd = ''),
+      expired_date: () => (this.expiredDate = ''),
+      lot_no: () => (this.lotNo = ''),
+      reason_cd: () => (this.reasonCd = ''),
+      remarks: () => (this.remarks = '')
+    }
+    Object.keys(resetters).forEach(key => {
+      if (!this.held[key]) resetters[key]()
+    })
+    // 상품코드가 홀딩되지 않았다면 상품코드 입력란에 포커스 (연속 등록 편의)
     this.updateComplete.then(() => {
       const el = this.renderRoot.querySelectorAll('input[type="text"]')[0]
-      if (el) el.focus()
+      if (el && !this.held['sku_cd']) el.focus()
     })
   }
 
