@@ -20,6 +20,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import operato.wms.base.entity.SKU;
 import xyz.anythings.sys.service.ICustomService;
 import xyz.elidom.dbist.dml.Page;
+import xyz.elidom.dev.service.ExcelTemplateService;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.print.rest.PrintoutController;
@@ -53,6 +54,12 @@ public class SKUController extends AbstractRestService {
      */
     @Autowired
     private ICustomService customSvc;
+
+    /**
+     * 엑셀 템플릿 서비스
+     */
+    @Autowired
+    private ExcelTemplateService excelTemplateService;
 
     @Override
     protected Class<?> entityClass() {
@@ -145,5 +152,44 @@ public class SKUController extends AbstractRestService {
         // 2. 로케이션 바코드 생성을 위한 PDF 다운로드
         this.printoutCtrl.showPdfByPrintTemplateName(req, res, "SIMPLE_BARCODE",
                 ValueUtil.newMap("barcode", sku.getSkuBarcd()));
+    }
+
+    /**
+     * 엑셀 템플릿(master.sku) 임포트 — 행 단위 upsert.
+     * 검증·필드 매핑은 ExcelTemplateService.applyImportBody에 위임한다.
+     * com_cd + sku_cd 조합으로 기존 레코드 조회 후 없으면 insert, 있으면 update.
+     *
+     * POST /rest/sku/import_one?template_id={id} 또는 ?template_name={name}
+     */
+    @RequestMapping(value = "/import_one", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ApiDesc(description = "Import one SKU row using ExcelTemplate column config (upsert by com_cd + sku_cd)")
+    public SKU importOne(
+            @RequestParam(name = "template_id", required = false) String templateId,
+            @RequestParam(name = "template_name", required = false) String templateName,
+            @RequestBody Map<String, Object> body) {
+
+        Long domainId = Domain.currentDomainId();
+
+        // 1. com_cd + sku_cd 기준으로 기존 SKU 조회 또는 신규 생성
+        String comCd = ValueUtil.toString(body.get("com_cd"));
+        String skuCd = ValueUtil.toString(body.get("sku_cd"));
+        SKU sku = this.queryManager.selectByCondition(SKU.class, new SKU(domainId, comCd, skuCd));
+        if (sku == null) {
+            sku = new SKU();
+            sku.setDomainId(domainId);
+            sku.setDelFlag(false);
+        }
+
+        // 2. ExcelTemplate 기반 필수 검증 및 동적 필드 매핑
+        this.excelTemplateService.applyImportBody(domainId, templateId, templateName, sku, body);
+
+        // 3. Insert or Update
+        if (sku.getId() == null) {
+            this.queryManager.insert(sku);
+        } else {
+            this.queryManager.update(sku);
+        }
+
+        return sku;
     }
 }
