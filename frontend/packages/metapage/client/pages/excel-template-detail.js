@@ -369,6 +369,7 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
           <button class="btn btn-danger btn-sm" @click=${this._deleteChecked}>선택 삭제</button>
           <button class="btn btn-secondary btn-sm" @click=${this._moveUp}>위로</button>
           <button class="btn btn-secondary btn-sm" @click=${this._moveDown}>아래로</button>
+          <button class="btn btn-secondary btn-sm" @click=${this._reorderAll}>순서 정렬</button>
         </div>
 
         <!-- 컬럼 그리드 -->
@@ -661,6 +662,19 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
     next.col_order = tmpOrder
     col._modified = true
     next._modified = true
+    this.requestUpdate()
+  }
+
+  /** 현재 표시 순서대로 col_order를 10, 20, 30, ... 으로 재부여 */
+  _reorderAll() {
+    const visible = this._visibleSorted()
+    visible.forEach((col, i) => {
+      const newOrder = (i + 1) * 10
+      if (col.col_order !== newOrder) {
+        col.col_order = newOrder
+        col._modified = true
+      }
+    })
     this.requestUpdate()
   }
 

@@ -1,6 +1,7 @@
 package operato.wms.base.rest;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -18,6 +19,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import operato.wms.base.entity.Location;
 import operato.wms.base.entity.Zone;
+import xyz.elidom.dev.service.ExcelTemplateService;
 import xyz.elidom.orm.system.annotation.service.ApiDesc;
 import xyz.elidom.orm.system.annotation.service.ServiceDesc;
 import xyz.elidom.print.rest.PrintoutController;
@@ -37,6 +39,12 @@ public class LocationController extends AbstractRestService {
 	 */
 	@Autowired
 	private PrintoutController printoutCtrl;
+
+	/**
+	 * 엑셀 템플릿 서비스
+	 */
+	@Autowired
+	private ExcelTemplateService excelTemplateService;
 
 	@Override
 	protected Class<?> entityClass() {
@@ -97,6 +105,47 @@ public class LocationController extends AbstractRestService {
 	@ApiDesc(description = "Create, Update or Delete multiple at one time")
 	public Boolean multipleUpdate(@RequestBody List<Location> list) {
 		return this.cudMultipleData(this.entityClass(), list);
+	}
+
+	/**
+	 * 엑셀 템플릿(master.location) 임포트 — 행 단위 upsert.
+	 * 검증·필드 매핑은 ExcelTemplateService.applyImportBody에 위임한다.
+	 * loc_cd 기준으로 기존 레코드 조회 후 없으면 insert, 있으면 update.
+	 *
+	 * POST /rest/locations/import_one?template_id={id} 또는 ?template_name={name}
+	 */
+	@RequestMapping(value = "/import_one", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Import one Location row using ExcelTemplate column config (upsert by loc_cd)")
+	public Location importOne(
+			@RequestParam(name = "template_id", required = false) String templateId,
+			@RequestParam(name = "template_name", required = false) String templateName,
+			@RequestBody Map<String, Object> body) {
+
+		Long domainId = Domain.currentDomainId();
+
+		// 1. loc_cd 기준으로 기존 Location 조회 또는 신규 생성
+		String locCd = ValueUtil.toString(body.get("loc_cd"));
+		Location cond = new Location();
+		cond.setDomainId(domainId);
+		cond.setLocCd(locCd);
+		Location location = this.queryManager.selectByCondition(Location.class, cond);
+		if (location == null) {
+			location = new Location();
+			location.setDomainId(domainId);
+			location.setDelFlag(false);
+		}
+
+		// 2. ExcelTemplate 기반 필수 검증 및 동적 필드 매핑
+		this.excelTemplateService.applyImportBody(domainId, templateId, templateName, location, body);
+
+		// 3. Insert or Update
+		if (location.getId() == null) {
+			this.queryManager.insert(location);
+		} else {
+			this.queryManager.update(location);
+		}
+
+		return location;
 	}
 
 	@RequestMapping(value = "/{id}/download_barcode", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
