@@ -74,3 +74,4 @@ frontend/packages/operato-wes/config/config.development.js
 src/main/resources/logback-spring.xml
 frontend/packages/operato-wes/config/config.development.js
 src/main/resources/WEB-INF/logback-spring.xml
+ref/operato-java-tools-doc.pdf
