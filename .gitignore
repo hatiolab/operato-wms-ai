@@ -41,6 +41,12 @@ frontend/.pnp.*
 frontend/yarn.lock
 frontend/packages/operato-wes/cache/
 
+# 템플릿 파일 (엑셀 등 업무 데이터)
+templates/
+
+# 참조 문서 (공유 제외)
+ref/incubator/
+
 # Spring Boot static 리소스 (빌드 산출물)
 src/main/resources/static/
 !src/main/resources/static/.gitkeep
