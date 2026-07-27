@@ -649,6 +649,15 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
         </select>
       `
     }
+    if (param.col_type === 'boolean') {
+      return html`
+        <select @change=${onChange}>
+          <option value="" ?selected=${!val}>-- 선택 --</option>
+          <option value="TRUE" ?selected=${val === 'TRUE'}>TRUE</option>
+          <option value="FALSE" ?selected=${val === 'FALSE'}>FALSE</option>
+        </select>
+      `
+    }
     return html`<input type="text" .value=${val} placeholder="${param.default_value || ''}" @input=${onChange}>`
   }
 
@@ -685,6 +694,7 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
       const raw = row[col.col_key]
       let display = raw != null ? String(raw) : ''
       if (col.col_type === 'date' && raw != null) display = this._formatDate(raw)
+      if (col.col_type === 'boolean' && raw != null) display = String(raw).toUpperCase() === 'TRUE' ? '✓' : '✗'
       const map = (this._selectMaps || {})[col.col_key]
       if (map && raw != null && map[raw] != null) display = `${map[raw]} (${raw})`
       return html`<td title="${display}">${display}</td>`
@@ -1216,6 +1226,8 @@ class DynamicShipmentOrderImportPopup extends localize(i18next)(LitElement) {
 
       if (col.col_type === 'date') {
         val = this._formatDate(val)
+      } else if (col.col_type === 'boolean') {
+        val = String(val).toUpperCase() === 'TRUE'
       } else if (col.col_type === 'code_select' && col.select_label_key) {
         const codeMap = (this._codeSelectMaps || {})[col.col_key] || {}
         val = codeMap[String(val)] ?? val

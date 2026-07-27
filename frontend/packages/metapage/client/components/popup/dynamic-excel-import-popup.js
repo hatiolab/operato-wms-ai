@@ -525,6 +525,15 @@ class DynamicExcelImportPopup extends localize(i18next)(LitElement) {
         </select>
       `
     }
+    if (param.col_type === 'boolean') {
+      return html`
+        <select @change=${onChange}>
+          <option value="" ?selected=${!val}>-- 선택 --</option>
+          <option value="TRUE" ?selected=${val === 'TRUE'}>TRUE</option>
+          <option value="FALSE" ?selected=${val === 'FALSE'}>FALSE</option>
+        </select>
+      `
+    }
     return html`<input type="text" .value=${val} placeholder="${param.default_value || ''}" @input=${onChange}>`
   }
 
@@ -562,6 +571,8 @@ class DynamicExcelImportPopup extends localize(i18next)(LitElement) {
       let display = raw != null ? String(raw) : ''
       // date 타입: YYYY-MM-DD 포맷
       if (col.col_type === 'date' && raw != null) display = this._formatDate(raw)
+      // boolean 타입: ✓/✗ 표시
+      if (col.col_type === 'boolean' && raw != null) display = String(raw).toUpperCase() === 'TRUE' ? '✓' : '✗'
       // select 타입: value→label 변환
       const map = (this._selectMaps || {})[col.col_key]
       if (map && raw != null && map[raw] != null) display = `${map[raw]} (${raw})`
@@ -920,8 +931,9 @@ class DynamicExcelImportPopup extends localize(i18next)(LitElement) {
    * @param {boolean} includeErrors - true: 오류 행도 재처리
    */
   async _startImport(includeErrors) {
-    const url = this._template?.import_url
-    if (!url) { UiUtil.showToast('error', '임포트 URL이 설정되지 않았습니다.'); return }
+    const baseUrl = this._template?.import_url
+    if (!baseUrl) { UiUtil.showToast('error', '임포트 URL이 설정되지 않았습니다.'); return }
+    const url = this._template?.id ? `${baseUrl}?template_id=${encodeURIComponent(this._template.id)}` : baseUrl
 
     // 필수 공통 파라미터 검증
     const missingParams = (this._params || []).filter(p => {
@@ -1022,6 +1034,8 @@ class DynamicExcelImportPopup extends localize(i18next)(LitElement) {
 
       if (col.col_type === 'date') {
         val = this._formatDate(val)
+      } else if (col.col_type === 'boolean') {
+        val = String(val).toUpperCase() === 'TRUE'
       } else if (col.col_type === 'code_select' && col.select_label_key) {
         // select_label_key 설정 시: 엑셀 셀의 label값을 code값으로 역변환
         const codeMap = (this._codeSelectMaps || {})[col.col_key] || {}

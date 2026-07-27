@@ -20,10 +20,8 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
           flex-direction: column;
           background: var(--md-sys-color-surface, #fff);
           overflow: hidden;
-          width: 90vw;
-          max-width: 1400px;
-          min-width: 860px;
-          height: 80vh;
+          width: 100%;  /* 팝업 래퍼 너비에 맞춤 */
+          height: 100%; /* 팝업 래퍼 높이에 맞춤 */
         }
 
         /* ── 메인 탭 바 ── */
@@ -58,14 +56,15 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
         /* ── 탭 패널 ── */
         .tab-panel {
           display: none;
-          flex: 1;
+          flex: 1;         /* 호스트 남은 높이를 채움 (col-panel용) */
           overflow: hidden;
           flex-direction: column;
         }
         .tab-panel.active { display: flex; }
 
-        /* 기본 정보 탭 패널: 세로 스크롤 허용 */
+        /* 기본 정보 탭 패널: 내용 크기에 맞게 유지 (flex: 1 재정의) */
         .info-panel {
+          flex: none;      /* 늘어나지 않고 내용 높이만큼만 */
           overflow-y: auto;
           padding: 20px;
           gap: 20px;
@@ -106,9 +105,9 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
         }
         .field textarea { resize: vertical; min-height: 80px; }
 
-        /* 컬럼 탭 패널 */
+        /* 컬럼 탭 패널: .tab-panel의 flex: 1 + overflow: hidden 상속 */
         .col-panel {
-          overflow: hidden;
+          /* tab-panel에서 flex: 1 과 overflow: hidden 상속 — 별도 재정의 불필요 */
         }
 
         /* 컬럼 서브 탭 (데이터 컬럼 / 공통 파라미터) */
@@ -146,7 +145,7 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
           border-bottom: 1px solid var(--md-sys-color-outline-variant, #e8e8e8);
         }
         .grid-wrap {
-          flex: 1;
+          flex: 1;     /* col-panel(flex:1, height 확정)의 남은 공간을 채워 그리드 스크롤 */
           overflow: auto;
         }
 
@@ -219,6 +218,7 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
           padding: 12px 20px;
           border-top: 1px solid var(--md-sys-color-outline-variant, #e0e0e0);
           background: var(--md-sys-color-surface-container, #f9f9f9);
+          margin-top: auto; /* 기본 정보 탭에서 내용이 compact할 때 하단 고정 */
         }
         .spacer { flex: 1; }
 
@@ -301,7 +301,9 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
   render() {
     const t = this._template || {}
     const isNew = !this.templateId
-    const tabCols = (this._columns || []).filter(c => c.col_role === this._colRole && !c._deleted)
+    const tabCols = (this._columns || [])
+      .filter(c => c.col_role === this._colRole && !c._deleted)
+      .sort((a, b) => (a.col_order || 0) - (b.col_order || 0))
 
     return html`
       <!-- 메인 탭 바 -->
@@ -466,7 +468,7 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
           @input=${e => this._onColChange(col, 'col_label', e.target.value)}></td>
         <td>
           <select @change=${e => this._onColChange(col, 'col_type', e.target.value)}>
-            ${['text', 'number', 'date', 'select', 'key_value_select', 'api_select', 'code_select'].map(ct => html`
+            ${['text', 'number', 'date', 'boolean', 'select', 'key_value_select', 'api_select', 'code_select'].map(ct => html`
               <option value="${ct}" ?selected=${col.col_type === ct}>${ct}</option>
             `)}
           </select>
@@ -594,7 +596,7 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
     const newCol = {
       _new: true,
       col_role: role,
-      col_order: maxOrder + 1,
+      col_order: (Math.floor(maxOrder / 10) + 1) * 10,
       col_key: '',
       col_label: '',
       col_type: 'text',
@@ -621,9 +623,16 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
     this.requestUpdate()
   }
 
+  /** col_order 기준으로 정렬된 현재 탭 컬럼 목록 반환 */
+  _visibleSorted() {
+    return (this._columns || [])
+      .filter(c => c.col_role === this._colRole && !c._deleted)
+      .sort((a, b) => (a.col_order || 0) - (b.col_order || 0))
+  }
+
   /** 위로 이동 */
   _moveUp() {
-    const visible = (this._columns || []).filter(c => c.col_role === this._colRole && !c._deleted)
+    const visible = this._visibleSorted()
     const checked = visible.filter(c => c._checked)
     if (checked.length !== 1) { UiUtil.showToast('warning', '이동할 행을 1개 선택하세요.'); return }
     const col = checked[0]
@@ -640,7 +649,7 @@ class ExcelTemplateDetail extends localize(i18next)(LitElement) {
 
   /** 아래로 이동 */
   _moveDown() {
-    const visible = (this._columns || []).filter(c => c.col_role === this._colRole && !c._deleted)
+    const visible = this._visibleSorted()
     const checked = visible.filter(c => c._checked)
     if (checked.length !== 1) { UiUtil.showToast('warning', '이동할 행을 1개 선택하세요.'); return }
     const col = checked[0]
