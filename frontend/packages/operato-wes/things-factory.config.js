@@ -13,6 +13,7 @@ export default {
     { tagname: 'shipment-order-b2c-import', page: 'shipment-order-b2c-import' },
     { tagname: 'shipment-wave-list', page: 'shipment-wave-list' },
     { tagname: 'shipment-wave-detail', page: 'shipment-wave-detail' },
+    { tagname: 'shipment-order-bulk-import-popup', page: 'shipment-order-bulk-import-popup' },
     { tagname: 'stock-allocation-list', page: 'stock-allocation-list' },
 
     { tagname: 'fulfillment-home', page: 'fulfillment-home' },

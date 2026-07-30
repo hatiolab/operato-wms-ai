@@ -15,6 +15,7 @@ import './pages/oms/backorder-reallocate-popup'    // 팝업으로 사용
 import './pages/oms/courier-booking-popup'         // 팝업으로 사용
 import './pages/oms/shipment-order-ready-popup'    // 팝업으로 사용
 import './pages/oms/shipment-label-print-popup'    // 팝업으로 사용 (송장 라벨 일괄 출력)
+import './pages/oms/shipment-order-bulk-import-popup' // 팝업으로 사용 (출하주문 대량 엑셀 등록)
 import './pages/oms/shipment-product-mapping-popup' // 팝업으로 사용
 import './pages/oms/shipment-product-mapping-search-popup' // 팝업으로 사용
 
