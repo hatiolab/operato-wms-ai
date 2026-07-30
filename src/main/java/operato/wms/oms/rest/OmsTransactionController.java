@@ -196,6 +196,103 @@ public class OmsTransactionController extends AbstractRestService {
 		return result;
 	}
 
+	/**
+	 * 출하 주문 대량 임포트 청크를 재검증한 뒤 등록한다.
+	 *
+	 * 프론트엔드는 참조 주문번호 그룹이 나뉘지 않도록 청크를 구성해야 한다.
+	 * 한 청크에서 검증 오류가 발견되면 해당 청크는 한 건도 등록하지 않는다.
+	 *
+	 * @param bizType 업무 유형 (B2C_OUT 또는 B2B_OUT)
+	 * @param list    청크 내 임포트 데이터
+	 * @return 성공 여부와 등록/검증 결과
+	 */
+	@RequestMapping(value = "shipment_orders/import/bulk/confirm/{bizType}", method = RequestMethod.POST,
+			consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Validate and import a shipment-order chunk atomically")
+	public Map<String, Object> importBulkChunk(
+			@PathVariable("bizType") String bizType,
+			@RequestBody List<ImportShipmentOrder> list) {
+		String normalizedBizType = this.normalizeImportBizType(bizType);
+		for (ImportShipmentOrder row : list) {
+			if (ValueUtil.isEmpty(row.getBizType())) {
+				row.setBizType(normalizedBizType);
+			}
+		}
+
+		Map<String, Object> validation = this.importService.validateImportData(list, normalizedBizType, true);
+		int errorCount = ValueUtil.toInteger(validation.get("error"), 0);
+		if (errorCount > 0) {
+			validation.put("success", false);
+			return validation;
+		}
+
+		Long domainId = Domain.currentDomainId();
+		Map<String, Object> params = ValueUtil.newMap("biz_type,list", normalizedBizType, list);
+		try {
+			this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_PRE_IMPORT_SHIPMENT, params);
+		} catch (Throwable ignored) {
+		}
+
+		Map<String, Object> imported = this.importService.importShipmentOrders(list);
+		params.put("shipmentOrders", imported);
+		try {
+			this.customSvc.doCustomService(domainId, WmsOmsConstants.TRX_OMS_POST_IMPORT_SHIPMENT, params);
+		} catch (Throwable ignored) {
+		}
+
+		imported.put("success", true);
+		imported.put("error", 0);
+		return imported;
+	}
+
+	/**
+	 * 출하 주문 대량 임포트 청크를 엄격 모드로 검증한다.
+	 *
+	 * @param bizType 업무 유형 (B2C_OUT 또는 B2B_OUT)
+	 * @param list    청크 내 임포트 데이터
+	 * @return 검증 결과
+	 */
+	@RequestMapping(value = "shipment_orders/import/bulk/validate/{bizType}", method = RequestMethod.POST,
+			consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Validate a shipment-order chunk for bulk import")
+	public Map<String, Object> validateBulkChunk(
+			@PathVariable("bizType") String bizType,
+			@RequestBody List<ImportShipmentOrder> list) {
+		String normalizedBizType = this.normalizeImportBizType(bizType);
+		Long domainId = Domain.currentDomainId();
+		Map<String, Object> params = ValueUtil.newMap("biz_type,list", normalizedBizType, list);
+
+		try {
+			this.customSvc.doCustomService(
+					domainId, WmsOmsConstants.TRX_OMS_PRE_CHECK_IMPORT_SHIPMENT, params);
+		} catch (Throwable ignored) {
+		}
+
+		Map<String, Object> result = this.importService.validateImportData(
+				list, normalizedBizType, true);
+		params.put("result", result);
+		try {
+			this.customSvc.doCustomService(
+					domainId, WmsOmsConstants.TRX_OMS_POST_CHECK_IMPORT_SHIPMENT, params);
+		} catch (Throwable ignored) {
+		}
+
+		return result;
+	}
+
+	/**
+	 * 대량 임포트 업무 유형을 서버에서 허용하는 값으로 정규화한다.
+	 *
+	 * @param bizType 요청 업무 유형
+	 * @return 정규화된 업무 유형
+	 */
+	private String normalizeImportBizType(String bizType) {
+		if (WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT.equalsIgnoreCase(bizType)) {
+			return WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2B_OUT;
+		}
+		return WmsOmsConfigConstants.SHIPMENT_ORDER_BIZ_TYPE_B2C_OUT;
+	}
+
 	/*
 	 * ============================================================
 	 * 웨이브 생성 API

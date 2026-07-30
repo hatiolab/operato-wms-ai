@@ -10,6 +10,7 @@
 
 - [입고 관리 (Inbound)](#입고-관리-inbound)
 - [출고 관리 (Outbound)](#출고-관리-outbound)
+- [OMS 관리](#oms-관리)
 - [재고 관리 (Stock)](#재고-관리-stock)
 
 ---
@@ -270,6 +271,19 @@
 | PUT | `/rest/delivery_infos/{id}` | 배송 정보 수정 |
 | DELETE | `/rest/delivery_infos/{id}` | 배송 정보 삭제 |
 | POST | `/rest/delivery_infos/update_multiple` | 다건 생성/수정/삭제 |
+
+---
+
+## OMS 관리
+
+### 출하 주문 대량 임포트 — `/rest/oms_trx`
+
+| Method | Path | 파라미터 | 설명 |
+|--------|------|---------|------|
+| POST | `/rest/oms_trx/shipment_orders/import/bulk/validate/{bizType}` | Path: `B2C_OUT` 또는 `B2B_OUT`, Body: `List<ImportShipmentOrder>` | 참조 주문번호 필수·마스터·중복·주문 그룹 일관성을 일괄 조회 방식으로 검증 |
+| POST | `/rest/oms_trx/shipment_orders/import/bulk/confirm/{bizType}` | Path: `B2C_OUT` 또는 `B2B_OUT`, Body: `List<ImportShipmentOrder>` | 청크를 서버에서 다시 검증하고 오류가 없을 때만 등록 |
+
+대량 임포트 화면은 동일한 `ref_order_no` 주문을 분리하지 않는다. 처리 단위는 사용자가 20~2,000행 사이에서 설정하며 기본값은 200행이다.
 
 ---
 
