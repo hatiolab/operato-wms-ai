@@ -2,6 +2,7 @@ import './pages/base/storage-browser'
 import './pages/base/domain-storage-browser'
 
 import './pages/oms/oms-home'
+import './pages/oms/inout-status'
 import './pages/oms/shipment-order-import'
 import './pages/oms/shipment-order-b2b-import'
 import './pages/oms/shipment-order-b2c-import'
@@ -20,6 +21,7 @@ import './pages/oms/shipment-product-mapping-popup' // 팝업으로 사용
 import './pages/oms/shipment-product-mapping-search-popup' // 팝업으로 사용
 
 import './pages/inbound/inbound-home'
+import './pages/inbound/inbound-dashboard'
 import './pages/inbound/supplier-shipment-new'  // 팝업으로 사용
 
 import './pages/fulfillment/fulfillment-home'
@@ -39,6 +41,7 @@ import './pages/outbound/outbound-inspection'
 import './pages/outbound/outbound-picking-pc'
 
 import './pages/inventory/inventory-home'
+import './pages/inventory/inventory-dashboard'
 import './pages/inventory/inventory-form-element'
 import './pages/inventory/inventory-lock'
 import './pages/inventory/inventory-releases'
@@ -49,6 +52,7 @@ import './pages/inventory/inventory-quick-create-popup'   // 팝업으로 사용
 import './pages/inventory/sku-select-popup'                // 팝업으로 사용
 
 import './pages/rwa/rwa-home'
+import './pages/rwa/rwa-dashboard'
 import './pages/rwa/rwa-order-new'  // 팝업으로 사용
 import './pages/rwa/rwa-order-detail'  // 팝업으로 사용
 import './pages/rwa/rwa-receive-list'

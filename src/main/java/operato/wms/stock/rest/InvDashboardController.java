@@ -132,6 +132,110 @@ public class InvDashboardController extends AbstractRestService {
 	}
 
 	/**
+	 * 재고 이상 감지 건수 조회
+	 *
+	 * GET /rest/inv_dashboard/anomaly
+	 */
+	@RequestMapping(value = "/anomaly", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get Inventory Anomaly Counts")
+	public Map<String, Object> getAnomalyCounts(
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd",  required = false) String whCd) {
+		return this.invDashSvc.getAnomalyCounts(comCd, whCd);
+	}
+
+	/**
+	 * 입출고 흐름 조회 (오늘 기준)
+	 *
+	 * GET /rest/inv_dashboard/flow
+	 */
+	@RequestMapping(value = "/flow", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get Today Inventory Flow Summary")
+	public Map<String, Object> getFlowSummary(
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd",  required = false) String whCd) {
+		return this.invDashSvc.getFlowSummary(comCd, whCd);
+	}
+
+	/**
+	 * 재고 정확도 KPI 조회 (이번 달 기준)
+	 *
+	 * GET /rest/inv_dashboard/accuracy
+	 */
+	@RequestMapping(value = "/accuracy", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get Inventory Accuracy KPI")
+	public Map<String, Object> getAccuracySummary(
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd",  required = false) String whCd) {
+		return this.invDashSvc.getAccuracySummary(comCd, whCd);
+	}
+
+	/**
+	 * TOP 위험 SKU 조회 (안전재고 미달 상위 10건)
+	 *
+	 * GET /rest/inv_dashboard/top-risk-sku
+	 */
+	@RequestMapping(value = "/top-risk-sku", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get Top Risk SKU List")
+	public List<Map<String, Object>> getTopRiskSkus(
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd",  required = false) String whCd) {
+		return this.invDashSvc.getTopRiskSkus(comCd, whCd);
+	}
+
+	/**
+	 * 장기 재고 현황 조회 (30일/90일/180일 미출고 기준)
+	 *
+	 * GET /rest/inv_dashboard/long-term
+	 */
+	@RequestMapping(value = "/long-term", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get Long Term Stock Summary")
+	public Map<String, Object> getLongTermStock(
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd",  required = false) String whCd) {
+		return this.invDashSvc.getLongTermStock(comCd, whCd);
+	}
+
+	/**
+	 * 세트 재고 현황 조회
+	 *
+	 * GET /rest/inv_dashboard/set-stock
+	 */
+	@RequestMapping(value = "/set-stock", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get Set Stock Summary")
+	public Map<String, Object> getSetStockSummary(
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd",  required = false) String whCd) {
+		return this.invDashSvc.getSetStockSummary(comCd, whCd);
+	}
+
+	/**
+	 * 실사/조정 현황 조회 (이번 달 기준)
+	 *
+	 * GET /rest/inv_dashboard/audit-adjustment
+	 */
+	@RequestMapping(value = "/audit-adjustment", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get Audit and Adjustment Summary")
+	public Map<String, Object> getAuditAdjustment(
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd",  required = false) String whCd) {
+		return this.invDashSvc.getAuditAdjustment(comCd, whCd);
+	}
+
+	/**
+	 * 로케이션 사용률 상세 조회
+	 *
+	 * GET /rest/inv_dashboard/location-usage
+	 */
+	@RequestMapping(value = "/location-usage", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ApiDesc(description = "Get Location Usage Summary")
+	public Map<String, Object> getLocationUsageSummary(
+			@RequestParam(name = "com_cd", required = false) String comCd,
+			@RequestParam(name = "wh_cd",  required = false) String whCd) {
+		return this.invDashSvc.getLocationUsageSummary(comCd, whCd);
+	}
+
+	/**
 	 * 부족 재고 SKU 목록 조회
 	 *
 	 * 가용 재고가 안전 재고(safety_stock) 미만인 SKU 목록을 반환한다.

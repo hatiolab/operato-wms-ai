@@ -1,5 +1,9 @@
 package operato.wms.inbound.service;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Map;
 
@@ -355,5 +359,205 @@ public class InboundDashboardService extends AbstractQueryService {
 
         return ValueUtil.newMap("waiting_count,stored_count,stored_qty", ValueUtil.toInteger(waitingCount, 0),
                 ValueUtil.toInteger(storedCount, 0), ValueUtil.toInteger(storedQty, 0));
+    }
+
+    /**
+     * 대시보드 KPI 요약 조회
+     *
+     * @param comCd 화주사 코드 (optional)
+     * @param whCd  창고 코드 (optional)
+     * @return today_count, today_qty, completion_rate, urgent_count, urgent_qty,
+     *         delayed_count, delayed_qty, safety_shortage_count, weekly_qty, weekly_start, weekly_end
+     */
+    public Map<String, Object> getDashboardSummary(String comCd, String whCd) {
+        Long domainId = Domain.currentDomainId();
+        String today = DateUtil.todayStr();
+        String thisMonth = today.substring(0, 7);
+
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        LocalDate todayDate = LocalDate.now();
+        String weekStart = todayDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).format(fmt);
+        String weekEnd   = todayDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).format(fmt);
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+
+        // 1. 오늘 입고 예정 건수
+        String todayCntSql = "SELECT COUNT(DISTINCT r.id) FROM receivings r " +
+                "WHERE r.domain_id = :domainId AND r.rcv_req_date = :today AND r.status != 'CANCEL'";
+        Map<String, Object> todayP = ValueUtil.newMap("domainId,today", domainId, today);
+        if (ValueUtil.isNotEmpty(comCd)) { todayCntSql += " AND r.com_cd = :comCd"; todayP.put("comCd", comCd); }
+        if (ValueUtil.isNotEmpty(whCd))  { todayCntSql += " AND r.wh_cd = :whCd";   todayP.put("whCd", whCd); }
+        result.put("today_count", toLong(this.queryManager.selectBySql(todayCntSql, todayP, Long.class)));
+
+        // 2. 오늘 입고 예정 수량
+        String todayQtySql = "SELECT COALESCE(SUM(ri.rcv_exp_qty), 0) " +
+                "FROM receiving_items ri INNER JOIN receivings r ON r.id = ri.receiving_id AND r.domain_id = ri.domain_id " +
+                "WHERE r.domain_id = :domainId AND r.rcv_req_date = :today AND r.status != 'CANCEL'";
+        if (ValueUtil.isNotEmpty(comCd)) { todayQtySql += " AND r.com_cd = :comCd"; }
+        if (ValueUtil.isNotEmpty(whCd))  { todayQtySql += " AND r.wh_cd = :whCd"; }
+        result.put("today_qty", toLong(this.queryManager.selectBySql(todayQtySql, todayP, Double.class)));
+
+        // 3. 이번 달 입고 완료율
+        String doneSql = "SELECT COUNT(CASE WHEN r.status IN ('END', 'STORED') THEN 1 END) FROM receivings r " +
+                "WHERE r.domain_id = :domainId AND SUBSTRING(r.rcv_req_date, 1, 7) = :thisMonth AND r.status != 'CANCEL'";
+        String totalSql = "SELECT COUNT(*) FROM receivings r " +
+                "WHERE r.domain_id = :domainId AND SUBSTRING(r.rcv_req_date, 1, 7) = :thisMonth AND r.status != 'CANCEL'";
+        Map<String, Object> monthP = ValueUtil.newMap("domainId,thisMonth", domainId, thisMonth);
+        if (ValueUtil.isNotEmpty(comCd)) { doneSql += " AND r.com_cd = :comCd"; totalSql += " AND r.com_cd = :comCd"; monthP.put("comCd", comCd); }
+        if (ValueUtil.isNotEmpty(whCd))  { doneSql += " AND r.wh_cd = :whCd";   totalSql += " AND r.wh_cd = :whCd";   monthP.put("whCd", whCd); }
+        long doneCnt  = toLong(this.queryManager.selectBySql(doneSql,  monthP, Long.class));
+        long totalCnt = toLong(this.queryManager.selectBySql(totalSql, monthP, Long.class));
+        result.put("completion_rate", totalCnt > 0 ? (int) Math.round((double) doneCnt / totalCnt * 100) : 0);
+
+        // 4. 긴급 입고 건수 및 수량 (rcv_type = 'URGENT')
+        String urgCntSql = "SELECT COUNT(DISTINCT r.id) FROM receivings r " +
+                "WHERE r.domain_id = :domainId AND r.rcv_type = 'URGENT' AND r.status NOT IN ('END', 'STORED', 'CANCEL')";
+        String urgQtySql = "SELECT COALESCE(SUM(ri.rcv_exp_qty), 0) " +
+                "FROM receiving_items ri INNER JOIN receivings r ON r.id = ri.receiving_id AND r.domain_id = ri.domain_id " +
+                "WHERE r.domain_id = :domainId AND r.rcv_type = 'URGENT' AND r.status NOT IN ('END', 'STORED', 'CANCEL')";
+        Map<String, Object> urgP = ValueUtil.newMap("domainId", domainId);
+        if (ValueUtil.isNotEmpty(comCd)) { urgCntSql += " AND r.com_cd = :comCd"; urgQtySql += " AND r.com_cd = :comCd"; urgP.put("comCd", comCd); }
+        if (ValueUtil.isNotEmpty(whCd))  { urgCntSql += " AND r.wh_cd = :whCd";   urgQtySql += " AND r.wh_cd = :whCd";   urgP.put("whCd", whCd); }
+        result.put("urgent_count", toLong(this.queryManager.selectBySql(urgCntSql, urgP, Long.class)));
+        result.put("urgent_qty",   toLong(this.queryManager.selectBySql(urgQtySql, urgP, Double.class)));
+
+        // 5. 입고 지연 건수 및 수량 (예정일 초과, 미완료)
+        String dlyCntSql = "SELECT COUNT(DISTINCT r.id) FROM receivings r " +
+                "WHERE r.domain_id = :domainId AND r.rcv_req_date < :today AND r.status NOT IN ('END', 'STORED', 'CANCEL')";
+        String dlyQtySql = "SELECT COALESCE(SUM(ri.rcv_exp_qty), 0) " +
+                "FROM receiving_items ri INNER JOIN receivings r ON r.id = ri.receiving_id AND r.domain_id = ri.domain_id " +
+                "WHERE r.domain_id = :domainId AND r.rcv_req_date < :today AND r.status NOT IN ('END', 'STORED', 'CANCEL')";
+        Map<String, Object> dlyP = ValueUtil.newMap("domainId,today", domainId, today);
+        if (ValueUtil.isNotEmpty(comCd)) { dlyCntSql += " AND r.com_cd = :comCd"; dlyQtySql += " AND r.com_cd = :comCd"; dlyP.put("comCd", comCd); }
+        if (ValueUtil.isNotEmpty(whCd))  { dlyCntSql += " AND r.wh_cd = :whCd";   dlyQtySql += " AND r.wh_cd = :whCd";   dlyP.put("whCd", whCd); }
+        result.put("delayed_count", toLong(this.queryManager.selectBySql(dlyCntSql, dlyP, Long.class)));
+        result.put("delayed_qty",   toLong(this.queryManager.selectBySql(dlyQtySql, dlyP, Double.class)));
+
+        // 6. 안전재고 미달 SKU 수
+        String safetySql = "SELECT COUNT(*) FROM (" +
+                "  SELECT s.sku_cd FROM sku s " +
+                "  LEFT JOIN (SELECT sku_cd, SUM(inv_qty) AS total FROM inventories WHERE domain_id = :domainId AND (del_flag IS NULL OR del_flag = false) GROUP BY sku_cd) inv ON inv.sku_cd = s.sku_cd " +
+                "  WHERE s.domain_id = :domainId AND (s.del_flag IS NULL OR s.del_flag = false) " +
+                "  AND s.safety_stock IS NOT NULL AND s.safety_stock > 0 " +
+                "  AND COALESCE(inv.total, 0) < s.safety_stock" +
+                ") sub";
+        result.put("safety_shortage_count", toLong(this.queryManager.selectBySql(safetySql, ValueUtil.newMap("domainId", domainId), Long.class)));
+
+        // 7. 이번 주 입고 예정 수량
+        String wkQtySql = "SELECT COALESCE(SUM(ri.rcv_exp_qty), 0) " +
+                "FROM receiving_items ri INNER JOIN receivings r ON r.id = ri.receiving_id AND r.domain_id = ri.domain_id " +
+                "WHERE r.domain_id = :domainId AND r.rcv_req_date >= :weekStart AND r.rcv_req_date <= :weekEnd AND r.status != 'CANCEL'";
+        Map<String, Object> wkP = ValueUtil.newMap("domainId,weekStart,weekEnd", domainId, weekStart, weekEnd);
+        if (ValueUtil.isNotEmpty(comCd)) { wkQtySql += " AND r.com_cd = :comCd"; wkP.put("comCd", comCd); }
+        if (ValueUtil.isNotEmpty(whCd))  { wkQtySql += " AND r.wh_cd = :whCd";   wkP.put("whCd", whCd); }
+        result.put("weekly_qty",   toLong(this.queryManager.selectBySql(wkQtySql, wkP, Double.class)));
+        result.put("weekly_start", weekStart.substring(5));
+        result.put("weekly_end",   weekEnd.substring(5));
+
+        return result;
+    }
+
+    /**
+     * 월간 캘린더 이벤트 조회
+     *
+     * @param year  조회 연도 (null이면 올해)
+     * @param month 조회 월 (null이면 이번 달, 1-based)
+     * @param comCd 화주사 코드 (optional)
+     * @param whCd  창고 코드 (optional)
+     * @return List of { event_date, event_type, event_label, event_qty }
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getCalendarEvents(Integer year, Integer month, String comCd, String whCd) {
+        Long domainId = Domain.currentDomainId();
+        String today = DateUtil.todayStr();
+
+        LocalDate ref = LocalDate.now();
+        int yr = (year  != null) ? year  : ref.getYear();
+        int mo = (month != null) ? month : ref.getMonthValue();
+
+        String monthStart = String.format("%04d-%02d-01", yr, mo);
+        String monthEnd   = LocalDate.of(yr, mo, 1)
+                .with(TemporalAdjusters.lastDayOfMonth())
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+        String sql = "SELECT r.rcv_req_date AS event_date, " +
+                "CASE " +
+                "  WHEN r.rcv_type = 'URGENT' THEN 'urgent' " +
+                "  WHEN r.status IN ('END', 'STORED') THEN 'done' " +
+                "  WHEN r.rcv_req_date < :today AND r.status NOT IN ('END', 'STORED', 'CANCEL') THEN 'delay' " +
+                "  ELSE 'normal' " +
+                "END AS event_type, " +
+                "COALESCE(NULLIF(TRIM(r.remarks), ''), r.rcv_no) AS event_label, " +
+                "COALESCE((SELECT SUM(ri.rcv_exp_qty) FROM receiving_items ri WHERE ri.receiving_id = r.id AND ri.domain_id = r.domain_id), 0) AS event_qty " +
+                "FROM receivings r " +
+                "WHERE r.domain_id = :domainId " +
+                "AND r.status != 'CANCEL' " +
+                "AND r.rcv_req_date >= :monthStart " +
+                "AND r.rcv_req_date <= :monthEnd ";
+
+        Map<String, Object> params = ValueUtil.newMap("domainId,today,monthStart,monthEnd",
+                domainId, today, monthStart, monthEnd);
+        if (ValueUtil.isNotEmpty(comCd)) { sql += "AND r.com_cd = :comCd "; params.put("comCd", comCd); }
+        if (ValueUtil.isNotEmpty(whCd))  { sql += "AND r.wh_cd = :whCd ";   params.put("whCd", whCd); }
+        sql += "ORDER BY r.rcv_req_date, r.rcv_type";
+
+        return (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+    }
+
+    /**
+     * 입고 권고 리스트 조회 (안전재고 미달 SKU, 최대 20건)
+     *
+     * @param comCd 화주사 코드 (optional)
+     * @param whCd  창고 코드 (optional — 재고는 loc_cd 기준이므로 사용하지 않음)
+     * @return List of { sku_cd, sku_nm, current_qty, safety_qty, recommended_qty, reason, remarks }
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getReplenishmentList(String comCd, String whCd) {
+        Long domainId = Domain.currentDomainId();
+
+        String sql = "SELECT s.sku_cd, s.sku_nm, " +
+                "COALESCE(inv.total_qty, 0) AS current_qty, " +
+                "s.safety_stock AS safety_qty, " +
+                "GREATEST(s.safety_stock - COALESCE(inv.total_qty, 0), 0) AS recommended_qty, " +
+                "'안전재고 미달' AS reason, " +
+                "s.remarks " +
+                "FROM sku s " +
+                "LEFT JOIN (" +
+                "  SELECT sku_cd, SUM(inv_qty) AS total_qty FROM inventories " +
+                "  WHERE domain_id = :domainId AND (del_flag IS NULL OR del_flag = false) ";
+
+        Map<String, Object> params = ValueUtil.newMap("domainId", domainId);
+        if (ValueUtil.isNotEmpty(comCd)) { sql += "AND com_cd = :comCd "; params.put("comCd", comCd); }
+        sql += "  GROUP BY sku_cd" +
+                ") inv ON inv.sku_cd = s.sku_cd " +
+                "WHERE s.domain_id = :domainId " +
+                "AND (s.del_flag IS NULL OR s.del_flag = false) " +
+                "AND s.safety_stock IS NOT NULL AND s.safety_stock > 0 " +
+                "AND COALESCE(inv.total_qty, 0) < s.safety_stock ";
+        if (ValueUtil.isNotEmpty(comCd)) { sql += "AND s.com_cd = :comCd "; }
+        sql += "ORDER BY (s.safety_stock - COALESCE(inv.total_qty, 0)) DESC " +
+                "LIMIT 20";
+
+        return (List<Map<String, Object>>) (List<?>) this.queryManager.selectListBySql(sql, params, Map.class, 0, 0);
+    }
+
+    /**
+     * 공지사항 목록 조회
+     *
+     * @param comCd 화주사 코드 (optional)
+     * @param whCd  창고 코드 (optional)
+     * @return 공지사항 목록 (notice_type, notice_title, notice_date)
+     */
+    public List<Map<String, Object>> getNotices(String comCd, String whCd) {
+        return new java.util.ArrayList<>();
+    }
+
+    /** Number → long 변환 (null 안전) */
+    private long toLong(Object val) {
+        if (val == null) return 0L;
+        if (val instanceof Long)    return (Long) val;
+        if (val instanceof Integer) return ((Integer) val).longValue();
+        if (val instanceof Double)  return ((Double) val).longValue();
+        return 0L;
     }
 }

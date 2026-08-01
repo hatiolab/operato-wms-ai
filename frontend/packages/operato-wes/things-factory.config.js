@@ -8,6 +8,7 @@ export default {
     { tagname: 'domain-storage-browser', page: 'domain-storage-browser' },
 
     { tagname: 'oms-home', page: 'oms-home' },
+    { tagname: 'inout-status', page: 'inout-status' },
     { tagname: 'shipment-order-import', page: 'shipment-order-import' },
     { tagname: 'shipment-order-b2b-import', page: 'shipment-order-b2b-import' },
     { tagname: 'shipment-order-b2c-import', page: 'shipment-order-b2c-import' },
@@ -28,7 +29,10 @@ export default {
     { tagname: 'fulfillment-b2b-packing-pc', page: 'fulfillment-b2b-packing-pc' },
     { tagname: 'shipment-tracking', page: 'shipment-tracking' },
 
+    { tagname: 'inventory-dashboard', page: 'inventory-dashboard' },
+
     { tagname: 'inbound-home', page: 'inbound-home' },
+    { tagname: 'inbound-dashboard', page: 'inbound-dashboard' },
     { tagname: 'outbound-home', page: 'outbound-home' },
     { tagname: 'outbound-picking-pc', page: 'outbound-picking-pc' },
     { tagname: 'outbound-picking-work', page: 'outbound-picking-work' },
@@ -40,6 +44,7 @@ export default {
     { tagname: 'inventory-move-tracker', page: 'inventory-move-tracker' },
 
     { tagname: 'rwa-home', page: 'rwa-home' },
+    { tagname: 'rwa-dashboard', page: 'rwa-dashboard' },
     { tagname: 'rwa-receive-list', page: 'rwa-receive-list' },
     { tagname: 'rwa-receive-work', page: 'rwa-receive-work' },
     { tagname: 'rwa-inspection-list', page: 'rwa-inspection-list' },

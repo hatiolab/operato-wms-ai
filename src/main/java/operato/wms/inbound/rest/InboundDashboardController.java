@@ -127,4 +127,77 @@ public class InboundDashboardController {
     public Map<String, Object> getPutawaySummary() {
         return this.inbTrxService.getPutawaySummary();
     }
+
+    /**
+     * 대시보드 KPI 요약 조회
+     *
+     * GET /rest/inbound_dashboard/summary
+     *
+     * @param comCd 화주사 코드 (optional)
+     * @param whCd  창고 코드 (optional)
+     * @return today_count, today_qty, completion_rate, urgent_count, urgent_qty,
+     *         delayed_count, delayed_qty, safety_shortage_count, weekly_qty, weekly_start, weekly_end
+     */
+    @GetMapping("/summary")
+    @ApiDesc(description = "Get Dashboard KPI Summary")
+    public Map<String, Object> getDashboardSummary(
+            @RequestParam(name = "com_cd", required = false) String comCd,
+            @RequestParam(name = "wh_cd", required = false) String whCd) {
+        return this.inbTrxService.getDashboardSummary(comCd, whCd);
+    }
+
+    /**
+     * 월간 캘린더 이벤트 조회
+     *
+     * GET /rest/inbound_dashboard/calendar-events?year=2026&month=6
+     *
+     * @param year  조회 연도 (optional, 기본값: 올해)
+     * @param month 조회 월 (optional, 기본값: 이번 달)
+     * @param comCd 화주사 코드 (optional)
+     * @param whCd  창고 코드 (optional)
+     * @return List of { event_date, event_type(normal/urgent/done/delay), event_label, event_qty }
+     */
+    @GetMapping("/calendar-events")
+    @ApiDesc(description = "Get Calendar Events for Month")
+    public List<Map<String, Object>> getCalendarEvents(
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "month", required = false) Integer month,
+            @RequestParam(name = "com_cd", required = false) String comCd,
+            @RequestParam(name = "wh_cd", required = false) String whCd) {
+        return this.inbTrxService.getCalendarEvents(year, month, comCd, whCd);
+    }
+
+    /**
+     * 입고 권고 리스트 조회 (안전재고 미달 SKU)
+     *
+     * GET /rest/inbound_dashboard/replenishment-list
+     *
+     * @param comCd 화주사 코드 (optional)
+     * @param whCd  창고 코드 (optional)
+     * @return List of { sku_cd, sku_nm, current_qty, safety_qty, recommended_qty, reason, remarks }
+     */
+    @GetMapping("/replenishment-list")
+    @ApiDesc(description = "Get Replenishment Recommendation List (Safety Stock Shortage)")
+    public List<Map<String, Object>> getReplenishmentList(
+            @RequestParam(name = "com_cd", required = false) String comCd,
+            @RequestParam(name = "wh_cd", required = false) String whCd) {
+        return this.inbTrxService.getReplenishmentList(comCd, whCd);
+    }
+
+    /**
+     * 공지사항 목록 조회
+     *
+     * GET /rest/inbound_dashboard/notices
+     *
+     * @param comCd 화주사 코드 (optional)
+     * @param whCd  창고 코드 (optional)
+     * @return 공지사항 목록 List<Map> { notice_type(URGENT/INFO/NORMAL), notice_title, notice_date }
+     */
+    @GetMapping("/notices")
+    @ApiDesc(description = "Get Dashboard Notices")
+    public List<Map<String, Object>> getNotices(
+            @RequestParam(name = "com_cd", required = false) String comCd,
+            @RequestParam(name = "wh_cd", required = false) String whCd) {
+        return this.inbTrxService.getNotices(comCd, whCd);
+    }
 }
