@@ -16,36 +16,39 @@ class InoutStatus extends localize(i18next)(PageView) {
     return [
       css`
         :host {
-          display: block;
+          display: flex;
+          flex-direction: column;
+          height: 100%;
           background-color: var(--md-sys-color-background);
-          padding: var(--padding-wide);
-          overflow: auto;
+          padding: 10px;
+          box-sizing: border-box;
+          overflow: hidden;
         }
 
         /* 검색 필터 영역 */
         .filter-section {
           background: var(--md-sys-color-surface);
-          border-radius: 12px;
-          padding: 20px;
+          border-radius: 8px;
+          padding: 10px;
           box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-          margin-bottom: 20px;
+          margin-bottom: 10px;
         }
 
         .filter-row {
           display: flex;
           flex-wrap: wrap;
-          gap: 12px;
+          gap: 6px;
           align-items: flex-end;
         }
 
         .filter-row + .filter-row {
-          margin-top: 12px;
+          margin-top: 6px;
         }
 
         .filter-item {
           display: flex;
           flex-direction: column;
-          gap: 5px;
+          gap: 3px;
           min-width: 140px;
         }
 
@@ -76,13 +79,7 @@ class InoutStatus extends localize(i18next)(PageView) {
           border-color: var(--md-sys-color-primary, #1976D2);
         }
 
-        /* 기간 빠른 선택 버튼 */
-        .date-range-wrap {
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
-        }
-
+        /* 기간 날짜 입력 */
         .date-range-row {
           display: flex;
           align-items: center;
@@ -107,6 +104,7 @@ class InoutStatus extends localize(i18next)(PageView) {
           padding: 0 2px;
         }
 
+        /* 기간 빠른 선택 버튼 */
         .quick-btns {
           display: flex;
           gap: 4px;
@@ -165,6 +163,7 @@ class InoutStatus extends localize(i18next)(PageView) {
         }
 
         .btn-secondary:hover { background: #e0e0e0; }
+        .btn-icon { width: 32px; height: 32px; padding: 0; font-size: 16px; display: flex; align-items: center; justify-content: center; }
 
         .btn-outline {
           background: transparent;
@@ -178,18 +177,18 @@ class InoutStatus extends localize(i18next)(PageView) {
         .kpi-row {
           display: grid;
           grid-template-columns: repeat(5, 1fr);
-          gap: 16px;
-          margin-bottom: 20px;
+          gap: 8px;
+          margin-bottom: 10px;
         }
 
         .kpi-card {
           background: var(--md-sys-color-surface);
-          border-radius: 12px;
-          padding: 18px 20px;
+          border-radius: 8px;
+          padding: 10px;
           box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 3px;
         }
 
         .kpi-label {
@@ -232,13 +231,17 @@ class InoutStatus extends localize(i18next)(PageView) {
           border-radius: 12px;
           box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
           overflow: hidden;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
         }
 
         .result-header {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 14px 20px;
+          padding: 7px 10px;
           border-bottom: 1px solid var(--md-sys-color-outline-variant, #eee);
         }
 
@@ -281,7 +284,9 @@ class InoutStatus extends localize(i18next)(PageView) {
 
         /* 테이블 */
         .table-wrap {
-          overflow-x: auto;
+          overflow: auto;
+          flex: 1;
+          min-height: 0;
         }
 
         .data-table {
@@ -435,7 +440,8 @@ class InoutStatus extends localize(i18next)(PageView) {
       _totalCount: { type: Number },
       _page: { type: Number },
       _limit: { type: Number },
-      _loading: { type: Boolean }
+      _loading: { type: Boolean },
+      _customers: { type: Array }
     }
   }
 
@@ -447,6 +453,7 @@ class InoutStatus extends localize(i18next)(PageView) {
     this._page = 1
     this._limit = 50
     this._loading = false
+    this._customers = []
 
     const today = this._todayStr()
     this._fromDate = today
@@ -455,7 +462,24 @@ class InoutStatus extends localize(i18next)(PageView) {
 
   /** 페이지 컨텍스트 (타이틀) */
   get context() {
-    return { title: TermsUtil.tMenu('lbl.inout_status', '입출고 현황') }
+    return { title: TermsUtil.tLabel('inout_status', '입출고 현황') }
+  }
+
+  /** 페이지 활성화 시 거래처 목록 로드 */
+  async pageUpdated(_changes, _lifecycle) {
+    if (this.active && this._customers.length === 0) {
+      await this._fetchCustomers()
+    }
+  }
+
+  /** 거래처 목록 조회 */
+  async _fetchCustomers() {
+    try {
+      const data = await ServiceUtil.searchByPagination('customers', [], null, 1, 500)
+      this._customers = data?.items || []
+    } catch (e) {
+      this._customers = []
+    }
   }
 
   /** 오늘 날짜 문자열 */
@@ -503,6 +527,7 @@ class InoutStatus extends localize(i18next)(PageView) {
     this.shadowRoot.querySelector('#fromDate').value = today
     this.shadowRoot.querySelector('#toDate').value = today
     this.shadowRoot.querySelector('#category').value = ''
+    this.shadowRoot.querySelector('#custCd').value = ''
     this.shadowRoot.querySelector('#tranType').value = ''
     this.shadowRoot.querySelector('#skuCd').value = ''
     this._summary = {}
@@ -547,6 +572,8 @@ class InoutStatus extends localize(i18next)(PageView) {
     }
     const cat = this.shadowRoot.querySelector('#category').value
     if (cat) p.category = cat
+    const cust = this.shadowRoot.querySelector('#custCd').value
+    if (cust) p.cust_cd = cust
     const tt = this.shadowRoot.querySelector('#tranType').value
     if (tt) p.tran_type = tt
     const sku = this.shadowRoot.querySelector('#skuCd').value
@@ -645,8 +672,8 @@ class InoutStatus extends localize(i18next)(PageView) {
       <div class="filter-section">
         <div class="filter-row">
           <!-- 기간 -->
-          <div class="date-range-wrap">
-            <label>${TermsUtil.tLabel('lbl.period', '기간')}</label>
+          <div class="filter-item">
+            <label>${TermsUtil.tLabel('period', '기간')}</label>
             <div class="date-range-row">
               <input id="fromDate" type="date" .value=${this._fromDate}
                 @change=${e => { this._fromDate = e.target.value }} />
@@ -654,17 +681,11 @@ class InoutStatus extends localize(i18next)(PageView) {
               <input id="toDate" type="date" .value=${this._toDate}
                 @change=${e => { this._toDate = e.target.value }} />
             </div>
-            <div class="quick-btns">
-              <button class="quick-btn" @click=${() => this._setQuickDate('today')}>오늘</button>
-              <button class="quick-btn" @click=${() => this._setQuickDate('yesterday')}>어제</button>
-              <button class="quick-btn" @click=${() => this._setQuickDate('7days')}>7일</button>
-              <button class="quick-btn" @click=${() => this._setQuickDate('1month')}>1개월</button>
-            </div>
           </div>
 
           <!-- 구분 -->
           <div class="filter-item">
-            <label>${TermsUtil.tLabel('lbl.category', '구분')}</label>
+            <label>${TermsUtil.tLabel('category', '구분')}</label>
             <select id="category">
               <option value="">전체</option>
               <option value="입고">입고</option>
@@ -673,9 +694,20 @@ class InoutStatus extends localize(i18next)(PageView) {
             </select>
           </div>
 
+          <!-- 거래처 -->
+          <div class="filter-item">
+            <label>${TermsUtil.tLabel('cust_cd', '거래처')}</label>
+            <select id="custCd">
+              <option value="">전체</option>
+              ${this._customers.map(c => html`
+                <option value="${c.cust_cd}">${c.cust_nm || c.cust_cd}</option>
+              `)}
+            </select>
+          </div>
+
           <!-- 입출고 구분 -->
           <div class="filter-item">
-            <label>${TermsUtil.tLabel('lbl.tran_type', '입출고 구분')}</label>
+            <label>${TermsUtil.tLabel('tran_type', '입출고 구분')}</label>
             <select id="tranType">
               <option value="">전체</option>
               <option value="IN">IN (입고)</option>
@@ -690,29 +722,30 @@ class InoutStatus extends localize(i18next)(PageView) {
 
           <!-- 상품코드 -->
           <div class="filter-item">
-            <label>${TermsUtil.tLabel('lbl.sku_cd', '상품코드')}</label>
+            <label>${TermsUtil.tLabel('sku_cd', '상품코드')}</label>
             <input id="skuCd" type="text" placeholder="상품코드 입력" />
           </div>
 
           <!-- 버튼 -->
           <div class="filter-actions">
-            <button class="btn btn-primary" @click=${this._onSearch}>
-              ${TermsUtil.tButton('btn.search', '조회')}
-            </button>
-            <button class="btn btn-secondary" @click=${this._onReset}>
-              ${TermsUtil.tButton('btn.reset', '초기화')}
-            </button>
-            <button class="btn btn-outline" @click=${this._onExcelDownload}>
-              ${TermsUtil.tButton('btn.excel_download', '엑셀 다운로드')}
-            </button>
+            <button class="btn btn-primary btn-icon" title="조회" @click=${this._onSearch}>🔍</button>
+            <button class="btn btn-secondary btn-icon" title="초기화" @click=${this._onReset}>↺</button>
+            <button class="btn btn-outline btn-icon" title="엑셀 다운로드" @click=${this._onExcelDownload}>⬇</button>
           </div>
+        </div>
+        <!-- 기간 빠른 선택 버튼 -->
+        <div class="quick-btns">
+          <button class="quick-btn" @click=${() => this._setQuickDate('today')}>오늘</button>
+          <button class="quick-btn" @click=${() => this._setQuickDate('yesterday')}>어제</button>
+          <button class="quick-btn" @click=${() => this._setQuickDate('7days')}>7일</button>
+          <button class="quick-btn" @click=${() => this._setQuickDate('1month')}>1개월</button>
         </div>
       </div>
 
       <!-- KPI 카드 -->
       <div class="kpi-row">
         <div class="kpi-card in">
-          <div class="kpi-label">${TermsUtil.tLabel('lbl.total_in_qty', '총 입고수량')}</div>
+          <div class="kpi-label">${TermsUtil.tLabel('in_qty', '총 입고수량')}</div>
           <div class="kpi-value">
             ${this._fmt(s.total_in_qty)}
             <span class="unit">EA</span>
@@ -721,7 +754,7 @@ class InoutStatus extends localize(i18next)(PageView) {
         </div>
 
         <div class="kpi-card out">
-          <div class="kpi-label">${TermsUtil.tLabel('lbl.total_out_qty', '총 출고수량')}</div>
+          <div class="kpi-label">${TermsUtil.tLabel('out_qty', '총 출고수량')}</div>
           <div class="kpi-value">
             ${this._fmt(s.total_out_qty)}
             <span class="unit">EA</span>
@@ -730,7 +763,7 @@ class InoutStatus extends localize(i18next)(PageView) {
         </div>
 
         <div class="kpi-card return">
-          <div class="kpi-label">${TermsUtil.tLabel('lbl.total_return_qty', '총 반품수량')}</div>
+          <div class="kpi-label">${TermsUtil.tLabel('return_qty', '총 반품수량')}</div>
           <div class="kpi-value">
             ${this._fmt(s.total_return_qty)}
             <span class="unit">EA</span>
@@ -739,7 +772,7 @@ class InoutStatus extends localize(i18next)(PageView) {
         </div>
 
         <div class="kpi-card change">
-          <div class="kpi-label">${TermsUtil.tLabel('lbl.total_stock_change', '총 재고변동수량')}</div>
+          <div class="kpi-label">${TermsUtil.tLabel('stock_change_qty', '총 재고변동수량')}</div>
           <div class="kpi-value">
             ${this._fmt(s.total_stock_change)}
             <span class="unit">EA</span>
@@ -748,7 +781,7 @@ class InoutStatus extends localize(i18next)(PageView) {
         </div>
 
         <div class="kpi-card count">
-          <div class="kpi-label">${TermsUtil.tLabel('lbl.total_inout_count', '입출고 건수')}</div>
+          <div class="kpi-label">${TermsUtil.tLabel('inout_count', '입출고 건수')}</div>
           <div class="kpi-value">
             ${this._fmt(s.total_count)}
             <span class="unit">건</span>
@@ -761,7 +794,7 @@ class InoutStatus extends localize(i18next)(PageView) {
       <div class="result-section">
         <div class="result-header">
           <span class="result-title">
-            ${TermsUtil.tLabel('lbl.inout_detail', '입출고 상세 내역')}
+            ${TermsUtil.tLabel('inout_status', '입출고 상세 내역')}
           </span>
           <div style="display:flex; align-items:center; gap:16px;">
             <span class="result-count">
@@ -783,57 +816,53 @@ class InoutStatus extends localize(i18next)(PageView) {
             <thead>
               <tr>
                 <th>#</th>
-                <th>${TermsUtil.tLabel('lbl.tran_date', '일자')}</th>
-                <th>${TermsUtil.tLabel('lbl.category', '구분')}</th>
-                <th>${TermsUtil.tLabel('lbl.tran_type', '입출고구분')}</th>
-                <th>${TermsUtil.tLabel('lbl.partner_cd', '거래처코드')}</th>
-                <th class="left">${TermsUtil.tLabel('lbl.partner_nm', '거래처명')}</th>
-                <th>${TermsUtil.tLabel('lbl.sku_cd', '상품코드')}</th>
-                <th class="left">${TermsUtil.tLabel('lbl.sku_nm', '상품명')}</th>
-                <th>${TermsUtil.tLabel('lbl.option', '옵션')}</th>
-                <th>${TermsUtil.tLabel('lbl.unit', '단위')}</th>
-                <th>${TermsUtil.tLabel('lbl.in_qty', '입고수량')}</th>
-                <th>${TermsUtil.tLabel('lbl.out_qty', '출고수량')}</th>
-                <th>${TermsUtil.tLabel('lbl.return_qty', '반품수량')}</th>
-                <th>${TermsUtil.tLabel('lbl.stock_change_qty', '재고변동수량')}</th>
-                <th>${TermsUtil.tLabel('lbl.partner_order_no', '거래처주문번호')}</th>
-                <th>${TermsUtil.tLabel('lbl.status', '상태')}</th>
-                <th class="left">${TermsUtil.tLabel('lbl.remarks', '비고')}</th>
+                <th>${TermsUtil.tLabel('tran_date', '일자')}</th>
+                <th>${TermsUtil.tLabel('category', '구분')}</th>
+                <th>${TermsUtil.tLabel('tran_type', '입출고구분')}</th>
+                <th>${TermsUtil.tLabel('cust_cd', '거래처코드')}</th>
+                <th class="left">${TermsUtil.tLabel('cust_nm', '거래처명')}</th>
+                <th>${TermsUtil.tLabel('sku_cd', '상품코드')}</th>
+                <th class="left">${TermsUtil.tLabel('sku_nm', '상품명')}</th>
+                <th>${TermsUtil.tLabel('in_qty', '입고수량')}</th>
+                <th>${TermsUtil.tLabel('out_qty', '출고수량')}</th>
+                <th>${TermsUtil.tLabel('rwa_qty', '반품수량')}</th>
+                <th>${TermsUtil.tLabel('stock_change_qty', '재고변동수량')}</th>
+                <th>${TermsUtil.tLabel('ref_order_no', '참조 주문번호')}</th>
+                <th>${TermsUtil.tLabel('status', '상태')}</th>
+                <th class="left">${TermsUtil.tLabel('remarks', '비고')}</th>
               </tr>
             </thead>
             <tbody>
               ${this._items.length === 0
-                ? html`
+        ? html`
                   <tr>
                     <td colspan="17" class="empty-msg">
                       ${this._loading ? '조회 중...' : '조회된 데이터가 없습니다.'}
                     </td>
                   </tr>`
-                : this._items.map((row, idx) => {
-                  const no = (this._page - 1) * this._limit + idx + 1
-                  return html`
+        : this._items.map((row, idx) => {
+          const no = (this._page - 1) * this._limit + idx + 1
+          return html`
                     <tr>
                       <td class="center">${no}</td>
                       <td class="center">${row.tran_date || '-'}</td>
                       <td class="center">${this._renderCatBadge(row.category || '기타')}</td>
                       <td class="center" style="font-size:11px;">${row.tran_type || '-'}</td>
-                      <td class="center">${row.partner_cd || '-'}</td>
-                      <td class="left td-nm">${row.partner_nm || '-'}</td>
+                      <td class="center">${row.cust_cd || '-'}</td>
+                      <td class="left td-nm">${row.cust_nm || '-'}</td>
                       <td class="center">${row.sku_cd || '-'}</td>
                       <td class="left td-nm">${row.sku_nm || '-'}</td>
-                      <td class="center">${row.option_val || '-'}</td>
-                      <td class="center">${row.unit_cd || 'EA'}</td>
                       <td class="right">${this._renderQty(row.in_qty, 'qty-in')}</td>
                       <td class="right">${this._renderQty(row.out_qty, 'qty-out')}</td>
-                      <td class="right">${this._renderQty(row.return_qty, 'qty-return')}</td>
-                      <td class="right">${row.stock_change_qty != null ? Number(row.stock_change_qty).toLocaleString() : '-'}</td>
-                      <td class="center">${row.partner_order_no || '-'}</td>
+                      <td class="right">${this._renderQty(row.rwa_qty, 'qty-return')}</td>
+                      <td class="right">${row.tran_qty != null ? Number(row.tran_qty).toLocaleString() : '-'}</td>
+                      <td class="center">${row.ref_order_no || '-'}</td>
                       <td class="center">${this._renderStatusBadge(row.doc_status)}</td>
                       <td class="left">${row.remarks || '-'}</td>
                     </tr>
                   `
-                })
-              }
+        })
+      }
             </tbody>
           </table>
         </div>

@@ -42,6 +42,7 @@ export default {
     { tagname: 'inventory-home', page: 'inventory-home' },
     { tagname: 'inventory-transaction-list', page: 'inventory-transaction-list' },
     { tagname: 'inventory-move-tracker', page: 'inventory-move-tracker' },
+    { tagname: 'inventory-move-list', page: 'inventory-move-list' },
 
     { tagname: 'rwa-home', page: 'rwa-home' },
     { tagname: 'rwa-dashboard', page: 'rwa-dashboard' },

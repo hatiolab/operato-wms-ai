@@ -80,6 +80,7 @@ public class InoutStatusService extends AbstractQueryService {
 	 * @param toDate    종료일
 	 * @param comCd     화주사 코드 (optional)
 	 * @param whCd      창고 코드 (optional)
+	 * @param custCd    거래처 코드 (optional)
 	 * @param skuCd     상품 코드 (optional)
 	 * @param category  구분 — 입고/출고/반품 (optional)
 	 * @param tranType  입출고 구분 — tran_type 값 (optional)
@@ -90,7 +91,7 @@ public class InoutStatusService extends AbstractQueryService {
 	 */
 	@SuppressWarnings("unchecked")
 	public Map<String, Object> getList(String fromDate, String toDate, String comCd, String whCd,
-			String skuCd, String category, String tranType, String docStatus,
+			String custCd, String skuCd, String category, String tranType, String docStatus,
 			Integer page, Integer limit) {
 
 		Long domainId = Domain.currentDomainId();
@@ -111,6 +112,10 @@ public class InoutStatusService extends AbstractQueryService {
 		if (ValueUtil.isNotEmpty(whCd)) {
 			where.append(" AND it.wh_cd = :whCd");
 			params.put("whCd", whCd);
+		}
+		if (ValueUtil.isNotEmpty(custCd)) {
+			where.append(" AND so.cust_cd = :custCd");
+			params.put("custCd", custCd);
 		}
 		if (ValueUtil.isNotEmpty(skuCd)) {
 			where.append(" AND it.sku_cd ILIKE :skuCd");

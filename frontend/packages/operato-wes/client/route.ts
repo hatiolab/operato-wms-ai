@@ -47,6 +47,7 @@ import './pages/inventory/inventory-lock'
 import './pages/inventory/inventory-releases'
 import './pages/inventory/inventory-transaction-list'
 import './pages/inventory/inventory-move-tracker'
+import './pages/inventory/inventory-move-list'
 import './pages/inventory/inventory-multi-create-popup'   // 팝업으로 사용
 import './pages/inventory/inventory-quick-create-popup'   // 팝업으로 사용
 import './pages/inventory/sku-select-popup'                // 팝업으로 사용

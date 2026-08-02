@@ -79,12 +79,13 @@ public class InoutStatusController {
 			@RequestParam(name = "to_date", required = false) String toDate,
 			@RequestParam(name = "com_cd", required = false) String comCd,
 			@RequestParam(name = "wh_cd", required = false) String whCd,
+			@RequestParam(name = "cust_cd", required = false) String custCd,
 			@RequestParam(name = "sku_cd", required = false) String skuCd,
 			@RequestParam(name = "category", required = false) String category,
 			@RequestParam(name = "tran_type", required = false) String tranType,
 			@RequestParam(name = "doc_status", required = false) String docStatus,
 			@RequestParam(name = "page", required = false, defaultValue = "1") Integer page,
 			@RequestParam(name = "limit", required = false, defaultValue = "50") Integer limit) {
-		return this.inoutStatusService.getList(fromDate, toDate, comCd, whCd, skuCd, category, tranType, docStatus, page, limit);
+		return this.inoutStatusService.getList(fromDate, toDate, comCd, whCd, custCd, skuCd, category, tranType, docStatus, page, limit);
 	}
 }
